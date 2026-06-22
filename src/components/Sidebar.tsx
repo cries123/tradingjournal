@@ -1,6 +1,7 @@
 interface SidebarProps {
   onAddTrade: () => void;
   onImportScreenshot: () => void;
+  onImportCsv: () => void;
 }
 
 const NAV_SECTIONS = [
@@ -12,7 +13,7 @@ const NAV_SECTIONS = [
   },
 ];
 
-export function Sidebar({ onAddTrade, onImportScreenshot }: SidebarProps) {
+export function Sidebar({ onAddTrade, onImportScreenshot, onImportCsv }: SidebarProps) {
   return (
     <aside className="w-52 shrink-0 bg-bg-secondary border-r border-border flex flex-col">
       <div className="p-4 border-b border-border">
@@ -44,6 +45,13 @@ export function Sidebar({ onAddTrade, onImportScreenshot }: SidebarProps) {
       </nav>
 
       <div className="p-3 border-t border-border space-y-2">
+        <button
+          type="button"
+          onClick={onImportCsv}
+          className="w-full py-2.5 border border-border text-text-primary rounded-md text-sm font-medium hover:bg-bg-tertiary transition-colors"
+        >
+          📄 Import CSV
+        </button>
         <button
           type="button"
           onClick={onImportScreenshot}

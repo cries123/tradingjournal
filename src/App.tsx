@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { DashboardView } from './components/DashboardView';
 import { Sidebar } from './components/Sidebar';
+import { CsvImportModal } from './components/CsvImportModal';
 import { ScreenshotImportModal } from './components/ScreenshotImportModal';
 import { DayDetailModal, TradeModal } from './components/TradeModal';
 import { useTrades } from './hooks/useTrades';
@@ -20,6 +21,7 @@ export default function App() {
   const [month, setMonth] = useState(now.getMonth());
   const [showTradeModal, setShowTradeModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showCsvModal, setShowCsvModal] = useState(false);
   const [tradeModalDate, setTradeModalDate] = useState<string | undefined>();
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
@@ -51,6 +53,7 @@ export default function App() {
       <Sidebar
         onAddTrade={() => openAddTrade()}
         onImportScreenshot={() => setShowImportModal(true)}
+        onImportCsv={() => setShowCsvModal(true)}
       />
 
       <main className="flex-1 p-5 overflow-auto max-w-6xl">
@@ -69,6 +72,13 @@ export default function App() {
           </button>
         </div>
       </main>
+
+      {showCsvModal && (
+        <CsvImportModal
+          onClose={() => setShowCsvModal(false)}
+          onSave={addTrades}
+        />
+      )}
 
       {showImportModal && (
         <ScreenshotImportModal
