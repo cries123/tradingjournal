@@ -53,17 +53,13 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
 
   const handleParse = async () => {
     if (!file) return;
-    if (!apiKey.trim()) {
-      setError('Enter your OpenAI API key to parse screenshots');
-      return;
-    }
 
     saveApiKey(apiKey.trim());
     setError(null);
     setStep('parsing');
 
     try {
-      const result = await parseScreenshot(file, apiKey.trim());
+      const result = await parseScreenshot(file, apiKey.trim() || undefined);
       if (result.trades.length === 0) {
         setError('No trades found in this screenshot. Try a clearer image or log manually.');
         setStep('upload');
@@ -191,7 +187,7 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
                 />
               </label>
               <p className="text-xs text-text-secondary mt-1">
-                Stored locally in your browser. Get a key at{' '}
+                Optional if configured on the server. Stored locally in your browser. Get a key at{' '}
                 <a
                   href="https://platform.openai.com/api-keys"
                   target="_blank"
