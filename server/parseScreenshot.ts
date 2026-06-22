@@ -4,35 +4,118 @@ export interface ParsedTrade {
   date: string;
   side?: 'long' | 'short';
   notes?: string;
+  contract?: string;
+  assetType?: 'stock' | 'option';
+  optionType?: 'call' | 'put';
+  expiration?: string;
+  strike?: number;
+  quantity?: number;
+  mark?: number;
+  tradePrice?: number;
+  pnlOpen?: number;
+  netLiq?: number;
+  underlyingPrice?: number;
+  delta?: number;
+  gamma?: number;
+  theta?: number;
+  vega?: number;
+  accountType?: string;
 }
 
 interface ParseResponse {
-  trades: ParsedTrade[];
+  trades: Partial<ParsedTrade>[];
 }
 
-const SYSTEM_PROMPT = `You extract trade data from mobile brokerage screenshots (Thinkorswim, TD Ameritrade, Schwab, Robinhood, etc.).
+const SYSTEM_PROMPT = `You extract trade data from mobile brokerage screenshots (Thinkorswim/TOS, TD Ameritrade, Schwab, Robinhood, etc.).
 
-Return ONLY valid JSON with this shape:
+Return ONLY valid JSON:
 {
   "trades": [
     {
       "symbol": "SPY",
       "pnl": 260.00,
       "date": "2025-06-22",
-      "side": "long",
-      "notes": "SPY 22 JUN 26 746 P 100 (Weeklys)"
+      "side": "short",
+      "contract": "SPY 22 JUN 26 746 P 100 (Weeklys)",
+      "assetType": "option",
+      "optionType": "put",
+      "expiration": "2026-06-22",
+      "strike": 746,
+      "quantity": 0,
+      "mark": 1.90,
+      "tradePrice": 0.00,
+      "pnlOpen": 0.00,
+      "netLiq": 0.00,
+      "underlyingPrice": 745.7492,
+      "delta": 0.00,
+      "gamma": 0.00,
+      "theta": 0.00,
+      "vega": 0.00,
+      "accountType": "Individual",
+      "notes": "Any extra context from the screenshot"
     }
   ]
 }
 
-Rules:
-- symbol: underlying ticker only (e.g. SPY, QQQ, AAPL) — not the full option string
-- pnl: use "P/L Day" when visible; otherwise "P/L Open". Positive = profit, negative = loss. No dollar signs.
-- date: YYYY-MM-DD. If no date is shown, use today's date for P/L Day entries.
-- side: "long" for calls or long stock; "short" for puts or short positions. Infer from option type (C/P) when visible.
-- notes: full contract or position description when visible (option expiry, strike, etc.)
-- If multiple positions are in the screenshot table, return one entry per row with its own pnl.
-- If nothing trade-related is found, return { "trades": [] }`;
+Field rules:
+- symbol: underlying ticker only (SPY, not full option string)
+- pnl: "P/L Day" when shown; else "P/L Open". Number only, no $ sign.
+- pnlOpen: separate field for P/L Open when visible
+- date: YYYY-MM-DD; use today if P/L Day with no date shown
+- side: "long" or "short"; puts often short, calls often long
+- contract: full option/position description line
+- assetType: "option" or "stock"
+- optionType: "call" or "put"
+- expiration: YYYY-MM-DD from contract
+- strike, quantity, mark, tradePrice, netLiq, underlyingPrice: numbers when visible
+- delta, gamma, theta, vega: numbers when visible (0 is valid)
+- accountType: e.g. Individual, IRA
+- notes: bid/ask, MM expected move, or other useful details not captured above
+- One entry per position row in a table; skip rows with no P/L data
+- Omit fields not visible; do not guess values
+- If nothing found: { "trades": [] }`;
+
+function num(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === '') return undefined;
+  const n = Number(value);
+  return isNaN(n) ? undefined : n;
+}
+
+function str(value: unknown): string | undefined {
+  if (value === null || value === undefined) return undefined;
+  const s = String(value).trim();
+  return s || undefined;
+}
+
+function normalizeTrade(t: Partial<ParsedTrade>, today: string): ParsedTrade | null {
+  const symbol = str(t.symbol)?.toUpperCase();
+  const pnl = num(t.pnl);
+  if (!symbol || pnl === undefined) return null;
+
+  return {
+    symbol,
+    pnl,
+    date: str(t.date) || today,
+    side: t.side === 'short' ? 'short' : t.side === 'long' ? 'long' : undefined,
+    notes: str(t.notes),
+    contract: str(t.contract),
+    assetType: t.assetType === 'option' ? 'option' : t.assetType === 'stock' ? 'stock' : undefined,
+    optionType: t.optionType === 'put' ? 'put' : t.optionType === 'call' ? 'call' : undefined,
+    expiration: str(t.expiration),
+    strike: num(t.strike),
+    quantity: num(t.quantity),
+    mark: num(t.mark),
+    tradePrice: num(t.tradePrice),
+    pnlOpen: num(t.pnlOpen),
+    netLiq: num(t.netLiq),
+    underlyingPrice: num(t.underlyingPrice),
+    delta: num(t.delta),
+    gamma: num(t.gamma),
+    theta: num(t.theta),
+    vega: num(t.vega),
+    accountType: str(t.accountType),
+  };
+}
 
 export async function parseScreenshotWithAI(
   imageBase64: string,
@@ -54,7 +137,7 @@ export async function parseScreenshotWithAI(
     body: JSON.stringify({
       model: 'gpt-4o-mini',
       response_format: { type: 'json_object' },
-      max_tokens: 1024,
+      max_tokens: 2048,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         {
@@ -96,14 +179,8 @@ export async function parseScreenshotWithAI(
   }
 
   return parsed.trades
-    .filter((t) => t.symbol && typeof t.pnl === 'number')
-    .map((t) => ({
-      symbol: String(t.symbol).toUpperCase().trim(),
-      pnl: Number(t.pnl),
-      date: t.date || today,
-      side: t.side === 'short' ? 'short' : t.side === 'long' ? 'long' : undefined,
-      notes: t.notes?.trim() || undefined,
-    }));
+    .map((t) => normalizeTrade(t, today))
+    .filter((t): t is ParsedTrade => t !== null);
 }
 
 export async function readJsonBody(req: import('http').IncomingMessage): Promise<unknown> {

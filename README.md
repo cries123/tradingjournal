@@ -30,6 +30,14 @@ Open http://localhost:5173 in your browser.
 
 The parser reads symbol (e.g. SPY), P/L Day ($260.00), option contract notes, and side from screenshots like your Thinkorswim positions screen.
 
+**Fields extracted from Thinkorswim screenshots:**
+- P/L Day & P/L Open
+- Full contract (e.g. SPY 22 JUN 26 746 P 100 Weeklys)
+- Strike, expiration, option type (call/put)
+- Mark, trade price, net liq, underlying price
+- Greeks (delta, gamma, theta, vega)
+- Account type & quantity
+
 ## Usage
 
 1. Click **+ Log Trade** or **Import Screenshot** to record a trade.

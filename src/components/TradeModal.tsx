@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { TradeDetails } from './TradeDetails';
 import type { Trade, TradeSide } from '../types';
 import { formatCurrency } from '../utils/format';
 
@@ -187,34 +188,44 @@ export function DayDetailModal({ date, trades, onClose, onDelete, onAddTrade }: 
             {dayTrades.map((trade) => (
               <div
                 key={trade.id}
-                className="flex items-center justify-between p-3 bg-bg-tertiary rounded-md"
+                className="p-3 bg-bg-tertiary rounded-md"
               >
-                <div>
-                  <span className="font-medium">{trade.symbol}</span>
-                  {trade.setup && (
-                    <span className="ml-2 px-1.5 py-0.5 text-[10px] font-semibold uppercase bg-tag text-bg-primary rounded-sm">
-                      {trade.setup}
-                    </span>
-                  )}
-                  {trade.side && (
-                    <span className="ml-2 text-xs text-text-secondary capitalize">{trade.side}</span>
-                  )}
-                  {trade.notes && (
-                    <p className="text-xs text-text-secondary mt-1">{trade.notes}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className={`font-semibold ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {formatCurrency(trade.pnl)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(trade.id)}
-                    className="text-text-secondary hover:text-red-400 text-sm"
-                    aria-label="Delete trade"
-                  >
-                    ✕
-                  </button>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium">{trade.symbol}</span>
+                      {trade.optionType && (
+                        <span className="text-xs text-text-secondary uppercase">{trade.optionType}</span>
+                      )}
+                      {trade.setup && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase bg-tag text-bg-primary rounded-sm">
+                          {trade.setup}
+                        </span>
+                      )}
+                      {trade.side && (
+                        <span className="text-xs text-text-secondary capitalize">{trade.side}</span>
+                      )}
+                    </div>
+                    <TradeDetails trade={trade} compact />
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0 ml-3">
+                    <div className="text-right">
+                      <span className={`font-semibold block ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {formatCurrency(trade.pnl)}
+                      </span>
+                      {trade.pnlOpen != null && (
+                        <span className="text-xs text-text-secondary">Open {formatCurrency(trade.pnlOpen)}</span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onDelete(trade.id)}
+                      className="text-text-secondary hover:text-red-400 text-sm"
+                      aria-label="Delete trade"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import type { Trade, TradeSide } from '../types';
+import { TradeDetails } from './TradeDetails';
+import type { ParsedTradeInput, Trade, TradeSide } from '../types';
 import { formatCurrency } from '../utils/format';
 import { loadApiKey, parseScreenshot, saveApiKey } from '../utils/parseScreenshot';
 
@@ -10,12 +11,7 @@ interface ScreenshotImportModalProps {
 
 type Step = 'upload' | 'parsing' | 'review';
 
-interface ReviewTrade {
-  symbol: string;
-  pnl: string;
-  date: string;
-  side: TradeSide;
-  notes: string;
+interface ReviewTrade extends ParsedTradeInput {
   selected: boolean;
 }
 
@@ -68,11 +64,8 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
 
       setReviewTrades(
         result.trades.map((t) => ({
-          symbol: t.symbol,
-          pnl: String(t.pnl),
-          date: t.date,
+          ...t,
           side: t.side ?? 'long',
-          notes: t.notes ?? '',
           selected: true,
         })),
       );
@@ -86,18 +79,8 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
   const handleSave = () => {
     const toSave = reviewTrades
       .filter((t) => t.selected)
-      .map((t) => {
-        const pnl = parseFloat(t.pnl);
-        if (!t.symbol || isNaN(pnl)) return null;
-        return {
-          symbol: t.symbol.toUpperCase(),
-          pnl,
-          date: t.date,
-          side: t.side,
-          notes: t.notes || undefined,
-        };
-      })
-      .filter(Boolean) as Omit<Trade, 'id'>[];
+      .map(({ selected: _, ...t }) => t)
+      .filter((t) => t.symbol && !isNaN(t.pnl));
 
     if (toSave.length === 0) {
       setError('Select at least one valid trade to import');
@@ -124,7 +107,7 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
           <div>
             <h3 className="text-lg font-semibold">Import from Screenshot</h3>
             <p className="text-xs text-text-secondary mt-1">
-              Upload a Thinkorswim or brokerage screenshot — AI reads P/L Day and logs the trade
+              Upload Thinkorswim — AI extracts P/L, contract, strike, Greeks, and more
             </p>
           </div>
           <button
@@ -187,15 +170,7 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
                 />
               </label>
               <p className="text-xs text-text-secondary mt-1">
-                Optional if configured on the server. Stored locally in your browser. Get a key at{' '}
-                <a
-                  href="https://platform.openai.com/api-keys"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-accent hover:underline"
-                >
-                  platform.openai.com
-                </a>
+                Optional if configured on the server. Stored locally in your browser.
               </p>
             </div>
 
@@ -225,14 +200,16 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
           <div className="py-12 text-center">
             <div className="text-3xl mb-4 animate-pulse">🤖</div>
             <p className="text-sm text-text-primary">Reading your screenshot...</p>
-            <p className="text-xs text-text-secondary mt-1">Extracting symbol, P/L Day, and contract details</p>
+            <p className="text-xs text-text-secondary mt-1">
+              Extracting P/L Day, contract, strike, mark, Greeks, underlying price...
+            </p>
           </div>
         )}
 
         {step === 'review' && (
           <>
             <p className="text-sm text-text-secondary mb-3">
-              Review parsed trades before adding to your journal:
+              Review parsed data before adding to your journal:
             </p>
             <div className="space-y-3 mb-4">
               {reviewTrades.map((trade, i) => (
@@ -247,46 +224,47 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
                       onChange={(e) => updateTrade(i, { selected: e.target.checked })}
                       className="accent-accent"
                     />
-                    <span className={`text-sm font-semibold ${parseFloat(trade.pnl) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {formatCurrency(parseFloat(trade.pnl) || 0)}
+                    <span className="font-medium">{trade.symbol}</span>
+                    <span className={`text-sm font-semibold ml-auto ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      P/L Day {formatCurrency(trade.pnl)}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      value={trade.symbol}
-                      onChange={(e) => updateTrade(i, { symbol: e.target.value })}
-                      className="input-field text-sm"
-                      placeholder="Symbol"
-                    />
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={trade.pnl}
-                      onChange={(e) => updateTrade(i, { pnl: e.target.value })}
-                      className="input-field text-sm"
-                      placeholder="P/L"
-                    />
-                    <input
-                      type="date"
-                      value={trade.date}
-                      onChange={(e) => updateTrade(i, { date: e.target.value })}
-                      className="input-field text-sm"
-                    />
-                    <select
-                      value={trade.side}
-                      onChange={(e) => updateTrade(i, { side: e.target.value as TradeSide })}
-                      className="input-field text-sm"
-                    >
-                      <option value="long">Long</option>
-                      <option value="short">Short</option>
-                    </select>
-                  </div>
-                  <input
-                    value={trade.notes}
-                    onChange={(e) => updateTrade(i, { notes: e.target.value })}
-                    className="input-field text-sm mt-2"
-                    placeholder="Contract notes"
-                  />
+
+                  <TradeDetails trade={trade} compact />
+
+                  <details className="mt-3">
+                    <summary className="text-xs text-accent cursor-pointer">Edit core fields</summary>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <input
+                        value={trade.symbol}
+                        onChange={(e) => updateTrade(i, { symbol: e.target.value })}
+                        className="input-field text-sm"
+                        placeholder="Symbol"
+                      />
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={trade.pnl}
+                        onChange={(e) => updateTrade(i, { pnl: parseFloat(e.target.value) || 0 })}
+                        className="input-field text-sm"
+                        placeholder="P/L Day"
+                      />
+                      <input
+                        type="date"
+                        value={trade.date}
+                        onChange={(e) => updateTrade(i, { date: e.target.value })}
+                        className="input-field text-sm"
+                      />
+                      <select
+                        value={trade.side ?? 'long'}
+                        onChange={(e) => updateTrade(i, { side: e.target.value as TradeSide })}
+                        className="input-field text-sm"
+                      >
+                        <option value="long">Long</option>
+                        <option value="short">Short</option>
+                      </select>
+                    </div>
+                  </details>
                 </div>
               ))}
             </div>

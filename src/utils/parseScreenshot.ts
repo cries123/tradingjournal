@@ -1,3 +1,5 @@
+import type { ParsedTradeInput } from '../types';
+
 const API_KEY_STORAGE = 'trading-journal-openai-key';
 
 export function loadApiKey(): string {
@@ -12,20 +14,8 @@ export function saveApiKey(key: string): void {
   }
 }
 
-export interface ParseScreenshotRequest {
-  image: string;
-  mimeType: string;
-  apiKey?: string;
-}
-
 export interface ParseScreenshotResult {
-  trades: {
-    symbol: string;
-    pnl: number;
-    date: string;
-    side?: 'long' | 'short';
-    notes?: string;
-  }[];
+  trades: ParsedTradeInput[];
 }
 
 export async function parseScreenshot(
