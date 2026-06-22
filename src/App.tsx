@@ -17,12 +17,12 @@ export default function App() {
     addTrade,
     addTrades,
     deleteTrade,
-    resetToSample,
     clearAll,
   } = useTrades();
 
-  const [year, setYear] = useState(2025);
-  const [month, setMonth] = useState(3);
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth());
   const [showTradeModal, setShowTradeModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [tradeModalDate, setTradeModalDate] = useState<string | undefined>();
@@ -76,10 +76,7 @@ export default function App() {
           onNextMonth={handleNextMonth}
         />
 
-        <div className="mt-8 pt-4 border-t border-border flex gap-4 text-xs text-text-secondary">
-          <button type="button" onClick={resetToSample} className="hover:text-text-primary transition-colors">
-            Load sample data
-          </button>
+        <div className="mt-8 pt-4 border-t border-border text-xs text-text-secondary">
           <button type="button" onClick={clearAll} className="hover:text-red-400 transition-colors">
             Clear all trades
           </button>

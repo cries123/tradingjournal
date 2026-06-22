@@ -32,10 +32,9 @@ The parser reads symbol (e.g. SPY), P/L Day ($260.00), option contract notes, an
 
 ## Usage
 
-1. Click **+ Log Trade** to record a trade (enter your daily P/L from Thinkorswim).
+1. Click **+ Log Trade** or **Import Screenshot** to record a trade.
 2. Use the calendar arrows to navigate months.
 3. Click any day to view or delete trades for that date.
-4. Sample April 2025 data loads automatically on first visit.
 
 ## Tech Stack
 
