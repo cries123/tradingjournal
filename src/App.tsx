@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { CalendarView } from './components/CalendarView';
-import { FiltersBar } from './components/FiltersBar';
+import { DashboardView } from './components/DashboardView';
 import { Sidebar } from './components/Sidebar';
 import { ScreenshotImportModal } from './components/ScreenshotImportModal';
 import { DayDetailModal, TradeModal } from './components/TradeModal';
@@ -10,10 +9,6 @@ export default function App() {
   const {
     trades,
     allTrades,
-    filters,
-    setFilters,
-    symbols,
-    setups,
     addTrade,
     addTrades,
     deleteTrade,
@@ -52,31 +47,23 @@ export default function App() {
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-bg-primary">
       <Sidebar
-        activeView="calendar"
         onAddTrade={() => openAddTrade()}
         onImportScreenshot={() => setShowImportModal(true)}
       />
 
-      <main className="flex-1 p-6 overflow-auto">
-        <FiltersBar
-          filters={filters}
-          symbols={symbols}
-          setups={setups}
-          onChange={setFilters}
-        />
-
-        <CalendarView
+      <main className="flex-1 p-5 overflow-auto max-w-6xl">
+        <DashboardView
+          trades={trades}
           year={year}
           month={month}
-          trades={trades}
           onDayClick={setSelectedDay}
           onPrevMonth={handlePrevMonth}
           onNextMonth={handleNextMonth}
         />
 
-        <div className="mt-8 pt-4 border-t border-border text-xs text-text-secondary">
+        <div className="mt-6 pt-4 border-t border-border text-xs text-text-secondary">
           <button type="button" onClick={clearAll} className="hover:text-red-400 transition-colors">
             Clear all trades
           </button>

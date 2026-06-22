@@ -1,5 +1,4 @@
 interface SidebarProps {
-  activeView: string;
   onAddTrade: () => void;
   onImportScreenshot: () => void;
 }
@@ -8,22 +7,14 @@ const NAV_SECTIONS = [
   {
     title: 'PERFORMANCE',
     items: [
-      { id: 'calendar', label: 'Calendar', icon: '📅' },
-      { id: 'overview', label: 'Overview', icon: '📊', disabled: true },
-    ],
-  },
-  {
-    title: 'TRADE',
-    items: [
-      { id: 'weekday', label: 'Weekday', icon: '📆', disabled: true },
-      { id: 'monthly', label: 'Month', icon: '🗓', disabled: true },
+      { id: 'overview', label: 'Overview', icon: '📊' },
     ],
   },
 ];
 
-export function Sidebar({ activeView, onAddTrade, onImportScreenshot }: SidebarProps) {
+export function Sidebar({ onAddTrade, onImportScreenshot }: SidebarProps) {
   return (
-    <aside className="w-56 shrink-0 bg-bg-secondary border-r border-border flex flex-col">
+    <aside className="w-52 shrink-0 bg-bg-secondary border-r border-border flex flex-col">
       <div className="p-4 border-b border-border">
         <h1 className="text-lg font-bold tracking-tight">Trading Journal</h1>
         <p className="text-xs text-text-secondary mt-0.5">Track your daily P&L</p>
@@ -40,14 +31,7 @@ export function Sidebar({ activeView, onAddTrade, onImportScreenshot }: SidebarP
                 <li key={item.id}>
                   <button
                     type="button"
-                    disabled={item.disabled}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${
-                      activeView === item.id
-                        ? 'bg-accent/20 text-accent font-medium'
-                        : item.disabled
-                          ? 'text-text-secondary/50 cursor-not-allowed'
-                          : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
-                    }`}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm bg-accent/20 text-accent font-medium"
                   >
                     <span>{item.icon}</span>
                     {item.label}
