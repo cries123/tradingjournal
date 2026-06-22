@@ -325,14 +325,24 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
                         className="input-field text-sm"
                         placeholder="Symbol"
                       />
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={trade.pnl}
-                        onChange={(e) => updateTrade(trade.id, { pnl: parseFloat(e.target.value) || 0 })}
-                        className="input-field text-sm"
-                        placeholder="P/L Day"
-                      />
+                      <div className="flex gap-1">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={trade.pnl}
+                          onChange={(e) => updateTrade(trade.id, { pnl: parseFloat(e.target.value) || 0 })}
+                          className="input-field text-sm flex-1"
+                          placeholder="P/L Day"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => updateTrade(trade.id, { pnl: -trade.pnl })}
+                          className="px-2 py-1 text-xs border border-border rounded-md text-text-secondary hover:text-text-primary shrink-0"
+                          title="Flip +/- sign"
+                        >
+                          +/−
+                        </button>
+                      </div>
                       <input
                         type="date"
                         value={trade.date}

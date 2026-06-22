@@ -33,7 +33,8 @@ Return ONLY valid JSON:
   "trades": [
     {
       "symbol": "SPY",
-      "pnl": 260.00,
+      "pnl": -75.00,
+      "pnlDisplay": "($75.00)",
       "date": "2025-06-22",
       "side": "short",
       "contract": "SPY 22 JUN 26 746 P 100 (Weeklys)",
@@ -59,8 +60,13 @@ Return ONLY valid JSON:
 
 Field rules:
 - symbol: underlying ticker only (SPY, not full option string)
-- pnl: "P/L Day" when shown; else "P/L Open". Number only, no $ sign.
-- pnlOpen: separate field for P/L Open when visible
+- pnl: signed number from "P/L Day" (or "P/L Open" if Day not shown). CRITICAL SIGN RULES for Thinkorswim:
+  * Parentheses mean LOSS: ($75.00) → pnl: -75, pnlDisplay: "($75.00)"
+  * Red text P/L values are losses → negative pnl
+  * Green text or leading + → positive pnl
+  * NEVER return a positive number when the screenshot shows ($X.XX) in red
+  * Always include pnlDisplay: the exact P/L string as shown on screen
+- pnlOpen: signed number with same parenthesis/red rules; include pnlOpenDisplay if visible
 - date: YYYY-MM-DD; use today if P/L Day with no date shown
 - side: "long" or "short"; puts often short, calls often long
 - contract: full option/position description line
@@ -87,10 +93,37 @@ function str(value: unknown): string | undefined {
   return s || undefined;
 }
 
-function normalizeTrade(t: Partial<ParsedTrade>, today: string): ParsedTrade | null {
+function parseSignedPnl(value: unknown, display?: unknown): number | undefined {
+  const displayStr = str(display);
+  if (displayStr) {
+    const parenMatch = displayStr.match(/\(\s*\$?\s*([\d,]+\.?\d*)\s*\)/);
+    if (parenMatch) {
+      const amount = parseFloat(parenMatch[1].replace(/,/g, ''));
+      if (!isNaN(amount)) return -Math.abs(amount);
+    }
+    if (displayStr.includes('-') || displayStr.startsWith('−')) {
+      const amount = parseFloat(displayStr.replace(/[^0-9.]/g, ''));
+      if (!isNaN(amount)) return -Math.abs(amount);
+    }
+  }
+
+  if (typeof value === 'string') {
+    const s = value.trim();
+    if (s.startsWith('(') && s.includes(')')) {
+      const amount = parseFloat(s.replace(/[$(),]/g, ''));
+      if (!isNaN(amount)) return -Math.abs(amount);
+    }
+  }
+
+  return num(value);
+}
+
+function normalizeTrade(t: Partial<ParsedTrade & { pnlDisplay?: string; pnlOpenDisplay?: string }>, today: string): ParsedTrade | null {
   const symbol = str(t.symbol)?.toUpperCase();
-  const pnl = num(t.pnl);
+  const pnl = parseSignedPnl(t.pnl, t.pnlDisplay);
   if (!symbol || pnl === undefined) return null;
+
+  const pnlOpen = parseSignedPnl(t.pnlOpen, t.pnlOpenDisplay);
 
   return {
     symbol,
@@ -106,7 +139,7 @@ function normalizeTrade(t: Partial<ParsedTrade>, today: string): ParsedTrade | n
     quantity: num(t.quantity),
     mark: num(t.mark),
     tradePrice: num(t.tradePrice),
-    pnlOpen: num(t.pnlOpen),
+    pnlOpen: pnlOpen,
     netLiq: num(t.netLiq),
     underlyingPrice: num(t.underlyingPrice),
     delta: num(t.delta),
