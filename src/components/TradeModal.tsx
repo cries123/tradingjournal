@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TradeDetails } from './TradeDetails';
+import { TradeListItem } from './TradeListItem';
 import type { Trade, TradeSide } from '../types';
 import { formatCurrency } from '../utils/format';
 
@@ -148,6 +148,7 @@ interface DayDetailModalProps {
 }
 
 export function DayDetailModal({ date, trades, onClose, onDelete, onAddTrade }: DayDetailModalProps) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const dayTrades = trades.filter((t) => t.date === date);
   const totalPnl = dayTrades.reduce((sum, t) => sum + t.pnl, 0);
   const formattedDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
@@ -186,48 +187,27 @@ export function DayDetailModal({ date, trades, onClose, onDelete, onAddTrade }: 
         ) : (
           <div className="space-y-2 mb-4">
             {dayTrades.map((trade) => (
-              <div
+              <TradeListItem
                 key={trade.id}
-                className="p-3 bg-bg-tertiary rounded-md"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium">{trade.symbol}</span>
-                      {trade.optionType && (
-                        <span className="text-xs text-text-secondary uppercase">{trade.optionType}</span>
-                      )}
-                      {trade.setup && (
-                        <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase bg-tag text-bg-primary rounded-sm">
-                          {trade.setup}
-                        </span>
-                      )}
-                      {trade.side && (
-                        <span className="text-xs text-text-secondary capitalize">{trade.side}</span>
-                      )}
-                    </div>
-                    <TradeDetails trade={trade} compact />
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0 ml-3">
-                    <div className="text-right">
-                      <span className={`font-semibold block ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {formatCurrency(trade.pnl)}
-                      </span>
-                      {trade.pnlOpen != null && (
-                        <span className="text-xs text-text-secondary">Open {formatCurrency(trade.pnlOpen)}</span>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => onDelete(trade.id)}
-                      className="text-text-secondary hover:text-red-400 text-sm"
-                      aria-label="Delete trade"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              </div>
+                trade={trade}
+                expanded={expandedId === trade.id}
+                onToggle={() =>
+                  setExpandedId((prev) => (prev === trade.id ? null : trade.id))
+                }
+                trailing={
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(trade.id);
+                    }}
+                    className="text-text-secondary hover:text-red-400 text-sm shrink-0 ml-2"
+                    aria-label="Delete trade"
+                  >
+                    ✕
+                  </button>
+                }
+              />
             ))}
           </div>
         )}

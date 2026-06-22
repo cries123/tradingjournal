@@ -1,7 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import { TradeDetails } from './TradeDetails';
+import { TradeListItem } from './TradeListItem';
 import type { ParsedTradeInput, Trade, TradeSide } from '../types';
-import { formatCurrency } from '../utils/format';
 import { loadApiKey, parseScreenshot, saveApiKey } from '../utils/parseScreenshot';
 
 interface ScreenshotImportModalProps {
@@ -11,75 +10,113 @@ interface ScreenshotImportModalProps {
 
 type Step = 'upload' | 'parsing' | 'review';
 
+interface PendingFile {
+  id: string;
+  file: File;
+  preview: string;
+}
+
 interface ReviewTrade extends ParsedTradeInput {
+  id: string;
   selected: boolean;
+  sourceFile: string;
 }
 
 export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModalProps) {
   const [step, setStep] = useState<Step>('upload');
-  const [preview, setPreview] = useState<string | null>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [apiKey, setApiKey] = useState(loadApiKey);
   const [error, setError] = useState<string | null>(null);
   const [reviewTrades, setReviewTrades] = useState<ReviewTrade[]>([]);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [parseProgress, setParseProgress] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = useCallback((f: File) => {
-    if (!f.type.startsWith('image/')) {
-      setError('Please upload an image file (PNG, JPG, etc.)');
+  const addFiles = useCallback((incoming: FileList | File[]) => {
+    const images = Array.from(incoming).filter((f) => f.type.startsWith('image/'));
+    if (images.length === 0) {
+      setError('Please upload image files (PNG, JPG, etc.)');
       return;
     }
     setError(null);
-    setFile(f);
-    setPreview(URL.createObjectURL(f));
-    setStep('upload');
+    setPendingFiles((prev) => [
+      ...prev,
+      ...images.map((file) => ({
+        id: crypto.randomUUID(),
+        file,
+        preview: URL.createObjectURL(file),
+      })),
+    ]);
     setReviewTrades([]);
+    setStep('upload');
   }, []);
+
+  const removeFile = (id: string) => {
+    setPendingFiles((prev) => {
+      const item = prev.find((f) => f.id === id);
+      if (item) URL.revokeObjectURL(item.preview);
+      return prev.filter((f) => f.id !== id);
+    });
+  };
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       setDragOver(false);
-      const f = e.dataTransfer.files[0];
-      if (f) handleFile(f);
+      if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
     },
-    [handleFile],
+    [addFiles],
   );
 
   const handleParse = async () => {
-    if (!file) return;
+    if (pendingFiles.length === 0) return;
 
     saveApiKey(apiKey.trim());
     setError(null);
     setStep('parsing');
 
-    try {
-      const result = await parseScreenshot(file, apiKey.trim() || undefined);
-      if (result.trades.length === 0) {
-        setError('No trades found in this screenshot. Try a clearer image or log manually.');
-        setStep('upload');
-        return;
-      }
+    const allTrades: ReviewTrade[] = [];
+    const errors: string[] = [];
 
-      setReviewTrades(
-        result.trades.map((t) => ({
-          ...t,
-          side: t.side ?? 'long',
-          selected: true,
-        })),
-      );
-      setStep('review');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to parse screenshot');
-      setStep('upload');
+    for (let i = 0; i < pendingFiles.length; i++) {
+      const { file, id } = pendingFiles[i];
+      setParseProgress(`Parsing screenshot ${i + 1} of ${pendingFiles.length}...`);
+
+      try {
+        const result = await parseScreenshot(file, apiKey.trim() || undefined);
+        for (const t of result.trades) {
+          allTrades.push({
+            ...t,
+            id: crypto.randomUUID(),
+            side: t.side ?? 'long',
+            selected: true,
+            sourceFile: file.name || id,
+          });
+        }
+        if (result.trades.length === 0) {
+          errors.push(`No trades found in ${file.name || 'screenshot'}`);
+        }
+      } catch (err) {
+        errors.push(`${file.name || 'Screenshot'}: ${err instanceof Error ? err.message : 'parse failed'}`);
+      }
     }
+
+    if (allTrades.length === 0) {
+      setError(errors.join(' · ') || 'No trades found in any screenshot.');
+      setStep('upload');
+      return;
+    }
+
+    if (errors.length) setError(errors.join(' · '));
+    setReviewTrades(allTrades);
+    setStep('review');
   };
 
   const handleSave = () => {
     const toSave = reviewTrades
       .filter((t) => t.selected)
-      .map(({ selected: _, ...t }) => t)
+      .map(({ selected: _, id: __, sourceFile: ___, ...t }) => t)
       .filter((t) => t.symbol && !isNaN(t.pnl));
 
     if (toSave.length === 0) {
@@ -91,10 +128,24 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
     onClose();
   };
 
-  const updateTrade = (index: number, patch: Partial<ReviewTrade>) => {
-    setReviewTrades((prev) =>
-      prev.map((t, i) => (i === index ? { ...t, ...patch } : t)),
-    );
+  const updateTrade = (id: string, patch: Partial<ReviewTrade>) => {
+    setReviewTrades((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+  };
+
+  const toggleExpanded = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectedCount = reviewTrades.filter((t) => t.selected).length;
+  const allSelected = reviewTrades.length > 0 && selectedCount === reviewTrades.length;
+
+  const setAllSelected = (selected: boolean) => {
+    setReviewTrades((prev) => prev.map((t) => ({ ...t, selected })));
   };
 
   return (
@@ -107,7 +158,7 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
           <div>
             <h3 className="text-lg font-semibold">Import from Screenshot</h3>
             <p className="text-xs text-text-secondary mt-1">
-              Upload Thinkorswim — AI extracts P/L, contract, strike, Greeks, and more
+              Upload one or more Thinkorswim screenshots — select trades to import
             </p>
           </div>
           <button
@@ -129,7 +180,7 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
               onClick={() => inputRef.current?.click()}
-              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+              className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
                 dragOver ? 'border-accent bg-accent/10' : 'border-border hover:border-accent/50'
               }`}
             >
@@ -137,26 +188,43 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
                 ref={inputRef}
                 type="file"
                 accept="image/*"
+                multiple
                 className="hidden"
                 onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleFile(f);
+                  if (e.target.files?.length) addFiles(e.target.files);
+                  e.target.value = '';
                 }}
               />
-              {preview ? (
-                <img
-                  src={preview}
-                  alt="Screenshot preview"
-                  className="max-h-48 mx-auto rounded-md mb-3 object-contain"
-                />
-              ) : (
-                <div className="text-4xl mb-3">📷</div>
-              )}
-              <p className="text-sm text-text-primary">
-                {preview ? 'Click or drop to replace' : 'Drop screenshot here or click to browse'}
-              </p>
-              <p className="text-xs text-text-secondary mt-1">PNG, JPG, or screenshot from your phone</p>
+              <div className="text-4xl mb-2">📷</div>
+              <p className="text-sm text-text-primary">Drop screenshots here or click to browse</p>
+              <p className="text-xs text-text-secondary mt-1">Select multiple files at once</p>
             </div>
+
+            {pendingFiles.length > 0 && (
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                {pendingFiles.map(({ id, preview, file }) => (
+                  <div key={id} className="relative group">
+                    <img
+                      src={preview}
+                      alt={file.name}
+                      className="w-full h-24 object-cover rounded-md border border-border"
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFile(id);
+                      }}
+                      className="absolute top-1 right-1 w-5 h-5 bg-black/70 text-white text-xs rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      aria-label="Remove"
+                    >
+                      ✕
+                    </button>
+                    <p className="text-[10px] text-text-secondary truncate mt-1">{file.name}</p>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="mt-4">
               <label className="block">
@@ -169,9 +237,6 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
                   className="input-field"
                 />
               </label>
-              <p className="text-xs text-text-secondary mt-1">
-                Optional if configured on the server. Stored locally in your browser.
-              </p>
             </div>
 
             {error && <p className="text-sm text-red-400 mt-3">{error}</p>}
@@ -179,11 +244,11 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
             <div className="flex gap-3 mt-5">
               <button
                 type="button"
-                disabled={!file}
+                disabled={pendingFiles.length === 0}
                 onClick={handleParse}
                 className="flex-1 py-2.5 bg-accent text-white rounded-md font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Parse with AI
+                Parse {pendingFiles.length > 1 ? `${pendingFiles.length} Screenshots` : 'with AI'}
               </button>
               <button
                 type="button"
@@ -199,45 +264,62 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
         {step === 'parsing' && (
           <div className="py-12 text-center">
             <div className="text-3xl mb-4 animate-pulse">🤖</div>
-            <p className="text-sm text-text-primary">Reading your screenshot...</p>
-            <p className="text-xs text-text-secondary mt-1">
-              Extracting P/L Day, contract, strike, mark, Greeks, underlying price...
-            </p>
+            <p className="text-sm text-text-primary">{parseProgress || 'Reading screenshots...'}</p>
           </div>
         )}
 
         {step === 'review' && (
           <>
-            <p className="text-sm text-text-secondary mb-3">
-              Review parsed data before adding to your journal:
-            </p>
-            <div className="space-y-3 mb-4">
-              {reviewTrades.map((trade, i) => (
-                <div
-                  key={i}
-                  className={`p-3 rounded-md border ${trade.selected ? 'border-border bg-bg-tertiary' : 'border-border/50 bg-bg-primary opacity-60'}`}
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-text-secondary">
+                {selectedCount} of {reviewTrades.length} trades selected
+              </p>
+              <div className="flex gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setAllSelected(true)}
+                  className="text-accent hover:underline"
+                  disabled={allSelected}
                 >
-                  <div className="flex items-center gap-2 mb-2">
-                    <input
-                      type="checkbox"
-                      checked={trade.selected}
-                      onChange={(e) => updateTrade(i, { selected: e.target.checked })}
-                      className="accent-accent"
-                    />
-                    <span className="font-medium">{trade.symbol}</span>
-                    <span className={`text-sm font-semibold ml-auto ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      P/L Day {formatCurrency(trade.pnl)}
-                    </span>
-                  </div>
+                  Select all
+                </button>
+                <span className="text-text-secondary">·</span>
+                <button
+                  type="button"
+                  onClick={() => setAllSelected(false)}
+                  className="text-accent hover:underline"
+                  disabled={selectedCount === 0}
+                >
+                  Deselect all
+                </button>
+              </div>
+            </div>
 
-                  <TradeDetails trade={trade} compact />
-
-                  <details className="mt-3">
-                    <summary className="text-xs text-accent cursor-pointer">Edit core fields</summary>
-                    <div className="grid grid-cols-2 gap-2 mt-2">
+            <div className="space-y-2 mb-4">
+              {reviewTrades.map((trade) => (
+                <div key={trade.id}>
+                  <TradeListItem
+                    trade={trade}
+                    expanded={expandedIds.has(trade.id)}
+                    onToggle={() => toggleExpanded(trade.id)}
+                    leading={
+                      <input
+                        type="checkbox"
+                        checked={trade.selected}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          updateTrade(trade.id, { selected: e.target.checked });
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="accent-accent shrink-0"
+                      />
+                    }
+                  />
+                  {expandedIds.has(trade.id) && (
+                    <div className="mt-1 ml-8 grid grid-cols-2 gap-2">
                       <input
                         value={trade.symbol}
-                        onChange={(e) => updateTrade(i, { symbol: e.target.value })}
+                        onChange={(e) => updateTrade(trade.id, { symbol: e.target.value })}
                         className="input-field text-sm"
                         placeholder="Symbol"
                       />
@@ -245,31 +327,32 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
                         type="number"
                         step="0.01"
                         value={trade.pnl}
-                        onChange={(e) => updateTrade(i, { pnl: parseFloat(e.target.value) || 0 })}
+                        onChange={(e) => updateTrade(trade.id, { pnl: parseFloat(e.target.value) || 0 })}
                         className="input-field text-sm"
                         placeholder="P/L Day"
                       />
                       <input
                         type="date"
                         value={trade.date}
-                        onChange={(e) => updateTrade(i, { date: e.target.value })}
+                        onChange={(e) => updateTrade(trade.id, { date: e.target.value })}
                         className="input-field text-sm"
                       />
                       <select
                         value={trade.side ?? 'long'}
-                        onChange={(e) => updateTrade(i, { side: e.target.value as TradeSide })}
+                        onChange={(e) => updateTrade(trade.id, { side: e.target.value as TradeSide })}
                         className="input-field text-sm"
                       >
                         <option value="long">Long</option>
                         <option value="short">Short</option>
                       </select>
                     </div>
-                  </details>
+                  )}
+                  <p className="text-[10px] text-text-secondary ml-8 mt-0.5">from {trade.sourceFile}</p>
                 </div>
               ))}
             </div>
 
-            {error && <p className="text-sm text-red-400 mb-3">{error}</p>}
+            {error && <p className="text-sm text-yellow-400/80 mb-3">{error}</p>}
 
             <div className="flex gap-3">
               <button
@@ -277,7 +360,7 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
                 onClick={handleSave}
                 className="flex-1 py-2.5 bg-accent text-white rounded-md font-medium hover:opacity-90 transition-opacity"
               >
-                Add to Journal
+                Import {selectedCount} Trade{selectedCount !== 1 ? 's' : ''}
               </button>
               <button
                 type="button"
