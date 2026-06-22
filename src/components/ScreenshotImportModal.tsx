@@ -83,6 +83,8 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
       const { file, id } = pendingFiles[i];
       setParseProgress(`Parsing screenshot ${i + 1} of ${pendingFiles.length}...`);
 
+      if (i > 0) await new Promise((r) => setTimeout(r, 500));
+
       try {
         const result = await parseScreenshot(file, apiKey.trim() || undefined);
         for (const t of result.trades) {
