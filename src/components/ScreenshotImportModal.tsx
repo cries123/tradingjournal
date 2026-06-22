@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { TradeListItem } from './TradeListItem';
 import type { ParsedTradeInput, Trade, TradeSide } from '../types';
-import { loadApiKey, parseScreenshot, saveApiKey } from '../utils/parseScreenshot';
+import { checkParseServer, loadApiKey, parseScreenshot, saveApiKey } from '../utils/parseScreenshot';
 
 interface ScreenshotImportModalProps {
   onClose: () => void;
@@ -74,6 +74,13 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
 
     saveApiKey(apiKey.trim());
     setError(null);
+
+    const serverOk = await checkParseServer();
+    if (!serverOk) {
+      setError('Server is not running. Reload the page and try again.');
+      return;
+    }
+
     setStep('parsing');
 
     const allTrades: ReviewTrade[] = [];

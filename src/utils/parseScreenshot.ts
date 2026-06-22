@@ -19,6 +19,15 @@ export interface ParseScreenshotResult {
   trades: ParsedTradeInput[];
 }
 
+export async function checkParseServer(): Promise<boolean> {
+  try {
+    const response = await fetch('/api/health');
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 async function readResponseJson(response: Response): Promise<Record<string, unknown>> {
   const text = await response.text();
   if (!text.trim()) {
