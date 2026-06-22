@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { CalendarView } from './components/CalendarView';
 import { FiltersBar } from './components/FiltersBar';
 import { Sidebar } from './components/Sidebar';
+import { ScreenshotImportModal } from './components/ScreenshotImportModal';
 import { DayDetailModal, TradeModal } from './components/TradeModal';
 import { useTrades } from './hooks/useTrades';
 
@@ -14,6 +15,7 @@ export default function App() {
     symbols,
     setups,
     addTrade,
+    addTrades,
     deleteTrade,
     resetToSample,
     clearAll,
@@ -22,6 +24,7 @@ export default function App() {
   const [year, setYear] = useState(2025);
   const [month, setMonth] = useState(3);
   const [showTradeModal, setShowTradeModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [tradeModalDate, setTradeModalDate] = useState<string | undefined>();
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
@@ -50,7 +53,11 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar activeView="calendar" onAddTrade={() => openAddTrade()} />
+      <Sidebar
+        activeView="calendar"
+        onAddTrade={() => openAddTrade()}
+        onImportScreenshot={() => setShowImportModal(true)}
+      />
 
       <main className="flex-1 p-6 overflow-auto">
         <FiltersBar
@@ -78,6 +85,13 @@ export default function App() {
           </button>
         </div>
       </main>
+
+      {showImportModal && (
+        <ScreenshotImportModal
+          onClose={() => setShowImportModal(false)}
+          onSave={addTrades}
+        />
+      )}
 
       {showTradeModal && (
         <TradeModal

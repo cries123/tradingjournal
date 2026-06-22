@@ -1,6 +1,7 @@
 interface SidebarProps {
   activeView: string;
   onAddTrade: () => void;
+  onImportScreenshot: () => void;
 }
 
 const NAV_SECTIONS = [
@@ -20,7 +21,7 @@ const NAV_SECTIONS = [
   },
 ];
 
-export function Sidebar({ activeView, onAddTrade }: SidebarProps) {
+export function Sidebar({ activeView, onAddTrade, onImportScreenshot }: SidebarProps) {
   return (
     <aside className="w-56 shrink-0 bg-bg-secondary border-r border-border flex flex-col">
       <div className="p-4 border-b border-border">
@@ -58,7 +59,14 @@ export function Sidebar({ activeView, onAddTrade }: SidebarProps) {
         ))}
       </nav>
 
-      <div className="p-3 border-t border-border">
+      <div className="p-3 border-t border-border space-y-2">
+        <button
+          type="button"
+          onClick={onImportScreenshot}
+          className="w-full py-2.5 border border-accent/50 text-accent rounded-md text-sm font-medium hover:bg-accent/10 transition-colors"
+        >
+          📷 Import Screenshot
+        </button>
         <button
           type="button"
           onClick={onAddTrade}

@@ -43,6 +43,11 @@ export function useTrades() {
     setTrades((prev) => [...prev, newTrade]);
   }, []);
 
+  const addTrades = useCallback((newTrades: Omit<Trade, 'id'>[]) => {
+    const withIds = newTrades.map((trade) => ({ ...trade, id: crypto.randomUUID() }));
+    setTrades((prev) => [...prev, ...withIds]);
+  }, []);
+
   const deleteTrade = useCallback((id: string) => {
     setTrades((prev) => prev.filter((t) => t.id !== id));
   }, []);
@@ -63,6 +68,7 @@ export function useTrades() {
     symbols,
     setups,
     addTrade,
+    addTrades,
     deleteTrade,
     resetToSample,
     clearAll,
