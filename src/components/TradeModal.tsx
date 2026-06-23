@@ -145,9 +145,19 @@ interface DayDetailModalProps {
   onClose: () => void;
   onDelete: (id: string) => void;
   onAddTrade: () => void;
+  onImportCsv: () => void;
+  onImportScreenshot: () => void;
 }
 
-export function DayDetailModal({ date, trades, onClose, onDelete, onAddTrade }: DayDetailModalProps) {
+export function DayDetailModal({
+  date,
+  trades,
+  onClose,
+  onDelete,
+  onAddTrade,
+  onImportCsv,
+  onImportScreenshot,
+}: DayDetailModalProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const dayTrades = trades.filter((t) => t.date === date);
   const totalPnl = dayTrades.reduce((sum, t) => sum + t.pnl, 0);
@@ -183,7 +193,7 @@ export function DayDetailModal({ date, trades, onClose, onDelete, onAddTrade }: 
         </div>
 
         {dayTrades.length === 0 ? (
-          <p className="text-text-secondary text-sm mb-4">No trades recorded for this day.</p>
+          <p className="text-text-secondary text-sm mb-4">No trades yet — import or add trades for this day.</p>
         ) : (
           <div className="space-y-2 mb-4">
             {dayTrades.map((trade) => (
@@ -212,13 +222,32 @@ export function DayDetailModal({ date, trades, onClose, onDelete, onAddTrade }: 
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={onAddTrade}
-          className="w-full py-2 border border-dashed border-border rounded-md text-text-secondary hover:text-text-primary hover:border-accent transition-colors"
-        >
-          + Add trade for this day
-        </button>
+        <div className="space-y-2">
+          <p className="text-xs text-text-secondary font-medium uppercase tracking-wide">Import trades</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={onImportCsv}
+              className="py-2.5 px-3 border border-border rounded-md text-sm text-text-primary hover:border-accent hover:bg-accent/10 transition-colors"
+            >
+              📄 Import CSV
+            </button>
+            <button
+              type="button"
+              onClick={onImportScreenshot}
+              className="py-2.5 px-3 border border-border rounded-md text-sm text-text-primary hover:border-accent hover:bg-accent/10 transition-colors"
+            >
+              📷 Screenshot
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={onAddTrade}
+            className="w-full py-2 border border-dashed border-border rounded-md text-text-secondary hover:text-text-primary hover:border-accent transition-colors text-sm"
+          >
+            + Log trade manually
+          </button>
+        </div>
       </div>
     </div>
   );

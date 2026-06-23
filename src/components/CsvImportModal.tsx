@@ -7,11 +7,20 @@ import { previewSchwabCsv, type SchwabImportPreview } from '../utils/parseSchwab
 interface CsvImportModalProps {
   onClose: () => void;
   onSave: (trades: Omit<Trade, 'id'>[]) => void;
+  targetDate?: string;
 }
 
 type Step = 'upload' | 'review';
 
-export function CsvImportModal({ onClose, onSave }: CsvImportModalProps) {
+function formatTargetDate(date: string): string {
+  return new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+export function CsvImportModal({ onClose, onSave, targetDate }: CsvImportModalProps) {
   const [step, setStep] = useState<Step>('upload');
   const [fileName, setFileName] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +39,16 @@ export function CsvImportModal({ onClose, onSave }: CsvImportModalProps) {
     reader.onload = () => {
       try {
         const text = reader.result as string;
-        const parsed = previewSchwabCsv(text);
+        let parsed = previewSchwabCsv(text);
+
+        if (targetDate) {
+          parsed = parsed.filter((t) => t.date === targetDate);
+          if (parsed.length === 0) {
+            setError(`No trades found for ${formatTargetDate(targetDate)} in this CSV. Try the full statement import from the sidebar.`);
+            return;
+          }
+        }
+
         if (parsed.length === 0) {
           setError('No completed trades found in this CSV');
           return;
@@ -46,7 +64,7 @@ export function CsvImportModal({ onClose, onSave }: CsvImportModalProps) {
     };
     reader.onerror = () => setError('Failed to read file');
     reader.readAsText(file);
-  }, []);
+  }, [targetDate]);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -86,7 +104,9 @@ export function CsvImportModal({ onClose, onSave }: CsvImportModalProps) {
           <div>
             <h3 className="text-lg font-semibold">Import Schwab Statement</h3>
             <p className="text-xs text-text-secondary mt-1">
-              Upload your Schwab/Thinkorswim account statement CSV — matches open &amp; close trades automatically
+              {targetDate
+                ? `Showing trades for ${formatTargetDate(targetDate)} only`
+                : 'Upload your Schwab/Thinkorswim account statement CSV'}
             </p>
           </div>
           <button type="button" onClick={onClose} className="text-text-secondary hover:text-text-primary text-xl">×</button>

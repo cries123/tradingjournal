@@ -6,6 +6,7 @@ import { checkParseServer, loadApiKey, parseScreenshot, saveApiKey } from '../ut
 interface ScreenshotImportModalProps {
   onClose: () => void;
   onSave: (trades: Omit<Trade, 'id'>[]) => void;
+  targetDate?: string;
 }
 
 type Step = 'upload' | 'parsing' | 'review';
@@ -22,7 +23,7 @@ interface ReviewTrade extends ParsedTradeInput {
   sourceFile: string;
 }
 
-export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModalProps) {
+export function ScreenshotImportModal({ onClose, onSave, targetDate }: ScreenshotImportModalProps) {
   const [step, setStep] = useState<Step>('upload');
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [apiKey, setApiKey] = useState(loadApiKey);
@@ -97,6 +98,7 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
         for (const t of result.trades) {
           allTrades.push({
             ...t,
+            date: targetDate ?? t.date,
             id: crypto.randomUUID(),
             side: t.side ?? 'long',
             selected: true,
@@ -167,7 +169,9 @@ export function ScreenshotImportModal({ onClose, onSave }: ScreenshotImportModal
           <div>
             <h3 className="text-lg font-semibold">Import from Screenshot</h3>
             <p className="text-xs text-text-secondary mt-1">
-              Upload one or more Thinkorswim screenshots — select trades to import
+              {targetDate
+                ? `Trades will be logged to ${new Date(targetDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
+                : 'Upload one or more Thinkorswim screenshots — select trades to import'}
             </p>
           </div>
           <button

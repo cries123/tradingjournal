@@ -26,10 +26,7 @@ export function DashboardDayCell({ dayNumber, summary, onClick }: DashboardDayCe
     <button
       type="button"
       onClick={onClick}
-      disabled={!hasTrades}
-      className={`min-h-[88px] p-3 rounded-lg text-left transition-all flex flex-col bg-bg-card border ${borderClass} ${
-        hasTrades ? 'hover:bg-bg-tertiary cursor-pointer' : 'cursor-default opacity-80'
-      }`}
+      className={`min-h-[88px] p-3 rounded-lg text-left transition-all flex flex-col bg-bg-card border ${borderClass} hover:bg-bg-tertiary cursor-pointer group`}
     >
       <span className="text-xs text-text-secondary">{dayNumber}</span>
       {hasTrades ? (
@@ -45,7 +42,11 @@ export function DashboardDayCell({ dayNumber, summary, onClick }: DashboardDayCe
             {summary.tradeCount} {summary.tradeCount === 1 ? 'trade' : 'trades'}
           </span>
         </div>
-      ) : null}
+      ) : (
+        <span className="mt-auto text-[11px] text-text-secondary/0 group-hover:text-text-secondary transition-colors">
+          + import
+        </span>
+      )}
     </button>
   );
 }

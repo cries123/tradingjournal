@@ -23,6 +23,7 @@ export default function App() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showCsvModal, setShowCsvModal] = useState(false);
   const [tradeModalDate, setTradeModalDate] = useState<string | undefined>();
+  const [importTargetDate, setImportTargetDate] = useState<string | undefined>();
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const handlePrevMonth = () => {
@@ -48,12 +49,30 @@ export default function App() {
     setShowTradeModal(true);
   };
 
+  const openImportCsv = (date?: string) => {
+    setImportTargetDate(date);
+    setShowCsvModal(true);
+    if (date) setSelectedDay(null);
+  };
+
+  const openImportScreenshot = (date?: string) => {
+    setImportTargetDate(date);
+    setShowImportModal(true);
+    if (date) setSelectedDay(null);
+  };
+
+  const closeImportModals = () => {
+    setShowCsvModal(false);
+    setShowImportModal(false);
+    setImportTargetDate(undefined);
+  };
+
   return (
     <div className="flex min-h-screen bg-bg-primary">
       <Sidebar
         onAddTrade={() => openAddTrade()}
-        onImportScreenshot={() => setShowImportModal(true)}
-        onImportCsv={() => setShowCsvModal(true)}
+        onImportScreenshot={() => openImportScreenshot()}
+        onImportCsv={() => openImportCsv()}
       />
 
       <main className="flex-1 p-5 overflow-auto max-w-6xl">
@@ -75,15 +94,23 @@ export default function App() {
 
       {showCsvModal && (
         <CsvImportModal
-          onClose={() => setShowCsvModal(false)}
-          onSave={addTrades}
+          targetDate={importTargetDate}
+          onClose={closeImportModals}
+          onSave={(t) => {
+            addTrades(t);
+            closeImportModals();
+          }}
         />
       )}
 
       {showImportModal && (
         <ScreenshotImportModal
-          onClose={() => setShowImportModal(false)}
-          onSave={addTrades}
+          targetDate={importTargetDate}
+          onClose={closeImportModals}
+          onSave={(t) => {
+            addTrades(t);
+            closeImportModals();
+          }}
         />
       )}
 
@@ -108,6 +135,8 @@ export default function App() {
             openAddTrade(selectedDay);
             setSelectedDay(null);
           }}
+          onImportCsv={() => openImportCsv(selectedDay)}
+          onImportScreenshot={() => openImportScreenshot(selectedDay)}
         />
       )}
     </div>
