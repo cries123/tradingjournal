@@ -1,50 +1,91 @@
 # Trading Journal
 
-A dark-themed trading journal with a calendar view that color-codes each day green (profit) or red (loss), inspired by TraderSync.
+A dark-themed trading journal with a calendar dashboard — green days for profit, red for loss. Import trades from Schwab CSV exports or Thinkorswim screenshots.
 
-## Features
+## Run locally on your computer
 
-- **Calendar view** — Monthly grid with green/red/gray day cells based on daily P&L
-- **Daily details** — P&L amount, trade count, and setup tags (BREAKOUT, FOMO, RSI CROSSED, etc.)
-- **Weekly summaries** — Totals on the right column for each week
-- **Log trades** — Add trades with symbol, P/L, setup, and side (matches Thinkorswim-style daily P/L)
-- **Screenshot import** — Upload a Thinkorswim/brokerage screenshot; AI extracts P/L Day, symbol, and contract details
-- **Filters** — Filter by symbol, setup, or side
-- **Persistent storage** — Trades saved in your browser via localStorage
+### Requirements
 
-## Getting Started
+- [Node.js](https://nodejs.org/) 18 or newer (includes `npm`)
+
+### 1. Get the code
+
+```bash
+git clone https://github.com/cries123/tradingjournal.git
+cd tradingjournal
+```
+
+### 2. Install dependencies
 
 ```bash
 npm install
+```
+
+### 3. Start the app
+
+**Development (recommended while using it):**
+
+```bash
 npm run dev
 ```
 
-Open http://localhost:5173 in your browser.
+Open **http://localhost:5173** in your browser.
 
-## Screenshot Import (AI)
+**Production build (faster, no hot reload):**
 
-1. Click **Import Screenshot** in the sidebar
-2. Upload a Thinkorswim (or other brokerage) screenshot showing P/L Day
-3. Enter your [OpenAI API key](https://platform.openai.com/api-keys) (saved locally), or set `OPENAI_API_KEY` in `.env`
-4. Click **Parse with AI**, review the extracted fields, then **Add to Journal**
+```bash
+npm run build
+npm start
+```
 
-The parser reads symbol (e.g. SPY), P/L Day ($260.00), option contract notes, and side from screenshots like your Thinkorswim positions screen.
+Open **http://localhost:5173** — this serves the built app locally.
 
-**Fields extracted from Thinkorswim screenshots:**
-- P/L Day & P/L Open
-- Full contract (e.g. SPY 22 JUN 26 746 P 100 Weeklys)
-- Strike, expiration, option type (call/put)
-- Mark, trade price, net liq, underlying price
-- Greeks (delta, gamma, theta, vega)
-- Account type & quantity
+### 4. Optional — AI screenshot import
 
-## Usage
+Create a `.env` file in the project root:
 
-1. Click **+ Log Trade** or **Import Screenshot** to record a trade.
-2. Use the calendar arrows to navigate months.
-3. Click any day to view or delete trades for that date.
+```bash
+cp .env.example .env
+```
 
-## Tech Stack
+Add your OpenAI API key:
+
+```
+OPENAI_API_KEY=sk-your-key-here
+```
+
+Restart the dev server after changing `.env`. You can also paste the key in the import dialog (stored in your browser only).
+
+---
+
+## Features
+
+- **Dashboard** — Calendar, Net P&L, win rate, profit factor, weekday & daily charts
+- **Import CSV** — Schwab/Thinkorswim account statement (`Account Trade History`)
+- **Import Screenshot** — AI reads Thinkorswim P/L Day from phone screenshots
+- **Log trades manually** — Symbol, P/L, setup tags
+- **Persistent storage** — All data stays in your browser (`localStorage`); nothing is sent to a server except OpenAI when parsing screenshots
+
+## Import your Schwab trades
+
+1. In Thinkorswim/Schwab: **History → Export account statement** (CSV)
+2. In the app: **Import CSV** → upload the file
+3. Review matched round-trip trades → **Import**
+
+## Import from screenshots
+
+1. Click **Import Screenshot**
+2. Upload Thinkorswim position screenshots
+3. Parse with AI → review → add to journal
+
+## Data & privacy
+
+- Trades are saved **only in your browser** on this computer
+- Clearing browser data or using a different browser/device will not show the same trades
+- CSV import runs entirely in your browser — your statement never leaves your machine
+- Screenshot AI parsing sends the image to OpenAI if you use that feature
+
+## Tech stack
 
 - React + TypeScript
 - Vite
