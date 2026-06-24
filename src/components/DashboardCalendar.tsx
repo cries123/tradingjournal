@@ -28,23 +28,23 @@ export function DashboardCalendar({
   const monthTotal = useMemo(() => getMonthTotalPnl(summaries, year, month), [summaries, year, month]);
 
   return (
-    <div className="bg-bg-card border border-border rounded-xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">{formatMonthYear(year, month)}</h2>
-        <div className="flex items-center gap-3">
-          <span className={`text-sm font-semibold ${monthTotal >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}>
+    <div className="bg-bg-card border border-border rounded-lg p-3 shrink-0">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-sm font-semibold">{formatMonthYear(year, month)}</h2>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-semibold ${monthTotal >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}>
             {formatCurrency(monthTotal)}
           </span>
-          <div className="flex gap-1">
-            <button type="button" onClick={onPrevMonth} className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary" aria-label="Previous month">‹</button>
-            <button type="button" onClick={onNextMonth} className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary" aria-label="Next month">›</button>
+          <div className="flex gap-0.5">
+            <button type="button" onClick={onPrevMonth} className="p-1 rounded hover:bg-bg-tertiary text-text-secondary text-sm" aria-label="Previous month">‹</button>
+            <button type="button" onClick={onNextMonth} className="p-1 rounded hover:bg-bg-tertiary text-text-secondary text-sm" aria-label="Next month">›</button>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-2">
+      <div className="grid grid-cols-7 gap-1">
         {WEEKDAYS.map((day) => (
-          <div key={day} className="text-[11px] text-text-secondary text-center py-1 font-medium uppercase tracking-wide">
+          <div key={day} className="text-[9px] text-text-secondary text-center py-0.5 font-medium uppercase tracking-wide">
             {day}
           </div>
         ))}

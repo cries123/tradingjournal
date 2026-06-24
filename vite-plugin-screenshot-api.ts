@@ -8,8 +8,8 @@ function sendJson(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body));
 }
 
-function handleHealth(_req: IncomingMessage, res: ServerResponse) {
-  sendJson(res, 200, { ok: true });
+function handleHealth(_req: IncomingMessage, res: ServerResponse, getApiKey: () => string) {
+  sendJson(res, 200, { ok: true, hasApiKey: Boolean(getApiKey()) });
 }
 
 function createParseHandler(getApiKey: () => string) {
@@ -60,11 +60,11 @@ export function screenshotApiPlugin(): Plugin {
       envApiKey = env.OPENAI_API_KEY || '';
     },
     configureServer(server) {
-      server.middlewares.use('/api/health', handleHealth);
+      server.middlewares.use('/api/health', (req, res) => handleHealth(req, res, () => envApiKey));
       server.middlewares.use('/api/parse-screenshot', createParseHandler(() => envApiKey));
     },
     configurePreviewServer(server) {
-      server.middlewares.use('/api/health', handleHealth);
+      server.middlewares.use('/api/health', (req, res) => handleHealth(req, res, () => envApiKey));
       server.middlewares.use('/api/parse-screenshot', createParseHandler(() => envApiKey));
     },
   };

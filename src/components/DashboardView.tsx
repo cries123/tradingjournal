@@ -34,7 +34,7 @@ export function DashboardView({
   const weekdayPnl = useMemo(() => getWeekdayPnl(trades, year, month), [trades, year, month]);
 
   return (
-    <div className="space-y-4">
+    <div className="h-full flex flex-col gap-2 min-h-0">
       <DashboardCalendar
         year={year}
         month={month}
@@ -46,14 +46,16 @@ export function DashboardView({
 
       <StatsCards stats={stats} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-bg-card border border-border rounded-xl p-5">
-          <h3 className="text-sm font-semibold mb-4">Performance by Weekday</h3>
-          <WeekdayChart data={weekdayPnl} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 flex-1 min-h-0">
+        <div className="bg-bg-card border border-border rounded-lg p-3 flex flex-col min-h-0">
+          <h3 className="text-xs font-semibold mb-2 shrink-0">Performance by Weekday</h3>
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <WeekdayChart data={weekdayPnl} />
+          </div>
         </div>
-        <div className="bg-bg-card border border-border rounded-xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold">Gross Daily P&L</h3>
+        <div className="bg-bg-card border border-border rounded-lg p-3 flex flex-col min-h-0">
+          <div className="flex items-center justify-between mb-2 shrink-0">
+            <h3 className="text-xs font-semibold">Gross Daily P&L</h3>
             <div className="flex gap-2 text-[10px]">
               <span className="flex items-center gap-1 text-profit-bright">
                 <span className="w-2 h-2 rounded-sm bg-profit-bright" /> Win
@@ -63,7 +65,9 @@ export function DashboardView({
               </span>
             </div>
           </div>
-          <DailyPnlChart data={dailyPnl} />
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <DailyPnlChart data={dailyPnl} />
+          </div>
         </div>
       </div>
     </div>

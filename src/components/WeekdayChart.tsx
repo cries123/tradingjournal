@@ -11,21 +11,21 @@ export function WeekdayChart({ data }: WeekdayChartProps) {
 
   if (!hasData) {
     return (
-      <div className="flex items-center justify-center h-48 text-sm text-text-secondary">
+      <div className="flex items-center justify-center h-full text-xs text-text-secondary">
         No weekday data this month
       </div>
     );
   }
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1 h-full flex flex-col justify-center">
       {data.map((point) => {
         const widthPct = (Math.abs(point.pnl) / maxAbs) * 100;
         const isProfit = point.pnl >= 0;
         return (
-          <div key={point.label} className="flex items-center gap-2">
-            <span className="text-[11px] text-text-secondary w-8 shrink-0">{point.label}</span>
-            <div className="flex-1 h-5 bg-bg-primary rounded overflow-hidden relative">
+          <div key={point.label} className="flex items-center gap-1.5">
+            <span className="text-[10px] text-text-secondary w-7 shrink-0">{point.label}</span>
+            <div className="flex-1 h-3.5 bg-bg-primary rounded overflow-hidden relative">
               {point.pnl !== 0 && (
                 <div
                   className={`h-full rounded ${isProfit ? 'bg-profit-bright' : 'bg-loss-bright'}`}
@@ -33,7 +33,7 @@ export function WeekdayChart({ data }: WeekdayChartProps) {
                 />
               )}
             </div>
-            <span className={`text-[11px] font-medium w-20 text-right shrink-0 ${point.pnl >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}>
+            <span className={`text-[10px] font-medium w-16 text-right shrink-0 ${point.pnl >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}>
               {point.pnl !== 0 ? formatCurrency(point.pnl) : '—'}
             </span>
           </div>

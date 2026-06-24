@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { TradeListItem } from './TradeListItem';
 import type { ParsedTradeInput, Trade, TradeSide } from '../types';
 import { checkParseServer, loadApiKey, parseScreenshot, saveApiKey } from '../utils/parseScreenshot';
@@ -27,12 +27,19 @@ export function ScreenshotImportModal({ onClose, onSave, targetDate }: Screensho
   const [step, setStep] = useState<Step>('upload');
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [apiKey, setApiKey] = useState(loadApiKey);
+  const [serverHasApiKey, setServerHasApiKey] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reviewTrades, setReviewTrades] = useState<ReviewTrade[]>([]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [parseProgress, setParseProgress] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    void checkParseServer().then((status) => {
+      if (status.hasApiKey) setServerHasApiKey(true);
+    });
+  }, []);
 
   const addFiles = useCallback((incoming: FileList | File[]) => {
     const images = Array.from(incoming).filter((f) => f.type.startsWith('image/'));
@@ -76,9 +83,15 @@ export function ScreenshotImportModal({ onClose, onSave, targetDate }: Screensho
     saveApiKey(apiKey.trim());
     setError(null);
 
-    const serverOk = await checkParseServer();
-    if (!serverOk) {
+    const serverStatus = await checkParseServer();
+    if (!serverStatus.ok) {
       setError('Server is not running. Reload the page and try again.');
+      return;
+    }
+
+    const effectiveKey = serverStatus.hasApiKey ? undefined : apiKey.trim() || undefined;
+    if (!serverStatus.hasApiKey && !effectiveKey) {
+      setError('OpenAI API key is required. Add it below or set OPENAI_API_KEY on the server.');
       return;
     }
 
@@ -94,7 +107,7 @@ export function ScreenshotImportModal({ onClose, onSave, targetDate }: Screensho
       if (i > 0) await new Promise((r) => setTimeout(r, 500));
 
       try {
-        const result = await parseScreenshot(file, apiKey.trim() || undefined);
+        const result = await parseScreenshot(file, effectiveKey);
         for (const t of result.trades) {
           allTrades.push({
             ...t,
@@ -239,18 +252,29 @@ export function ScreenshotImportModal({ onClose, onSave, targetDate }: Screensho
               </div>
             )}
 
-            <div className="mt-4">
-              <label className="block">
-                <span className="text-xs text-text-secondary mb-1 block">OpenAI API Key</span>
-                <input
-                  type="password"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="sk-..."
-                  className="input-field"
-                />
-              </label>
-            </div>
+            {!serverHasApiKey && (
+              <div className="mt-4">
+                <label className="block">
+                  <span className="text-xs text-text-secondary mb-1 block">OpenAI API Key</span>
+                  <input
+                    type="password"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="sk-..."
+                    className="input-field"
+                  />
+                </label>
+                <p className="text-[10px] text-text-secondary mt-1">
+                  On Netlify, set <code className="text-accent">OPENAI_API_KEY</code> in site env vars instead.
+                </p>
+              </div>
+            )}
+
+            {serverHasApiKey && (
+              <p className="mt-4 text-[10px] text-text-secondary">
+                AI parsing is configured on the server — no API key needed.
+              </p>
+            )}
 
             {error && <p className="text-sm text-red-400 mt-3">{error}</p>}
 

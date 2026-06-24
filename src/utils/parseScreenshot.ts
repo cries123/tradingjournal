@@ -19,12 +19,19 @@ export interface ParseScreenshotResult {
   trades: ParsedTradeInput[];
 }
 
-export async function checkParseServer(): Promise<boolean> {
+export interface ParseServerStatus {
+  ok: boolean;
+  hasApiKey: boolean;
+}
+
+export async function checkParseServer(): Promise<ParseServerStatus> {
   try {
     const response = await fetch('/api/health');
-    return response.ok;
+    if (!response.ok) return { ok: false, hasApiKey: false };
+    const data = (await response.json()) as { hasApiKey?: boolean };
+    return { ok: true, hasApiKey: Boolean(data.hasApiKey) };
   } catch {
-    return false;
+    return { ok: false, hasApiKey: false };
   }
 }
 

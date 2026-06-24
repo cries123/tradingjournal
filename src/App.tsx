@@ -1,12 +1,15 @@
 import { useState } from 'react';
+import { AuthModal } from './components/AuthModal';
 import { DashboardView } from './components/DashboardView';
 import { Sidebar } from './components/Sidebar';
 import { CsvImportModal } from './components/CsvImportModal';
 import { ScreenshotImportModal } from './components/ScreenshotImportModal';
 import { DayDetailModal, TradeModal } from './components/TradeModal';
+import { useAuth } from './context/AuthContext';
 import { useTrades } from './hooks/useTrades';
 
 export default function App() {
+  const { user, loading, firebaseEnabled } = useAuth();
   const {
     trades,
     allTrades,
@@ -25,6 +28,8 @@ export default function App() {
   const [tradeModalDate, setTradeModalDate] = useState<string | undefined>();
   const [importTargetDate, setImportTargetDate] = useState<string | undefined>();
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  const showAuthModal = firebaseEnabled && !loading && !user;
 
   const handlePrevMonth = () => {
     if (month === 0) {
@@ -68,14 +73,15 @@ export default function App() {
   };
 
   return (
-    <div className="flex min-h-screen bg-bg-primary">
+    <div className="flex h-full bg-bg-primary overflow-hidden">
       <Sidebar
         onAddTrade={() => openAddTrade()}
         onImportScreenshot={() => openImportScreenshot()}
         onImportCsv={() => openImportCsv()}
+        onClearAll={() => void clearAll()}
       />
 
-      <main className="flex-1 p-5 overflow-auto max-w-6xl">
+      <main className="flex-1 min-w-0 min-h-0 p-3 overflow-hidden">
         <DashboardView
           trades={trades}
           year={year}
@@ -84,13 +90,9 @@ export default function App() {
           onPrevMonth={handlePrevMonth}
           onNextMonth={handleNextMonth}
         />
-
-        <div className="mt-6 pt-4 border-t border-border text-xs text-text-secondary">
-          <button type="button" onClick={clearAll} className="hover:text-red-400 transition-colors">
-            Clear all trades
-          </button>
-        </div>
       </main>
+
+      {showAuthModal && <AuthModal />}
 
       {showCsvModal && (
         <CsvImportModal

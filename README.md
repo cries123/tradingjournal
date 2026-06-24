@@ -54,29 +54,46 @@ Add your OpenAI API key:
 OPENAI_API_KEY=sk-your-key-here
 ```
 
-Restart the dev server after changing `.env`. You can also paste the key in the import dialog (stored in your browser only).
+Restart the dev server after changing `.env`. You can also paste the key in the import dialog when no server key is configured (stored in your browser only).
 
 ### 5. Firebase cloud sync (optional)
 
 1. Create a project at [Firebase Console](https://console.firebase.google.com/)
 2. Add a **Web app** and copy the config values into `.env` (see `.env.example`)
-3. Enable **Authentication → Google** sign-in provider
+3. Enable **Authentication → Email/Password** and **Google** sign-in providers
 4. Create a **Firestore Database** (production mode)
-5. Deploy rules from `firestore.rules` in the Firebase console (Rules tab):
-
-```
-allow read, write: if request.auth.uid == userId;
-```
-
-6. Restart `npm run dev` and click **Sign in with Google** in the sidebar
+5. Deploy rules from `firestore.rules` in the Firebase console (Rules tab)
+6. Add your Netlify domain under **Authentication → Settings → Authorized domains**
+7. Restart `npm run dev` — a login popup appears on first visit
 
 Your trades sync to `users/{your-uid}/trades` in Firestore. Local browser trades migrate automatically on first sign-in.
 
 ---
 
+## Deploy to Netlify
+
+1. Push this repo to GitHub and connect it in [Netlify](https://www.netlify.com/)
+2. Build settings are in `netlify.toml` (`npm run build`, publish `dist`)
+3. Add **Environment variables** in Netlify → Site settings → Environment:
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `OPENAI_API_KEY` | For screenshot AI | Server-side only — never exposed to the browser |
+| `VITE_FIREBASE_API_KEY` | For cloud sync | Firebase web config |
+| `VITE_FIREBASE_AUTH_DOMAIN` | For cloud sync | |
+| `VITE_FIREBASE_PROJECT_ID` | For cloud sync | |
+| `VITE_FIREBASE_STORAGE_BUCKET` | For cloud sync | |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | For cloud sync | |
+| `VITE_FIREBASE_APP_ID` | For cloud sync | |
+
+4. Deploy. Screenshot import calls `/api/parse-screenshot`, which runs as a Netlify Function using your `OPENAI_API_KEY`.
+
+---
+
 ## Features
 
-- **Dashboard** — Calendar, Net P&L, win rate, profit factor, weekday & daily charts
+- **Dashboard** — Calendar, Net P&L, win rate, profit factor, weekday & daily charts (fits in one screen, no scrolling)
+- **Login popup** — Email/password or Google sign-in; create an account stored in Firebase
 - **Import CSV** — Schwab/Thinkorswim account statement (`Account Trade History`)
 - **Import Screenshot** — AI reads Thinkorswim P/L Day from phone screenshots
 - **Log trades manually** — Symbol, P/L, setup tags
@@ -97,7 +114,7 @@ Your trades sync to `users/{your-uid}/trades` in Firestore. Local browser trades
 ## Data & privacy
 
 - Without Firebase: trades saved in your browser only
-- With Firebase: trades sync to your Firestore under your Google account
+- With Firebase: trades sync to your Firestore under your account
 - CSV import runs in your browser — your statement never leaves your machine
 - Screenshot AI sends images to OpenAI only when you use that feature
 
@@ -106,3 +123,5 @@ Your trades sync to `users/{your-uid}/trades` in Firestore. Local browser trades
 - React + TypeScript
 - Vite
 - Tailwind CSS
+- Firebase Auth + Firestore
+- Netlify Functions (OpenAI screenshot parsing)

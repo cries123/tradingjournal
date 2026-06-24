@@ -10,9 +10,9 @@ export function StatsCards({ stats }: StatsCardsProps) {
   const lossPct = 100 - winPct;
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 shrink-0">
       <StatCard label="Net P&L">
-        <span className={`text-2xl font-bold ${stats.netPnl >= 0 ? 'text-text-primary' : 'text-loss-bright'}`}>
+        <span className={`text-lg font-bold ${stats.netPnl >= 0 ? 'text-text-primary' : 'text-loss-bright'}`}>
           {formatCurrency(stats.netPnl)}
         </span>
         {stats.netPnl > 0 && (
@@ -23,7 +23,7 @@ export function StatsCards({ stats }: StatsCardsProps) {
       </StatCard>
 
       <StatCard label="Trade Win Rate">
-        <span className="text-2xl font-bold">{stats.totalTrades > 0 ? `${winPct.toFixed(2)}%` : '—'}</span>
+        <span className="text-lg font-bold">{stats.totalTrades > 0 ? `${winPct.toFixed(2)}%` : '—'}</span>
         {stats.totalTrades > 0 && (
           <div className="mt-2 h-1.5 rounded-full bg-bg-primary overflow-hidden flex">
             <div className="bg-profit-bright h-full" style={{ width: `${winPct}%` }} />
@@ -33,7 +33,7 @@ export function StatsCards({ stats }: StatsCardsProps) {
       </StatCard>
 
       <StatCard label="Avg Win / Loss">
-        <span className="text-2xl font-bold">
+        <span className="text-lg font-bold">
           {stats.totalTrades > 0 ? stats.avgRR.toFixed(2) : '—'}
         </span>
         <p className="text-[10px] text-text-secondary mt-1">Average win ÷ average loss</p>
@@ -41,7 +41,7 @@ export function StatsCards({ stats }: StatsCardsProps) {
 
       <StatCard label="Profit Factor">
         <div className="flex items-center gap-3">
-          <span className="text-2xl font-bold">
+          <span className="text-lg font-bold">
             {stats.totalTrades > 0 ? (stats.profitFactor >= 99 ? '∞' : stats.profitFactor.toFixed(2)) : '—'}
           </span>
           {stats.totalTrades > 0 && stats.profitFactor > 1 && (
@@ -67,8 +67,8 @@ export function StatsCards({ stats }: StatsCardsProps) {
 
 function StatCard({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="bg-bg-card border border-border rounded-xl p-4">
-      <p className="text-xs text-text-secondary mb-2">{label}</p>
+    <div className="bg-bg-card border border-border rounded-lg p-2.5">
+      <p className="text-[10px] text-text-secondary mb-1">{label}</p>
       <div className="flex items-center flex-wrap">{children}</div>
     </div>
   );
