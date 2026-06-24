@@ -8,6 +8,9 @@ export interface TradingStats {
   totalTrades: number;
   winningTrades: number;
   losingTrades: number;
+  avgProfitPerTrade: number;
+  avgProfitPerDay: number;
+  tradingDays: number;
 }
 
 export interface DailyPnlPoint {
@@ -25,7 +28,18 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export function computeStats(trades: Trade[]): TradingStats {
   if (trades.length === 0) {
-    return { netPnl: 0, winRate: 0, avgRR: 0, profitFactor: 0, totalTrades: 0, winningTrades: 0, losingTrades: 0 };
+    return {
+      netPnl: 0,
+      winRate: 0,
+      avgRR: 0,
+      profitFactor: 0,
+      totalTrades: 0,
+      winningTrades: 0,
+      losingTrades: 0,
+      avgProfitPerTrade: 0,
+      avgProfitPerDay: 0,
+      tradingDays: 0,
+    };
   }
 
   const winners = trades.filter((t) => t.pnl > 0);
@@ -35,6 +49,7 @@ export function computeStats(trades: Trade[]): TradingStats {
   const grossLoss = Math.abs(losers.reduce((s, t) => s + t.pnl, 0));
   const avgWin = winners.length ? grossProfit / winners.length : 0;
   const avgLoss = losers.length ? grossLoss / losers.length : 0;
+  const tradingDays = new Set(trades.map((t) => t.date)).size;
 
   return {
     netPnl,
@@ -44,6 +59,9 @@ export function computeStats(trades: Trade[]): TradingStats {
     totalTrades: trades.length,
     winningTrades: winners.length,
     losingTrades: losers.length,
+    avgProfitPerTrade: netPnl / trades.length,
+    avgProfitPerDay: tradingDays > 0 ? netPnl / tradingDays : 0,
+    tradingDays,
   };
 }
 

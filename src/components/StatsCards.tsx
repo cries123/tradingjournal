@@ -10,7 +10,7 @@ export function StatsCards({ stats }: StatsCardsProps) {
   const lossPct = 100 - winPct;
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 md:gap-3 shrink-0">
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5 md:gap-3 shrink-0">
       <StatCard label="Net P&L">
         <span className={`text-sm md:text-2xl font-bold ${stats.netPnl >= 0 ? 'text-text-primary' : 'text-loss-bright'}`}>
           {formatCurrency(stats.netPnl)}
@@ -19,6 +19,31 @@ export function StatsCards({ stats }: StatsCardsProps) {
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/20 text-accent font-medium ml-2">
             {stats.totalTrades > 0 ? '▲' : ''}
           </span>
+        )}
+      </StatCard>
+
+      <StatCard label="Avg Profit / Trade">
+        <span
+          className={`text-sm md:text-2xl font-bold ${
+            stats.avgProfitPerTrade >= 0 ? 'text-text-primary' : 'text-loss-bright'
+          }`}
+        >
+          {stats.totalTrades > 0 ? formatCurrency(stats.avgProfitPerTrade) : '—'}
+        </span>
+      </StatCard>
+
+      <StatCard label="Avg Profit / Day">
+        <span
+          className={`text-sm md:text-2xl font-bold ${
+            stats.avgProfitPerDay >= 0 ? 'text-text-primary' : 'text-loss-bright'
+          }`}
+        >
+          {stats.tradingDays > 0 ? formatCurrency(stats.avgProfitPerDay) : '—'}
+        </span>
+        {stats.tradingDays > 0 && (
+          <p className="text-[9px] md:text-[10px] text-text-secondary mt-0.5 md:mt-1 hidden sm:block">
+            Across {stats.tradingDays} trading {stats.tradingDays === 1 ? 'day' : 'days'}
+          </p>
         )}
       </StatCard>
 
