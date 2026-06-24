@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { TradeListItem } from './TradeListItem';
 import type { Trade, TradeSide } from '../types';
 import { formatCurrency } from '../utils/format';
 
@@ -144,9 +145,20 @@ interface DayDetailModalProps {
   onClose: () => void;
   onDelete: (id: string) => void;
   onAddTrade: () => void;
+  onImportCsv: () => void;
+  onImportScreenshot: () => void;
 }
 
-export function DayDetailModal({ date, trades, onClose, onDelete, onAddTrade }: DayDetailModalProps) {
+export function DayDetailModal({
+  date,
+  trades,
+  onClose,
+  onDelete,
+  onAddTrade,
+  onImportCsv,
+  onImportScreenshot,
+}: DayDetailModalProps) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const dayTrades = trades.filter((t) => t.date === date);
   const totalPnl = dayTrades.reduce((sum, t) => sum + t.pnl, 0);
   const formattedDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
@@ -181,53 +193,61 @@ export function DayDetailModal({ date, trades, onClose, onDelete, onAddTrade }: 
         </div>
 
         {dayTrades.length === 0 ? (
-          <p className="text-text-secondary text-sm mb-4">No trades recorded for this day.</p>
+          <p className="text-text-secondary text-sm mb-4">No trades yet — import or add trades for this day.</p>
         ) : (
           <div className="space-y-2 mb-4">
             {dayTrades.map((trade) => (
-              <div
+              <TradeListItem
                 key={trade.id}
-                className="flex items-center justify-between p-3 bg-bg-tertiary rounded-md"
-              >
-                <div>
-                  <span className="font-medium">{trade.symbol}</span>
-                  {trade.setup && (
-                    <span className="ml-2 px-1.5 py-0.5 text-[10px] font-semibold uppercase bg-tag text-bg-primary rounded-sm">
-                      {trade.setup}
-                    </span>
-                  )}
-                  {trade.side && (
-                    <span className="ml-2 text-xs text-text-secondary capitalize">{trade.side}</span>
-                  )}
-                  {trade.notes && (
-                    <p className="text-xs text-text-secondary mt-1">{trade.notes}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className={`font-semibold ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {formatCurrency(trade.pnl)}
-                  </span>
+                trade={trade}
+                expanded={expandedId === trade.id}
+                onToggle={() =>
+                  setExpandedId((prev) => (prev === trade.id ? null : trade.id))
+                }
+                trailing={
                   <button
                     type="button"
-                    onClick={() => onDelete(trade.id)}
-                    className="text-text-secondary hover:text-red-400 text-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(trade.id);
+                    }}
+                    className="text-text-secondary hover:text-red-400 text-sm shrink-0 ml-2"
                     aria-label="Delete trade"
                   >
                     ✕
                   </button>
-                </div>
-              </div>
+                }
+              />
             ))}
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={onAddTrade}
-          className="w-full py-2 border border-dashed border-border rounded-md text-text-secondary hover:text-text-primary hover:border-accent transition-colors"
-        >
-          + Add trade for this day
-        </button>
+        <div className="space-y-2">
+          <p className="text-xs text-text-secondary font-medium uppercase tracking-wide">Import trades</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={onImportCsv}
+              className="py-2.5 px-3 border border-border rounded-md text-sm text-text-primary hover:border-accent hover:bg-accent/10 transition-colors"
+            >
+              📄 Import CSV
+            </button>
+            <button
+              type="button"
+              onClick={onImportScreenshot}
+              className="py-2.5 px-3 border border-border rounded-md text-sm text-text-primary hover:border-accent hover:bg-accent/10 transition-colors"
+            >
+              📷 Screenshot
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={onAddTrade}
+            className="w-full py-2 border border-dashed border-border rounded-md text-text-secondary hover:text-text-primary hover:border-accent transition-colors text-sm"
+          >
+            + Log trade manually
+          </button>
+        </div>
       </div>
     </div>
   );

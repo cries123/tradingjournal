@@ -1,29 +1,35 @@
 import { useState } from 'react';
-import { CalendarView } from './components/CalendarView';
-import { FiltersBar } from './components/FiltersBar';
+import { AuthModal } from './components/AuthModal';
+import { DashboardView } from './components/DashboardView';
 import { Sidebar } from './components/Sidebar';
+import { CsvImportModal } from './components/CsvImportModal';
+import { ScreenshotImportModal } from './components/ScreenshotImportModal';
 import { DayDetailModal, TradeModal } from './components/TradeModal';
+import { useAuth } from './context/AuthContext';
 import { useTrades } from './hooks/useTrades';
 
 export default function App() {
+  const { user, loading, firebaseEnabled } = useAuth();
   const {
     trades,
     allTrades,
-    filters,
-    setFilters,
-    symbols,
-    setups,
     addTrade,
+    addTrades,
     deleteTrade,
-    resetToSample,
     clearAll,
   } = useTrades();
 
-  const [year, setYear] = useState(2025);
-  const [month, setMonth] = useState(3);
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth());
   const [showTradeModal, setShowTradeModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showCsvModal, setShowCsvModal] = useState(false);
   const [tradeModalDate, setTradeModalDate] = useState<string | undefined>();
+  const [importTargetDate, setImportTargetDate] = useState<string | undefined>();
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  const showAuthModal = firebaseEnabled && !loading && !user;
 
   const handlePrevMonth = () => {
     if (month === 0) {
@@ -48,36 +54,67 @@ export default function App() {
     setShowTradeModal(true);
   };
 
+  const openImportCsv = (date?: string) => {
+    setImportTargetDate(date);
+    setShowCsvModal(true);
+    if (date) setSelectedDay(null);
+  };
+
+  const openImportScreenshot = (date?: string) => {
+    setImportTargetDate(date);
+    setShowImportModal(true);
+    if (date) setSelectedDay(null);
+  };
+
+  const closeImportModals = () => {
+    setShowCsvModal(false);
+    setShowImportModal(false);
+    setImportTargetDate(undefined);
+  };
+
   return (
-    <div className="flex min-h-screen">
-      <Sidebar activeView="calendar" onAddTrade={() => openAddTrade()} />
+    <div className="flex h-full bg-bg-primary overflow-hidden">
+      <Sidebar
+        onAddTrade={() => openAddTrade()}
+        onImportScreenshot={() => openImportScreenshot()}
+        onImportCsv={() => openImportCsv()}
+        onClearAll={() => void clearAll()}
+      />
 
-      <main className="flex-1 p-6 overflow-auto">
-        <FiltersBar
-          filters={filters}
-          symbols={symbols}
-          setups={setups}
-          onChange={setFilters}
-        />
-
-        <CalendarView
+      <main className="flex-1 min-w-0 min-h-0 p-3 overflow-hidden">
+        <DashboardView
+          trades={trades}
           year={year}
           month={month}
-          trades={trades}
           onDayClick={setSelectedDay}
           onPrevMonth={handlePrevMonth}
           onNextMonth={handleNextMonth}
         />
-
-        <div className="mt-8 pt-4 border-t border-border flex gap-4 text-xs text-text-secondary">
-          <button type="button" onClick={resetToSample} className="hover:text-text-primary transition-colors">
-            Load sample data
-          </button>
-          <button type="button" onClick={clearAll} className="hover:text-red-400 transition-colors">
-            Clear all trades
-          </button>
-        </div>
       </main>
+
+      {showAuthModal && <AuthModal />}
+
+      {showCsvModal && (
+        <CsvImportModal
+          targetDate={importTargetDate}
+          onClose={closeImportModals}
+          onSave={(t) => {
+            addTrades(t);
+            closeImportModals();
+          }}
+        />
+      )}
+
+      {showImportModal && (
+        <ScreenshotImportModal
+          targetDate={importTargetDate}
+          onClose={closeImportModals}
+          onSave={(t) => {
+            addTrades(t);
+            closeImportModals();
+          }}
+        />
+      )}
 
       {showTradeModal && (
         <TradeModal
@@ -100,6 +137,8 @@ export default function App() {
             openAddTrade(selectedDay);
             setSelectedDay(null);
           }}
+          onImportCsv={() => openImportCsv(selectedDay)}
+          onImportScreenshot={() => openImportScreenshot(selectedDay)}
         />
       )}
     </div>

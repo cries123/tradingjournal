@@ -1,0 +1,18 @@
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import type { User } from 'firebase/auth';
+import { getFirebaseDb } from '../lib/firebase';
+
+export async function ensureUserProfile(user: User, isNewUser = false): Promise<void> {
+  const ref = doc(getFirebaseDb(), 'users', user.uid);
+  await setDoc(
+    ref,
+    {
+      email: user.email ?? '',
+      displayName: user.displayName ?? '',
+      photoURL: user.photoURL ?? '',
+      ...(isNewUser ? { createdAt: serverTimestamp() } : {}),
+      lastLoginAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+}
