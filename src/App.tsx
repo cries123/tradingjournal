@@ -93,10 +93,11 @@ export default function App() {
         {!isDesktop && <MobileHeader onOpenMenu={() => setMobileMenuOpen(true)} />}
 
         <main
-          className={`flex-1 min-h-0 overflow-y-auto p-2 md:p-3 ${
-            isDesktop ? 'md:overflow-hidden' : ''
+          className={`flex-1 min-h-0 p-2 md:p-5 ${
+            isDesktop ? 'overflow-hidden' : 'overflow-y-auto'
           }`}
         >
+          <div className={`h-full ${isDesktop ? 'max-w-6xl mx-auto' : ''}`}>
           <DashboardView
             trades={trades}
             year={year}
@@ -105,6 +106,7 @@ export default function App() {
             onPrevMonth={handlePrevMonth}
             onNextMonth={handleNextMonth}
           />
+          </div>
         </main>
 
         {!isDesktop && (

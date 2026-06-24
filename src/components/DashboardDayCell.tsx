@@ -7,9 +7,12 @@ interface DashboardDayCellProps {
   onClick?: () => void;
 }
 
+const cellShell =
+  'rounded-sm md:rounded-lg text-left transition-all flex flex-col bg-bg-card overflow-hidden aspect-square md:aspect-auto md:h-[72px]';
+
 export function DashboardDayCell({ dayNumber, summary, onClick }: DashboardDayCellProps) {
   if (dayNumber === null) {
-    return <div className="aspect-square md:min-h-[52px] rounded-sm md:rounded-md bg-bg-card/40" />;
+    return <div className={`${cellShell} bg-bg-card/40 border border-transparent`} />;
   }
 
   const hasTrades = summary && summary.tradeCount > 0;
@@ -26,25 +29,25 @@ export function DashboardDayCell({ dayNumber, summary, onClick }: DashboardDayCe
     <button
       type="button"
       onClick={onClick}
-      className={`aspect-square md:aspect-auto md:min-h-[52px] p-0.5 md:p-1.5 rounded-sm md:rounded-md text-left transition-all flex flex-col bg-bg-card border ${borderClass} hover:bg-bg-tertiary cursor-pointer group overflow-hidden`}
+      className={`${cellShell} p-0.5 md:p-2 border ${borderClass} hover:bg-bg-tertiary cursor-pointer group`}
     >
-      <span className="text-[9px] md:text-[10px] text-text-secondary leading-none">{dayNumber}</span>
+      <span className="text-[9px] md:text-xs text-text-secondary leading-none">{dayNumber}</span>
       {hasTrades ? (
         <div className="mt-auto min-w-0 w-full">
           <span
-            className={`text-[9px] md:text-xs font-bold leading-none block truncate ${
+            className={`text-[9px] md:text-sm font-bold leading-tight block truncate ${
               isProfit ? 'text-profit-bright' : 'text-loss-bright'
             }`}
           >
             <span className="md:hidden">{formatCurrencyCompact(summary.totalPnl)}</span>
             <span className="hidden md:inline">{formatCurrency(summary.totalPnl)}</span>
           </span>
-          <span className="hidden md:block text-[9px] text-text-secondary mt-0.5 truncate">
+          <span className="hidden md:block text-[10px] text-text-secondary mt-0.5 truncate">
             {summary.tradeCount} {summary.tradeCount === 1 ? 'trade' : 'trades'}
           </span>
         </div>
       ) : (
-        <span className="mt-auto hidden md:block text-[9px] text-text-secondary/0 group-hover:text-text-secondary transition-colors">
+        <span className="mt-auto hidden md:block text-[10px] text-text-secondary/0 group-hover:text-text-secondary transition-colors">
           + import
         </span>
       )}

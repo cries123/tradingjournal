@@ -34,7 +34,7 @@ export function Sidebar({
   const shellClass =
     variant === 'drawer'
       ? 'flex flex-col w-full h-full bg-bg-secondary'
-      : 'flex flex-col w-48 shrink-0 h-full bg-bg-secondary border-r border-border';
+      : 'flex flex-col w-52 shrink-0 h-full bg-bg-secondary border-r border-border';
 
   return (
     <aside className={`${shellClass} overflow-hidden`}>
@@ -68,11 +68,11 @@ export function Sidebar({
 
       <AuthPanel />
 
-      <div className="p-2 border-t border-border space-y-1.5 shrink-0">
+      <div className="p-2 md:p-3 border-t border-border space-y-1.5 md:space-y-2 shrink-0">
         <button
           type="button"
           onClick={wrap(onImportCsv)}
-          className="w-full py-2 border border-border text-text-primary rounded-md text-xs font-medium hover:bg-bg-tertiary transition-colors"
+          className="w-full py-2 md:py-2.5 border border-border text-text-primary rounded-md text-xs md:text-sm font-medium hover:bg-bg-tertiary transition-colors"
         >
           📄 Import CSV
         </button>
