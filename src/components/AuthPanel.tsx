@@ -1,9 +1,10 @@
 import { useAuth } from '../context/AuthContext';
 
-export function AuthPanel() {
+export function AuthPanel({ compact = false }: { compact?: boolean }) {
   const { user, loading, firebaseEnabled, logout } = useAuth();
 
   if (!firebaseEnabled) {
+    if (compact) return null;
     return (
       <div className="px-3 py-2 mx-3 mb-2 rounded-md bg-bg-tertiary border border-border">
         <p className="text-[10px] text-text-secondary leading-relaxed">
@@ -15,6 +16,20 @@ export function AuthPanel() {
 
   if (loading || !user) {
     return null;
+  }
+
+  if (compact) {
+    return (
+      <button
+        type="button"
+        onClick={() => void logout()}
+        className="flex flex-col items-center justify-center gap-0.5 w-full text-text-secondary hover:text-text-primary"
+        title={user.email ?? 'Signed in — tap to sign out'}
+      >
+        <span className="w-2.5 h-2.5 rounded-full bg-profit-bright" />
+        <span className="text-[9px] truncate max-w-full px-1">Out</span>
+      </button>
+    );
   }
 
   return (

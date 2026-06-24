@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import { AuthModal } from './components/AuthModal';
 import { DashboardView } from './components/DashboardView';
+import { MobileBottomNav, MobileDrawer, MobileHeader } from './components/MobileNav';
 import { Sidebar } from './components/Sidebar';
 import { CsvImportModal } from './components/CsvImportModal';
 import { ScreenshotImportModal } from './components/ScreenshotImportModal';
 import { DayDetailModal, TradeModal } from './components/TradeModal';
 import { useAuth } from './context/AuthContext';
+import { useIsDesktop } from './hooks/useMediaQuery';
 import { useTrades } from './hooks/useTrades';
 
 export default function App() {
+  const isDesktop = useIsDesktop();
   const { user, loading, firebaseEnabled } = useAuth();
   const {
     trades,
@@ -28,6 +31,7 @@ export default function App() {
   const [tradeModalDate, setTradeModalDate] = useState<string | undefined>();
   const [importTargetDate, setImportTargetDate] = useState<string | undefined>();
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const showAuthModal = firebaseEnabled && !loading && !user;
 
@@ -72,25 +76,51 @@ export default function App() {
     setImportTargetDate(undefined);
   };
 
+  const closeMobileMenu = () => setMobileMenuOpen(false);
+
+  const sidebarActions = {
+    onAddTrade: () => openAddTrade(),
+    onImportScreenshot: () => openImportScreenshot(),
+    onImportCsv: () => openImportCsv(),
+    onClearAll: () => void clearAll(),
+  };
+
   return (
     <div className="flex h-full bg-bg-primary overflow-hidden">
-      <Sidebar
-        onAddTrade={() => openAddTrade()}
-        onImportScreenshot={() => openImportScreenshot()}
-        onImportCsv={() => openImportCsv()}
-        onClearAll={() => void clearAll()}
-      />
+      {isDesktop && <Sidebar variant="desktop" {...sidebarActions} />}
 
-      <main className="flex-1 min-w-0 min-h-0 p-3 overflow-hidden">
-        <DashboardView
-          trades={trades}
-          year={year}
-          month={month}
-          onDayClick={setSelectedDay}
-          onPrevMonth={handlePrevMonth}
-          onNextMonth={handleNextMonth}
-        />
-      </main>
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 w-full">
+        {!isDesktop && <MobileHeader onOpenMenu={() => setMobileMenuOpen(true)} />}
+
+        <main
+          className={`flex-1 min-h-0 overflow-y-auto p-2 md:p-3 ${
+            isDesktop ? 'md:overflow-hidden' : 'pb-[calc(3.5rem+env(safe-area-inset-bottom))]'
+          }`}
+        >
+          <DashboardView
+            trades={trades}
+            year={year}
+            month={month}
+            onDayClick={setSelectedDay}
+            onPrevMonth={handlePrevMonth}
+            onNextMonth={handleNextMonth}
+          />
+        </main>
+
+        {!isDesktop && (
+          <MobileBottomNav
+            onOpenMenu={() => setMobileMenuOpen(true)}
+            onAddTrade={() => openAddTrade()}
+            onImportScreenshot={() => openImportScreenshot()}
+          />
+        )}
+      </div>
+
+      {!isDesktop && (
+        <MobileDrawer open={mobileMenuOpen} onClose={closeMobileMenu}>
+          <Sidebar variant="drawer" {...sidebarActions} onNavigate={closeMobileMenu} />
+        </MobileDrawer>
+      )}
 
       {showAuthModal && <AuthModal />}
 
