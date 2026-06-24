@@ -42,6 +42,16 @@ body,
   body {
     overscroll-behavior: none;
   }
+
+  .desktop-only {
+    display: none !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .mobile-only {
+    display: none !important;
+  }
 }
 
 @keyframes slide-in {

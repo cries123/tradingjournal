@@ -7,9 +7,11 @@ import { CsvImportModal } from './components/CsvImportModal';
 import { ScreenshotImportModal } from './components/ScreenshotImportModal';
 import { DayDetailModal, TradeModal } from './components/TradeModal';
 import { useAuth } from './context/AuthContext';
+import { useIsDesktop } from './hooks/useMediaQuery';
 import { useTrades } from './hooks/useTrades';
 
 export default function App() {
+  const isDesktop = useIsDesktop();
   const { user, loading, firebaseEnabled } = useAuth();
   const {
     trades,
@@ -76,20 +78,25 @@ export default function App() {
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
+  const sidebarActions = {
+    onAddTrade: () => openAddTrade(),
+    onImportScreenshot: () => openImportScreenshot(),
+    onImportCsv: () => openImportCsv(),
+    onClearAll: () => void clearAll(),
+  };
+
   return (
     <div className="flex h-full bg-bg-primary overflow-hidden">
-      <Sidebar
-        className="hidden md:flex"
-        onAddTrade={() => openAddTrade()}
-        onImportScreenshot={() => openImportScreenshot()}
-        onImportCsv={() => openImportCsv()}
-        onClearAll={() => void clearAll()}
-      />
+      {isDesktop && <Sidebar variant="desktop" {...sidebarActions} />}
 
-      <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        <MobileHeader onOpenMenu={() => setMobileMenuOpen(true)} />
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 w-full">
+        {!isDesktop && <MobileHeader onOpenMenu={() => setMobileMenuOpen(true)} />}
 
-        <main className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden p-2 md:p-3 pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-3">
+        <main
+          className={`flex-1 min-h-0 overflow-y-auto p-2 md:p-3 ${
+            isDesktop ? 'md:overflow-hidden' : 'pb-[calc(3.5rem+env(safe-area-inset-bottom))]'
+          }`}
+        >
           <DashboardView
             trades={trades}
             year={year}
@@ -100,23 +107,20 @@ export default function App() {
           />
         </main>
 
-        <MobileBottomNav
-          onOpenMenu={() => setMobileMenuOpen(true)}
-          onAddTrade={() => openAddTrade()}
-          onImportScreenshot={() => openImportScreenshot()}
-        />
+        {!isDesktop && (
+          <MobileBottomNav
+            onOpenMenu={() => setMobileMenuOpen(true)}
+            onAddTrade={() => openAddTrade()}
+            onImportScreenshot={() => openImportScreenshot()}
+          />
+        )}
       </div>
 
-      <MobileDrawer open={mobileMenuOpen} onClose={closeMobileMenu}>
-        <Sidebar
-          className="w-full h-full"
-          onAddTrade={() => openAddTrade()}
-          onImportScreenshot={() => openImportScreenshot()}
-          onImportCsv={() => openImportCsv()}
-          onClearAll={() => void clearAll()}
-          onNavigate={closeMobileMenu}
-        />
-      </MobileDrawer>
+      {!isDesktop && (
+        <MobileDrawer open={mobileMenuOpen} onClose={closeMobileMenu}>
+          <Sidebar variant="drawer" {...sidebarActions} onNavigate={closeMobileMenu} />
+        </MobileDrawer>
+      )}
 
       {showAuthModal && <AuthModal />}
 

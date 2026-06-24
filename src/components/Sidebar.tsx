@@ -5,7 +5,7 @@ interface SidebarProps {
   onImportScreenshot: () => void;
   onImportCsv: () => void;
   onClearAll: () => void;
-  className?: string;
+  variant?: 'desktop' | 'drawer';
   onNavigate?: () => void;
 }
 
@@ -23,7 +23,7 @@ export function Sidebar({
   onImportScreenshot,
   onImportCsv,
   onClearAll,
-  className = '',
+  variant = 'desktop',
   onNavigate,
 }: SidebarProps) {
   const wrap = (fn: () => void) => () => {
@@ -31,10 +31,13 @@ export function Sidebar({
     onNavigate?.();
   };
 
+  const shellClass =
+    variant === 'drawer'
+      ? 'flex flex-col w-full h-full bg-bg-secondary'
+      : 'flex flex-col w-48 shrink-0 h-full bg-bg-secondary border-r border-border';
+
   return (
-    <aside
-      className={`w-48 shrink-0 bg-bg-secondary border-r border-border flex flex-col h-full overflow-hidden ${className}`}
-    >
+    <aside className={`${shellClass} overflow-hidden`}>
       <div className="p-3 border-b border-border shrink-0">
         <h1 className="text-base font-bold tracking-tight">Trading Journal</h1>
         <p className="text-[10px] text-text-secondary mt-0.5">Track daily P&L</p>
