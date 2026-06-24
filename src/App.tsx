@@ -94,7 +94,7 @@ export default function App() {
 
         <main
           className={`flex-1 min-h-0 overflow-y-auto p-2 md:p-3 ${
-            isDesktop ? 'md:overflow-hidden' : 'pb-[calc(3.5rem+env(safe-area-inset-bottom))]'
+            isDesktop ? 'md:overflow-hidden' : ''
           }`}
         >
           <DashboardView

@@ -30,7 +30,7 @@ export function MobileHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
 
 export function MobileBottomNav({ onOpenMenu, onAddTrade, onImportScreenshot }: MobileNavProps) {
   return (
-    <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border bg-bg-secondary/95 backdrop-blur-sm pb-[env(safe-area-inset-bottom)]">
+    <nav className="shrink-0 z-40 border-t border-border bg-bg-secondary pb-[env(safe-area-inset-bottom)]">
       <div className="grid grid-cols-4 h-14">
         <button
           type="button"

@@ -46,14 +46,14 @@ export function DashboardView({
 
       <StatsCards stats={stats} />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:flex-1 md:min-h-0">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:flex-1 md:min-h-0 pb-2 md:pb-0">
         <div className="bg-bg-card border border-border rounded-lg p-2.5 md:p-3 flex flex-col min-h-[120px] md:min-h-0">
           <h3 className="text-[10px] md:text-xs font-semibold mb-1.5 md:mb-2 shrink-0">Performance by Weekday</h3>
           <div className="flex-1 min-h-0">
             <WeekdayChart data={weekdayPnl} />
           </div>
         </div>
-        <div className="bg-bg-card border border-border rounded-lg p-2.5 md:p-3 flex flex-col min-h-[120px] md:min-h-0">
+        <div className="bg-bg-card border border-border rounded-lg p-2.5 md:p-3 flex flex-col min-h-[140px] md:min-h-0">
           <div className="flex items-center justify-between mb-1.5 md:mb-2 shrink-0">
             <h3 className="text-[10px] md:text-xs font-semibold">Gross Daily P&L</h3>
             <div className="flex gap-2 text-[9px] md:text-[10px]">
