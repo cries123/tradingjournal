@@ -34,7 +34,7 @@ export function DashboardView({
   const weekdayPnl = useMemo(() => getWeekdayPnl(trades, year, month), [trades, year, month]);
 
   return (
-    <div className="h-full flex flex-col gap-2 min-h-0">
+    <div className="h-full flex flex-col gap-2 min-h-0 md:overflow-hidden">
       <DashboardCalendar
         year={year}
         month={month}
@@ -46,26 +46,26 @@ export function DashboardView({
 
       <StatsCards stats={stats} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 flex-1 min-h-0">
-        <div className="bg-bg-card border border-border rounded-lg p-3 flex flex-col min-h-0">
-          <h3 className="text-xs font-semibold mb-2 shrink-0">Performance by Weekday</h3>
-          <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:flex-1 md:min-h-0">
+        <div className="bg-bg-card border border-border rounded-lg p-2.5 md:p-3 flex flex-col min-h-[120px] md:min-h-0">
+          <h3 className="text-[10px] md:text-xs font-semibold mb-1.5 md:mb-2 shrink-0">Performance by Weekday</h3>
+          <div className="flex-1 min-h-0">
             <WeekdayChart data={weekdayPnl} />
           </div>
         </div>
-        <div className="bg-bg-card border border-border rounded-lg p-3 flex flex-col min-h-0">
-          <div className="flex items-center justify-between mb-2 shrink-0">
-            <h3 className="text-xs font-semibold">Gross Daily P&L</h3>
-            <div className="flex gap-2 text-[10px]">
+        <div className="bg-bg-card border border-border rounded-lg p-2.5 md:p-3 flex flex-col min-h-[120px] md:min-h-0">
+          <div className="flex items-center justify-between mb-1.5 md:mb-2 shrink-0">
+            <h3 className="text-[10px] md:text-xs font-semibold">Gross Daily P&L</h3>
+            <div className="flex gap-2 text-[9px] md:text-[10px]">
               <span className="flex items-center gap-1 text-profit-bright">
-                <span className="w-2 h-2 rounded-sm bg-profit-bright" /> Win
+                <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-sm bg-profit-bright" /> Win
               </span>
               <span className="flex items-center gap-1 text-loss-bright">
-                <span className="w-2 h-2 rounded-sm bg-loss-bright" /> Loss
+                <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-sm bg-loss-bright" /> Loss
               </span>
             </div>
           </div>
-          <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0">
             <DailyPnlChart data={dailyPnl} />
           </div>
         </div>

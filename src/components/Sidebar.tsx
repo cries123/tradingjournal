@@ -5,6 +5,8 @@ interface SidebarProps {
   onImportScreenshot: () => void;
   onImportCsv: () => void;
   onClearAll: () => void;
+  className?: string;
+  onNavigate?: () => void;
 }
 
 const NAV_SECTIONS = [
@@ -16,15 +18,29 @@ const NAV_SECTIONS = [
   },
 ];
 
-export function Sidebar({ onAddTrade, onImportScreenshot, onImportCsv, onClearAll }: SidebarProps) {
+export function Sidebar({
+  onAddTrade,
+  onImportScreenshot,
+  onImportCsv,
+  onClearAll,
+  className = '',
+  onNavigate,
+}: SidebarProps) {
+  const wrap = (fn: () => void) => () => {
+    fn();
+    onNavigate?.();
+  };
+
   return (
-    <aside className="w-48 shrink-0 bg-bg-secondary border-r border-border flex flex-col h-full overflow-hidden">
+    <aside
+      className={`w-48 shrink-0 bg-bg-secondary border-r border-border flex flex-col h-full overflow-hidden ${className}`}
+    >
       <div className="p-3 border-b border-border shrink-0">
         <h1 className="text-base font-bold tracking-tight">Trading Journal</h1>
         <p className="text-[10px] text-text-secondary mt-0.5">Track daily P&L</p>
       </div>
 
-      <nav className="flex-1 min-h-0 p-2 space-y-3 overflow-hidden">
+      <nav className="flex-1 min-h-0 p-2 space-y-3 overflow-y-auto">
         {NAV_SECTIONS.map((section) => (
           <div key={section.title}>
             <p className="text-[10px] font-semibold text-text-secondary tracking-wider mb-1 px-2">
@@ -52,28 +68,28 @@ export function Sidebar({ onAddTrade, onImportScreenshot, onImportCsv, onClearAl
       <div className="p-2 border-t border-border space-y-1.5 shrink-0">
         <button
           type="button"
-          onClick={onImportCsv}
+          onClick={wrap(onImportCsv)}
           className="w-full py-2 border border-border text-text-primary rounded-md text-xs font-medium hover:bg-bg-tertiary transition-colors"
         >
           📄 Import CSV
         </button>
         <button
           type="button"
-          onClick={onImportScreenshot}
+          onClick={wrap(onImportScreenshot)}
           className="w-full py-2 border border-accent/50 text-accent rounded-md text-xs font-medium hover:bg-accent/10 transition-colors"
         >
           📷 Import Screenshot
         </button>
         <button
           type="button"
-          onClick={onAddTrade}
+          onClick={wrap(onAddTrade)}
           className="w-full py-2 bg-accent text-white rounded-md text-xs font-medium hover:opacity-90 transition-opacity"
         >
           + Log Trade
         </button>
         <button
           type="button"
-          onClick={onClearAll}
+          onClick={wrap(onClearAll)}
           className="w-full py-1 text-[10px] text-text-secondary hover:text-red-400 transition-colors"
         >
           Clear all trades

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AuthModal } from './components/AuthModal';
 import { DashboardView } from './components/DashboardView';
+import { MobileBottomNav, MobileDrawer, MobileHeader } from './components/MobileNav';
 import { Sidebar } from './components/Sidebar';
 import { CsvImportModal } from './components/CsvImportModal';
 import { ScreenshotImportModal } from './components/ScreenshotImportModal';
@@ -28,6 +29,7 @@ export default function App() {
   const [tradeModalDate, setTradeModalDate] = useState<string | undefined>();
   const [importTargetDate, setImportTargetDate] = useState<string | undefined>();
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const showAuthModal = firebaseEnabled && !loading && !user;
 
@@ -72,25 +74,49 @@ export default function App() {
     setImportTargetDate(undefined);
   };
 
+  const closeMobileMenu = () => setMobileMenuOpen(false);
+
   return (
     <div className="flex h-full bg-bg-primary overflow-hidden">
       <Sidebar
+        className="hidden md:flex"
         onAddTrade={() => openAddTrade()}
         onImportScreenshot={() => openImportScreenshot()}
         onImportCsv={() => openImportCsv()}
         onClearAll={() => void clearAll()}
       />
 
-      <main className="flex-1 min-w-0 min-h-0 p-3 overflow-hidden">
-        <DashboardView
-          trades={trades}
-          year={year}
-          month={month}
-          onDayClick={setSelectedDay}
-          onPrevMonth={handlePrevMonth}
-          onNextMonth={handleNextMonth}
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
+        <MobileHeader onOpenMenu={() => setMobileMenuOpen(true)} />
+
+        <main className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden p-2 md:p-3 pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-3">
+          <DashboardView
+            trades={trades}
+            year={year}
+            month={month}
+            onDayClick={setSelectedDay}
+            onPrevMonth={handlePrevMonth}
+            onNextMonth={handleNextMonth}
+          />
+        </main>
+
+        <MobileBottomNav
+          onOpenMenu={() => setMobileMenuOpen(true)}
+          onAddTrade={() => openAddTrade()}
+          onImportScreenshot={() => openImportScreenshot()}
         />
-      </main>
+      </div>
+
+      <MobileDrawer open={mobileMenuOpen} onClose={closeMobileMenu}>
+        <Sidebar
+          className="w-full h-full"
+          onAddTrade={() => openAddTrade()}
+          onImportScreenshot={() => openImportScreenshot()}
+          onImportCsv={() => openImportCsv()}
+          onClearAll={() => void clearAll()}
+          onNavigate={closeMobileMenu}
+        />
+      </MobileDrawer>
 
       {showAuthModal && <AuthModal />}
 
