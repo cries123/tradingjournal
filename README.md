@@ -56,6 +56,22 @@ OPENAI_API_KEY=sk-your-key-here
 
 Restart the dev server after changing `.env`. You can also paste the key in the import dialog (stored in your browser only).
 
+### 5. Firebase cloud sync (optional)
+
+1. Create a project at [Firebase Console](https://console.firebase.google.com/)
+2. Add a **Web app** and copy the config values into `.env` (see `.env.example`)
+3. Enable **Authentication → Google** sign-in provider
+4. Create a **Firestore Database** (production mode)
+5. Deploy rules from `firestore.rules` in the Firebase console (Rules tab):
+
+```
+allow read, write: if request.auth.uid == userId;
+```
+
+6. Restart `npm run dev` and click **Sign in with Google** in the sidebar
+
+Your trades sync to `users/{your-uid}/trades` in Firestore. Local browser trades migrate automatically on first sign-in.
+
 ---
 
 ## Features
@@ -64,7 +80,7 @@ Restart the dev server after changing `.env`. You can also paste the key in the 
 - **Import CSV** — Schwab/Thinkorswim account statement (`Account Trade History`)
 - **Import Screenshot** — AI reads Thinkorswim P/L Day from phone screenshots
 - **Log trades manually** — Symbol, P/L, setup tags
-- **Persistent storage** — All data stays in your browser (`localStorage`); nothing is sent to a server except OpenAI when parsing screenshots
+- **Persistent storage** — Browser cache + **Firebase Firestore** when signed in
 
 ## Import your Schwab trades
 
@@ -80,10 +96,10 @@ Restart the dev server after changing `.env`. You can also paste the key in the 
 
 ## Data & privacy
 
-- Trades are saved **only in your browser** on this computer
-- Clearing browser data or using a different browser/device will not show the same trades
-- CSV import runs entirely in your browser — your statement never leaves your machine
-- Screenshot AI parsing sends the image to OpenAI if you use that feature
+- Without Firebase: trades saved in your browser only
+- With Firebase: trades sync to your Firestore under your Google account
+- CSV import runs in your browser — your statement never leaves your machine
+- Screenshot AI sends images to OpenAI only when you use that feature
 
 ## Tech stack
 

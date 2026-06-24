@@ -1,3 +1,5 @@
+import { AuthPanel } from './AuthPanel';
+
 interface SidebarProps {
   onAddTrade: () => void;
   onImportScreenshot: () => void;
@@ -43,6 +45,8 @@ export function Sidebar({ onAddTrade, onImportScreenshot, onImportCsv }: Sidebar
           </div>
         ))}
       </nav>
+
+      <AuthPanel />
 
       <div className="p-3 border-t border-border space-y-2">
         <button
