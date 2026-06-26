@@ -18,6 +18,16 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
+    match /users/{userId}/integrations/{integrationId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /coachShares/{shareToken} {
+      allow read: if true;
+      allow create, update: if request.auth != null && request.auth.uid == request.resource.data.ownerUid;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.ownerUid;
+    }
+
     match /usernames/{usernameId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null

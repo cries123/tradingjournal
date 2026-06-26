@@ -1,6 +1,7 @@
 import type { Trade } from '../types';
 import { formatCurrency } from '../utils/format';
 import { marketSessionFromTime, tradeTags } from '../utils/tradeHelpers';
+import { buildTradingViewReplayUrl } from '../utils/tradingView';
 
 interface TradeDetailsProps {
   trade: Partial<Trade>;
@@ -83,6 +84,16 @@ export function TradeDetails({ trade, compact }: TradeDetailsProps) {
             <img key={i} src={url} alt="Trade chart" className="w-20 h-20 object-cover rounded border border-border/60" />
           ))}
         </div>
+      )}
+      {(trade.chartUrl || trade.symbol) && (
+        <a
+          href={trade.chartUrl || buildTradingViewReplayUrl(trade)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex text-xs text-emerald-400 hover:text-emerald-300 mt-2"
+        >
+          Open chart replay →
+        </a>
       )}
     </div>
   );
