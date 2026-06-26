@@ -112,10 +112,15 @@ export function AuthModal() {
 
       <div className="relative w-full max-w-4xl grid md:grid-cols-5 rounded-2xl overflow-hidden glow-border shadow-2xl shadow-black/50 my-auto">
         {/* Brand panel */}
-        <div className="md:col-span-2 bg-gradient-to-br from-emerald-500/15 via-bg-secondary to-cyan-500/10 border-b md:border-b-0 md:border-r border-border/50 p-8 md:p-10 flex flex-col justify-between">
+        <div className="md:col-span-2 bg-gradient-to-br from-emerald-500/15 via-bg-secondary to-cyan-500/10 border-b md:border-b-0 md:border-r border-border/50 p-6 md:p-10 flex flex-col justify-between">
           <div>
-            <BrandLogo size="lg" />
-            <h2 className="text-2xl md:text-3xl font-bold mt-8 leading-tight">
+            <div className="md:hidden">
+              <BrandLogo size="md" variant="compact" />
+            </div>
+            <div className="hidden md:block">
+              <BrandLogo size="lg" variant="full" />
+            </div>
+            <h2 className="text-xl md:text-3xl font-bold mt-5 md:mt-8 leading-tight">
               {mode === 'login' ? 'Welcome back' : mode === 'signup' ? 'Create your account' : 'Reset password'}
             </h2>
             <p className="text-text-secondary mt-3 text-sm leading-relaxed">

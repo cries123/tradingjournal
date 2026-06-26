@@ -17,7 +17,7 @@ export function MobileHeader({
   onHome?: () => void;
 }) {
   return (
-    <header className="md:hidden shrink-0 flex items-center gap-2 px-3 py-2.5 border-b border-border/60 bg-bg-secondary/90 backdrop-blur-md">
+    <header className="md:hidden shrink-0 flex items-center gap-2 px-3 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] border-b border-border/60 bg-bg-secondary/90 backdrop-blur-md">
       <button
         type="button"
         onClick={onOpenMenu}
@@ -28,11 +28,11 @@ export function MobileHeader({
       </button>
       {onHome ? (
         <button type="button" onClick={onHome} className="flex-1 min-w-0 text-left focus-ring rounded">
-          <BrandLogo size="sm" />
+          <BrandLogo size="sm" variant="compact" />
         </button>
       ) : (
         <div className="flex-1 min-w-0">
-          <BrandLogo size="sm" />
+          <BrandLogo size="sm" variant="compact" />
         </div>
       )}
     </header>

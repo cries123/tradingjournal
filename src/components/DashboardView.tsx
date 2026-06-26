@@ -81,7 +81,7 @@ export function DashboardView({
     <div className="flex flex-col gap-2 md:gap-3 pb-2">
       <AccountSwitcher />
 
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex flex-wrap items-center gap-2 shrink-0">
         <div className="flex rounded-lg bg-bg-tertiary/60 p-0.5 border border-border/50">
           <button
             type="button"

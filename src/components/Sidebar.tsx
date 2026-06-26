@@ -40,10 +40,10 @@ export function Sidebar({
       <div className="px-4 py-3.5 border-b border-border/60 shrink-0">
         {onHome ? (
           <button type="button" onClick={onHome} className="text-left hover:opacity-90 transition-opacity focus-ring rounded">
-            <BrandLogo size="md" />
+            <BrandLogo size="md" variant="compact" />
           </button>
         ) : (
-          <BrandLogo size="md" />
+          <BrandLogo size="md" variant="compact" />
         )}
       </div>
 

@@ -38,7 +38,7 @@ export function UsernameSetupModal() {
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-bg-primary/95 backdrop-blur-md p-4">
       <div className="relative w-full max-w-md rounded-2xl overflow-hidden glow-border shadow-2xl bg-bg-secondary p-6 md:p-8">
-        <BrandLogo size="md" />
+        <BrandLogo size="md" variant="compact" />
         <h2 className="text-xl font-bold mt-5 mb-2">Choose your username</h2>
         <p className="text-sm text-text-secondary leading-relaxed mb-6">
           {user?.email ? (
