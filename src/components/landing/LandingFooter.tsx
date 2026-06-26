@@ -83,6 +83,11 @@ export function LandingFooter({ onPrivacy, onTerms, onHome, onBrokers }: Landing
             <p className="text-xs font-semibold uppercase tracking-wider text-text-primary mb-3">Contact</p>
             <ul className="space-y-2 text-sm text-text-secondary">
               <li>
+                <a href="/report-bug" className="hover:text-emerald-400 transition-colors">
+                  Report a bug
+                </a>
+              </li>
+              <li>
                 <a
                   href="https://github.com/cries123/tradingjournal/issues/new"
                   target="_blank"
@@ -94,10 +99,15 @@ export function LandingFooter({ onPrivacy, onTerms, onHome, onBrokers }: Landing
               </li>
               <li>
                 <a
-                  href="mailto:support@tradingjournal.app?subject=Broker%20support%20request"
+                  href="mailto:support@tradingjournal.app?subject=Support%20request"
                   className="hover:text-emerald-400 transition-colors"
                 >
                   Email us
+                </a>
+              </li>
+              <li>
+                <a href="/admin" className="hover:text-emerald-400 transition-colors opacity-60">
+                  Admin
                 </a>
               </li>
             </ul>

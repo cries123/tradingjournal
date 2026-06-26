@@ -1,9 +1,44 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/config/admin)
+        && get(/databases/$(database)/documents/config/admin).data.uid == request.auth.uid;
+    }
+
+    function validBugReportCreate() {
+      return request.resource.data.description is string
+        && request.resource.data.description.size() >= 10
+        && request.resource.data.email is string
+        && request.resource.data.email.size() > 0
+        && request.resource.data.status == 'open'
+        && request.resource.data.createdAt is string
+        && (
+          (request.auth != null && request.resource.data.uid == request.auth.uid)
+          || (request.auth == null && request.resource.data.uid == null)
+        );
+    }
+
     match /config/brokers {
       allow read: if true;
       allow write: if false;
+    }
+
+    match /config/admin {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && !exists(/databases/$(database)/documents/config/admin)
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email is string
+        && request.resource.data.claimedAt is string;
+      allow update, delete: if false;
+    }
+
+    match /bugReports/{reportId} {
+      allow create: if validBugReportCreate();
+      allow read, update: if isAdmin();
+      allow delete: if false;
     }
 
     match /users/{userId} {

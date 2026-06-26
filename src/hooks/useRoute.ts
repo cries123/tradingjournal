@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-export type AppRoute = 'landing' | 'app' | 'brokers' | 'privacy' | 'terms' | 'coach';
+export type AppRoute = 'landing' | 'app' | 'brokers' | 'privacy' | 'terms' | 'coach' | 'report-bug' | 'admin';
 
 const ROUTE_PATHS: Record<Exclude<AppRoute, 'coach'>, string> = {
   landing: '/',
@@ -8,6 +8,8 @@ const ROUTE_PATHS: Record<Exclude<AppRoute, 'coach'>, string> = {
   brokers: '/brokers',
   privacy: '/privacy',
   terms: '/terms',
+  'report-bug': '/report-bug',
+  admin: '/admin',
 };
 
 interface RouteState {
@@ -23,6 +25,8 @@ function readRoute(): RouteState {
   if (path.startsWith('/brokers')) return { route: 'brokers' };
   if (path.startsWith('/privacy')) return { route: 'privacy' };
   if (path.startsWith('/terms')) return { route: 'terms' };
+  if (path.startsWith('/report-bug')) return { route: 'report-bug' };
+  if (path.startsWith('/admin')) return { route: 'admin' };
   return { route: 'landing' };
 }
 
