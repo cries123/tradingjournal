@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Bot, Camera } from 'lucide-react';
 import { TradeListItem } from './TradeListItem';
 import type { ParsedTradeInput, Trade, TradeSide } from '../types';
+import { useAuth } from '../context/AuthContext';
 import { checkParseServer, loadApiKey, parseScreenshot, saveApiKey } from '../utils/parseScreenshot';
 
 interface ScreenshotImportModalProps {
@@ -24,6 +26,7 @@ interface ReviewTrade extends ParsedTradeInput {
 }
 
 export function ScreenshotImportModal({ onClose, onSave, targetDate }: ScreenshotImportModalProps) {
+  const { user } = useAuth();
   const [step, setStep] = useState<Step>('upload');
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [apiKey, setApiKey] = useState(loadApiKey);
@@ -107,7 +110,7 @@ export function ScreenshotImportModal({ onClose, onSave, targetDate }: Screensho
       if (i > 0) await new Promise((r) => setTimeout(r, 500));
 
       try {
-        const result = await parseScreenshot(file, effectiveKey);
+        const result = await parseScreenshot(file, effectiveKey, user?.uid);
         for (const t of result.trades) {
           allTrades.push({
             ...t,
@@ -221,7 +224,7 @@ export function ScreenshotImportModal({ onClose, onSave, targetDate }: Screensho
                   e.target.value = '';
                 }}
               />
-              <div className="text-4xl mb-2">📷</div>
+              <Camera size={40} className="mx-auto mb-2 text-text-secondary" />
               <p className="text-sm text-text-primary">Drop screenshots here or click to browse</p>
               <p className="text-xs text-text-secondary mt-1">Select multiple files at once</p>
             </div>
@@ -291,7 +294,7 @@ export function ScreenshotImportModal({ onClose, onSave, targetDate }: Screensho
 
         {step === 'parsing' && (
           <div className="py-12 text-center">
-            <div className="text-3xl mb-4 animate-pulse">🤖</div>
+            <Bot size={36} className="mx-auto mb-4 text-emerald-400 animate-pulse" />
             <p className="text-sm text-text-primary">{parseProgress || 'Reading screenshots...'}</p>
           </div>
         )}

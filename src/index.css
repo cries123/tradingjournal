@@ -89,8 +89,14 @@ body {
 
 .glass-card {
   background: linear-gradient(145deg, rgba(15, 20, 31, 0.95), rgba(13, 17, 26, 0.85));
-  border: 1px solid rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.16);
   backdrop-filter: blur(12px);
+  transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.glass-card:hover {
+  border-color: rgba(148, 163, 184, 0.28);
+  transform: translateY(-1px);
 }
 
 .glow-border {
@@ -141,21 +147,67 @@ body {
 
 .panel-card {
   background: linear-gradient(160deg, rgba(15, 20, 31, 0.98), rgba(13, 17, 26, 0.92));
-  border: 1px solid rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 0.75rem;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+  transition: border-color 0.25s ease;
+}
+
+.panel-card:hover {
+  border-color: rgba(148, 163, 184, 0.24);
 }
 
 .stat-card {
   background: linear-gradient(160deg, rgba(15, 20, 31, 0.95), rgba(13, 17, 26, 0.88));
-  border: 1px solid rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 0.75rem;
-  transition: border-color 0.2s;
+  transition: border-color 0.25s ease, transform 0.2s ease;
 }
 
 .stat-card:hover {
-  border-color: rgba(52, 211, 153, 0.2);
+  border-color: rgba(52, 211, 153, 0.28);
+  transform: translateY(-1px);
 }
+
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-bg-primary), 0 0 0 4px rgba(56, 189, 248, 0.55);
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.08) 0%,
+    rgba(148, 163, 184, 0.16) 50%,
+    rgba(148, 163, 184, 0.08) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-up { animation: fade-up 0.4s ease-out both; }
+.animate-backdrop-in { animation: backdrop-in 0.25s ease-out; }
+.animate-scale-in { animation: scale-in 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
 
 @keyframes slide-in {
   from {

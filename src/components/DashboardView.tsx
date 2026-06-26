@@ -2,9 +2,11 @@ import { useMemo } from 'react';
 import type { Trade } from '../types';
 import {
   computeStats,
+  getCumulativePnlSeries,
   getDailyPnlForMonth,
   getMonthTrades,
   getWeekdayPnl,
+  getWinRateSeries,
 } from '../utils/stats';
 import { DailyPnlChart } from './DailyPnlChart';
 import { DashboardCalendar } from './DashboardCalendar';
@@ -18,6 +20,7 @@ interface DashboardViewProps {
   onDayClick: (date: string) => void;
   onPrevMonth: () => void;
   onNextMonth: () => void;
+  onMonthChange: (year: number, month: number) => void;
 }
 
 export function DashboardView({
@@ -27,11 +30,14 @@ export function DashboardView({
   onDayClick,
   onPrevMonth,
   onNextMonth,
+  onMonthChange,
 }: DashboardViewProps) {
   const monthTrades = useMemo(() => getMonthTrades(trades, year, month), [trades, year, month]);
   const stats = useMemo(() => computeStats(monthTrades), [monthTrades]);
   const dailyPnl = useMemo(() => getDailyPnlForMonth(trades, year, month), [trades, year, month]);
   const weekdayPnl = useMemo(() => getWeekdayPnl(trades, year, month), [trades, year, month]);
+  const cumulativeSeries = useMemo(() => getCumulativePnlSeries(trades, year, month), [trades, year, month]);
+  const winRateSeries = useMemo(() => getWinRateSeries(trades, year, month), [trades, year, month]);
 
   return (
     <div className="h-full flex flex-col gap-2 md:gap-3 min-h-0">
@@ -42,9 +48,10 @@ export function DashboardView({
         onDayClick={onDayClick}
         onPrevMonth={onPrevMonth}
         onNextMonth={onNextMonth}
+        onMonthChange={onMonthChange}
       />
 
-      <StatsCards stats={stats} />
+      <StatsCards stats={stats} cumulativeSeries={cumulativeSeries} winRateSeries={winRateSeries} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 md:flex-1 md:min-h-[180px] pb-2 md:pb-0">
         <div className="bg-bg-card border border-border rounded-lg p-2.5 md:p-4 flex flex-col min-h-[120px] md:min-h-0 md:overflow-hidden panel-card">

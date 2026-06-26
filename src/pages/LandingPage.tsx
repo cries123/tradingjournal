@@ -1,3 +1,14 @@
+import {
+  Bot,
+  Calendar,
+  Check,
+  Cloud,
+  FileSpreadsheet,
+  Lock,
+  Pencil,
+  BarChart3,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { DashboardPreview } from '../components/landing/DashboardPreview';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
@@ -9,39 +20,39 @@ interface LandingPageProps {
   onBrokers: () => void;
 }
 
-const FEATURES = [
+const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
   {
-    icon: '📅',
+    icon: Calendar,
     title: 'P&L Calendar',
     description:
       'See your month at a glance — green days for profit, red for loss. Click any day to import trades or drill into that session.',
   },
   {
-    icon: '🤖',
+    icon: Bot,
     title: 'AI Screenshot Parsing',
     description:
       'Upload brokerage screenshots and let AI extract P/L, symbols, and contract details. Review before saving — no typing required.',
   },
   {
-    icon: '📄',
+    icon: FileSpreadsheet,
     title: 'CSV Statement Import',
     description:
       'Drop in your account statement export. Round-trip trades are matched automatically so you can review and import in seconds.',
   },
   {
-    icon: '✏️',
+    icon: Pencil,
     title: 'Manual Trade Entry',
     description:
       'Log trades by hand with symbol, P/L, side, setup tags, and notes. Perfect when you want full control.',
   },
   {
-    icon: '📊',
+    icon: BarChart3,
     title: 'Performance Analytics',
     description:
       'Net P&L, win rate, profit factor, avg profit per trade & day, weekday breakdown, and daily gross charts.',
   },
   {
-    icon: '☁️',
+    icon: Cloud,
     title: 'Optional Cloud Sync',
     description:
       'Sign in with Google or email to sync across devices — or stay local-only. Your journal, your choice.',
@@ -108,15 +119,12 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
               </button>
             </div>
             <div className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-sm text-text-secondary">
-              <span className="flex items-center gap-2">
-                <span className="text-emerald-400">✓</span> No brokerage login required
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="text-emerald-400">✓</span> AI screenshot parsing
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="text-emerald-400">✓</span> Mobile & desktop
-              </span>
+              {['No brokerage login required', 'AI screenshot parsing', 'Mobile & desktop'].map((item) => (
+                <span key={item} className="flex items-center gap-2">
+                  <Check size={14} className="text-emerald-400" />
+                  {item}
+                </span>
+              ))}
             </div>
           </div>
           <div className="relative">
@@ -130,8 +138,8 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
       <section id="security" className="relative z-10 border-y border-border/50 bg-emerald-500/5 py-10 md:py-12">
         <div className="max-w-6xl mx-auto px-4 md:px-6">
           <div className="glass-card rounded-2xl p-6 md:p-8 flex flex-col md:flex-row gap-6 md:gap-10 items-start md:items-center">
-            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-2xl shrink-0">
-              🔒
+            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
+              <Lock size={22} className="text-emerald-400" />
             </div>
             <div className="flex-1">
               <h2 className="text-xl md:text-2xl font-bold mb-2">Your broker stays separate</h2>
@@ -194,7 +202,7 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
       </section>
 
       {/* Brokers teaser */}
-      <section id="brokers" className="relative z-10 border-t border-border/50 bg-bg-secondary/30 py-16 md:py-20">
+      <section id="brokers" className="relative z-10 border-t border-border/50 bg-bg-secondary/30 py-16 md:py-24">
         <div className="max-w-6xl mx-auto px-4 md:px-6 text-center">
           <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Brokers</p>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">Thinkorswim · Schwab · Robinhood</h2>
@@ -218,18 +226,21 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
             </p>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
-            {FEATURES.map((f) => (
+            {FEATURES.map((f) => {
+              const Icon = f.icon;
+              return (
               <article
                 key={f.title}
                 className="glass-card rounded-xl p-5 md:p-6 hover:border-emerald-500/30 transition-colors group"
               >
-                <div className="w-10 h-10 rounded-lg bg-bg-primary/80 border border-border/60 flex items-center justify-center text-lg mb-4 group-hover:scale-105 transition-transform">
-                  {f.icon}
+                <div className="w-10 h-10 rounded-lg bg-bg-primary/80 border border-border/60 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform text-emerald-400">
+                  <Icon size={20} />
                 </div>
                 <h3 className="text-base font-semibold mb-2">{f.title}</h3>
                 <p className="text-sm text-text-secondary leading-relaxed">{f.description}</p>
               </article>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -275,7 +286,7 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
       </section>
 
       {/* CTA */}
-      <section className="relative z-10 border-t border-border/50 py-16 md:py-20">
+      <section className="relative z-10 border-t border-border/50 py-16 md:py-24">
         <div className="max-w-3xl mx-auto px-4 md:px-6 text-center">
           <BrandLogo size="lg" />
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-8">Ready to track your edge?</h2>

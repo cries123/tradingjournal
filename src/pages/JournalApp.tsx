@@ -1,18 +1,24 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AuthModal } from '../components/AuthModal';
 import { DashboardView } from '../components/DashboardView';
+import { DashboardSkeleton } from '../components/DashboardSkeleton';
+import { DayDetailDrawer } from '../components/DayDetailDrawer';
 import { MobileBottomNav, MobileDrawer, MobileHeader } from '../components/MobileNav';
+import { SettingsPage } from '../components/SettingsPage';
 import { Sidebar } from '../components/Sidebar';
 import { CsvImportModal } from '../components/CsvImportModal';
 import { ScreenshotImportModal } from '../components/ScreenshotImportModal';
-import { DayDetailModal, TradeModal } from '../components/TradeModal';
+import { TradeModal } from '../components/TradeModal';
 import { useAuth } from '../context/AuthContext';
 import { useIsDesktop } from '../hooks/useMediaQuery';
 import { useTrades } from '../hooks/useTrades';
+import { computeStats, getMonthTrades } from '../utils/stats';
 
 interface JournalAppProps {
   onHome?: () => void;
 }
+
+type AppView = 'dashboard' | 'settings';
 
 export function JournalApp({ onHome }: JournalAppProps) {
   const isDesktop = useIsDesktop();
@@ -24,11 +30,13 @@ export function JournalApp({ onHome }: JournalAppProps) {
     addTrades,
     deleteTrade,
     clearAll,
+    syncStatus,
   } = useTrades();
 
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
+  const [appView, setAppView] = useState<AppView>('dashboard');
   const [showTradeModal, setShowTradeModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showCsvModal, setShowCsvModal] = useState(false);
@@ -38,6 +46,10 @@ export function JournalApp({ onHome }: JournalAppProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const showAuthModal = firebaseEnabled && !loading && !user;
+  const isLoading = syncStatus === 'loading';
+
+  const monthTrades = useMemo(() => getMonthTrades(allTrades, year, month), [allTrades, year, month]);
+  const monthStats = useMemo(() => computeStats(monthTrades), [monthTrades]);
 
   const handlePrevMonth = () => {
     if (month === 0) {
@@ -55,6 +67,11 @@ export function JournalApp({ onHome }: JournalAppProps) {
     } else {
       setMonth((m) => m + 1);
     }
+  };
+
+  const handleMonthChange = (y: number, m: number) => {
+    setYear(y);
+    setMonth(m);
   };
 
   const openAddTrade = (date?: string) => {
@@ -87,6 +104,10 @@ export function JournalApp({ onHome }: JournalAppProps) {
     onImportScreenshot: () => openImportScreenshot(),
     onImportCsv: () => openImportCsv(),
     onClearAll: () => void clearAll(),
+    onSettings: () => {
+      setAppView('settings');
+      closeMobileMenu();
+    },
   };
 
   return (
@@ -102,18 +123,31 @@ export function JournalApp({ onHome }: JournalAppProps) {
           }`}
         >
           <div className={`h-full ${isDesktop ? 'max-w-6xl mx-auto w-full' : ''}`}>
-            <DashboardView
-              trades={trades}
-              year={year}
-              month={month}
-              onDayClick={setSelectedDay}
-              onPrevMonth={handlePrevMonth}
-              onNextMonth={handleNextMonth}
-            />
+            {appView === 'settings' ? (
+              <SettingsPage
+                trades={allTrades}
+                monthStats={monthStats}
+                year={year}
+                month={month}
+                onBack={() => setAppView('dashboard')}
+              />
+            ) : isLoading ? (
+              <DashboardSkeleton />
+            ) : (
+              <DashboardView
+                trades={trades}
+                year={year}
+                month={month}
+                onDayClick={setSelectedDay}
+                onPrevMonth={handlePrevMonth}
+                onNextMonth={handleNextMonth}
+                onMonthChange={handleMonthChange}
+              />
+            )}
           </div>
         </main>
 
-        {!isDesktop && (
+        {!isDesktop && appView === 'dashboard' && (
           <MobileBottomNav
             onOpenMenu={() => setMobileMenuOpen(true)}
             onAddTrade={() => openAddTrade()}
@@ -164,7 +198,7 @@ export function JournalApp({ onHome }: JournalAppProps) {
       )}
 
       {selectedDay && (
-        <DayDetailModal
+        <DayDetailDrawer
           date={selectedDay}
           trades={allTrades}
           onClose={() => setSelectedDay(null)}

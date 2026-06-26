@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Camera, Menu, Plus } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
 import { AuthPanel } from './AuthPanel';
 
@@ -20,15 +21,13 @@ export function MobileHeader({
       <button
         type="button"
         onClick={onOpenMenu}
-        className="p-2 rounded-lg hover:bg-bg-tertiary text-text-primary"
+        className="p-2 rounded-lg hover:bg-bg-tertiary text-text-primary focus-ring"
         aria-label="Open menu"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
-        </svg>
+        <Menu size={20} />
       </button>
       {onHome ? (
-        <button type="button" onClick={onHome} className="flex-1 min-w-0 text-left">
+        <button type="button" onClick={onHome} className="flex-1 min-w-0 text-left focus-ring rounded">
           <BrandLogo size="sm" />
         </button>
       ) : (
@@ -47,26 +46,26 @@ export function MobileBottomNav({ onOpenMenu, onAddTrade, onImportScreenshot }: 
         <button
           type="button"
           onClick={onOpenMenu}
-          className="flex flex-col items-center justify-center gap-0.5 text-text-secondary hover:text-text-primary"
+          className="flex flex-col items-center justify-center gap-0.5 text-text-secondary hover:text-text-primary focus-ring"
         >
-          <span className="text-lg">☰</span>
+          <Menu size={18} />
           <span className="text-[9px]">Menu</span>
         </button>
         <button
           type="button"
           onClick={onImportScreenshot}
-          className="flex flex-col items-center justify-center gap-0.5 text-cyan-400"
+          className="flex flex-col items-center justify-center gap-0.5 text-cyan-400 focus-ring"
         >
-          <span className="text-lg">📷</span>
+          <Camera size={18} />
           <span className="text-[9px]">Screenshot</span>
         </button>
         <button
           type="button"
           onClick={onAddTrade}
-          className="flex flex-col items-center justify-center"
+          className="flex flex-col items-center justify-center focus-ring"
         >
-          <span className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center text-bg-primary text-xl font-light leading-none shadow-lg shadow-emerald-500/30">
-            +
+          <span className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center text-bg-primary shadow-lg shadow-emerald-500/30">
+            <Plus size={22} strokeWidth={2.5} />
           </span>
         </button>
         <div className="flex items-center justify-center px-1">
@@ -92,11 +91,11 @@ export function MobileDrawer({ open, onClose, children }: MobileDrawerProps) {
     <>
       <button
         type="button"
-        className="md:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+        className="md:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm animate-backdrop-in"
         onClick={onClose}
         aria-label="Close menu"
       />
-      <div className="md:hidden fixed inset-y-0 left-0 z-50 w-[min(280px,85vw)] shadow-2xl animate-slide-in">
+      <div className="md:hidden fixed inset-y-0 left-0 z-50 w-[min(280px,85vw)] shadow-2xl animate-slide-in motion-safe:animate-slide-in">
         {children}
       </div>
     </>

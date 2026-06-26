@@ -100,3 +100,36 @@ export function getMonthTrades(trades: Trade[], year: number, month: number): Tr
   const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
   return trades.filter((t) => t.date.startsWith(prefix));
 }
+
+/** Cumulative net P&L by trading day in month — for sparklines. */
+export function getCumulativePnlSeries(trades: Trade[], year: number, month: number): number[] {
+  const daily = getDailyPnlForMonth(trades, year, month);
+  let running = 0;
+  return daily.map((d) => {
+    running += d.pnl;
+    return running;
+  });
+}
+
+/** Daily win rate trend (rolling %) for sparklines. */
+export function getWinRateSeries(trades: Trade[], year: number, month: number): number[] {
+  const monthTrades = getMonthTrades(trades, year, month).sort((a, b) => a.date.localeCompare(b.date));
+  const byDay = new Map<string, Trade[]>();
+  for (const t of monthTrades) {
+    const list = byDay.get(t.date) ?? [];
+    list.push(t);
+    byDay.set(t.date, list);
+  }
+
+  const series: number[] = [];
+  let wins = 0;
+  let total = 0;
+  for (const [, dayTrades] of [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    for (const t of dayTrades) {
+      total += 1;
+      if (t.pnl > 0) wins += 1;
+    }
+    series.push(total > 0 ? (wins / total) * 100 : 0);
+  }
+  return series;
+}
