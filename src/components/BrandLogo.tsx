@@ -39,6 +39,10 @@ export function BrandLogo({ size = 'md', variant = 'compact' }: BrandLogoProps) 
         src="/logo.svg"
         alt="Trend Chasers"
         className={`${fullHeights[size]} w-auto shrink-0 object-contain object-left`}
+        onError={(e) => {
+          e.currentTarget.onerror = null;
+          e.currentTarget.src = '/logo-mark.svg';
+        }}
       />
     );
   }
