@@ -5,34 +5,41 @@ export type SharePeriod = 'day' | 'month' | 'year';
 
 export const SHARE_SITE_URL = 'Trendchaser.net';
 
-const SHARE_LOGO_MARK = `<g transform="translate(40 40) scale(0.45)">
-  <circle cx="44" cy="44" r="36" stroke="#7ED9A4" stroke-width="2" opacity="0.28"/>
-  <g fill="#7ED9A4">
-    <path d="M44 6 L48 20 L40 20 Z"/>
-    <path d="M44 82 L48 68 L40 68 Z"/>
-    <path d="M6 44 L20 48 L20 40 Z"/>
-    <path d="M82 44 L68 48 L68 40 Z"/>
+const SHARE_LOGO_MARK = `<g transform="translate(40 36) scale(0.105)">
+  <g transform="translate(0, -30)">
+    <path d="M 300 270 A 120 120 0 1 1 500 130" fill="none" stroke="#6cd59f" stroke-width="14" stroke-linecap="round"/>
+    <path d="M 280 230 A 120 120 0 0 0 350 310" fill="none" stroke="#6cd59f" stroke-width="14" stroke-linecap="round"/>
+    <polygon points="400,50 415,110 400,125 385,110" fill="#6cd59f"/>
+    <polygon points="250,200 310,215 325,200 310,185" fill="#6cd59f"/>
+    <polygon points="550,200 490,185 475,200 490,215" fill="#6cd59f"/>
+    <polygon points="400,350 385,290 400,275 415,290" fill="#6cd59f"/>
+    <polygon points="294,94 325,125 310,140 295,125" fill="#6cd59f"/>
+    <polygon points="506,94 475,125 490,140 505,125" fill="#6cd59f"/>
+    <polygon points="310,280 340,250 355,265 325,295" fill="#6cd59f"/>
+    <rect x="540" y="80" width="8" height="12" rx="4" fill="#ff5757"/>
+    <rect x="555" y="65" width="8" height="27" rx="4" fill="#ff5757"/>
+    <rect x="570" y="50" width="8" height="42" rx="4" fill="#ff5757"/>
+    <path d="M 250 320 L 330 240 L 370 280 L 520 130 L 520 160 L 370 310 L 330 270 L 250 350 Z" fill="#4ba779"/>
+    <path d="M 235 305 L 330 210 L 380 260 L 520 120 L 520 135 L 380 275 L 330 225 L 235 320 Z" fill="#6cd59f"/>
+    <polygon points="540,100 460,110 520,170" fill="#6cd59f"/>
+    <polygon points="530,115 470,125 515,170" fill="#4ba779"/>
   </g>
-  <path d="M14 58 L24 48 L34 52 L44 38 L54 42 L64 28 L72 20" stroke="#7ED9A4" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <path d="M72 20 L63 18 L72 10 Z" fill="#7ED9A4"/>
-  <rect x="58" y="12" width="4.5" height="11" rx="1.2" fill="#F87171"/>
-  <rect x="64.5" y="8" width="4.5" height="15" rx="1.2" fill="#F87171"/>
-  <rect x="71" y="4" width="4.5" height="19" rx="1.2" fill="#F87171"/>
 </g>`;
 
-const SHARE_LOGO_MARK_SMALL = `<g transform="translate(40 352) scale(0.25)">
-  <circle cx="44" cy="44" r="36" stroke="#7ED9A4" stroke-width="2.5" opacity="0.28"/>
-  <g fill="#7ED9A4">
-    <path d="M44 6 L48 20 L40 20 Z"/>
-    <path d="M44 82 L48 68 L40 68 Z"/>
-    <path d="M6 44 L20 48 L20 40 Z"/>
-    <path d="M82 44 L68 48 L68 40 Z"/>
+const SHARE_LOGO_MARK_SMALL = `<g transform="translate(40 348) scale(0.055)">
+  <g transform="translate(0, -30)">
+    <path d="M 300 270 A 120 120 0 1 1 500 130" fill="none" stroke="#6cd59f" stroke-width="14" stroke-linecap="round"/>
+    <path d="M 280 230 A 120 120 0 0 0 350 310" fill="none" stroke="#6cd59f" stroke-width="14" stroke-linecap="round"/>
+    <polygon points="400,50 415,110 400,125 385,110" fill="#6cd59f"/>
+    <polygon points="250,200 310,215 325,200 310,185" fill="#6cd59f"/>
+    <polygon points="550,200 490,185 475,200 490,215" fill="#6cd59f"/>
+    <polygon points="400,350 385,290 400,275 415,290" fill="#6cd59f"/>
+    <rect x="540" y="80" width="8" height="12" rx="4" fill="#ff5757"/>
+    <rect x="555" y="65" width="8" height="27" rx="4" fill="#ff5757"/>
+    <rect x="570" y="50" width="8" height="42" rx="4" fill="#ff5757"/>
+    <path d="M 235 305 L 330 210 L 380 260 L 520 120 L 520 135 L 380 275 L 330 225 L 235 320 Z" fill="#6cd59f"/>
+    <polygon points="540,100 460,110 520,170" fill="#6cd59f"/>
   </g>
-  <path d="M14 58 L24 48 L34 52 L44 38 L54 42 L64 28 L72 20" stroke="#7ED9A4" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <path d="M72 20 L63 18 L72 10 Z" fill="#7ED9A4"/>
-  <rect x="58" y="12" width="5" height="11" rx="1.2" fill="#F87171"/>
-  <rect x="65" y="8" width="5" height="15" rx="1.2" fill="#F87171"/>
-  <rect x="72" y="4" width="5" height="19" rx="1.2" fill="#F87171"/>
 </g>`;
 
 const PERIOD_BADGE: Record<SharePeriod, string> = {
@@ -150,9 +157,9 @@ export function buildShareSvg(data: ShareSvgInput): string {
   <rect x="24" y="24" width="552" height="72" rx="14" fill="rgba(15,20,31,0.65)" stroke="rgba(148,163,184,0.12)" stroke-width="1"/>
 
   ${SHARE_LOGO_MARK}
-  <text x="92" y="52" fill="#7ED9A4" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="800" letter-spacing="1.5">TREND</text>
-  <text x="92" y="68" fill="#f8fafc" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="800" letter-spacing="1.5">CHASERS</text>
-  <text x="92" y="82" fill="#94a3b8" font-family="system-ui,-apple-system,sans-serif" font-size="10">Track · Analyze · Improve</text>
+  <text x="92" y="52" fill="#6cd59f" font-family="Montserrat, system-ui, sans-serif" font-size="14" font-weight="900" letter-spacing="1.5">TREND</text>
+  <text x="92" y="68" fill="#f8fafc" font-family="Montserrat, system-ui, sans-serif" font-size="14" font-weight="900" letter-spacing="1.5">CHASERS</text>
+  <text x="92" y="82" fill="#8e939d" font-family="system-ui, sans-serif" font-size="10">Track · Analyze · Improve</text>
   <text x="552" y="62" fill="#6ee7b7" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="600" text-anchor="end">@${username}</text>
 
   <rect x="40" y="118" width="${badgeWidth}" height="26" rx="13" fill="rgba(52,211,153,0.12)" stroke="rgba(52,211,153,0.35)" stroke-width="1"/>
