@@ -9,7 +9,7 @@ import {
   saveTradesBatch,
   subscribeTrades,
 } from '../services/tradesFirestore';
-import { loadTrades, saveTrades } from '../utils/storage';
+import { clearLegacyTradesStorage, clearTrades, loadTrades, saveTrades } from '../utils/storage';
 import { resolveTradeAccountId } from '../utils/accounts';
 import { tradeTags } from '../utils/tradeHelpers';
 
@@ -21,6 +21,7 @@ export function useTrades() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('loading');
   const migratedRef = useRef(false);
+  const activeUidRef = useRef<string | null>(null);
 
   const [filters, setFilters] = useState<Filters>({
     symbol: '',
@@ -31,40 +32,54 @@ export function useTrades() {
 
   useEffect(() => {
     migratedRef.current = false;
+    activeUidRef.current = user?.uid ?? null;
+    setTrades([]);
+    setSyncStatus('loading');
 
     if (!firebaseEnabled || !user) {
-      setTrades(loadTrades());
+      setTrades(loadTrades(null));
       setSyncStatus('local');
       return;
     }
 
-    setSyncStatus('loading');
+    let cancelled = false;
     let unsubscribe: (() => void) | undefined;
+    const uid = user.uid;
 
     const setup = async () => {
+      clearLegacyTradesStorage();
+
       if (!migratedRef.current) {
-        const local = loadTrades();
-        const migrated = await migrateLocalTrades(user.uid, local);
+        const anonymousTrades = loadTrades(null);
+        const migrated = await migrateLocalTrades(uid, anonymousTrades);
         migratedRef.current = true;
+        if (migrated > 0) {
+          clearTrades(null);
+        }
+        if (cancelled || activeUidRef.current !== uid) return;
         if (migrated > 0) {
           setSyncStatus('syncing');
         }
       }
 
-      unsubscribe = subscribeTrades(user.uid, (cloudTrades) => {
+      unsubscribe = subscribeTrades(uid, (cloudTrades) => {
+        if (cancelled || activeUidRef.current !== uid) return;
         setTrades(cloudTrades);
-        saveTrades(cloudTrades);
+        saveTrades(cloudTrades, uid);
         setSyncStatus('cloud');
       });
     };
 
     void setup();
-    return () => unsubscribe?.();
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
   }, [user, firebaseEnabled]);
 
   useEffect(() => {
     if (syncStatus === 'local') {
-      saveTrades(trades);
+      saveTrades(trades, null);
     }
   }, [trades, syncStatus]);
 
@@ -101,7 +116,7 @@ export function useTrades() {
       } else {
         setTrades((prev) => {
           const next = [...prev.filter((t) => t.id !== trade.id), trade];
-          saveTrades(next);
+          saveTrades(next, null);
           return next;
         });
       }
@@ -137,7 +152,7 @@ export function useTrades() {
       } else {
         setTrades((prev) => {
           const next = [...prev, ...withIds];
-          saveTrades(next);
+          saveTrades(next, null);
           return next;
         });
       }
@@ -153,7 +168,7 @@ export function useTrades() {
       } else {
         setTrades((prev) => {
           const next = prev.filter((t) => t.id !== id);
-          saveTrades(next);
+          saveTrades(next, null);
           return next;
         });
       }
@@ -180,7 +195,7 @@ export function useTrades() {
     } else {
       setTrades((prev) => {
         const next = prev.filter((t) => !toRemove.has(t.id));
-        saveTrades(next);
+        saveTrades(next, null);
         return next;
       });
     }
