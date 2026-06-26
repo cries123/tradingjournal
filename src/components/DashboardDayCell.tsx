@@ -8,7 +8,7 @@ interface DashboardDayCellProps {
 }
 
 const cellShell =
-  'rounded-sm md:rounded-lg text-left transition-all flex flex-col bg-bg-card overflow-hidden aspect-square md:aspect-auto md:h-[72px]';
+  'rounded-sm md:rounded-lg text-left transition-all duration-200 ease-out flex flex-col bg-bg-card overflow-hidden aspect-square md:aspect-auto md:h-[72px] motion-safe:hover:scale-[1.03] motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.98]';
 
 export function DashboardDayCell({ dayNumber, summary, onClick }: DashboardDayCellProps) {
   if (dayNumber === null) {

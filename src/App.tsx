@@ -1,4 +1,5 @@
 import { useRoute } from './hooks/useRoute';
+import { PageTransition } from './components/motion/FadeIn';
 import { BrokersPage } from './pages/BrokersPage';
 import { LandingPage } from './pages/LandingPage';
 import { JournalApp } from './pages/JournalApp';
@@ -14,8 +15,10 @@ export default function App() {
   const goPrivacy = () => navigate('privacy');
   const goTerms = () => navigate('terms');
 
+  let content;
+
   if (route === 'brokers') {
-    return (
+    content = (
       <BrokersPage
         onHome={goHome}
         onLaunch={goApp}
@@ -23,10 +26,8 @@ export default function App() {
         onTerms={goTerms}
       />
     );
-  }
-
-  if (route === 'privacy') {
-    return (
+  } else if (route === 'privacy') {
+    content = (
       <PrivacyPolicyPage
         onHome={goHome}
         onLaunch={goApp}
@@ -35,10 +36,8 @@ export default function App() {
         onBrokers={goBrokers}
       />
     );
-  }
-
-  if (route === 'terms') {
-    return (
+  } else if (route === 'terms') {
+    content = (
       <TermsOfServicePage
         onHome={goHome}
         onLaunch={goApp}
@@ -47,18 +46,18 @@ export default function App() {
         onBrokers={goBrokers}
       />
     );
+  } else if (route === 'app') {
+    content = <JournalApp onHome={goHome} />;
+  } else {
+    content = (
+      <LandingPage
+        onLaunch={goApp}
+        onPrivacy={goPrivacy}
+        onTerms={goTerms}
+        onBrokers={goBrokers}
+      />
+    );
   }
 
-  if (route === 'app') {
-    return <JournalApp onHome={goHome} />;
-  }
-
-  return (
-    <LandingPage
-      onLaunch={goApp}
-      onPrivacy={goPrivacy}
-      onTerms={goTerms}
-      onBrokers={goBrokers}
-    />
-  );
+  return <PageTransition routeKey={route}>{content}</PageTransition>;
 }

@@ -92,11 +92,11 @@ export function MobileDrawer({ open, onClose, children }: MobileDrawerProps) {
     <>
       <button
         type="button"
-        className="md:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+        className="md:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm animate-backdrop-in"
         onClick={onClose}
         aria-label="Close menu"
       />
-      <div className="md:hidden fixed inset-y-0 left-0 z-50 w-[min(280px,85vw)] shadow-2xl animate-slide-in">
+      <div className="md:hidden fixed inset-y-0 left-0 z-50 w-[min(280px,85vw)] shadow-2xl animate-slide-in motion-safe:animate-slide-in">
         {children}
       </div>
     </>

@@ -87,10 +87,11 @@ body {
   color: transparent;
 }
 
-.glass-card {
-  background: linear-gradient(145deg, rgba(15, 20, 31, 0.95), rgba(13, 17, 26, 0.85));
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  backdrop-filter: blur(12px);
+.text-gradient {
+  background: linear-gradient(135deg, #34d399 0%, #38bdf8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .glow-border {
@@ -105,6 +106,106 @@ body {
     var(--color-bg-primary);
 }
 
+@keyframes slide-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.animate-page-in {
+  animation: fade-in 0.35s ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.animate-backdrop-in {
+  animation: backdrop-in 0.25s ease-out;
+}
+
+.animate-fade-up {
+  animation: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.glass-card {
+  background: linear-gradient(145deg, rgba(15, 20, 31, 0.95), rgba(13, 17, 26, 0.85));
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  backdrop-filter: blur(12px);
+  transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.glass-card:hover {
+  transform: translateY(-2px);
+}
+
+.panel-card {
+  background: linear-gradient(160deg, rgba(15, 20, 31, 0.98), rgba(13, 17, 26, 0.92));
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+  transition: border-color 0.25s ease, transform 0.2s ease;
+}
+
+.stat-card {
+  background: linear-gradient(160deg, rgba(15, 20, 31, 0.95), rgba(13, 17, 26, 0.88));
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 0.75rem;
+  transition: border-color 0.25s ease, transform 0.2s ease;
+}
+
+.stat-card:hover {
+  border-color: rgba(52, 211, 153, 0.2);
+  transform: translateY(-1px);
+}
+
 .btn-primary {
   display: inline-flex;
   align-items: center;
@@ -114,12 +215,17 @@ body {
   color: #042f2e;
   background: linear-gradient(135deg, #34d399, #2dd4bf);
   box-shadow: 0 4px 20px rgba(52, 211, 153, 0.25);
-  transition: opacity 0.15s, transform 0.15s;
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease;
 }
 
 .btn-primary:hover {
-  opacity: 0.92;
-  transform: translateY(-1px);
+  opacity: 0.95;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(52, 211, 153, 0.35);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
 }
 
 .btn-secondary {
@@ -131,43 +237,64 @@ body {
   color: var(--color-text-primary);
   background: rgba(15, 20, 31, 0.8);
   border: 1px solid rgba(148, 163, 184, 0.2);
-  transition: border-color 0.15s, background 0.15s;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
 }
 
 .btn-secondary:hover {
   border-color: rgba(52, 211, 153, 0.4);
   background: rgba(21, 27, 40, 0.9);
+  transform: translateY(-1px);
 }
 
-.panel-card {
-  background: linear-gradient(160deg, rgba(15, 20, 31, 0.98), rgba(13, 17, 26, 0.92));
-  border: 1px solid rgba(148, 163, 184, 0.1);
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+.chart-bar {
+  transform-origin: bottom;
+  transition: height 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease;
 }
 
-.stat-card {
-  background: linear-gradient(160deg, rgba(15, 20, 31, 0.95), rgba(13, 17, 26, 0.88));
-  border: 1px solid rgba(148, 163, 184, 0.1);
-  border-radius: 0.75rem;
-  transition: border-color 0.2s;
+.chart-bar-h {
+  transform-origin: left;
+  transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease;
 }
 
-.stat-card:hover {
-  border-color: rgba(52, 211, 153, 0.2);
+details.glass-card {
+  transition: border-color 0.25s ease;
 }
 
-@keyframes slide-in {
-  from {
-    transform: translateX(-100%);
+details.glass-card[open] summary {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+}
+
+details.glass-card > p {
+  animation: fade-up 0.3s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-safe\:animate-page-in,
+  .animate-page-in,
+  .animate-scale-in,
+  .animate-slide-in,
+  .animate-backdrop-in,
+  .animate-fade-up {
+    animation: none !important;
   }
-  to {
-    transform: translateX(0);
-  }
-}
 
-.animate-slide-in {
-  animation: slide-in 0.2s ease-out;
+  .motion-safe\:transition-all,
+  .glass-card,
+  .panel-card,
+  .stat-card,
+  .btn-primary,
+  .btn-secondary,
+  .chart-bar,
+  .chart-bar-h {
+    transition: none !important;
+  }
+
+  .glass-card:hover,
+  .stat-card:hover,
+  .btn-primary:hover,
+  .btn-secondary:hover {
+    transform: none !important;
+  }
 }
 
 .input-field {

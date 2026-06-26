@@ -173,9 +173,9 @@ export function ScreenshotImportModal({ onClose, onSave, targetDate }: Screensho
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-backdrop-in motion-safe:animate-backdrop-in p-4" onClick={onClose}>
       <div
-        className="bg-bg-secondary border border-border rounded-lg p-6 w-full max-w-xl shadow-xl max-h-[90vh] overflow-y-auto"
+        className="bg-bg-secondary border border-border rounded-lg p-6 w-full max-w-xl shadow-xl max-h-[90vh] overflow-y-auto animate-scale-in motion-safe:animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-start mb-4">

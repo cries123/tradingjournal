@@ -1,6 +1,7 @@
 import { BrandLogo } from '../components/BrandLogo';
 import { DashboardPreview } from '../components/landing/DashboardPreview';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
+import { FadeIn } from '../components/motion/FadeIn';
 
 interface LandingPageProps {
   onLaunch: () => void;
@@ -86,6 +87,7 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
       {/* Hero */}
       <section className="relative z-10 max-w-6xl mx-auto px-4 md:px-6 pt-12 md:pt-20 pb-16 md:pb-20">
         <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+          <FadeIn>
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs font-medium mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -119,16 +121,19 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
               </span>
             </div>
           </div>
+          </FadeIn>
+          <FadeIn delay={120}>
           <div className="relative">
             <div className="absolute -inset-4 bg-gradient-to-br from-emerald-500/20 via-transparent to-cyan-500/20 rounded-3xl blur-2xl" />
             <DashboardPreview />
           </div>
+          </FadeIn>
         </div>
       </section>
 
       {/* Security callout */}
       <section id="security" className="relative z-10 border-y border-border/50 bg-emerald-500/5 py-10 md:py-12">
-        <div className="max-w-6xl mx-auto px-4 md:px-6">
+        <FadeIn className="max-w-6xl mx-auto px-4 md:px-6">
           <div className="glass-card rounded-2xl p-6 md:p-8 flex flex-col md:flex-row gap-6 md:gap-10 items-start md:items-center">
             <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-2xl shrink-0">
               🔒
@@ -142,13 +147,14 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
               </p>
             </div>
           </div>
-        </div>
+        </FadeIn>
       </section>
 
       {/* AI Import */}
       <section className="relative z-10 py-16 md:py-24">
         <div className="max-w-6xl mx-auto px-4 md:px-6">
           <div className="grid lg:grid-cols-2 gap-10 items-center">
+            <FadeIn>
             <div>
               <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">AI Import</p>
               <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
@@ -172,6 +178,8 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
                 ))}
               </ul>
             </div>
+            </FadeIn>
+            <FadeIn delay={100}>
             <div className="glass-card rounded-2xl p-6 md:p-8 glow-border">
               <p className="text-xs uppercase tracking-widest text-text-secondary mb-4">How AI import works</p>
               <ol className="space-y-4">
@@ -189,13 +197,14 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
                 ))}
               </ol>
             </div>
+            </FadeIn>
           </div>
         </div>
       </section>
 
       {/* Brokers teaser */}
       <section id="brokers" className="relative z-10 border-t border-border/50 bg-bg-secondary/30 py-16 md:py-20">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 text-center">
+        <FadeIn className="max-w-6xl mx-auto px-4 md:px-6 text-center">
           <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Brokers</p>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">Thinkorswim · Schwab · Robinhood</h2>
           <p className="text-text-secondary max-w-xl mx-auto mb-8">
@@ -204,24 +213,24 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
           <button type="button" onClick={onBrokers} className="btn-secondary px-8 py-3">
             View all supported brokers →
           </button>
-        </div>
+        </FadeIn>
       </section>
 
       {/* Features */}
       <section id="features" className="relative z-10 py-16 md:py-24">
         <div className="max-w-6xl mx-auto px-4 md:px-6">
-          <div className="text-center max-w-2xl mx-auto mb-12 md:mb-16">
+          <FadeIn className="text-center max-w-2xl mx-auto mb-12 md:mb-16">
             <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Features</p>
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Everything you need to review your edge</h2>
             <p className="mt-4 text-text-secondary">
               Built for active traders who want clarity — not another spreadsheet.
             </p>
-          </div>
+          </FadeIn>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
-            {FEATURES.map((f) => (
+            {FEATURES.map((f, i) => (
+              <FadeIn key={f.title} delay={i * 60}>
               <article
-                key={f.title}
-                className="glass-card rounded-xl p-5 md:p-6 hover:border-emerald-500/30 transition-colors group"
+                className="glass-card rounded-xl p-5 md:p-6 hover:border-emerald-500/30 transition-colors group h-full"
               >
                 <div className="w-10 h-10 rounded-lg bg-bg-primary/80 border border-border/60 flex items-center justify-center text-lg mb-4 group-hover:scale-105 transition-transform">
                   {f.icon}
@@ -229,6 +238,7 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
                 <h3 className="text-base font-semibold mb-2">{f.title}</h3>
                 <p className="text-sm text-text-secondary leading-relaxed">{f.description}</p>
               </article>
+              </FadeIn>
             ))}
           </div>
         </div>
@@ -237,17 +247,19 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
       {/* Workflow */}
       <section className="relative z-10 border-t border-border/50 bg-bg-secondary/20 py-16 md:py-24">
         <div className="max-w-6xl mx-auto px-4 md:px-6">
-          <div className="text-center max-w-2xl mx-auto mb-12">
+          <FadeIn className="text-center max-w-2xl mx-auto mb-12">
             <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">Workflow</p>
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Three steps to clarity</h2>
-          </div>
+          </FadeIn>
           <div className="grid md:grid-cols-3 gap-6">
-            {STEPS.map((step) => (
-              <div key={step.n} className="glass-card rounded-xl p-6 md:p-7">
+            {STEPS.map((step, i) => (
+              <FadeIn key={step.n} delay={i * 80}>
+              <div className="glass-card rounded-xl p-6 md:p-7 h-full">
                 <span className="text-4xl font-bold text-gradient opacity-80">{step.n}</span>
                 <h3 className="text-lg font-semibold mt-3 mb-2">{step.title}</h3>
                 <p className="text-sm text-text-secondary leading-relaxed">{step.body}</p>
               </div>
+              </FadeIn>
             ))}
           </div>
         </div>
@@ -256,19 +268,21 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
       {/* FAQ */}
       <section id="faq" className="relative z-10 py-16 md:py-24">
         <div className="max-w-3xl mx-auto px-4 md:px-6">
-          <div className="text-center mb-12">
+          <FadeIn className="text-center mb-12">
             <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">FAQ</p>
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Common questions</h2>
-          </div>
+          </FadeIn>
           <div className="space-y-4">
-            {FAQ.map((item) => (
-              <details key={item.q} className="glass-card rounded-xl group">
+            {FAQ.map((item, i) => (
+              <FadeIn key={item.q} delay={i * 50}>
+              <details className="glass-card rounded-xl group">
                 <summary className="px-5 py-4 cursor-pointer font-medium text-sm md:text-base list-none flex items-center justify-between gap-4">
                   {item.q}
                   <span className="text-text-secondary group-open:rotate-45 transition-transform text-lg">+</span>
                 </summary>
                 <p className="px-5 pb-4 text-sm text-text-secondary leading-relaxed">{item.a}</p>
               </details>
+              </FadeIn>
             ))}
           </div>
         </div>
@@ -276,7 +290,7 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
 
       {/* CTA */}
       <section className="relative z-10 border-t border-border/50 py-16 md:py-20">
-        <div className="max-w-3xl mx-auto px-4 md:px-6 text-center">
+        <FadeIn className="max-w-3xl mx-auto px-4 md:px-6 text-center">
           <BrandLogo size="lg" />
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-8">Ready to track your edge?</h2>
           <p className="mt-4 text-text-secondary text-base md:text-lg">
@@ -286,7 +300,7 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
           <button type="button" onClick={onLaunch} className="btn-primary text-base px-8 py-3.5 mt-8">
             Open Trading Journal
           </button>
-        </div>
+        </FadeIn>
       </section>
 
       <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} onBrokers={onBrokers} />

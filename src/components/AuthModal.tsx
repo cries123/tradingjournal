@@ -71,10 +71,10 @@ export function AuthModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-bg-primary/95 backdrop-blur-md p-4 md:p-8 overflow-y-auto">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-bg-primary/95 backdrop-blur-md p-4 md:p-8 overflow-y-auto animate-backdrop-in motion-safe:animate-backdrop-in">
       <div className="landing-grid pointer-events-none fixed inset-0 opacity-50" aria-hidden />
 
-      <div className="relative w-full max-w-4xl grid md:grid-cols-5 rounded-2xl overflow-hidden glow-border shadow-2xl shadow-black/50 my-auto">
+      <div className="relative w-full max-w-4xl grid md:grid-cols-5 rounded-2xl overflow-hidden glow-border shadow-2xl shadow-black/50 my-auto animate-scale-in motion-safe:animate-scale-in">
         {/* Brand panel */}
         <div className="md:col-span-2 bg-gradient-to-br from-emerald-500/15 via-bg-secondary to-cyan-500/10 border-b md:border-b-0 md:border-r border-border/50 p-8 md:p-10 flex flex-col justify-between">
           <div>

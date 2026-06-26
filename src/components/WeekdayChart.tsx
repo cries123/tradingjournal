@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { WeekdayPnlPoint } from '../utils/stats';
 import { formatCurrency } from '../utils/format';
 
@@ -6,8 +7,15 @@ interface WeekdayChartProps {
 }
 
 export function WeekdayChart({ data }: WeekdayChartProps) {
+  const [animate, setAnimate] = useState(false);
   const maxAbs = Math.max(...data.map((d) => Math.abs(d.pnl)), 1);
   const hasData = data.some((d) => d.pnl !== 0);
+
+  useEffect(() => {
+    setAnimate(false);
+    const t = requestAnimationFrame(() => setAnimate(true));
+    return () => cancelAnimationFrame(t);
+  }, [data]);
 
   if (!hasData) {
     return (
@@ -19,7 +27,7 @@ export function WeekdayChart({ data }: WeekdayChartProps) {
 
   return (
     <div className="space-y-1 h-full flex flex-col justify-center">
-      {data.map((point) => {
+      {data.map((point, i) => {
         const widthPct = (Math.abs(point.pnl) / maxAbs) * 100;
         const isProfit = point.pnl >= 0;
         return (
@@ -28,8 +36,11 @@ export function WeekdayChart({ data }: WeekdayChartProps) {
             <div className="flex-1 h-3.5 bg-bg-primary rounded overflow-hidden relative">
               {point.pnl !== 0 && (
                 <div
-                  className={`h-full rounded ${isProfit ? 'bg-profit-bright' : 'bg-loss-bright'}`}
-                  style={{ width: `${Math.max(widthPct, 2)}%` }}
+                  className={`h-full rounded chart-bar-h ${isProfit ? 'bg-profit-bright' : 'bg-loss-bright'}`}
+                  style={{
+                    width: animate ? `${Math.max(widthPct, 2)}%` : '0%',
+                    transitionDelay: `${i * 50}ms`,
+                  }}
                 />
               )}
             </div>

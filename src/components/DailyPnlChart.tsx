@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { DailyPnlPoint } from '../utils/stats';
 import { formatCurrency } from '../utils/format';
 
@@ -6,7 +7,14 @@ interface DailyPnlChartProps {
 }
 
 export function DailyPnlChart({ data }: DailyPnlChartProps) {
+  const [animate, setAnimate] = useState(false);
   const maxAbs = Math.max(...data.map((d) => Math.abs(d.pnl)), 1);
+
+  useEffect(() => {
+    setAnimate(false);
+    const t = requestAnimationFrame(() => setAnimate(true));
+    return () => cancelAnimationFrame(t);
+  }, [data]);
 
   if (data.length === 0) {
     return (
@@ -18,7 +26,7 @@ export function DailyPnlChart({ data }: DailyPnlChartProps) {
 
   return (
     <div className="h-full flex items-end gap-1 px-1">
-      {data.map((point) => {
+      {data.map((point, i) => {
         const heightPct = (Math.abs(point.pnl) / maxAbs) * 100;
         const isProfit = point.pnl >= 0;
         return (
@@ -28,8 +36,11 @@ export function DailyPnlChart({ data }: DailyPnlChartProps) {
             </span>
             <div className="w-full flex-1 flex items-end justify-center min-h-0">
               <div
-                className={`w-full max-w-[28px] rounded-t-sm transition-all ${isProfit ? 'bg-profit-bright' : 'bg-loss-bright'}`}
-                style={{ height: `${Math.max(heightPct, 4)}%` }}
+                className={`w-full max-w-[28px] rounded-t-sm chart-bar ${isProfit ? 'bg-profit-bright' : 'bg-loss-bright'}`}
+                style={{
+                  height: animate ? `${Math.max(heightPct, 4)}%` : '0%',
+                  transitionDelay: `${i * 60}ms`,
+                }}
               />
             </div>
             <span className="text-[9px] text-text-secondary">{point.label}</span>
