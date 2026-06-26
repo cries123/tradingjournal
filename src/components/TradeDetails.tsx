@@ -1,5 +1,6 @@
 import type { Trade } from '../types';
 import { formatCurrency } from '../utils/format';
+import { marketSessionFromTime, tradeTags } from '../utils/tradeHelpers';
 
 interface TradeDetailsProps {
   trade: Partial<Trade>;
@@ -34,6 +35,23 @@ export function TradeDetails({ trade, compact }: TradeDetailsProps) {
     rows.push({ label: 'Net Liq', value: formatCurrency(trade.netLiq) });
   }
   if (isNonEmptyString(trade.accountType)) rows.push({ label: 'Account', value: trade.accountType });
+  if (trade.grade) rows.push({ label: 'Grade', value: trade.grade });
+  if (trade.checklistScore != null) rows.push({ label: 'Checklist', value: `${trade.checklistScore}%` });
+  if (isMeaningfulNumber(trade.fees)) rows.push({ label: 'Fees', value: formatCurrency(trade.fees) });
+  if (isMeaningfulNumber(trade.grossPnl)) rows.push({ label: 'Gross P/L', value: formatCurrency(trade.grossPnl) });
+  if (isNonEmptyString(trade.entryTime)) rows.push({ label: 'Entry', value: trade.entryTime });
+  if (isNonEmptyString(trade.exitTime)) rows.push({ label: 'Exit', value: trade.exitTime });
+  const session = marketSessionFromTime(trade.entryTime);
+  if (session) rows.push({ label: 'Session', value: session });
+  if (isMeaningfulNumber(trade.mae)) rows.push({ label: 'MAE', value: formatCurrency(trade.mae) });
+  if (isMeaningfulNumber(trade.mfe)) rows.push({ label: 'MFE', value: formatCurrency(trade.mfe) });
+  if (isMeaningfulNumber(trade.rMultiple)) rows.push({ label: 'R multiple', value: String(trade.rMultiple) });
+  if (isMeaningfulNumber(trade.ivRank)) rows.push({ label: 'IV rank', value: `${trade.ivRank}%` });
+  if (trade.assetClass) rows.push({ label: 'Asset', value: trade.assetClass });
+  const tags = tradeTags(trade as Trade);
+  if (tags.length > 1 || (tags.length === 1 && tags[0] !== trade.setup)) {
+    rows.push({ label: 'Tags', value: tags.join(', ') });
+  }
 
   const greeks = [
     isMeaningfulNumber(trade.delta) ? `Δ ${trade.delta}` : null,
@@ -58,6 +76,13 @@ export function TradeDetails({ trade, compact }: TradeDetailsProps) {
       ))}
       {trade.notes && (
         <p className="text-xs text-text-secondary mt-1">{trade.notes}</p>
+      )}
+      {trade.imageUrls && trade.imageUrls.length > 0 && (
+        <div className="flex gap-2 mt-2 flex-wrap">
+          {trade.imageUrls.map((url, i) => (
+            <img key={i} src={url} alt="Trade chart" className="w-20 h-20 object-cover rounded border border-border/60" />
+          ))}
+        </div>
       )}
     </div>
   );

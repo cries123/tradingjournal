@@ -14,6 +14,8 @@ export function loadSettings(userId?: string | null): UserSettings {
       ...parsed,
       setupTags: parsed.setupTags?.length ? parsed.setupTags : DEFAULT_SETTINGS.setupTags,
       accounts: parsed.accounts?.length ? parsed.accounts : DEFAULT_SETTINGS.accounts,
+      strategies: parsed.strategies ?? DEFAULT_SETTINGS.strategies,
+      tradingRules: { ...DEFAULT_SETTINGS.tradingRules, ...parsed.tradingRules },
     };
   } catch {
     return { ...DEFAULT_SETTINGS };
