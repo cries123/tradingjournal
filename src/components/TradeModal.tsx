@@ -2,6 +2,12 @@ import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import type { Trade, TradeSide } from '../types';
+import {
+  TradeBehaviorFields,
+  behaviorFromTrade,
+  serializeBehavior,
+  type TradeBehaviorValues,
+} from './TradeBehaviorFields';
 
 interface TradeModalProps {
   trade?: Trade;
@@ -22,6 +28,7 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
   const [setup, setSetup] = useState(trade?.setup ?? '');
   const [side, setSide] = useState<TradeSide>(trade?.side ?? 'long');
   const [notes, setNotes] = useState(trade?.notes ?? '');
+  const [behavior, setBehavior] = useState<TradeBehaviorValues>(() => behaviorFromTrade(trade));
 
   useEffect(() => {
     if (trade) {
@@ -31,6 +38,7 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
       setSetup(trade.setup ?? '');
       setSide(trade.side ?? 'long');
       setNotes(trade.notes ?? '');
+      setBehavior(behaviorFromTrade(trade));
     }
   }, [trade]);
 
@@ -53,6 +61,7 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
       expiration: trade?.expiration,
       strike: trade?.strike,
       quantity: trade?.quantity,
+      ...serializeBehavior(behavior),
     };
 
     if (isEdit && trade && onUpdate) {
@@ -66,11 +75,13 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-backdrop-in motion-safe:animate-backdrop-in p-4" onClick={onClose}>
       <div
-        className="bg-bg-secondary border border-border rounded-lg p-6 w-full max-w-md shadow-xl animate-scale-in motion-safe:animate-scale-in"
+        className="bg-bg-secondary border border-border rounded-lg p-6 w-full max-w-md shadow-xl animate-scale-in motion-safe:animate-scale-in max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">{isEdit ? 'Edit Trade' : 'Add Trade'}</h3>
+          <h3 className="text-lg font-semibold">
+            {isEdit ? 'Edit Trade' : behavior.isGhost ? 'Log missed trade' : 'Add Trade'}
+          </h3>
           <button type="button" onClick={onClose} className="p-1 text-text-secondary hover:text-text-primary focus-ring rounded" aria-label="Close">
             <X size={20} />
           </button>
@@ -82,8 +93,19 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
           <Field label="Symbol">
             <input type="text" value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder="SPY" className="input-field" required />
           </Field>
-          <Field label="P/L ($)">
-            <input type="number" step="0.01" value={pnl} onChange={(e) => setPnl(e.target.value)} placeholder="260.00 or -1274.22" className="input-field" required />
+          <Field label={behavior.isGhost ? 'Hypothetical P/L ($)' : 'P/L ($)'}>
+            <input
+              type="number"
+              step="0.01"
+              value={pnl}
+              onChange={(e) => setPnl(e.target.value)}
+              placeholder={behavior.isGhost ? 'What you would have made/lost' : '260.00 or -1274.22'}
+              className="input-field"
+              required
+            />
+            {behavior.isGhost && (
+              <p className="text-[10px] text-violet-300/90 mt-1">Not added to your account balance — tracked in the discipline log only.</p>
+            )}
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Setup / Tag">
@@ -104,9 +126,12 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
           <Field label="Notes (optional)">
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="input-field resize-none" placeholder="SPY 746P weekly, etc." />
           </Field>
+
+          <TradeBehaviorFields values={behavior} onChange={setBehavior} />
+
           <div className="flex gap-3 pt-2">
             <button type="submit" className="flex-1 btn-primary py-2.5 text-sm">
-              {isEdit ? 'Save changes' : 'Save Trade'}
+              {isEdit ? 'Save changes' : behavior.isGhost ? 'Save ghost trade' : 'Save Trade'}
             </button>
             <button type="button" onClick={onClose} className="px-4 py-2.5 btn-secondary text-sm">Cancel</button>
           </div>

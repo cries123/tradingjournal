@@ -1,9 +1,11 @@
 import {
   Bot,
+  Brain,
   Calendar,
   Check,
   Cloud,
   FileSpreadsheet,
+  Ghost,
   Lock,
   Pencil,
   BarChart3,
@@ -43,13 +45,25 @@ const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
     icon: Pencil,
     title: 'Manual Trade Entry',
     description:
-      'Log trades by hand with symbol, P/L, side, setup tags, and notes. Perfect when you want full control.',
+      'Log trades by hand with symbol, P/L, side, setup tags, and notes. Add psychology checks, rule adherence, and market context — or flag ghost trades for missed opportunities.',
+  },
+  {
+    icon: Brain,
+    title: 'Psychology & Rule Adherence',
+    description:
+      'Optional mindset dropdown, 0–10 rule-adherence slider, and market context tags attach to any trade. CSV imports stay untouched — add behavioral notes anytime via edit.',
+  },
+  {
+    icon: Ghost,
+    title: 'Ghost Trades & FOMO Log',
+    description:
+      'Log trades you skipped with hypothetical P&L. Ghost entries never touch your real balance — they feed a separate discipline widget so you can spot FOMO patterns.',
   },
   {
     icon: BarChart3,
     title: 'Performance Analytics',
     description:
-      'Net P&L, win rate, profit factor, avg profit per trade & day, weekday breakdown, and daily gross charts.',
+      'Net P&L, win rate, profit factor, avg profit per trade & day, weekday breakdown, daily gross charts, and a FOMO/missed-trade discipline log.',
   },
   {
     icon: Cloud,
@@ -77,15 +91,23 @@ const FAQ = [
     a: 'Without an account, data stays in your browser. With an account, trades sync to Firebase under your user ID. Broker credentials are never collected.',
   },
   {
+    q: 'What is a ghost trade?',
+    a: 'A ghost trade logs a setup you watched but did not take. You enter hypothetical P&L so you can review missed opportunities later. Ghost trades never affect your real account balance, win rate, or profit factor — they appear in the discipline log only.',
+  },
+  {
+    q: 'Do psychology fields overwrite CSV imports?',
+    a: 'No. When you import a CSV, ticker, price, and P/L populate as usual. Psychology, rule adherence, and market context start blank. Open any trade to edit and append behavioral data without changing broker fields.',
+  },
+  {
     q: 'How accurate is AI import?',
     a: 'AI is a starting point — always review parsed trades before saving. You can edit P/L, flip signs, and deselect rows before importing.',
   },
 ];
 
 const STEPS = [
-  { n: '01', title: 'Upload or log', body: 'Screenshot, CSV, or manual entry — however you already track trades.' },
-  { n: '02', title: 'Review on calendar', body: 'Daily P&L colors show winning and losing sessions at a glance.' },
-  { n: '03', title: 'Analyze your edge', body: 'Stats and charts reveal patterns across weekdays and trade size.' },
+  { n: '01', title: 'Upload or log', body: 'Screenshot, CSV, or manual entry — broker data first, behavioral notes optional.' },
+  { n: '02', title: 'Review on calendar', body: 'Daily P&L colors show winning and losing sessions. Add psychology after import.' },
+  { n: '03', title: 'Analyze your edge', body: 'Stats, charts, and the FOMO log reveal patterns in execution and discipline.' },
 ];
 
 export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: LandingPageProps) {
@@ -107,8 +129,8 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
               <span className="text-gradient">your broker</span>
             </h1>
             <p className="mt-5 text-base md:text-lg text-text-secondary leading-relaxed max-w-xl">
-              Track daily P&L on a visual calendar, import trades with AI screenshot parsing or CSV uploads,
-              and analyze your performance — without connecting to your brokerage account. Ever.
+              Track daily P&L on a visual calendar, import trades with AI or CSV, log psychology and rule adherence,
+              and capture missed opportunities with ghost trades — without connecting to your brokerage account. Ever.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <button type="button" onClick={onLaunch} className="btn-primary text-base px-7 py-3.5">
@@ -119,7 +141,7 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
               </button>
             </div>
             <div className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-sm text-text-secondary">
-              {['No brokerage login required', 'AI screenshot parsing', 'Mobile & desktop'].map((item) => (
+              {['No brokerage login required', 'Psychology & ghost trade logging', 'AI screenshot parsing'].map((item) => (
                 <span key={item} className="flex items-center gap-2">
                   <Check size={14} className="text-emerald-400" />
                   {item}

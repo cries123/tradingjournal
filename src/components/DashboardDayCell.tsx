@@ -17,15 +17,19 @@ export function DashboardDayCell({ dayNumber, summary, onClick }: DashboardDayCe
     return <div className={`${cellShell} bg-bg-card/40 border border-transparent`} />;
   }
 
-  const hasTrades = summary && summary.tradeCount > 0;
-  const isProfit = hasTrades && summary.totalPnl >= 0;
-  const isLoss = hasTrades && summary.totalPnl < 0;
+  const hasTrades = summary && (summary.tradeCount > 0 || (summary.ghostCount ?? 0) > 0);
+  const hasExecuted = summary && summary.tradeCount > 0;
+  const isProfit = hasExecuted && summary.totalPnl >= 0;
+  const isLoss = hasExecuted && summary.totalPnl < 0;
+  const ghostsOnly = summary && summary.tradeCount === 0 && (summary.ghostCount ?? 0) > 0;
 
   const borderClass = isProfit
     ? 'border-emerald-500/50 ring-1 ring-emerald-500/15 shadow-sm shadow-emerald-500/10'
     : isLoss
       ? 'border-red-500/50 ring-1 ring-red-500/15 shadow-sm shadow-red-500/10'
-      : 'border-border/40';
+      : ghostsOnly
+        ? 'border-violet-500/40 ring-1 ring-violet-500/15 border-dashed'
+        : 'border-border/40';
 
   return (
     <button
@@ -36,17 +40,26 @@ export function DashboardDayCell({ dayNumber, summary, onClick }: DashboardDayCe
       <span className="text-[9px] md:text-xs text-text-secondary leading-none">{dayNumber}</span>
       {hasTrades ? (
         <div className="mt-auto min-w-0 w-full">
-          <span
-            className={`text-[9px] md:text-sm font-bold leading-tight block truncate ${
-              isProfit ? 'text-profit-bright' : 'text-loss-bright'
-            }`}
-          >
-            <span className="md:hidden">{formatCurrencyCompact(summary.totalPnl, settings.currency)}</span>
-            <span className="hidden md:inline">{formatCurrency(summary.totalPnl, settings.currency)}</span>
-          </span>
-          <span className="hidden md:block text-[10px] text-text-secondary mt-0.5 truncate">
-            {summary.tradeCount} {summary.tradeCount === 1 ? 'trade' : 'trades'}
-          </span>
+          {hasExecuted ? (
+            <>
+              <span
+                className={`text-[9px] md:text-sm font-bold leading-tight block truncate ${
+                  isProfit ? 'text-profit-bright' : 'text-loss-bright'
+                }`}
+              >
+                <span className="md:hidden">{formatCurrencyCompact(summary.totalPnl, settings.currency)}</span>
+                <span className="hidden md:inline">{formatCurrency(summary.totalPnl, settings.currency)}</span>
+              </span>
+              <span className="hidden md:block text-[10px] text-text-secondary mt-0.5 truncate">
+                {summary.tradeCount} {summary.tradeCount === 1 ? 'trade' : 'trades'}
+                {(summary.ghostCount ?? 0) > 0 && ` · ${summary.ghostCount} ghost`}
+              </span>
+            </>
+          ) : (
+            <span className="text-[9px] md:text-xs font-semibold text-violet-300 truncate block">
+              {(summary.ghostCount ?? 0)} ghost
+            </span>
+          )}
         </div>
       ) : (
         <span className="mt-auto hidden md:block text-[10px] text-text-secondary/0 group-hover:text-text-secondary transition-colors">
