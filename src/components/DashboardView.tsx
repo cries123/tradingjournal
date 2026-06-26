@@ -19,6 +19,7 @@ import { ShareCardModal } from './ShareCardModal';
 import { StatsCards } from './StatsCards';
 import { WeekdayChart } from './WeekdayChart';
 import { YearHeatmap } from './YearHeatmap';
+import { AdvancedAnalyticsSection } from './analytics/AdvancedAnalyticsSection';
 
 type DashboardMode = 'month' | 'year';
 
@@ -75,7 +76,8 @@ export function DashboardView({
   const cumulativeSeries = useMemo(() => getCumulativePnlSeries(trades, year, month), [trades, year, month]);
   const winRateSeries = useMemo(() => getWinRateSeries(trades, year, month), [trades, year, month]);
 
-  const hasFilters = Boolean(filters.symbol || filters.setup || filters.side);
+  const hasFilters = Boolean(filters.symbol || filters.setup || filters.side || filters.tag);
+  const analyticsTrades = mode === 'month' ? monthTrades : yearTrades;
 
   return (
     <div className="flex flex-col gap-2 md:gap-3 pb-2">
@@ -178,6 +180,8 @@ export function DashboardView({
           </div>
         </div>
       )}
+
+      {hasAnyTrades && <AdvancedAnalyticsSection trades={analyticsTrades} />}
 
       {showShare && (
         <ShareCardModal

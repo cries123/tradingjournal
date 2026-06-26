@@ -11,6 +11,7 @@ import {
 } from '../services/tradesFirestore';
 import { loadTrades, saveTrades } from '../utils/storage';
 import { resolveTradeAccountId } from '../utils/accounts';
+import { tradeTags } from '../utils/tradeHelpers';
 
 export type SyncStatus = 'loading' | 'local' | 'cloud' | 'syncing';
 
@@ -25,6 +26,7 @@ export function useTrades() {
     symbol: '',
     setup: '',
     side: '',
+    tag: '',
   });
 
   useEffect(() => {
@@ -76,6 +78,7 @@ export function useTrades() {
       if (filters.symbol && trade.symbol !== filters.symbol) return false;
       if (filters.setup && trade.setup !== filters.setup) return false;
       if (filters.side && trade.side !== filters.side) return false;
+      if (filters.tag && !tradeTags(trade).includes(filters.tag)) return false;
       return true;
     });
   }, [accountTrades, filters]);
@@ -86,7 +89,7 @@ export function useTrades() {
   );
 
   const setups = useMemo(
-    () => [...new Set(accountTrades.map((t) => t.setup).filter(Boolean))].sort() as string[],
+    () => [...new Set(accountTrades.flatMap((t) => tradeTags(t)))].sort(),
     [accountTrades],
   );
 

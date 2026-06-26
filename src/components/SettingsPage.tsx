@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import type { CurrencyCode, ThemeAccent } from '../types/settings';
 import type { Trade } from '../types';
 import type { TradingStats } from '../utils/stats';
-import { exportMonthReport, exportTradesCsv } from '../utils/exportTrades';
+import { exportMonthReport, exportTaxCsv, exportTradesCsv } from '../utils/exportTrades';
 
 interface SettingsPageProps {
   trades: Trade[];
@@ -16,10 +16,11 @@ interface SettingsPageProps {
 }
 
 export function SettingsPage({ trades, monthStats, year, month, onBack }: SettingsPageProps) {
-  const { settings, updateSettings, addSetupTag, addAccount, removeAccount, setActiveAccount } = useSettings();
+  const { settings, updateSettings, addSetupTag, addStrategy, removeStrategy, addAccount, removeAccount, setActiveAccount } = useSettings();
   const { username, user, firebaseEnabled } = useAuth();
   const [newTag, setNewTag] = useState('');
   const [newAccount, setNewAccount] = useState('');
+  const [newStrategy, setNewStrategy] = useState('');
 
   return (
     <div className="pb-6">
@@ -183,6 +184,127 @@ export function SettingsPage({ trades, monthStats, year, month, onBack }: Settin
           </div>
         </section>
 
+        <section className="panel-card p-5 space-y-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Trading rules</h2>
+          <p className="text-xs text-text-secondary">Track daily limits — violations show on the dashboard analytics panel.</p>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={settings.tradingRules.enabled}
+              onChange={(e) => updateSettings({ tradingRules: { ...settings.tradingRules, enabled: e.target.checked } })}
+              className="rounded border-border"
+            />
+            Enable rule tracking
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-xs text-text-secondary mb-1 block">Max daily loss ($)</span>
+              <input
+                type="number"
+                value={settings.tradingRules.maxDailyLoss ?? ''}
+                onChange={(e) =>
+                  updateSettings({
+                    tradingRules: { ...settings.tradingRules, maxDailyLoss: Number(e.target.value) || undefined },
+                  })
+                }
+                className="input-field"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs text-text-secondary mb-1 block">Max trades / day</span>
+              <input
+                type="number"
+                value={settings.tradingRules.maxTradesPerDay ?? ''}
+                onChange={(e) =>
+                  updateSettings({
+                    tradingRules: { ...settings.tradingRules, maxTradesPerDay: Number(e.target.value) || undefined },
+                  })
+                }
+                className="input-field"
+              />
+            </label>
+          </div>
+        </section>
+
+        <section className="panel-card p-5 space-y-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Strategy playbook</h2>
+          <p className="text-xs text-text-secondary">Define setups and link them to trades in the advanced trade form.</p>
+          <div className="space-y-2">
+            {settings.strategies.map((s) => (
+              <div key={s.id} className="flex items-center gap-2 p-2 rounded-lg border border-border/60">
+                <span className="flex-1 text-sm font-medium">{s.name}</span>
+                <button type="button" onClick={() => removeStrategy(s.id)} className="text-text-secondary hover:text-loss-bright p-1">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newStrategy}
+              onChange={(e) => setNewStrategy(e.target.value)}
+              placeholder="Strategy name"
+              className="input-field flex-1"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                addStrategy(newStrategy);
+                setNewStrategy('');
+              }}
+              className="btn-secondary px-4 py-2 text-sm"
+            >
+              Add
+            </button>
+          </div>
+        </section>
+
+        <section className="panel-card p-5 space-y-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Benchmark & reminders</h2>
+          <label className="block">
+            <span className="text-xs text-text-secondary mb-1 block">Monthly benchmark return % (e.g. SPY)</span>
+            <input
+              type="number"
+              step="0.1"
+              value={settings.benchmarkReturnPct || ''}
+              onChange={(e) => updateSettings({ benchmarkReturnPct: Number(e.target.value) || 0 })}
+              className="input-field"
+              placeholder="2.5"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={settings.remindersEnabled}
+              onChange={(e) => updateSettings({ remindersEnabled: e.target.checked })}
+              className="rounded border-border"
+            />
+            End-of-day journal reminder (browser notification when supported)
+          </label>
+        </section>
+
+        <section className="panel-card p-5 space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Integrations</h2>
+          <div className="rounded-lg border border-border/60 bg-bg-tertiary/30 p-3 space-y-2">
+            <p className="text-sm font-medium">Automated broker sync</p>
+            <p className="text-xs text-text-secondary">API connections for Schwab, TOS, Robinhood — coming soon. CSV & screenshot import remain available.</p>
+          </div>
+          <div className="rounded-lg border border-border/60 bg-bg-tertiary/30 p-3 space-y-2">
+            <p className="text-sm font-medium">TradingView / chart replay</p>
+            <p className="text-xs text-text-secondary">Attach chart screenshots per trade today. Deep chart linking planned.</p>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={settings.coachShareEnabled}
+              onChange={(e) => updateSettings({ coachShareEnabled: e.target.checked })}
+              className="rounded border-border"
+            />
+            Enable read-only coach sharing (invite link — coming soon)
+          </label>
+        </section>
+
         <section className="panel-card p-5 space-y-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Export data</h2>
           <button
@@ -200,6 +322,14 @@ export function SettingsPage({ trades, monthStats, year, month, onBack }: Settin
           >
             <FileText size={16} />
             Print monthly report (PDF)
+          </button>
+          <button
+            type="button"
+            onClick={() => exportTaxCsv(trades, `tax-realized-${year}.csv`)}
+            className="w-full flex items-center justify-center gap-2 btn-secondary py-2.5 text-sm"
+          >
+            <Download size={16} />
+            Export tax summary (realized P&L)
           </button>
         </section>
       </div>
