@@ -1,9 +1,11 @@
 import type { User } from 'firebase/auth';
 import type { TradingStats } from './stats';
 
+import { SITE_DOMAIN } from '../config/site';
+
 export type SharePeriod = 'day' | 'month' | 'year';
 
-export const SHARE_SITE_URL = 'Trendchaser.net';
+export const SHARE_SITE_URL = SITE_DOMAIN;
 
 const SHARE_LOGO_MARK = `<g transform="translate(40 36) scale(0.105)">
   <g transform="translate(0, -30)">

@@ -96,6 +96,9 @@ export async function fetchCoachShare(token: string): Promise<CoachShareSnapshot
 }
 
 export function coachShareUrl(token: string): string {
-  const base = typeof window !== 'undefined' ? window.location.origin : '';
+  const base =
+    typeof window !== 'undefined' && window.location.origin
+      ? window.location.origin
+      : 'https://trendchasers.net';
   return `${base}/coach/${token}`;
 }

@@ -1,9 +1,7 @@
 import { loadEnv, type Plugin } from 'vite';
 import type { IncomingMessage, ServerResponse } from 'http';
 import { handleParseScreenshotRequest } from './server/parseApiHandler';
-import { handleBrokerSyncRequest } from './server/brokerSyncHandler';
 import { readJsonBody } from './server/parseScreenshot';
-import type { BrokerSyncRequest } from './src/types/broker';
 
 function sendJson(res: ServerResponse, status: number, body: unknown, extraHeaders?: Record<string, string>) {
   res.statusCode = status;
@@ -65,42 +63,10 @@ export function screenshotApiPlugin(): Plugin {
     configureServer(server) {
       server.middlewares.use('/api/health', (req, res) => handleHealth(req, res, () => envApiKey));
       server.middlewares.use('/api/parse-screenshot', createParseHandler(() => envApiKey));
-      server.middlewares.use('/api/broker-sync', (req, res) => {
-        if (req.method !== 'POST') {
-          sendJson(res, 405, { error: 'Method not allowed' });
-          return;
-        }
-        void (async () => {
-          try {
-            const body = (await readJsonBody(req)) as BrokerSyncRequest;
-            const result = await handleBrokerSyncRequest(body);
-            sendJson(res, 200, result);
-          } catch (err) {
-            const message = err instanceof Error ? err.message : 'Broker sync failed';
-            sendJson(res, 400, { error: message });
-          }
-        })();
-      });
     },
     configurePreviewServer(server) {
       server.middlewares.use('/api/health', (req, res) => handleHealth(req, res, () => envApiKey));
       server.middlewares.use('/api/parse-screenshot', createParseHandler(() => envApiKey));
-      server.middlewares.use('/api/broker-sync', (req, res) => {
-        if (req.method !== 'POST') {
-          sendJson(res, 405, { error: 'Method not allowed' });
-          return;
-        }
-        void (async () => {
-          try {
-            const body = (await readJsonBody(req)) as BrokerSyncRequest;
-            const result = await handleBrokerSyncRequest(body);
-            sendJson(res, 200, result);
-          } catch (err) {
-            const message = err instanceof Error ? err.message : 'Broker sync failed';
-            sendJson(res, 400, { error: message });
-          }
-        })();
-      });
     },
   };
 }
