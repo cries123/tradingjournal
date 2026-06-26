@@ -101,6 +101,51 @@ export function getMonthTrades(trades: Trade[], year: number, month: number): Tr
   return trades.filter((t) => t.date.startsWith(prefix));
 }
 
+export interface MonthPnlPoint {
+  month: number;
+  label: string;
+  pnl: number;
+  tradeCount: number;
+  tradingDays: number;
+}
+
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+export function getMonthlyPnlForYear(trades: Trade[], year: number): MonthPnlPoint[] {
+  const prefix = `${year}-`;
+  const byMonth = new Map<number, { pnl: number; trades: Trade[]; days: Set<string> }>();
+
+  for (let m = 0; m < 12; m++) {
+    byMonth.set(m, { pnl: 0, trades: [], days: new Set() });
+  }
+
+  for (const trade of trades) {
+    if (!trade.date.startsWith(prefix)) continue;
+    const month = Number(trade.date.slice(5, 7)) - 1;
+    const bucket = byMonth.get(month);
+    if (!bucket) continue;
+    bucket.pnl += trade.pnl;
+    bucket.trades.push(trade);
+    bucket.days.add(trade.date);
+  }
+
+  return MONTH_LABELS.map((label, month) => {
+    const bucket = byMonth.get(month)!;
+    return {
+      month,
+      label,
+      pnl: bucket.pnl,
+      tradeCount: bucket.trades.length,
+      tradingDays: bucket.days.size,
+    };
+  });
+}
+
+export function getYearTrades(trades: Trade[], year: number): Trade[] {
+  const prefix = `${year}-`;
+  return trades.filter((t) => t.date.startsWith(prefix));
+}
+
 /** Cumulative net P&L by trading day in month — for sparklines. */
 export function getCumulativePnlSeries(trades: Trade[], year: number, month: number): number[] {
   const daily = getDailyPnlForMonth(trades, year, month);

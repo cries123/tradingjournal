@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Camera, FileText, Plus, X } from 'lucide-react';
+import { Camera, FileText, Pencil, Plus, X } from 'lucide-react';
 import { TradeListItem } from './TradeListItem';
 import type { Trade } from '../types';
 import { useSettings } from '../context/SettingsContext';
@@ -10,6 +10,7 @@ interface DayDetailDrawerProps {
   trades: Trade[];
   onClose: () => void;
   onDelete: (id: string) => void;
+  onEdit: (trade: Trade) => void;
   onAddTrade: () => void;
   onImportCsv: () => void;
   onImportScreenshot: () => void;
@@ -20,6 +21,7 @@ export function DayDetailDrawer({
   trades,
   onClose,
   onDelete,
+  onEdit,
   onAddTrade,
   onImportCsv,
   onImportScreenshot,
@@ -97,17 +99,30 @@ export function DayDetailDrawer({
                     setExpandedId((prev) => (prev === trade.id ? null : trade.id))
                   }
                   trailing={
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete(trade.id);
-                      }}
-                      className="text-text-secondary hover:text-loss-bright p-1 shrink-0 focus-ring rounded"
-                      aria-label="Delete trade"
-                    >
-                      <X size={14} />
-                    </button>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEdit(trade);
+                        }}
+                        className="text-text-secondary hover:text-emerald-400 p-1 focus-ring rounded"
+                        aria-label="Edit trade"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete(trade.id);
+                        }}
+                        className="text-text-secondary hover:text-loss-bright p-1 focus-ring rounded"
+                        aria-label="Delete trade"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
                   }
                 />
               ))}

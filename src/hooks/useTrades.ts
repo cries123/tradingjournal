@@ -158,6 +158,13 @@ export function useTrades() {
     [user, firebaseEnabled],
   );
 
+  const updateTrade = useCallback(
+    async (trade: Trade) => {
+      await persistTrade(trade);
+    },
+    [persistTrade],
+  );
+
   const clearAll = useCallback(async () => {
     const activeId = settings.activeAccountId;
     const toRemove = new Set(
@@ -185,6 +192,7 @@ export function useTrades() {
     setups,
     addTrade,
     addTrades,
+    updateTrade,
     deleteTrade,
     clearAll,
     syncStatus,
