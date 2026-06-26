@@ -141,14 +141,22 @@ export function JournalApp({ onHome }: JournalAppProps) {
   };
 
   return (
-    <div className="flex h-full bg-bg-primary overflow-hidden dashboard-bg">
+    <div
+      className={`flex w-full bg-bg-primary dashboard-bg ${
+        isDesktop ? 'min-h-dvh' : 'h-full min-h-0 overflow-hidden'
+      }`}
+    >
       {isDesktop && <Sidebar variant="desktop" onHome={onHome} {...sidebarActions} />}
 
-      <div className="flex-1 flex flex-col min-w-0 min-h-0 w-full">
+      <div className={`flex-1 flex flex-col min-w-0 w-full ${isDesktop ? '' : 'min-h-0'}`}>
         {!isDesktop && <MobileHeader onOpenMenu={() => setMobileMenuOpen(true)} onHome={onHome} />}
 
-        <main className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain p-2 md:p-5">
-          <div className="max-w-6xl mx-auto w-full min-h-0 pb-4">
+        <main
+          className={`flex-1 p-2 md:p-5 ${
+            isDesktop ? 'overflow-visible' : 'min-h-0 h-0 overflow-y-auto overscroll-y-contain'
+          }`}
+        >
+          <div className="max-w-6xl mx-auto w-full pb-6 md:pb-10">
             {appView === 'settings' ? (
               <SettingsPage
                 trades={allTrades}

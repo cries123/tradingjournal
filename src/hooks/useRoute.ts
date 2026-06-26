@@ -30,19 +30,29 @@ export function useRoute() {
 
   useEffect(() => {
     const root = document.getElementById('root');
-    const isApp = route === 'app';
 
-    if (isApp) {
-      root?.classList.add('route-app');
-      root?.classList.remove('route-public');
-      document.documentElement.style.overflow = 'hidden';
-      document.body.style.overflow = 'hidden';
-    } else {
-      root?.classList.remove('route-app');
-      root?.classList.add('route-public');
-      document.documentElement.style.overflow = '';
-      document.body.style.overflow = '';
-    }
+    const applyRouteStyles = () => {
+      const isApp = route === 'app';
+
+      if (isApp) {
+        root?.classList.add('route-app');
+        root?.classList.remove('route-public');
+        const lockDocumentScroll = window.matchMedia('(max-width: 767px)').matches;
+        document.documentElement.style.overflow = lockDocumentScroll ? 'hidden' : '';
+        document.body.style.overflow = lockDocumentScroll ? 'hidden' : '';
+      } else {
+        root?.classList.remove('route-app');
+        root?.classList.add('route-public');
+        document.documentElement.style.overflow = '';
+        document.body.style.overflow = '';
+      }
+    };
+
+    applyRouteStyles();
+
+    const mobileQuery = window.matchMedia('(max-width: 767px)');
+    mobileQuery.addEventListener('change', applyRouteStyles);
+    return () => mobileQuery.removeEventListener('change', applyRouteStyles);
   }, [route]);
 
   const navigate = useCallback((next: AppRoute) => {
