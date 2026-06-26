@@ -23,7 +23,7 @@ export function Sidebar({
   variant = 'desktop',
   onNavigate,
 }: SidebarProps) {
-  const { user, loading, firebaseEnabled, logout } = useAuth();
+  const { user, loading, firebaseEnabled, logout, username } = useAuth();
 
   const wrap = (fn: () => void) => () => {
     fn();
@@ -71,7 +71,12 @@ export function Sidebar({
         {firebaseEnabled && !loading && user && (
           <div className="flex items-center gap-2 px-1 min-w-0">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-            <p className="text-[11px] text-text-secondary truncate flex-1">{user.email}</p>
+            <div className="min-w-0 flex-1">
+              {username ? (
+                <p className="text-[11px] text-emerald-300 font-medium truncate">@{username}</p>
+              ) : null}
+              <p className="text-[11px] text-text-secondary truncate">{user.email}</p>
+            </div>
             <button
               type="button"
               onClick={() => void logout()}

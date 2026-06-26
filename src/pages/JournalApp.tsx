@@ -11,6 +11,7 @@ import { Sidebar } from '../components/Sidebar';
 import { CsvImportModal } from '../components/CsvImportModal';
 import { ScreenshotImportModal } from '../components/ScreenshotImportModal';
 import { TradeModal } from '../components/TradeModal';
+import { UsernameSetupModal } from '../components/UsernameSetupModal';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useIsDesktop } from '../hooks/useMediaQuery';
@@ -26,7 +27,7 @@ type AppView = 'dashboard' | 'settings';
 
 export function JournalApp({ onHome }: JournalAppProps) {
   const isDesktop = useIsDesktop();
-  const { user, loading, firebaseEnabled } = useAuth();
+  const { user, loading, firebaseEnabled, needsUsername, profileLoading } = useAuth();
   const { settings } = useSettings();
   const {
     trades,
@@ -59,6 +60,7 @@ export function JournalApp({ onHome }: JournalAppProps) {
   const [showOnboarding, setShowOnboarding] = useState(() => !hasCompletedOnboarding());
 
   const showAuthModal = firebaseEnabled && !loading && !user;
+  const showUsernameModal = firebaseEnabled && !loading && !profileLoading && needsUsername;
   const isLoading = syncStatus === 'loading';
 
   const monthTrades = useMemo(() => getMonthTrades(allTrades, year, month), [allTrades, year, month]);
@@ -208,11 +210,13 @@ export function JournalApp({ onHome }: JournalAppProps) {
         </MobileDrawer>
       )}
 
-      {showOnboarding && !showAuthModal && appView === 'dashboard' && (
+      {showOnboarding && !showAuthModal && !showUsernameModal && appView === 'dashboard' && (
         <OnboardingOverlay onDone={() => setShowOnboarding(false)} />
       )}
 
       {showAuthModal && <AuthModal />}
+
+      {showUsernameModal && <UsernameSetupModal />}
 
       {showClearConfirm && (
         <ConfirmDialog

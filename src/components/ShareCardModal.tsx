@@ -39,10 +39,10 @@ interface ShareCardModalProps {
 
 export function ShareCardModal({ period, stats, dateKey = '', year, month = 0, onClose }: ShareCardModalProps) {
   const { settings } = useSettings();
-  const { user } = useAuth();
+  const { user, username: profileUsername } = useAuth();
   const [copied, setCopied] = useState(false);
 
-  const username = resolveShareUsername(user);
+  const username = resolveShareUsername(user, profileUsername);
   const periodLabel = formatSharePeriodLabel(period, dateKey, year, month);
   const fmt = (n: number) => formatCurrency(n, settings.currency);
   const pnlStr = fmt(stats.netPnl);
