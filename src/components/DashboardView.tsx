@@ -15,7 +15,6 @@ import { DailyPnlChart } from './DailyPnlChart';
 import { DashboardCalendar } from './DashboardCalendar';
 import { EmptyDashboard } from './EmptyDashboard';
 import { FiltersBar } from './FiltersBar';
-import { FomoLogWidget } from './FomoLogWidget';
 import { ShareCardModal } from './ShareCardModal';
 import { StatsCards } from './StatsCards';
 import { WeekdayChart } from './WeekdayChart';
@@ -25,7 +24,6 @@ type DashboardMode = 'month' | 'year';
 
 interface DashboardViewProps {
   trades: Trade[];
-  accountTrades: Trade[];
   hasAnyTrades: boolean;
   year: number;
   month: number;
@@ -47,7 +45,6 @@ interface DashboardViewProps {
 
 export function DashboardView({
   trades,
-  accountTrades,
   hasAnyTrades,
   year,
   month,
@@ -152,8 +149,6 @@ export function DashboardView({
       )}
 
       <StatsCards stats={stats} cumulativeSeries={cumulativeSeries} winRateSeries={winRateSeries} />
-
-      <FomoLogWidget trades={accountTrades} />
 
       {hasAnyTrades && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">

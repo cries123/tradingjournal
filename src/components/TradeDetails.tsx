@@ -6,34 +6,40 @@ interface TradeDetailsProps {
   compact?: boolean;
 }
 
+function isMeaningfulNumber(value: number | null | undefined): value is number {
+  return value != null && value !== 0 && !Number.isNaN(value);
+}
+
+function isNonEmptyString(value: string | null | undefined): value is string {
+  return Boolean(value?.trim());
+}
+
 export function TradeDetails({ trade, compact }: TradeDetailsProps) {
   const rows: { label: string; value: string }[] = [];
 
-  if (trade.isGhost) rows.push({ label: 'Type', value: 'Ghost / missed trade' });
-  if (trade.psychology) rows.push({ label: 'Psychology', value: trade.psychology });
-  if (trade.ruleAdherence != null) rows.push({ label: 'Rule adherence', value: `${trade.ruleAdherence}/10` });
-  if (trade.marketContext?.length) rows.push({ label: 'Market context', value: trade.marketContext.join(', ') });
-  if (trade.contract) rows.push({ label: 'Contract', value: trade.contract });
-  if (trade.optionType) rows.push({ label: 'Option type', value: trade.optionType.toUpperCase() });
-  if (trade.expiration) rows.push({ label: 'Expiration', value: trade.expiration });
-  if (trade.strike != null) rows.push({ label: 'Strike', value: `$${trade.strike}` });
-  if (trade.quantity != null) rows.push({ label: 'Qty', value: String(trade.quantity) });
-  if (trade.underlyingPrice != null) {
+  if (isNonEmptyString(trade.contract)) rows.push({ label: 'Contract', value: trade.contract });
+  if (isNonEmptyString(trade.optionType)) rows.push({ label: 'Option type', value: trade.optionType.toUpperCase() });
+  if (isNonEmptyString(trade.expiration)) rows.push({ label: 'Expiration', value: trade.expiration });
+  if (isMeaningfulNumber(trade.strike)) rows.push({ label: 'Strike', value: `$${trade.strike}` });
+  if (isMeaningfulNumber(trade.quantity)) rows.push({ label: 'Qty', value: String(trade.quantity) });
+  if (isMeaningfulNumber(trade.underlyingPrice)) {
     rows.push({ label: 'Underlying', value: `$${trade.underlyingPrice}` });
   }
-  if (trade.mark != null) rows.push({ label: 'Mark', value: `$${trade.mark}` });
-  if (trade.tradePrice != null) rows.push({ label: 'Trade Price', value: `$${trade.tradePrice}` });
-  if (trade.pnlOpen != null) {
+  if (isMeaningfulNumber(trade.mark)) rows.push({ label: 'Mark', value: `$${trade.mark}` });
+  if (isMeaningfulNumber(trade.tradePrice)) rows.push({ label: 'Trade Price', value: `$${trade.tradePrice}` });
+  if (isMeaningfulNumber(trade.pnlOpen)) {
     rows.push({ label: 'P/L Open', value: formatCurrency(trade.pnlOpen) });
   }
-  if (trade.netLiq != null) rows.push({ label: 'Net Liq', value: formatCurrency(trade.netLiq) });
-  if (trade.accountType) rows.push({ label: 'Account', value: trade.accountType });
+  if (isMeaningfulNumber(trade.netLiq)) {
+    rows.push({ label: 'Net Liq', value: formatCurrency(trade.netLiq) });
+  }
+  if (isNonEmptyString(trade.accountType)) rows.push({ label: 'Account', value: trade.accountType });
 
   const greeks = [
-    trade.delta != null ? `Δ ${trade.delta}` : null,
-    trade.gamma != null ? `Γ ${trade.gamma}` : null,
-    trade.theta != null ? `Θ ${trade.theta}` : null,
-    trade.vega != null ? `V ${trade.vega}` : null,
+    isMeaningfulNumber(trade.delta) ? `Δ ${trade.delta}` : null,
+    isMeaningfulNumber(trade.gamma) ? `Γ ${trade.gamma}` : null,
+    isMeaningfulNumber(trade.theta) ? `Θ ${trade.theta}` : null,
+    isMeaningfulNumber(trade.vega) ? `V ${trade.vega}` : null,
   ].filter(Boolean);
 
   if (greeks.length > 0) {
