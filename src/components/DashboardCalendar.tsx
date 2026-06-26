@@ -29,9 +29,12 @@ export function DashboardCalendar({
   const monthTotal = useMemo(() => getMonthTotalPnl(summaries, year, month), [summaries, year, month]);
 
   return (
-    <div className="bg-bg-card border border-border rounded-lg p-2 md:p-4 shrink-0">
+    <div className="panel-card p-2 md:p-4 shrink-0">
       <div className="flex items-center justify-between mb-1.5 md:mb-3">
-        <h2 className="text-xs md:text-lg font-semibold">{formatMonthYear(year, month)}</h2>
+        <div>
+          <p className="text-[10px] uppercase tracking-widest text-emerald-400/80 font-medium mb-0.5">Calendar</p>
+          <h2 className="text-xs md:text-lg font-semibold">{formatMonthYear(year, month)}</h2>
+        </div>
         <div className="flex items-center gap-1.5 md:gap-3">
           <span className={`text-[10px] md:text-sm font-semibold ${monthTotal >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}>
             {formatCurrency(monthTotal)}

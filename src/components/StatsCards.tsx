@@ -94,8 +94,8 @@ export function StatsCards({ stats }: StatsCardsProps) {
 
 function StatCard({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="bg-bg-card border border-border rounded-lg p-2 md:p-4">
-      <p className="text-[9px] md:text-xs text-text-secondary mb-0.5 md:mb-2">{label}</p>
+    <div className="stat-card p-2 md:p-4">
+      <p className="text-[9px] md:text-xs text-text-secondary mb-0.5 md:mb-2 uppercase tracking-wide">{label}</p>
       <div className="flex items-center flex-wrap">{children}</div>
     </div>
   );

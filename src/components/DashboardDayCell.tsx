@@ -20,9 +20,9 @@ export function DashboardDayCell({ dayNumber, summary, onClick }: DashboardDayCe
   const isLoss = hasTrades && summary.totalPnl < 0;
 
   const borderClass = isProfit
-    ? 'border-profit-bright/60 ring-1 ring-profit-bright/20'
+    ? 'border-emerald-500/50 ring-1 ring-emerald-500/15 shadow-sm shadow-emerald-500/10'
     : isLoss
-      ? 'border-loss-bright/60 ring-1 ring-loss-bright/20'
+      ? 'border-red-500/50 ring-1 ring-red-500/15 shadow-sm shadow-red-500/10'
       : 'border-border/40';
 
   return (

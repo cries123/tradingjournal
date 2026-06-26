@@ -1,3 +1,4 @@
+import { BrandLogo } from './BrandLogo';
 import { AuthPanel } from './AuthPanel';
 
 interface SidebarProps {
@@ -5,16 +6,15 @@ interface SidebarProps {
   onImportScreenshot: () => void;
   onImportCsv: () => void;
   onClearAll: () => void;
+  onHome?: () => void;
   variant?: 'desktop' | 'drawer';
   onNavigate?: () => void;
 }
 
 const NAV_SECTIONS = [
   {
-    title: 'PERFORMANCE',
-    items: [
-      { id: 'overview', label: 'Overview', icon: '📊' },
-    ],
+    title: 'Performance',
+    items: [{ id: 'overview', label: 'Overview', icon: '◉' }],
   },
 ];
 
@@ -23,6 +23,7 @@ export function Sidebar({
   onImportScreenshot,
   onImportCsv,
   onClearAll,
+  onHome,
   variant = 'desktop',
   onNavigate,
 }: SidebarProps) {
@@ -33,30 +34,35 @@ export function Sidebar({
 
   const shellClass =
     variant === 'drawer'
-      ? 'flex flex-col w-full h-full bg-bg-secondary'
-      : 'flex flex-col w-52 shrink-0 h-full bg-bg-secondary border-r border-border';
+      ? 'flex flex-col w-full h-full bg-bg-secondary/95 backdrop-blur-xl'
+      : 'flex flex-col w-56 shrink-0 h-full bg-bg-secondary/80 backdrop-blur-xl border-r border-border/60';
 
   return (
     <aside className={`${shellClass} overflow-hidden`}>
-      <div className="p-3 border-b border-border shrink-0">
-        <h1 className="text-base font-bold tracking-tight">Trading Journal</h1>
-        <p className="text-[10px] text-text-secondary mt-0.5">Track daily P&L</p>
+      <div className="p-4 border-b border-border/60 shrink-0">
+        {onHome ? (
+          <button type="button" onClick={onHome} className="text-left hover:opacity-90 transition-opacity">
+            <BrandLogo size="md" />
+          </button>
+        ) : (
+          <BrandLogo size="md" />
+        )}
       </div>
 
-      <nav className="flex-1 min-h-0 p-2 space-y-3 overflow-y-auto">
+      <nav className="flex-1 min-h-0 p-3 space-y-4 overflow-y-auto">
         {NAV_SECTIONS.map((section) => (
           <div key={section.title}>
-            <p className="text-[10px] font-semibold text-text-secondary tracking-wider mb-1 px-2">
+            <p className="text-[10px] font-semibold text-text-secondary tracking-wider mb-2 px-2 uppercase">
               {section.title}
             </p>
-            <ul className="space-y-0.5">
+            <ul>
               {section.items.map((item) => (
                 <li key={item.id}>
                   <button
                     type="button"
-                    className="w-full flex items-center gap-2 px-2 py-1 rounded-md text-sm bg-accent/20 text-accent font-medium"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-medium"
                   >
-                    <span>{item.icon}</span>
+                    <span className="text-emerald-400">{item.icon}</span>
                     {item.label}
                   </button>
                 </li>
@@ -68,26 +74,22 @@ export function Sidebar({
 
       <AuthPanel />
 
-      <div className="p-2 md:p-3 border-t border-border space-y-1.5 md:space-y-2 shrink-0">
+      <div className="p-3 border-t border-border/60 space-y-2 shrink-0">
         <button
           type="button"
           onClick={wrap(onImportCsv)}
-          className="w-full py-2 md:py-2.5 border border-border text-text-primary rounded-md text-xs md:text-sm font-medium hover:bg-bg-tertiary transition-colors"
+          className="w-full py-2.5 panel-card text-text-primary text-sm font-medium hover:border-emerald-500/30 transition-colors"
         >
-          📄 Import CSV
+          Import CSV
         </button>
         <button
           type="button"
           onClick={wrap(onImportScreenshot)}
-          className="w-full py-2 border border-accent/50 text-accent rounded-md text-xs font-medium hover:bg-accent/10 transition-colors"
+          className="w-full py-2.5 panel-card text-cyan-300 text-sm font-medium border-cyan-500/20 hover:border-cyan-500/40 transition-colors"
         >
-          📷 Import Screenshot
+          Import Screenshot
         </button>
-        <button
-          type="button"
-          onClick={wrap(onAddTrade)}
-          className="w-full py-2 bg-accent text-white rounded-md text-xs font-medium hover:opacity-90 transition-opacity"
-        >
+        <button type="button" onClick={wrap(onAddTrade)} className="w-full py-2.5 btn-primary text-sm">
           + Log Trade
         </button>
         <button

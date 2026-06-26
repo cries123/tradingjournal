@@ -47,17 +47,17 @@ export function DashboardView({
       <StatsCards stats={stats} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 md:flex-1 md:min-h-[180px] pb-2 md:pb-0">
-        <div className="bg-bg-card border border-border rounded-lg p-2.5 md:p-4 flex flex-col min-h-[120px] md:min-h-0 md:overflow-hidden">
-          <h3 className="text-[10px] md:text-sm font-semibold mb-1.5 md:mb-3 shrink-0">
+        <div className="bg-bg-card border border-border rounded-lg p-2.5 md:p-4 flex flex-col min-h-[120px] md:min-h-0 md:overflow-hidden panel-card">
+          <h3 className="text-[10px] md:text-sm font-semibold mb-1.5 md:mb-3 shrink-0 text-text-primary">
             Performance by Weekday
           </h3>
           <div className="flex-1 min-h-[80px] md:min-h-0">
             <WeekdayChart data={weekdayPnl} />
           </div>
         </div>
-        <div className="bg-bg-card border border-border rounded-lg p-2.5 md:p-4 flex flex-col min-h-[140px] md:min-h-0 md:overflow-hidden">
+        <div className="panel-card p-2.5 md:p-4 flex flex-col min-h-[140px] md:min-h-0 md:overflow-hidden">
           <div className="flex items-center justify-between mb-1.5 md:mb-3 shrink-0 gap-2">
-            <h3 className="text-[10px] md:text-sm font-semibold whitespace-nowrap">Gross Daily P&L</h3>
+            <h3 className="text-[10px] md:text-sm font-semibold whitespace-nowrap text-text-primary">Gross Daily P&L</h3>
             <div className="flex gap-2 text-[9px] md:text-[10px] shrink-0">
               <span className="flex items-center gap-1 text-profit-bright">
                 <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-sm bg-profit-bright" /> Win
