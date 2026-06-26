@@ -33,7 +33,7 @@ export function Sidebar({
   const shellClass =
     variant === 'drawer'
       ? 'flex flex-col w-full h-full bg-bg-secondary/95 backdrop-blur-xl'
-      : 'flex flex-col w-56 shrink-0 h-full bg-bg-secondary/80 backdrop-blur-xl border-r border-border/60';
+      : 'flex flex-col w-56 shrink-0 sticky top-0 h-dvh bg-bg-secondary/80 backdrop-blur-xl border-r border-border/60';
 
   return (
     <aside className={`${shellClass} overflow-hidden`}>

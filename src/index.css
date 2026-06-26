@@ -49,6 +49,14 @@ body {
   overflow: hidden;
 }
 
+@media (min-width: 768px) {
+  #root.route-app {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+}
+
 #root.route-public {
   height: auto;
   min-height: 100dvh;
