@@ -1,4 +1,5 @@
 import type { BrokerIntegrationId } from '../src/types/broker';
+import { getSchwabRedirectUri, getSiteOrigin } from './siteConfig';
 
 const SCHWAB_AUTH_URL = 'https://api.schwabapi.com/v1/oauth/authorize';
 const SCHWAB_TOKEN_URL = 'https://api.schwabapi.com/v1/oauth/token';
@@ -14,6 +15,7 @@ export interface OAuthStatus {
   robinhoodConfigured: boolean;
   redirectUri: string;
   missingEnv: string[];
+  siteOrigin: string;
 }
 
 function readEnv(...keys: string[]): string | undefined {
@@ -30,10 +32,7 @@ export function getSchwabOAuthConfig(origin: string): SchwabOAuthConfig | null {
   const clientSecret = readEnv('SCHWAB_CLIENT_SECRET', 'SCHWAB_APP_SECRET', 'SCHWAB_SECRET');
   if (!clientId || !clientSecret) return null;
 
-  const redirectUri =
-    readEnv('SCHWAB_REDIRECT_URI') ??
-    (process.env.URL ? `${process.env.URL.replace(/\/$/, '')}/api/broker-oauth-callback` : undefined) ??
-    `${origin.replace(/\/$/, '')}/api/broker-oauth-callback`;
+  const redirectUri = getSchwabRedirectUri(origin);
 
   return { clientId, clientSecret, redirectUri };
 }
@@ -41,6 +40,7 @@ export function getSchwabOAuthConfig(origin: string): SchwabOAuthConfig | null {
 export function getOAuthStatus(origin: string): OAuthStatus {
   const config = getSchwabOAuthConfig(origin);
   const missingEnv: string[] = [];
+  const siteOrigin = getSiteOrigin(origin);
 
   if (!readEnv('SCHWAB_CLIENT_ID', 'SCHWAB_APP_KEY', 'SCHWAB_APP_ID')) {
     missingEnv.push('SCHWAB_CLIENT_ID (App Key from Schwab Developer Portal)');
@@ -54,8 +54,9 @@ export function getOAuthStatus(origin: string): OAuthStatus {
   return {
     schwabConfigured: Boolean(config),
     robinhoodConfigured,
-    redirectUri: config?.redirectUri ?? `${origin.replace(/\/$/, '')}/api/broker-oauth-callback`,
+    redirectUri: config?.redirectUri ?? getSchwabRedirectUri(origin),
     missingEnv,
+    siteOrigin,
   };
 }
 
@@ -105,7 +106,7 @@ export function buildRobinhoodAuthorizeUrl(origin: string): string | null {
 
   const redirectUri =
     readEnv('ROBINHOOD_REDIRECT_URI') ??
-    `${origin.replace(/\/$/, '')}/api/broker-oauth-callback?broker=robinhood`;
+    `${getSiteOrigin(origin)}/api/broker-oauth-callback?broker=robinhood`;
 
   const params = new URLSearchParams({
     client_id: clientId,

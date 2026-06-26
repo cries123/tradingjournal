@@ -3,6 +3,7 @@ export interface OAuthStatusResponse {
   robinhoodConfigured: boolean;
   redirectUri: string;
   missingEnv: string[];
+  siteOrigin: string;
 }
 
 export async function fetchOAuthStatus(): Promise<OAuthStatusResponse | null> {

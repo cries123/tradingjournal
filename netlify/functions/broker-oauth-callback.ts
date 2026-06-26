@@ -5,15 +5,14 @@ import {
   exchangeOAuthCode,
   oauthNotConfiguredMessage,
 } from '../../server/brokerOAuth';
+import { getSiteOrigin } from '../../server/siteConfig';
 import type { BrokerIntegrationId } from '../../src/types/broker';
 
 function originFromEvent(event: { headers: Record<string, string | undefined> }): string {
-  const siteUrl = process.env.URL?.replace(/\/$/, '');
-  if (siteUrl) return siteUrl;
-
   const host = event.headers.host ?? event.headers.Host;
   const proto = event.headers['x-forwarded-proto'] ?? 'https';
-  return host ? `${proto}://${host}` : 'http://localhost:5173';
+  const requestOrigin = host ? `${proto}://${host}` : undefined;
+  return getSiteOrigin(requestOrigin);
 }
 
 export const handler: Handler = async (event) => {

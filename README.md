@@ -63,7 +63,7 @@ Restart the dev server after changing `.env`. You can also paste the key in the 
 3. Enable **Authentication → Email/Password** and **Google** sign-in providers
 4. Create a **Firestore Database** (production mode)
 5. Deploy rules from `firestore.rules` in the Firebase console (Rules tab)
-6. Add your Netlify domain under **Authentication → Settings → Authorized domains**
+6. Add **trendchasers.net** (and your Netlify subdomain) under **Authentication → Settings → Authorized domains**
 7. Restart `npm run dev` — a login popup appears on first visit
 
 Your trades sync to `users/{your-uid}/trades` in Firestore. Local browser trades migrate automatically on first sign-in.
@@ -85,8 +85,19 @@ Your trades sync to `users/{your-uid}/trades` in Firestore. Local browser trades
 | `VITE_FIREBASE_STORAGE_BUCKET` | For cloud sync | |
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | For cloud sync | |
 | `VITE_FIREBASE_APP_ID` | For cloud sync | |
+| `SITE_URL` | Production domain | `https://trendchasers.net` — used for OAuth redirects and share links |
+| `SCHWAB_CLIENT_ID` | Schwab OAuth | App Key from Schwab Developer Portal |
+| `SCHWAB_CLIENT_SECRET` | Schwab OAuth | App Secret from Schwab Developer Portal |
+| `SCHWAB_REDIRECT_URI` | Schwab OAuth | `https://trendchasers.net/api/broker-oauth-callback` (must match Schwab portal exactly) |
 
 4. Deploy. Screenshot import calls `/api/parse-screenshot`, which runs as a Netlify Function using your `OPENAI_API_KEY`.
+
+### Custom domain (trendchasers.net)
+
+1. In Netlify → **Domain management**, add `trendchasers.net` and follow DNS instructions
+2. Set `SITE_URL=https://trendchasers.net` in environment variables
+3. Update Schwab Developer Portal **Callback URL** to `https://trendchasers.net/api/broker-oauth-callback`
+4. Redeploy after changing env vars
 
 ---
 

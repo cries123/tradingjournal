@@ -149,6 +149,7 @@ export function BrokerConnectionsPanel({ onTradesImported }: BrokerConnectionsPa
             Schwab OAuth: {oauthStatus.schwabConfigured ? 'configured' : 'not configured on server'}
           </p>
           <p className="break-all">Redirect URI: {oauthStatus.redirectUri}</p>
+          <p className="break-all">Site: {oauthStatus.siteOrigin ?? 'trendchasers.net'}</p>
           {!oauthStatus.schwabConfigured && oauthStatus.missingEnv.length > 0 && (
             <p className="text-amber-300">Missing env: {oauthStatus.missingEnv.join('; ')}</p>
           )}

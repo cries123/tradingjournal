@@ -9,6 +9,7 @@ import {
   getOAuthStatus,
   oauthNotConfiguredMessage,
 } from './server/brokerOAuth';
+import { getSiteOrigin } from './server/siteConfig';
 import { readJsonBody } from './server/parseScreenshot';
 import type { BrokerSyncRequest } from './src/types/broker';
 import type { BrokerIntegrationId } from './src/types/broker';
@@ -147,7 +148,7 @@ export function screenshotApiPlugin(): Plugin {
     config(_config, { mode }) {
       const env = loadEnv(mode, process.cwd(), '');
       envApiKey = env.OPENAI_API_KEY || '';
-      siteOrigin = env.URL?.replace(/\/$/, '') || env.VITE_SITE_URL?.replace(/\/$/, '') || 'http://localhost:5173';
+      siteOrigin = getSiteOrigin(env.SITE_URL || env.VITE_SITE_URL || undefined);
     },
     configureServer(server) {
       registerApiMiddleware(server, () => envApiKey, siteOrigin);
