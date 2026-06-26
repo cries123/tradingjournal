@@ -47,8 +47,10 @@ export function UsernameField({ value, onChange, currentUid, disabled }: Usernam
   return (
     <label className="block">
       <span className="text-xs font-medium text-text-secondary mb-1.5 block uppercase tracking-wide">Username</span>
-      <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary text-sm">@</span>
+      <div className="flex items-center gap-1.5 input-field py-3 px-3 focus-within:border-emerald-500/50 focus-within:shadow-[0_0_0_3px_rgba(52,211,153,0.1)]">
+        <span className="text-text-secondary text-base font-medium shrink-0 select-none" aria-hidden>
+          @
+        </span>
         <input
           type="text"
           required
@@ -56,7 +58,7 @@ export function UsernameField({ value, onChange, currentUid, disabled }: Usernam
           value={value}
           onChange={(e) => onChange(e.target.value.replace(/\s/g, ''))}
           disabled={disabled}
-          className="input-field py-3 pl-8"
+          className="flex-1 min-w-0 bg-transparent border-0 p-0 text-base text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-0"
           placeholder="yourname"
           minLength={3}
           maxLength={20}

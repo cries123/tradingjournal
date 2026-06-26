@@ -28,11 +28,11 @@ export function MobileHeader({
       </button>
       {onHome ? (
         <button type="button" onClick={onHome} className="flex-1 min-w-0 text-left focus-ring rounded">
-          <BrandLogo size="sm" variant="compact" />
+          <BrandLogo size="md" variant="compact" />
         </button>
       ) : (
         <div className="flex-1 min-w-0">
-          <BrandLogo size="sm" variant="compact" />
+          <BrandLogo size="md" variant="compact" />
         </div>
       )}
     </header>
