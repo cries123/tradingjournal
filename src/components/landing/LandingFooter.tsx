@@ -27,12 +27,12 @@ export function LandingFooter({ onPrivacy, onTerms, onHome, onBrokers }: Landing
               <button
                 type="button"
                 onClick={onHome}
-                className="inline-flex shrink-0 w-fit p-0 m-0 border-0 bg-transparent text-left hover:opacity-90 transition-opacity cursor-pointer"
+                className="inline-flex items-center justify-start shrink-0 w-fit max-w-none p-0 m-0 border-0 bg-transparent text-left hover:opacity-90 transition-opacity cursor-pointer"
               >
                 <BrandLogo size="sm" variant="compact" />
               </button>
             ) : (
-              <div className="inline-flex shrink-0 w-fit">
+              <div className="inline-flex items-center justify-start shrink-0 w-fit max-w-none">
                 <BrandLogo size="sm" variant="compact" />
               </div>
             )}
@@ -136,22 +136,28 @@ interface LandingNavProps {
   showBrokersLink?: boolean;
 }
 
-export function LandingNav({ onLaunch, onHome, onBrokers, showBrokersLink = true }: LandingNavProps) {
+function NavBrand({ onHome }: { onHome?: () => void }) {
   const logo = <BrandLogo size="sm" variant="compact" />;
-  const logoWrapClass =
-    'inline-flex shrink-0 w-fit p-0 m-0 border-0 bg-transparent hover:opacity-90 transition-opacity';
+  const shellClass =
+    'inline-flex items-center justify-start shrink-0 w-fit max-w-none p-0 m-0 border-0 bg-transparent text-left hover:opacity-90 transition-opacity focus-ring rounded';
 
+  if (onHome) {
+    return (
+      <button type="button" onClick={onHome} className={`${shellClass} cursor-pointer`}>
+        {logo}
+      </button>
+    );
+  }
+
+  return <div className={shellClass}>{logo}</div>;
+}
+
+export function LandingNav({ onLaunch, onHome, onBrokers, showBrokersLink = true }: LandingNavProps) {
   return (
     <header className="relative z-10 border-b border-border/50 backdrop-blur-md bg-bg-primary/70 sticky top-0">
       <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-4">
-        {onHome ? (
-          <button type="button" onClick={onHome} className={`${logoWrapClass} cursor-pointer`}>
-            {logo}
-          </button>
-        ) : (
-          <div className="inline-flex shrink-0 w-fit">{logo}</div>
-        )}
-        <div className="flex items-center gap-3">
+        <NavBrand onHome={onHome} />
+        <div className="flex items-center gap-3 shrink-0">
           {showBrokersLink && onBrokers && (
             <button
               type="button"

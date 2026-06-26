@@ -9,9 +9,10 @@ interface BrokersPageProps {
   onLaunch: () => void;
   onPrivacy: () => void;
   onTerms: () => void;
+  onBrokers: () => void;
 }
 
-export function BrokersPage({ onHome, onLaunch, onPrivacy, onTerms }: BrokersPageProps) {
+export function BrokersPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: BrokersPageProps) {
   const [supported, setSupported] = useState<BrokerConfig[]>([]);
   const [comingSoon, setComingSoon] = useState<string[]>([]);
 
@@ -25,7 +26,7 @@ export function BrokersPage({ onHome, onLaunch, onPrivacy, onTerms }: BrokersPag
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
       <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
-      <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={() => {}} showBrokersLink={false} />
+      <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} showBrokersLink={false} />
 
       <main className="relative z-10 flex-1">
         <div className="max-w-4xl mx-auto px-4 md:px-6 pt-8 md:pt-12 pb-16">

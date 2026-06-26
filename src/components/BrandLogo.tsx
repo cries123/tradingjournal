@@ -49,8 +49,13 @@ export function BrandLogo({ size = 'md', variant = 'compact' }: BrandLogoProps) 
 
   const text = compactText[size];
   return (
-    <div className={`inline-flex items-center ${text.gap} shrink-0 w-fit min-w-0`}>
-      <img src="/logo-mark.svg" alt="" aria-hidden className={`${markHeights[size]} shrink-0 object-contain`} />
+    <div className={`inline-flex items-center justify-start ${text.gap} shrink-0 w-fit`}>
+      <img
+        src="/logo-mark.svg"
+        alt=""
+        aria-hidden
+        className={`${markHeights[size]} shrink-0 object-contain object-left`}
+      />
       <div className="min-w-0 leading-none">
         <p className={`${text.title} font-black tracking-[0.14em] text-[#6cd59f]`}>TREND</p>
         <p className={`${text.title} font-black tracking-[0.14em] text-text-primary mt-0.5`}>CHASERS</p>
