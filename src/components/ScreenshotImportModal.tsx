@@ -264,16 +264,7 @@ export function ScreenshotImportModal({ onClose, onSave, targetDate }: Screensho
                     className="input-field"
                   />
                 </label>
-                <p className="text-[10px] text-text-secondary mt-1">
-                  On Netlify, set <code className="text-accent">OPENAI_API_KEY</code> in site env vars instead.
-                </p>
               </div>
-            )}
-
-            {serverHasApiKey && (
-              <p className="mt-4 text-[10px] text-text-secondary">
-                AI parsing is configured on the server — no API key needed.
-              </p>
             )}
 
             {error && <p className="text-sm text-red-400 mt-3">{error}</p>}

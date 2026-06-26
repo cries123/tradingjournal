@@ -164,7 +164,6 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
                   'Multi-screenshot upload — batch an entire session',
                   'Review & edit before saving — flip P/L signs, fix symbols',
                   'Extracts options details when visible (strike, Greeks, contract)',
-                  'Server-side AI — your API key stays secure on deploy',
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-2">
                     <span className="text-emerald-400 mt-0.5">→</span>
