@@ -33,11 +33,26 @@ body {
 }
 
 html,
-body,
+body {
+  margin: 0;
+  min-height: 100%;
+  min-height: 100dvh;
+}
+
 #root {
-  height: 100%;
+  min-height: 100%;
+  min-height: 100dvh;
+}
+
+#root.route-app {
   height: 100dvh;
   overflow: hidden;
+}
+
+#root.route-public {
+  height: auto;
+  min-height: 100dvh;
+  overflow: visible;
 }
 
 @media (max-width: 767px) {
@@ -160,14 +175,16 @@ body,
   padding: 0.5rem 0.75rem;
   background-color: var(--color-bg-tertiary);
   border: 1px solid var(--color-border);
-  border-radius: 0.375rem;
+  border-radius: 0.5rem;
   color: var(--color-text-primary);
   font-size: 0.875rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .input-field:focus {
   outline: none;
-  border-color: var(--color-accent);
+  border-color: rgba(52, 211, 153, 0.5);
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.1);
 }
 
 .prose-legal section {

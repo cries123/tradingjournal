@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 
-export type AppRoute = 'landing' | 'app' | 'privacy' | 'terms';
+export type AppRoute = 'landing' | 'app' | 'brokers' | 'privacy' | 'terms';
 
 const ROUTE_PATHS: Record<AppRoute, string> = {
   landing: '/',
   app: '/app',
+  brokers: '/brokers',
   privacy: '/privacy',
   terms: '/terms',
 };
@@ -12,6 +13,7 @@ const ROUTE_PATHS: Record<AppRoute, string> = {
 function readRoute(): AppRoute {
   const path = window.location.pathname;
   if (path.startsWith('/app')) return 'app';
+  if (path.startsWith('/brokers')) return 'brokers';
   if (path.startsWith('/privacy')) return 'privacy';
   if (path.startsWith('/terms')) return 'terms';
   return 'landing';
@@ -27,9 +29,20 @@ export function useRoute() {
   }, []);
 
   useEffect(() => {
-    const overflow = route === 'app' ? 'hidden' : 'auto';
-    document.documentElement.style.overflow = overflow;
-    document.body.style.overflow = overflow;
+    const root = document.getElementById('root');
+    const isApp = route === 'app';
+
+    if (isApp) {
+      root?.classList.add('route-app');
+      root?.classList.remove('route-public');
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.overflow = 'hidden';
+    } else {
+      root?.classList.remove('route-app');
+      root?.classList.add('route-public');
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
+    }
   }, [route]);
 
   const navigate = useCallback((next: AppRoute) => {

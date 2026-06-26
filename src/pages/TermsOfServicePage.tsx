@@ -5,11 +5,12 @@ interface TermsOfServicePageProps {
   onLaunch: () => void;
   onPrivacy: () => void;
   onTerms: () => void;
+  onBrokers?: () => void;
 }
 
-export function TermsOfServicePage({ onHome, onLaunch, onPrivacy, onTerms }: TermsOfServicePageProps) {
+export function TermsOfServicePage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: TermsOfServicePageProps) {
   return (
-    <LegalPageLayout title="Terms of Service" onHome={onHome} onLaunch={onLaunch} onPrivacy={onPrivacy} onTerms={onTerms}>
+    <LegalPageLayout title="Terms of Service" onHome={onHome} onLaunch={onLaunch} onPrivacy={onPrivacy} onTerms={onTerms} onBrokers={onBrokers}>
       <section>
         <h2>Agreement</h2>
         <p>

@@ -4,12 +4,23 @@ interface LandingFooterProps {
   onPrivacy: () => void;
   onTerms: () => void;
   onHome?: () => void;
+  onBrokers?: () => void;
 }
 
-export function LandingFooter({ onPrivacy, onTerms, onHome }: LandingFooterProps) {
+export function LandingFooter({ onPrivacy, onTerms, onHome, onBrokers }: LandingFooterProps) {
+  const goHomeSection = (hash: string) => (e: React.MouseEvent) => {
+    if (onHome) {
+      e.preventDefault();
+      onHome();
+      requestAnimationFrame(() => {
+        document.getElementById(hash.replace('#', ''))?.scrollIntoView({ behavior: 'smooth' });
+      });
+    }
+  };
+
   return (
-    <footer className="relative z-10 border-t border-border/50 bg-bg-secondary/20">
-      <div className="max-w-6xl mx-auto px-4 md:px-6 py-10 md:py-12">
+    <footer className="relative z-10 mt-auto border-t border-border/50 bg-bg-secondary/40 shrink-0">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-10 md:py-14">
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
           <div className="sm:col-span-2 lg:col-span-1">
             {onHome ? (
@@ -27,10 +38,28 @@ export function LandingFooter({ onPrivacy, onTerms, onHome }: LandingFooterProps
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-text-primary mb-3">Product</p>
             <ul className="space-y-2 text-sm text-text-secondary">
-              <li><a href="/#features" className="hover:text-emerald-400 transition-colors">Features</a></li>
-              <li><a href="/#brokers" className="hover:text-emerald-400 transition-colors">Supported brokers</a></li>
-              <li><a href="/#security" className="hover:text-emerald-400 transition-colors">Security</a></li>
-              <li><a href="/app" className="hover:text-emerald-400 transition-colors">Open journal</a></li>
+              <li>
+                <a href="/#features" onClick={goHomeSection('#features')} className="hover:text-emerald-400 transition-colors">
+                  Features
+                </a>
+              </li>
+              <li>
+                {onBrokers ? (
+                  <button type="button" onClick={onBrokers} className="hover:text-emerald-400 transition-colors">
+                    Supported brokers
+                  </button>
+                ) : (
+                  <a href="/brokers" className="hover:text-emerald-400 transition-colors">Supported brokers</a>
+                )}
+              </li>
+              <li>
+                <a href="/#security" onClick={goHomeSection('#security')} className="hover:text-emerald-400 transition-colors">
+                  Security
+                </a>
+              </li>
+              <li>
+                <a href="/app" className="hover:text-emerald-400 transition-colors">Open journal</a>
+              </li>
             </ul>
           </div>
 
@@ -87,9 +116,11 @@ export function LandingFooter({ onPrivacy, onTerms, onHome }: LandingFooterProps
 interface LandingNavProps {
   onLaunch: () => void;
   onHome?: () => void;
+  onBrokers?: () => void;
+  showBrokersLink?: boolean;
 }
 
-export function LandingNav({ onLaunch, onHome }: LandingNavProps) {
+export function LandingNav({ onLaunch, onHome, onBrokers, showBrokersLink = true }: LandingNavProps) {
   return (
     <header className="relative z-10 border-b border-border/50 backdrop-blur-md bg-bg-primary/70 sticky top-0">
       <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
@@ -101,9 +132,15 @@ export function LandingNav({ onLaunch, onHome }: LandingNavProps) {
           <BrandLogo size="md" />
         )}
         <div className="flex items-center gap-3">
-          <a href="/#brokers" className="hidden sm:inline text-sm text-text-secondary hover:text-text-primary transition-colors">
-            Brokers
-          </a>
+          {showBrokersLink && onBrokers && (
+            <button
+              type="button"
+              onClick={onBrokers}
+              className="hidden sm:inline text-sm text-text-secondary hover:text-text-primary transition-colors"
+            >
+              Brokers
+            </button>
+          )}
           <button type="button" onClick={onLaunch} className="btn-primary text-sm px-5 py-2.5">
             Open Journal
           </button>

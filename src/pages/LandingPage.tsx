@@ -6,6 +6,7 @@ interface LandingPageProps {
   onLaunch: () => void;
   onPrivacy: () => void;
   onTerms: () => void;
+  onBrokers: () => void;
 }
 
 const FEATURES = [
@@ -47,12 +48,6 @@ const FEATURES = [
   },
 ];
 
-const SUPPORTED_BROKERS = [
-  { name: 'Thinkorswim', status: 'live' as const, detail: 'Screenshot AI + CSV' },
-  { name: 'Schwab', status: 'live' as const, detail: 'Account statement CSV' },
-  { name: 'Robinhood', status: 'live' as const, detail: 'Screenshot AI parsing' },
-];
-
 const FAQ = [
   {
     q: 'Do I need to log in to my broker?',
@@ -82,11 +77,11 @@ const STEPS = [
   { n: '03', title: 'Analyze your edge', body: 'Stats and charts reveal patterns across weekdays and trade size.' },
 ];
 
-export function LandingPage({ onLaunch, onPrivacy, onTerms }: LandingPageProps) {
+export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: LandingPageProps) {
   return (
-    <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden">
+    <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
       <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
-      <LandingNav onLaunch={onLaunch} />
+      <LandingNav onLaunch={onLaunch} onBrokers={onBrokers} />
 
       {/* Hero */}
       <section className="relative z-10 max-w-6xl mx-auto px-4 md:px-6 pt-12 md:pt-20 pb-16 md:pb-20">
@@ -108,9 +103,9 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms }: LandingPageProps) 
               <button type="button" onClick={onLaunch} className="btn-primary text-base px-7 py-3.5">
                 Start journaling free
               </button>
-              <a href="#brokers" className="btn-secondary text-base px-7 py-3.5 text-center">
+              <button type="button" onClick={onBrokers} className="btn-secondary text-base px-7 py-3.5">
                 See supported brokers
-              </a>
+              </button>
             </div>
             <div className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-sm text-text-secondary">
               <span className="flex items-center gap-2">
@@ -199,53 +194,17 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms }: LandingPageProps) 
         </div>
       </section>
 
-      {/* Brokers */}
-      <section id="brokers" className="relative z-10 border-t border-border/50 bg-bg-secondary/30 py-16 md:py-24">
-        <div className="max-w-6xl mx-auto px-4 md:px-6">
-          <div className="text-center max-w-2xl mx-auto mb-12">
-            <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Brokers</p>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Supported today — more coming</h2>
-            <p className="mt-4 text-text-secondary">
-              We currently support Thinkorswim, Schwab, and Robinhood. Additional brokers are on the roadmap.
-            </p>
-          </div>
-
-          <div className="grid sm:grid-cols-3 gap-4 mb-10">
-            {SUPPORTED_BROKERS.map((b) => (
-              <div key={b.name} className="glass-card rounded-xl p-5 text-center">
-                <div className="inline-flex px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-semibold uppercase tracking-wide mb-3">
-                  Live
-                </div>
-                <h3 className="text-lg font-semibold">{b.name}</h3>
-                <p className="text-sm text-text-secondary mt-1">{b.detail}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="glass-card rounded-2xl p-6 md:p-8 border-dashed border-2 border-emerald-500/25 text-center max-w-2xl mx-auto">
-            <h3 className="text-lg font-semibold mb-2">Use a different broker?</h3>
-            <p className="text-sm text-text-secondary leading-relaxed mb-5">
-              We&apos;re actively expanding support. If you trade with Interactive Brokers, Webull, Tastytrade,
-              or any other platform — reach out. Tell us your broker and how you export data, and we&apos;ll
-              configure import support for your workflow.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <a
-                href="https://github.com/cries123/tradingjournal/issues/new?title=Broker%20support%20request"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-primary text-sm px-6 py-2.5"
-              >
-                Request your broker
-              </a>
-              <a
-                href="mailto:support@tradingjournal.app?subject=Broker%20support%20request"
-                className="btn-secondary text-sm px-6 py-2.5"
-              >
-                Email us
-              </a>
-            </div>
-          </div>
+      {/* Brokers teaser */}
+      <section id="brokers" className="relative z-10 border-t border-border/50 bg-bg-secondary/30 py-16 md:py-20">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 text-center">
+          <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Brokers</p>
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">Thinkorswim · Schwab · Robinhood</h2>
+          <p className="text-text-secondary max-w-xl mx-auto mb-8">
+            AI screenshot parsing and CSV imports — no brokerage login required. More brokers coming soon.
+          </p>
+          <button type="button" onClick={onBrokers} className="btn-secondary px-8 py-3">
+            View all supported brokers →
+          </button>
         </div>
       </section>
 
@@ -331,7 +290,7 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms }: LandingPageProps) 
         </div>
       </section>
 
-      <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} />
+      <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} onBrokers={onBrokers} />
     </div>
   );
 }

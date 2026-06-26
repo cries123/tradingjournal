@@ -1,4 +1,5 @@
 import { useRoute } from './hooks/useRoute';
+import { BrokersPage } from './pages/BrokersPage';
 import { LandingPage } from './pages/LandingPage';
 import { JournalApp } from './pages/JournalApp';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
@@ -9,8 +10,20 @@ export default function App() {
 
   const goHome = () => navigate('landing');
   const goApp = () => navigate('app');
+  const goBrokers = () => navigate('brokers');
   const goPrivacy = () => navigate('privacy');
   const goTerms = () => navigate('terms');
+
+  if (route === 'brokers') {
+    return (
+      <BrokersPage
+        onHome={goHome}
+        onLaunch={goApp}
+        onPrivacy={goPrivacy}
+        onTerms={goTerms}
+      />
+    );
+  }
 
   if (route === 'privacy') {
     return (
@@ -19,6 +32,7 @@ export default function App() {
         onLaunch={goApp}
         onPrivacy={goPrivacy}
         onTerms={goTerms}
+        onBrokers={goBrokers}
       />
     );
   }
@@ -30,6 +44,7 @@ export default function App() {
         onLaunch={goApp}
         onPrivacy={goPrivacy}
         onTerms={goTerms}
+        onBrokers={goBrokers}
       />
     );
   }
@@ -38,5 +53,12 @@ export default function App() {
     return <JournalApp onHome={goHome} />;
   }
 
-  return <LandingPage onLaunch={goApp} onPrivacy={goPrivacy} onTerms={goTerms} />;
+  return (
+    <LandingPage
+      onLaunch={goApp}
+      onPrivacy={goPrivacy}
+      onTerms={goTerms}
+      onBrokers={goBrokers}
+    />
+  );
 }
