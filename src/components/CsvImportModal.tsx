@@ -1,8 +1,15 @@
 import { useCallback, useRef, useState } from 'react';
+import { FileSpreadsheet, X } from 'lucide-react';
 import { TradeListItem } from './TradeListItem';
 import type { Trade } from '../types';
+import { useSettings } from '../context/SettingsContext';
 import { formatCurrency } from '../utils/format';
-import { previewSchwabCsv, type SchwabImportPreview } from '../utils/parseSchwabCsv';
+import {
+  brokerFormatLabel,
+  detectCsvFormat,
+  previewBrokerCsv,
+  type CsvImportPreview,
+} from '../utils/parseCsvRouter';
 
 interface CsvImportModalProps {
   onClose: () => void;
@@ -21,17 +28,19 @@ function formatTargetDate(date: string): string {
 }
 
 export function CsvImportModal({ onClose, onSave, targetDate }: CsvImportModalProps) {
+  const { settings } = useSettings();
   const [step, setStep] = useState<Step>('upload');
   const [fileName, setFileName] = useState('');
+  const [detectedFormat, setDetectedFormat] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [trades, setTrades] = useState<SchwabImportPreview[]>([]);
+  const [trades, setTrades] = useState<CsvImportPreview[]>([]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback((file: File) => {
     if (!file.name.toLowerCase().endsWith('.csv')) {
-      setError('Please upload a Schwab account statement CSV file');
+      setError('Please upload a CSV file from your broker');
       return;
     }
 
@@ -39,7 +48,9 @@ export function CsvImportModal({ onClose, onSave, targetDate }: CsvImportModalPr
     reader.onload = () => {
       try {
         const text = reader.result as string;
-        let parsed = previewSchwabCsv(text);
+        const format = detectCsvFormat(text);
+        setDetectedFormat(brokerFormatLabel(format));
+        let parsed = previewBrokerCsv(text);
 
         if (targetDate) {
           parsed = parsed.filter((t) => t.date === targetDate);
@@ -102,14 +113,16 @@ export function CsvImportModal({ onClose, onSave, targetDate }: CsvImportModalPr
       >
         <div className="flex justify-between items-start mb-4">
           <div>
-            <h3 className="text-lg font-semibold">Import Schwab Statement</h3>
+            <h3 className="text-lg font-semibold">Import CSV</h3>
             <p className="text-xs text-text-secondary mt-1">
               {targetDate
                 ? `Showing trades for ${formatTargetDate(targetDate)} only`
-                : 'Upload your Schwab/Thinkorswim account statement CSV'}
+                : 'Schwab, Thinkorswim, or Robinhood CSV exports'}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="text-text-secondary hover:text-text-primary text-xl">×</button>
+          <button type="button" onClick={onClose} className="p-1 text-text-secondary hover:text-text-primary focus-ring rounded" aria-label="Close">
+            <X size={20} />
+          </button>
         </div>
 
         {step === 'upload' && (
@@ -133,9 +146,9 @@ export function CsvImportModal({ onClose, onSave, targetDate }: CsvImportModalPr
                   if (f) handleFile(f);
                 }}
               />
-              <div className="text-4xl mb-2">📄</div>
-              <p className="text-sm">Drop your AccountStatement CSV here or click to browse</p>
-              <p className="text-xs text-text-secondary mt-1">Schwab → History → Export account statement</p>
+              <FileSpreadsheet size={40} className="mx-auto mb-2 text-text-secondary" />
+              <p className="text-sm">Drop your broker CSV here or click to browse</p>
+              <p className="text-xs text-text-secondary mt-1">Auto-detects Schwab, TOS, and Robinhood formats</p>
             </div>
             {error && <p className="text-sm text-red-400 mt-3">{error}</p>}
           </>
@@ -147,9 +160,10 @@ export function CsvImportModal({ onClose, onSave, targetDate }: CsvImportModalPr
               <div>
                 <p className="text-sm text-text-secondary">
                   {selectedCount} of {trades.length} trades from <span className="text-text-primary">{fileName}</span>
+                  {detectedFormat && <span className="ml-1 text-emerald-400">({detectedFormat})</span>}
                 </p>
                 <p className={`text-sm font-semibold mt-0.5 ${totalPnl >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}>
-                  Selected total: {formatCurrency(totalPnl)}
+                  Selected total: {formatCurrency(totalPnl, settings.currency)}
                 </p>
               </div>
               <div className="flex gap-2 text-xs">
@@ -193,11 +207,15 @@ export function CsvImportModal({ onClose, onSave, targetDate }: CsvImportModalPr
 
             {error && <p className="text-sm text-red-400 mb-3">{error}</p>}
 
+            <p className="text-[11px] text-text-secondary mb-4 leading-relaxed">
+              Broker fields import as-is. Psychology, rule adherence, and market context stay blank — edit any trade after import to add them.
+            </p>
+
             <div className="flex gap-3">
-              <button type="button" onClick={handleSave} className="flex-1 py-2.5 bg-accent text-white rounded-md font-medium hover:opacity-90">
+              <button type="button" onClick={handleSave} className="flex-1 py-2.5 btn-primary text-sm">
                 Import {selectedCount} Trades
               </button>
-              <button type="button" onClick={() => { setStep('upload'); setError(null); }} className="px-4 py-2.5 border border-border rounded-md text-text-secondary hover:text-text-primary">
+              <button type="button" onClick={() => { setStep('upload'); setError(null); }} className="px-4 py-2.5 btn-secondary text-sm">
                 Back
               </button>
             </div>

@@ -2,7 +2,9 @@ import { useMemo } from 'react';
 import type { Trade } from '../types';
 import { aggregateTradesByDay, buildCalendarWeeks, getMonthTotalPnl } from '../utils/calendar';
 import { formatCurrency, formatMonthYear } from '../utils/format';
+import { useSettings } from '../context/SettingsContext';
 import { DashboardDayCell } from './DashboardDayCell';
+import { MonthPicker } from './MonthPicker';
 
 interface DashboardCalendarProps {
   year: number;
@@ -11,6 +13,7 @@ interface DashboardCalendarProps {
   onDayClick: (date: string) => void;
   onPrevMonth: () => void;
   onNextMonth: () => void;
+  onMonthChange: (year: number, month: number) => void;
 }
 
 const WEEKDAYS_SHORT = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -23,36 +26,44 @@ export function DashboardCalendar({
   onDayClick,
   onPrevMonth,
   onNextMonth,
+  onMonthChange,
 }: DashboardCalendarProps) {
+  const { settings } = useSettings();
   const summaries = useMemo(() => aggregateTradesByDay(trades), [trades]);
   const weeks = useMemo(() => buildCalendarWeeks(year, month, summaries), [year, month, summaries]);
   const monthTotal = useMemo(() => getMonthTotalPnl(summaries, year, month), [summaries, year, month]);
 
   return (
     <div className="panel-card p-2 md:p-4 shrink-0">
-      <div className="flex items-center justify-between mb-1.5 md:mb-3">
-        <div>
+      <div className="flex flex-wrap items-center justify-between mb-1.5 md:mb-3 gap-x-2 gap-y-1">
+        <div className="min-w-0">
           <p className="text-[10px] uppercase tracking-widest text-emerald-400/80 font-medium mb-0.5">Calendar</p>
           <h2 className="text-xs md:text-lg font-semibold">{formatMonthYear(year, month)}</h2>
         </div>
-        <div className="flex items-center gap-1.5 md:gap-3">
+        <div className="flex items-center gap-1.5 md:gap-3 shrink-0 ml-auto">
           <span className={`text-[10px] md:text-sm font-semibold ${monthTotal >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}>
-            {formatCurrency(monthTotal)}
+            {formatCurrency(monthTotal, settings.currency)}
           </span>
-          <div className="flex gap-0.5 md:gap-1">
-            <button type="button" onClick={onPrevMonth} className="p-1 md:p-1.5 rounded hover:bg-bg-tertiary text-text-secondary text-sm" aria-label="Previous month">‹</button>
-            <button type="button" onClick={onNextMonth} className="p-1 md:p-1.5 rounded hover:bg-bg-tertiary text-text-secondary text-sm" aria-label="Next month">›</button>
-          </div>
+          <MonthPicker
+            year={year}
+            month={month}
+            onPrev={onPrevMonth}
+            onNext={onNextMonth}
+            onChange={onMonthChange}
+          />
         </div>
       </div>
 
-      <div key={`${year}-${month}`} className="grid grid-cols-7 gap-0.5 md:gap-2 animate-fade-up motion-safe:animate-fade-up">
+      <div className="grid grid-cols-7 gap-0.5 md:gap-2 mb-0.5 md:mb-1">
         {WEEKDAYS.map((day, i) => (
-          <div key={day} className="text-[8px] md:text-[11px] text-text-secondary text-center py-0.5 md:py-1 font-medium uppercase tracking-wide">
+          <div key={`${day}-${i}`} className="text-[8px] md:text-[11px] text-text-secondary text-center py-0.5 md:py-1 font-medium uppercase tracking-wide">
             <span className="md:hidden">{WEEKDAYS_SHORT[i]}</span>
             <span className="hidden md:inline">{day}</span>
           </div>
         ))}
+      </div>
+
+      <div key={`${year}-${month}`} className="grid grid-cols-7 gap-0.5 md:gap-2 animate-fade-up motion-safe:animate-fade-up">
         {weeks.flatMap((week) =>
           week.days.map((day, di) => (
             <DashboardDayCell

@@ -1,5 +1,5 @@
 import type { Handler } from '@netlify/functions';
-import { parseScreenshotWithAI } from '../../server/parseScreenshot';
+import { handleParseScreenshotRequest } from '../../server/parseApiHandler';
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -11,7 +11,7 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    let body: { image?: string; mimeType?: string; apiKey?: string };
+    let body: { image?: string; mimeType?: string; apiKey?: string; userId?: string };
     try {
       body = JSON.parse(event.body || '{}') as typeof body;
     } catch {
@@ -22,32 +22,25 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    if (!body.image) {
-      return {
-        statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Missing image data' }),
-      };
-    }
-
-    const apiKey = body.apiKey || process.env.OPENAI_API_KEY || '';
-    const trades = await parseScreenshotWithAI(
-      body.image,
-      body.mimeType || 'image/jpeg',
-      apiKey,
-    );
+    const result = await handleParseScreenshotRequest(body, {
+      'x-forwarded-for': event.headers['x-forwarded-for'],
+      'x-nf-client-connection-ip': event.headers['x-nf-client-connection-ip'],
+      'client-ip': event.headers['client-ip'],
+    });
 
     return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ trades }),
+      statusCode: result.statusCode,
+      headers: {
+        'Content-Type': 'application/json',
+        ...result.headers,
+      },
+      body: JSON.stringify(result.body),
     };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
+  } catch {
     return {
       statusCode: 500,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: message }),
+      body: JSON.stringify({ error: 'Internal server error' }),
     };
   }
 };

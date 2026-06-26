@@ -1,10 +1,16 @@
 import { loadEnv, type Plugin } from 'vite';
 import type { IncomingMessage, ServerResponse } from 'http';
-import { parseScreenshotWithAI, readJsonBody } from './server/parseScreenshot';
+import { handleParseScreenshotRequest } from './server/parseApiHandler';
+import { readJsonBody } from './server/parseScreenshot';
 
-function sendJson(res: ServerResponse, status: number, body: unknown) {
+function sendJson(res: ServerResponse, status: number, body: unknown, extraHeaders?: Record<string, string>) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json');
+  if (extraHeaders) {
+    for (const [k, v] of Object.entries(extraHeaders)) {
+      res.setHeader(k, v);
+    }
+  }
   res.end(JSON.stringify(body));
 }
 
@@ -21,7 +27,7 @@ function createParseHandler(getApiKey: () => string) {
 
     void (async () => {
       try {
-        let body: { image?: string; mimeType?: string; apiKey?: string };
+        let body: { image?: string; mimeType?: string; apiKey?: string; userId?: string };
         try {
           body = (await readJsonBody(req)) as typeof body;
         } catch {
@@ -29,22 +35,17 @@ function createParseHandler(getApiKey: () => string) {
           return;
         }
 
-        if (!body.image) {
-          sendJson(res, 400, { error: 'Missing image data' });
-          return;
+        if (!body.apiKey && getApiKey()) {
+          body = { ...body, apiKey: getApiKey() };
         }
 
-        const apiKey = body.apiKey || getApiKey() || '';
-        const trades = await parseScreenshotWithAI(
-          body.image,
-          body.mimeType || 'image/jpeg',
-          apiKey,
-        );
+        const result = await handleParseScreenshotRequest(body, {
+          'x-forwarded-for': req.headers['x-forwarded-for'] as string | undefined,
+        });
 
-        sendJson(res, 200, { trades });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        sendJson(res, 500, { error: message });
+        sendJson(res, result.statusCode, result.body, result.headers);
+      } catch {
+        sendJson(res, 500, { error: 'Internal server error' });
       }
     })();
   };

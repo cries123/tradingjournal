@@ -1,11 +1,30 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /config/brokers {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
+
+    match /users/{userId}/settings/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
     match /users/{userId}/trades/{tradeId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /usernames/{usernameId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && !exists(/databases/$(database)/documents/usernames/$(usernameId))
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.username == usernameId;
+      allow update, delete: if false;
     }
   }
 }

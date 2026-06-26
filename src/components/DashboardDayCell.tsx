@@ -1,4 +1,5 @@
 import type { DailySummary } from '../types';
+import { useSettings } from '../context/SettingsContext';
 import { formatCurrency, formatCurrencyCompact } from '../utils/format';
 
 interface DashboardDayCellProps {
@@ -11,6 +12,7 @@ const cellShell =
   'rounded-sm md:rounded-lg text-left transition-all duration-200 ease-out flex flex-col bg-bg-card overflow-hidden aspect-square md:aspect-auto md:h-[72px] motion-safe:hover:scale-[1.03] motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.98]';
 
 export function DashboardDayCell({ dayNumber, summary, onClick }: DashboardDayCellProps) {
+  const { settings } = useSettings();
   if (dayNumber === null) {
     return <div className={`${cellShell} bg-bg-card/40 border border-transparent`} />;
   }
@@ -29,7 +31,7 @@ export function DashboardDayCell({ dayNumber, summary, onClick }: DashboardDayCe
     <button
       type="button"
       onClick={onClick}
-      className={`${cellShell} p-0.5 md:p-2 border ${borderClass} hover:bg-bg-tertiary cursor-pointer group`}
+      className={`${cellShell} p-0.5 md:p-2 border ${borderClass} hover:bg-bg-tertiary cursor-pointer group focus-ring`}
     >
       <span className="text-[9px] md:text-xs text-text-secondary leading-none">{dayNumber}</span>
       {hasTrades ? (
@@ -39,8 +41,8 @@ export function DashboardDayCell({ dayNumber, summary, onClick }: DashboardDayCe
               isProfit ? 'text-profit-bright' : 'text-loss-bright'
             }`}
           >
-            <span className="md:hidden">{formatCurrencyCompact(summary.totalPnl)}</span>
-            <span className="hidden md:inline">{formatCurrency(summary.totalPnl)}</span>
+            <span className="md:hidden">{formatCurrencyCompact(summary.totalPnl, settings.currency)}</span>
+            <span className="hidden md:inline">{formatCurrency(summary.totalPnl, settings.currency)}</span>
           </span>
           <span className="hidden md:block text-[10px] text-text-secondary mt-0.5 truncate">
             {summary.tradeCount} {summary.tradeCount === 1 ? 'trade' : 'trades'}

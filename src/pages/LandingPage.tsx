@@ -1,3 +1,14 @@
+import {
+  Bot,
+  Calendar,
+  Check,
+  Cloud,
+  FileSpreadsheet,
+  Lock,
+  Pencil,
+  BarChart3,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { DashboardPreview } from '../components/landing/DashboardPreview';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
@@ -10,39 +21,39 @@ interface LandingPageProps {
   onBrokers: () => void;
 }
 
-const FEATURES = [
+const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
   {
-    icon: '📅',
+    icon: Calendar,
     title: 'P&L Calendar',
     description:
       'See your month at a glance — green days for profit, red for loss. Click any day to import trades or drill into that session.',
   },
   {
-    icon: '🤖',
+    icon: Bot,
     title: 'AI Screenshot Parsing',
     description:
       'Upload brokerage screenshots and let AI extract P/L, symbols, and contract details. Review before saving — no typing required.',
   },
   {
-    icon: '📄',
+    icon: FileSpreadsheet,
     title: 'CSV Statement Import',
     description:
       'Drop in your account statement export. Round-trip trades are matched automatically so you can review and import in seconds.',
   },
   {
-    icon: '✏️',
+    icon: Pencil,
     title: 'Manual Trade Entry',
     description:
-      'Log trades by hand with symbol, P/L, side, setup tags, and notes. Perfect when you want full control.',
+      'Log trades by hand with symbol, P/L, side, setup tags, and notes — a clean form without extra clutter.',
   },
   {
-    icon: '📊',
+    icon: BarChart3,
     title: 'Performance Analytics',
     description:
       'Net P&L, win rate, profit factor, avg profit per trade & day, weekday breakdown, and daily gross charts.',
   },
   {
-    icon: '☁️',
+    icon: Cloud,
     title: 'Optional Cloud Sync',
     description:
       'Sign in with Google or email to sync across devices — or stay local-only. Your journal, your choice.',
@@ -52,7 +63,7 @@ const FEATURES = [
 const FAQ = [
   {
     q: 'Do I need to log in to my broker?',
-    a: 'Never. Trading Journal never connects to your brokerage account. You upload CSV files, screenshots, or enter trades manually — completely separate from your broker login.',
+    a: 'Never. Trend Chasers never connects to your brokerage account. You upload CSV files, screenshots, or enter trades manually — completely separate from your broker login.',
   },
   {
     q: 'Which brokers are supported today?',
@@ -73,9 +84,9 @@ const FAQ = [
 ];
 
 const STEPS = [
-  { n: '01', title: 'Upload or log', body: 'Screenshot, CSV, or manual entry — however you already track trades.' },
+  { n: '01', title: 'Upload or log', body: 'Screenshot, CSV, or manual entry — get your trades into the journal in seconds.' },
   { n: '02', title: 'Review on calendar', body: 'Daily P&L colors show winning and losing sessions at a glance.' },
-  { n: '03', title: 'Analyze your edge', body: 'Stats and charts reveal patterns across weekdays and trade size.' },
+  { n: '03', title: 'Analyze your edge', body: 'Stats and charts reveal patterns in your performance over time.' },
 ];
 
 export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: LandingPageProps) {
@@ -94,12 +105,12 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
               AI-powered imports · No broker login ever
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-[3.25rem] font-bold leading-[1.1] tracking-tight">
-              The trading journal that works with{' '}
+              The journal built for{' '}
               <span className="text-gradient">your broker</span>
             </h1>
             <p className="mt-5 text-base md:text-lg text-text-secondary leading-relaxed max-w-xl">
-              Track daily P&L on a visual calendar, import trades with AI screenshot parsing or CSV uploads,
-              and analyze your performance — without connecting to your brokerage account. Ever.
+              Track daily P&L on a visual calendar, import trades with AI or CSV, and review your performance —
+              without connecting to your brokerage account. Ever.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <button type="button" onClick={onLaunch} className="btn-primary text-base px-7 py-3.5">
@@ -110,15 +121,12 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
               </button>
             </div>
             <div className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-sm text-text-secondary">
-              <span className="flex items-center gap-2">
-                <span className="text-emerald-400">✓</span> No brokerage login required
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="text-emerald-400">✓</span> AI screenshot parsing
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="text-emerald-400">✓</span> Mobile & desktop
-              </span>
+              {['No brokerage login required', 'Clean manual trade entry', 'AI screenshot parsing'].map((item) => (
+                <span key={item} className="flex items-center gap-2">
+                  <Check size={14} className="text-emerald-400" />
+                  {item}
+                </span>
+              ))}
             </div>
           </div>
           </FadeIn>
@@ -135,8 +143,8 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
       <section id="security" className="relative z-10 border-y border-border/50 bg-emerald-500/5 py-10 md:py-12">
         <FadeIn className="max-w-6xl mx-auto px-4 md:px-6">
           <div className="glass-card rounded-2xl p-6 md:p-8 flex flex-col md:flex-row gap-6 md:gap-10 items-start md:items-center">
-            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-2xl shrink-0">
-              🔒
+            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
+              <Lock size={22} className="text-emerald-400" />
             </div>
             <div className="flex-1">
               <h2 className="text-xl md:text-2xl font-bold mb-2">Your broker stays separate</h2>
@@ -203,7 +211,7 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
       </section>
 
       {/* Brokers teaser */}
-      <section id="brokers" className="relative z-10 border-t border-border/50 bg-bg-secondary/30 py-16 md:py-20">
+      <section id="brokers" className="relative z-10 border-t border-border/50 bg-bg-secondary/30 py-16 md:py-24">
         <FadeIn className="max-w-6xl mx-auto px-4 md:px-6 text-center">
           <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Brokers</p>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">Thinkorswim · Schwab · Robinhood</h2>
@@ -227,19 +235,22 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
             </p>
           </FadeIn>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
-            {FEATURES.map((f, i) => (
+            {FEATURES.map((f, i) => {
+              const Icon = f.icon;
+              return (
               <FadeIn key={f.title} delay={i * 60}>
               <article
                 className="glass-card rounded-xl p-5 md:p-6 hover:border-emerald-500/30 transition-colors group h-full"
               >
-                <div className="w-10 h-10 rounded-lg bg-bg-primary/80 border border-border/60 flex items-center justify-center text-lg mb-4 group-hover:scale-105 transition-transform">
-                  {f.icon}
+                <div className="w-10 h-10 rounded-lg bg-bg-primary/80 border border-border/60 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform text-emerald-400">
+                  <Icon size={20} />
                 </div>
                 <h3 className="text-base font-semibold mb-2">{f.title}</h3>
                 <p className="text-sm text-text-secondary leading-relaxed">{f.description}</p>
               </article>
               </FadeIn>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -289,16 +300,21 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
       </section>
 
       {/* CTA */}
-      <section className="relative z-10 border-t border-border/50 py-16 md:py-20">
+      <section className="relative z-10 border-t border-border/50 py-16 md:py-24">
         <FadeIn className="max-w-3xl mx-auto px-4 md:px-6 text-center">
-          <BrandLogo size="lg" />
+          <div className="sm:hidden flex justify-center mb-6">
+            <BrandLogo size="md" variant="compact" />
+          </div>
+          <div className="hidden sm:flex justify-center mb-8">
+            <BrandLogo size="lg" variant="full" />
+          </div>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-8">Ready to track your edge?</h2>
           <p className="mt-4 text-text-secondary text-base md:text-lg">
             Open your journal, import this month&apos;s trades, and see your performance on the calendar.
             No broker login. No credit card. Just your data, your way.
           </p>
           <button type="button" onClick={onLaunch} className="btn-primary text-base px-8 py-3.5 mt-8">
-            Open Trading Journal
+            Open Trend Chasers
           </button>
         </FadeIn>
       </section>

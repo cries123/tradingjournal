@@ -10,6 +10,7 @@ export interface Trade {
   setup?: string;
   side?: TradeSide;
   notes?: string;
+  accountId?: string;
   contract?: string;
   assetType?: AssetType;
   optionType?: OptionType;

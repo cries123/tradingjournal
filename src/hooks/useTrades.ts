@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import type { Filters, Trade } from '../types';
 import {
-  deleteAllTrades,
   deleteTradeDoc,
   migrateLocalTrades,
   saveTrade,
@@ -10,11 +10,13 @@ import {
   subscribeTrades,
 } from '../services/tradesFirestore';
 import { loadTrades, saveTrades } from '../utils/storage';
+import { resolveTradeAccountId } from '../utils/accounts';
 
 export type SyncStatus = 'loading' | 'local' | 'cloud' | 'syncing';
 
 export function useTrades() {
   const { user, firebaseEnabled } = useAuth();
+  const { settings } = useSettings();
   const [trades, setTrades] = useState<Trade[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('loading');
   const migratedRef = useRef(false);
@@ -64,23 +66,28 @@ export function useTrades() {
     }
   }, [trades, syncStatus]);
 
+  const accountTrades = useMemo(() => {
+    const activeId = settings.activeAccountId;
+    return trades.filter((t) => resolveTradeAccountId(t.accountId) === activeId);
+  }, [trades, settings.activeAccountId]);
+
   const filteredTrades = useMemo(() => {
-    return trades.filter((trade) => {
+    return accountTrades.filter((trade) => {
       if (filters.symbol && trade.symbol !== filters.symbol) return false;
       if (filters.setup && trade.setup !== filters.setup) return false;
       if (filters.side && trade.side !== filters.side) return false;
       return true;
     });
-  }, [trades, filters]);
+  }, [accountTrades, filters]);
 
   const symbols = useMemo(
-    () => [...new Set(trades.map((t) => t.symbol))].sort(),
-    [trades],
+    () => [...new Set(accountTrades.map((t) => t.symbol))].sort(),
+    [accountTrades],
   );
 
   const setups = useMemo(
-    () => [...new Set(trades.map((t) => t.setup).filter(Boolean))].sort() as string[],
-    [trades],
+    () => [...new Set(accountTrades.map((t) => t.setup).filter(Boolean))].sort() as string[],
+    [accountTrades],
   );
 
   const persistTrade = useCallback(
@@ -99,17 +106,28 @@ export function useTrades() {
     [user, firebaseEnabled],
   );
 
+  const withAccount = useCallback(
+    (trade: Omit<Trade, 'id'>): Omit<Trade, 'id'> => ({
+      ...trade,
+      accountId: trade.accountId ?? settings.activeAccountId,
+    }),
+    [settings.activeAccountId],
+  );
+
   const addTrade = useCallback(
     (trade: Omit<Trade, 'id'>) => {
-      const newTrade: Trade = { ...trade, id: crypto.randomUUID() };
+      const newTrade: Trade = { ...withAccount(trade), id: crypto.randomUUID() };
       void persistTrade(newTrade);
     },
-    [persistTrade],
+    [persistTrade, withAccount],
   );
 
   const addTrades = useCallback(
     async (newTrades: Omit<Trade, 'id'>[]) => {
-      const withIds = newTrades.map((trade) => ({ ...trade, id: crypto.randomUUID() }));
+      const withIds = newTrades.map((trade) => ({
+        ...withAccount(trade),
+        id: crypto.randomUUID(),
+      }));
       if (user && firebaseEnabled) {
         setSyncStatus('syncing');
         await saveTradesBatch(user.uid, withIds);
@@ -121,7 +139,7 @@ export function useTrades() {
         });
       }
     },
-    [user, firebaseEnabled],
+    [user, firebaseEnabled, withAccount],
   );
 
   const deleteTrade = useCallback(
@@ -140,25 +158,41 @@ export function useTrades() {
     [user, firebaseEnabled],
   );
 
+  const updateTrade = useCallback(
+    async (trade: Trade) => {
+      await persistTrade(trade);
+    },
+    [persistTrade],
+  );
+
   const clearAll = useCallback(async () => {
+    const activeId = settings.activeAccountId;
+    const toRemove = new Set(
+      trades.filter((t) => resolveTradeAccountId(t.accountId) === activeId).map((t) => t.id),
+    );
+
     if (user && firebaseEnabled) {
       setSyncStatus('syncing');
-      await deleteAllTrades(user.uid);
+      await Promise.all([...toRemove].map((id) => deleteTradeDoc(user.uid, id)));
     } else {
-      setTrades([]);
-      saveTrades([]);
+      setTrades((prev) => {
+        const next = prev.filter((t) => !toRemove.has(t.id));
+        saveTrades(next);
+        return next;
+      });
     }
-  }, [user, firebaseEnabled]);
+  }, [user, firebaseEnabled, settings.activeAccountId, trades]);
 
   return {
     trades: filteredTrades,
-    allTrades: trades,
+    allTrades: accountTrades,
     filters,
     setFilters,
     symbols,
     setups,
     addTrade,
     addTrades,
+    updateTrade,
     deleteTrade,
     clearAll,
     syncStatus,

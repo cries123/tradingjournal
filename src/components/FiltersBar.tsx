@@ -9,7 +9,7 @@ interface FiltersBarProps {
 
 export function FiltersBar({ filters, symbols, setups, onChange }: FiltersBarProps) {
   return (
-    <div className="flex flex-wrap gap-2 mb-4">
+    <div className="flex flex-wrap gap-2 shrink-0">
       <FilterSelect
         label="Symbol"
         value={filters.symbol}
