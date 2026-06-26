@@ -43,7 +43,7 @@ export function BrokersPage({ onHome, onLaunch, onPrivacy, onTerms }: BrokersPag
             Supported brokers & import methods
           </h1>
           <p className="text-text-secondary text-base md:text-lg leading-relaxed max-w-2xl mb-12">
-            Trading Journal never connects to your brokerage. You import data yourself — via AI screenshot
+            Trend Chasers never connects to your brokerage. You import data yourself — via AI screenshot
             parsing or CSV upload. We currently support Thinkorswim, Schwab, and Robinhood, with more
             brokers being added based on user requests.
           </p>
@@ -115,7 +115,7 @@ export function BrokersPage({ onHome, onLaunch, onPrivacy, onTerms }: BrokersPag
 
           <div className="mt-12 text-center">
             <button type="button" onClick={onLaunch} className="btn-primary text-base px-8 py-3">
-              Open Trading Journal
+              Open Trend Chasers
             </button>
           </div>
         </div>

@@ -14,7 +14,7 @@ export function PrivacyPolicyPage({ onHome, onLaunch, onPrivacy, onTerms, onBrok
       <section>
         <h2>Overview</h2>
         <p>
-          Trading Journal (&quot;we,&quot; &quot;us,&quot; or &quot;the app&quot;) respects your privacy. This policy explains
+          Trend Chasers (&quot;we,&quot; &quot;us,&quot; or &quot;the app&quot;) respects your privacy. This policy explains
           what information we collect, how we use it, and your choices. We built this product so you can
           track trades without connecting your brokerage account.
         </p>
@@ -23,7 +23,7 @@ export function PrivacyPolicyPage({ onHome, onLaunch, onPrivacy, onTerms, onBrok
       <section>
         <h2>We never ask for brokerage login</h2>
         <p>
-          Trading Journal does not integrate with, authenticate to, or request credentials for any broker
+          Trend Chasers does not integrate with, authenticate to, or request credentials for any broker
           (including Thinkorswim, Schwab, Robinhood, or others). You import data yourself — via CSV upload,
           screenshot, or manual entry. We have no access to your brokerage account.
         </p>

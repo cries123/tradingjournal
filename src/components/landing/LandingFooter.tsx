@@ -31,7 +31,7 @@ export function LandingFooter({ onPrivacy, onTerms, onHome, onBrokers }: Landing
               <BrandLogo size="sm" />
             )}
             <p className="mt-3 text-sm text-text-secondary leading-relaxed max-w-xs">
-              A professional trading journal for any broker. Import manually — we never ask for your brokerage login.
+              A professional journal for active traders. Import manually — we never ask for your brokerage login.
             </p>
           </div>
 
@@ -105,7 +105,7 @@ export function LandingFooter({ onPrivacy, onTerms, onHome, onBrokers }: Landing
         </div>
 
         <div className="pt-6 border-t border-border/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-secondary">
-          <p>© {new Date().getFullYear()} Trading Journal. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Trend Chasers. All rights reserved.</p>
           <p>Not affiliated with any brokerage. For journaling purposes only.</p>
         </div>
       </div>

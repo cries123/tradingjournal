@@ -62,7 +62,7 @@ const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
 const FAQ = [
   {
     q: 'Do I need to log in to my broker?',
-    a: 'Never. Trading Journal never connects to your brokerage account. You upload CSV files, screenshots, or enter trades manually — completely separate from your broker login.',
+    a: 'Never. Trend Chasers never connects to your brokerage account. You upload CSV files, screenshots, or enter trades manually — completely separate from your broker login.',
   },
   {
     q: 'Which brokers are supported today?',
@@ -103,7 +103,7 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
               AI-powered imports · No broker login ever
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-[3.25rem] font-bold leading-[1.1] tracking-tight">
-              The trading journal that works with{' '}
+              The journal built for{' '}
               <span className="text-gradient">your broker</span>
             </h1>
             <p className="mt-5 text-base md:text-lg text-text-secondary leading-relaxed max-w-xl">
@@ -295,7 +295,7 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
             No broker login. No credit card. Just your data, your way.
           </p>
           <button type="button" onClick={onLaunch} className="btn-primary text-base px-8 py-3.5 mt-8">
-            Open Trading Journal
+            Open Trend Chasers
           </button>
         </div>
       </section>

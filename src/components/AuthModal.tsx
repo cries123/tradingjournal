@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { BrandLogo } from './BrandLogo';
 import { useAuth } from '../context/AuthContext';
 
-type Mode = 'login' | 'signup';
+type Mode = 'login' | 'signup' | 'reset';
 
 function authErrorMessage(code: string): string {
   switch (code) {
@@ -32,12 +32,28 @@ const BENEFITS = [
 ];
 
 export function AuthModal() {
-  const { signInWithGoogle, signInWithEmail, createAccount } = useAuth();
+  const { signInWithGoogle, signInWithEmail, createAccount, resetPassword } = useAuth();
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetSent, setResetSent] = useState(false);
+
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      await resetPassword(email.trim());
+      setResetSent(true);
+    } catch (err) {
+      const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
+      setError(authErrorMessage(code));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,12 +96,14 @@ export function AuthModal() {
           <div>
             <BrandLogo size="lg" />
             <h2 className="text-2xl md:text-3xl font-bold mt-8 leading-tight">
-              {mode === 'login' ? 'Welcome back' : 'Create your account'}
+              {mode === 'login' ? 'Welcome back' : mode === 'signup' ? 'Create your account' : 'Reset password'}
             </h2>
             <p className="text-text-secondary mt-3 text-sm leading-relaxed">
               {mode === 'login'
                 ? 'Sign in to sync your journal to the cloud and access it from any device.'
-                : 'Start journaling with cloud backup. No brokerage login — ever.'}
+                : mode === 'signup'
+                  ? 'Start journaling with cloud backup. No brokerage login — ever.'
+                  : 'Enter your email and we\'ll send a link to reset your password.'}
             </p>
           </div>
 
@@ -103,10 +121,11 @@ export function AuthModal() {
 
         {/* Form panel */}
         <div className="md:col-span-3 bg-bg-secondary/95 p-6 md:p-10">
+          {mode !== 'reset' && (
           <div className="flex rounded-lg bg-bg-primary/60 p-1 mb-8 border border-border/50">
             <button
               type="button"
-              onClick={() => { setMode('login'); setError(null); }}
+              onClick={() => { setMode('login'); setError(null); setResetSent(false); }}
               className={`flex-1 py-2.5 text-sm font-medium rounded-md transition-all ${
                 mode === 'login'
                   ? 'bg-emerald-500/20 text-emerald-300 shadow-sm'
@@ -117,7 +136,7 @@ export function AuthModal() {
             </button>
             <button
               type="button"
-              onClick={() => { setMode('signup'); setError(null); }}
+              onClick={() => { setMode('signup'); setError(null); setResetSent(false); }}
               className={`flex-1 py-2.5 text-sm font-medium rounded-md transition-all ${
                 mode === 'signup'
                   ? 'bg-emerald-500/20 text-emerald-300 shadow-sm'
@@ -127,7 +146,30 @@ export function AuthModal() {
               Create account
             </button>
           </div>
+          )}
 
+          {mode === 'reset' ? (
+            <form onSubmit={(e) => void handleReset(e)} className="space-y-4">
+              <label className="block">
+                <span className="text-xs font-medium text-text-secondary mb-1.5 block uppercase tracking-wide">Email address</span>
+                <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input-field py-3" placeholder="you@example.com" />
+              </label>
+              {resetSent ? (
+                <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-4 py-3 text-sm text-emerald-300">
+                  Reset link sent! Check your inbox.
+                </div>
+              ) : null}
+              {error && (
+                <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-300">{error}</div>
+              )}
+              <button type="submit" disabled={busy || resetSent} className="w-full btn-primary py-3.5 text-base disabled:opacity-50">
+                {busy ? 'Sending…' : 'Send reset link'}
+              </button>
+              <button type="button" onClick={() => { setMode('login'); setError(null); setResetSent(false); }} className="w-full text-sm text-text-secondary hover:text-text-primary">
+                ← Back to sign in
+              </button>
+            </form>
+          ) : (
           <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
             <label className="block">
               <span className="text-xs font-medium text-text-secondary mb-1.5 block uppercase tracking-wide">
@@ -158,6 +200,17 @@ export function AuthModal() {
                 placeholder={mode === 'signup' ? 'At least 6 characters' : 'Your password'}
               />
             </label>
+            {mode === 'login' && (
+              <div className="text-right -mt-2">
+                <button
+                  type="button"
+                  onClick={() => { setMode('reset'); setError(null); setResetSent(false); }}
+                  className="text-xs text-emerald-400 hover:underline"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
 
             {error && (
               <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-300">
@@ -173,7 +226,10 @@ export function AuthModal() {
               {busy ? 'Please wait…' : mode === 'login' ? 'Sign in to journal' : 'Create account'}
             </button>
           </form>
+          )}
 
+          {mode !== 'reset' && (
+          <>
           <div className="flex items-center gap-3 my-6">
             <div className="flex-1 h-px bg-border/60" />
             <span className="text-[10px] text-text-secondary uppercase tracking-widest">or</span>
@@ -199,6 +255,8 @@ export function AuthModal() {
             By continuing, you agree that this is for personal trade journaling only.
             We never access your brokerage account.
           </p>
+          </>
+          )}
         </div>
       </div>
     </div>

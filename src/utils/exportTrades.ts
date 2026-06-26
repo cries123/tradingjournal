@@ -36,7 +36,7 @@ export function exportMonthReport(
     .join('');
 
   const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Trading Journal — ${monthLabel}</title>
+<html><head><meta charset="utf-8"><title>Trend Chasers — ${monthLabel}</title>
 <style>
   body { font-family: system-ui, sans-serif; padding: 2rem; color: #111; }
   h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
@@ -52,7 +52,7 @@ export function exportMonthReport(
   .loss { color: #dc2626; }
   @media print { body { padding: 0; } }
 </style></head><body>
-  <h1>Trading Journal Report</h1>
+  <h1>Trend Chasers Report</h1>
   <p class="meta">${monthLabel}</p>
   <div class="stats">
     <div class="stat"><label>Net P&amp;L</label><value class="${stats.netPnl >= 0 ? 'win' : 'loss'}">${fmt(stats.netPnl)}</value></div>

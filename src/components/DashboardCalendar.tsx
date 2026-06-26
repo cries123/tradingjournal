@@ -54,13 +54,16 @@ export function DashboardCalendar({
         </div>
       </div>
 
-      <div key={`${year}-${month}`} className="grid grid-cols-7 gap-0.5 md:gap-2 animate-fade-up motion-safe:animate-fade-up">
+      <div className="grid grid-cols-7 gap-0.5 md:gap-2 mb-0.5 md:mb-1">
         {WEEKDAYS.map((day, i) => (
-          <div key={day} className="text-[8px] md:text-[11px] text-text-secondary text-center py-0.5 md:py-1 font-medium uppercase tracking-wide">
+          <div key={`${day}-${i}`} className="text-[8px] md:text-[11px] text-text-secondary text-center py-0.5 md:py-1 font-medium uppercase tracking-wide">
             <span className="md:hidden">{WEEKDAYS_SHORT[i]}</span>
             <span className="hidden md:inline">{day}</span>
           </div>
         ))}
+      </div>
+
+      <div key={`${year}-${month}`} className="grid grid-cols-7 gap-0.5 md:gap-2 animate-fade-up motion-safe:animate-fade-up">
         {weeks.flatMap((week) =>
           week.days.map((day, di) => (
             <DashboardDayCell

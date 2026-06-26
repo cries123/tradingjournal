@@ -20,6 +20,6 @@ export const DEFAULT_SETTINGS: UserSettings = {
   defaultSymbol: 'SPY',
   themeAccent: 'emerald',
   setupTags: ['BREAKOUT', 'FOMO', 'RSI CROSSED', 'REVERSAL'],
-  accounts: [{ id: 'default', name: 'Main account' }],
+  accounts: [{ id: 'default', name: 'Primary journal' }],
   activeAccountId: 'default',
 };
