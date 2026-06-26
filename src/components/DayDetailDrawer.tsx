@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
-import { Camera, FileText, Pencil, Plus, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Camera, FileText, Pencil, Plus, Share2, X } from 'lucide-react';
 import { TradeListItem } from './TradeListItem';
+import { ShareCardModal } from './ShareCardModal';
 import type { Trade } from '../types';
 import { useSettings } from '../context/SettingsContext';
 import { formatCurrency } from '../utils/format';
+import { computeStats } from '../utils/stats';
 
 interface DayDetailDrawerProps {
   date: string;
@@ -29,6 +31,7 @@ export function DayDetailDrawer({
   const { settings } = useSettings();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
+  const [showShare, setShowShare] = useState(false);
 
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true));
@@ -40,7 +43,9 @@ export function DayDetailDrawer({
   };
 
   const dayTrades = trades.filter((t) => t.date === date);
-  const totalPnl = dayTrades.reduce((sum, t) => sum + t.pnl, 0);
+  const dayStats = useMemo(() => computeStats(dayTrades), [dayTrades]);
+  const totalPnl = dayStats.netPnl;
+  const [year, month] = date.split('-').map(Number);
   const formattedDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
@@ -84,6 +89,19 @@ export function DayDetailDrawer({
             <X size={20} />
           </button>
         </div>
+
+        {dayTrades.length > 0 && (
+          <div className="px-5 pb-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowShare(true)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium border border-emerald-500/30 text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/15 transition-colors focus-ring"
+            >
+              <Share2 size={16} />
+              Share session
+            </button>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto p-5">
           {dayTrades.length === 0 ? (
@@ -160,6 +178,17 @@ export function DayDetailDrawer({
           </button>
         </div>
       </aside>
+
+      {showShare && dayTrades.length > 0 && (
+        <ShareCardModal
+          period="day"
+          stats={dayStats}
+          dateKey={date}
+          year={year}
+          month={month - 1}
+          onClose={() => setShowShare(false)}
+        />
+      )}
     </>
   );
 }

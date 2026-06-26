@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Calendar, Grid3X3, Share2 } from 'lucide-react';
 import type { Filters, Trade } from '../types';
-import { useSettings } from '../context/SettingsContext';
 import {
   computeStats,
   getCumulativePnlSeries,
@@ -9,13 +8,14 @@ import {
   getMonthTrades,
   getWeekdayPnl,
   getWinRateSeries,
+  getYearTrades,
 } from '../utils/stats';
 import { AccountSwitcher } from './AccountSwitcher';
 import { DailyPnlChart } from './DailyPnlChart';
 import { DashboardCalendar } from './DashboardCalendar';
 import { EmptyDashboard } from './EmptyDashboard';
 import { FiltersBar } from './FiltersBar';
-import { ShareMonthCard } from './ShareMonthCard';
+import { ShareCardModal } from './ShareCardModal';
 import { StatsCards } from './StatsCards';
 import { WeekdayChart } from './WeekdayChart';
 import { YearHeatmap } from './YearHeatmap';
@@ -63,18 +63,18 @@ export function DashboardView({
   onImportCsv,
   onImportScreenshot,
 }: DashboardViewProps) {
-  const { settings } = useSettings();
   const [mode, setMode] = useState<DashboardMode>('month');
   const [showShare, setShowShare] = useState(false);
 
   const monthTrades = useMemo(() => getMonthTrades(trades, year, month), [trades, year, month]);
+  const yearTrades = useMemo(() => getYearTrades(trades, year), [trades, year]);
   const stats = useMemo(() => computeStats(monthTrades), [monthTrades]);
+  const yearStats = useMemo(() => computeStats(yearTrades), [yearTrades]);
   const dailyPnl = useMemo(() => getDailyPnlForMonth(trades, year, month), [trades, year, month]);
   const weekdayPnl = useMemo(() => getWeekdayPnl(trades, year, month), [trades, year, month]);
   const cumulativeSeries = useMemo(() => getCumulativePnlSeries(trades, year, month), [trades, year, month]);
   const winRateSeries = useMemo(() => getWinRateSeries(trades, year, month), [trades, year, month]);
 
-  const activeJournal = settings.accounts.find((a) => a.id === settings.activeAccountId)?.name ?? 'Journal';
   const hasFilters = Boolean(filters.symbol || filters.setup || filters.side);
 
   return (
@@ -105,14 +105,14 @@ export function DashboardView({
           </button>
         </div>
 
-        {mode === 'month' && monthTrades.length > 0 && (
+        {(mode === 'month' ? monthTrades.length > 0 : yearTrades.length > 0) && (
           <button
             type="button"
             onClick={() => setShowShare(true)}
             className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border/60 text-text-secondary hover:text-text-primary hover:border-emerald-500/30 transition-colors focus-ring"
           >
             <Share2 size={14} />
-            Share month
+            {mode === 'month' ? 'Share month' : 'Share year'}
           </button>
         )}
       </div>
@@ -180,11 +180,11 @@ export function DashboardView({
       )}
 
       {showShare && (
-        <ShareMonthCard
-          stats={stats}
+        <ShareCardModal
+          period={mode === 'month' ? 'month' : 'year'}
+          stats={mode === 'month' ? stats : yearStats}
           year={year}
           month={month}
-          journalName={activeJournal}
           onClose={() => setShowShare(false)}
         />
       )}
