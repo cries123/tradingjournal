@@ -5,6 +5,36 @@ export type SharePeriod = 'day' | 'month' | 'year';
 
 export const SHARE_SITE_URL = 'Trendchaser.net';
 
+const SHARE_LOGO_MARK = `<g transform="translate(40 40) scale(0.45)">
+  <circle cx="44" cy="44" r="36" stroke="#7ED9A4" stroke-width="2" opacity="0.28"/>
+  <g fill="#7ED9A4">
+    <path d="M44 6 L48 20 L40 20 Z"/>
+    <path d="M44 82 L48 68 L40 68 Z"/>
+    <path d="M6 44 L20 48 L20 40 Z"/>
+    <path d="M82 44 L68 48 L68 40 Z"/>
+  </g>
+  <path d="M14 58 L24 48 L34 52 L44 38 L54 42 L64 28 L72 20" stroke="#7ED9A4" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M72 20 L63 18 L72 10 Z" fill="#7ED9A4"/>
+  <rect x="58" y="12" width="4.5" height="11" rx="1.2" fill="#F87171"/>
+  <rect x="64.5" y="8" width="4.5" height="15" rx="1.2" fill="#F87171"/>
+  <rect x="71" y="4" width="4.5" height="19" rx="1.2" fill="#F87171"/>
+</g>`;
+
+const SHARE_LOGO_MARK_SMALL = `<g transform="translate(40 352) scale(0.25)">
+  <circle cx="44" cy="44" r="36" stroke="#7ED9A4" stroke-width="2.5" opacity="0.28"/>
+  <g fill="#7ED9A4">
+    <path d="M44 6 L48 20 L40 20 Z"/>
+    <path d="M44 82 L48 68 L40 68 Z"/>
+    <path d="M6 44 L20 48 L20 40 Z"/>
+    <path d="M82 44 L68 48 L68 40 Z"/>
+  </g>
+  <path d="M14 58 L24 48 L34 52 L44 38 L54 42 L64 28 L72 20" stroke="#7ED9A4" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M72 20 L63 18 L72 10 Z" fill="#7ED9A4"/>
+  <rect x="58" y="12" width="5" height="11" rx="1.2" fill="#F87171"/>
+  <rect x="65" y="8" width="5" height="15" rx="1.2" fill="#F87171"/>
+  <rect x="72" y="4" width="5" height="19" rx="1.2" fill="#F87171"/>
+</g>`;
+
 const PERIOD_BADGE: Record<SharePeriod, string> = {
   day: 'TRADING SESSION',
   month: 'MONTHLY RECAP',
@@ -119,10 +149,10 @@ export function buildShareSvg(data: ShareSvgInput): string {
   <rect x="1" y="1" width="598" height="398" rx="19" fill="none" stroke="url(#accent)" stroke-width="2"/>
   <rect x="24" y="24" width="552" height="72" rx="14" fill="rgba(15,20,31,0.65)" stroke="rgba(148,163,184,0.12)" stroke-width="1"/>
 
-  <rect x="40" y="40" width="40" height="40" rx="10" fill="url(#logo)"/>
-  <text x="60" y="67" fill="#042f2e" font-family="system-ui,-apple-system,sans-serif" font-size="16" font-weight="800" text-anchor="middle">TC</text>
-  <text x="92" y="58" fill="#f8fafc" font-family="system-ui,-apple-system,sans-serif" font-size="20" font-weight="700">Trend Chasers</text>
-  <text x="92" y="76" fill="#94a3b8" font-family="system-ui,-apple-system,sans-serif" font-size="11">Track · Analyze · Improve</text>
+  ${SHARE_LOGO_MARK}
+  <text x="92" y="52" fill="#7ED9A4" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="800" letter-spacing="1.5">TREND</text>
+  <text x="92" y="68" fill="#f8fafc" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="800" letter-spacing="1.5">CHASERS</text>
+  <text x="92" y="82" fill="#94a3b8" font-family="system-ui,-apple-system,sans-serif" font-size="10">Track · Analyze · Improve</text>
   <text x="552" y="62" fill="#6ee7b7" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="600" text-anchor="end">@${username}</text>
 
   <rect x="40" y="118" width="${badgeWidth}" height="26" rx="13" fill="rgba(52,211,153,0.12)" stroke="rgba(52,211,153,0.35)" stroke-width="1"/>
@@ -142,8 +172,7 @@ export function buildShareSvg(data: ShareSvgInput): string {
   <text x="400" y="296" fill="#64748b" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="600" letter-spacing="1">PROFIT FACTOR</text>
   <text x="400" y="322" fill="#f1f5f9" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="700">${escapeXml(data.profitFactor)}</text>
 
-  <rect x="40" y="352" width="22" height="22" rx="6" fill="url(#logo)"/>
-  <text x="51" y="367" fill="#042f2e" font-family="system-ui,-apple-system,sans-serif" font-size="9" font-weight="800" text-anchor="middle">TC</text>
+  ${SHARE_LOGO_MARK_SMALL}
   <text x="70" y="367" fill="#64748b" font-family="system-ui,-apple-system,sans-serif" font-size="13" font-weight="500">${SHARE_SITE_URL}</text>
 </svg>`;
 }

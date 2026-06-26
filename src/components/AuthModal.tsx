@@ -114,7 +114,7 @@ export function AuthModal() {
         {/* Brand panel */}
         <div className="md:col-span-2 bg-gradient-to-br from-emerald-500/15 via-bg-secondary to-cyan-500/10 border-b md:border-b-0 md:border-r border-border/50 p-8 md:p-10 flex flex-col justify-between">
           <div>
-            <BrandLogo size="lg" />
+            <BrandLogo size="lg" variant="stacked" />
             <h2 className="text-2xl md:text-3xl font-bold mt-8 leading-tight">
               {mode === 'login' ? 'Welcome back' : mode === 'signup' ? 'Create your account' : 'Reset password'}
             </h2>

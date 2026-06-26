@@ -288,7 +288,7 @@ export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: Landing
       {/* CTA */}
       <section className="relative z-10 border-t border-border/50 py-16 md:py-24">
         <div className="max-w-3xl mx-auto px-4 md:px-6 text-center">
-          <BrandLogo size="lg" />
+          <BrandLogo size="lg" variant="stacked" />
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-8">Ready to track your edge?</h2>
           <p className="mt-4 text-text-secondary text-base md:text-lg">
             Open your journal, import this month&apos;s trades, and see your performance on the calendar.
