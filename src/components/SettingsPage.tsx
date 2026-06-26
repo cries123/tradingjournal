@@ -6,7 +6,6 @@ import type { CurrencyCode, ThemeAccent } from '../types/settings';
 import type { Trade } from '../types';
 import type { TradingStats } from '../utils/stats';
 import { exportMonthReport, exportTaxCsv, exportTradesCsv } from '../utils/exportTrades';
-import { BrokerConnectionsPanel } from './integrations/BrokerConnectionsPanel';
 import { useLiveBenchmark } from '../hooks/useLiveBenchmark';
 import {
   coachShareUrl,
@@ -22,10 +21,9 @@ interface SettingsPageProps {
   year: number;
   month: number;
   onBack: () => void;
-  onBrokerTradesImported?: (trades: Omit<Trade, 'id'>[]) => void;
 }
 
-export function SettingsPage({ trades, monthStats, year, month, onBack, onBrokerTradesImported }: SettingsPageProps) {
+export function SettingsPage({ trades, monthStats, year, month, onBack }: SettingsPageProps) {
   const { settings, updateSettings, addSetupTag, addStrategy, removeStrategy, addAccount, removeAccount, setActiveAccount } = useSettings();
   const { username, user, firebaseEnabled } = useAuth();
   const [newTag, setNewTag] = useState('');
@@ -391,12 +389,7 @@ export function SettingsPage({ trades, monthStats, year, month, onBack, onBroker
         </section>
 
         <section className="panel-card p-5 space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Integrations</h2>
-          <BrokerConnectionsPanel
-            onTradesImported={(imported) => {
-              onBrokerTradesImported?.(imported);
-            }}
-          />
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Sharing & charts</h2>
           <div className="rounded-lg border border-border/60 bg-bg-tertiary/30 p-3 space-y-2">
             <p className="text-sm font-medium">TradingView / chart replay</p>
             <p className="text-xs text-text-secondary">

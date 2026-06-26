@@ -169,9 +169,6 @@ export function JournalApp({ onHome }: JournalAppProps) {
                 year={year}
                 month={month}
                 onBack={() => setAppView('dashboard')}
-                onBrokerTradesImported={(imported) => {
-                  void addTrades(imported);
-                }}
               />
             ) : isLoading ? (
               <DashboardSkeleton />
