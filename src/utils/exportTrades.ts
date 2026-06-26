@@ -3,6 +3,7 @@ import type { TradingStats } from './stats';
 import { formatCurrency, formatMonthYear } from './format';
 import type { CurrencyCode } from '../types/settings';
 import { effectivePnl } from './tradeHelpers';
+import { detectWashSales } from './washSale';
 
 const CSV_HEADERS = [
   'date',
@@ -44,14 +45,38 @@ export function exportTradesCsv(trades: Trade[], filename = 'trades.csv'): void 
 }
 
 export function exportTaxCsv(trades: Trade[], filename = 'tax-summary.csv'): void {
-  const headers = ['date', 'symbol', 'realized_pnl', 'fees', 'net_pnl', 'asset_class'];
+  const washSales = detectWashSales(trades);
+  const washByLossId = new Map(washSales.map((w) => [w.lossTradeId, w]));
+
+  const headers = [
+    'date',
+    'symbol',
+    'realized_pnl',
+    'fees',
+    'net_pnl',
+    'asset_class',
+    'wash_sale',
+    'disallowed_loss',
+    'replacement_date',
+  ];
   const rows = trades
     .sort((a, b) => a.date.localeCompare(b.date))
-    .map((t) =>
-      [t.date, t.symbol, t.pnl, t.fees ?? 0, effectivePnl(t), t.assetClass ?? 'stock']
+    .map((t) => {
+      const wash = washByLossId.get(t.id);
+      return [
+        t.date,
+        t.symbol,
+        t.pnl,
+        t.fees ?? 0,
+        effectivePnl(t),
+        t.assetClass ?? 'stock',
+        wash ? 'YES' : 'NO',
+        wash?.disallowedLoss ?? 0,
+        wash?.replacementDate ?? '',
+      ]
         .map(csvCell)
-        .join(','),
-    );
+        .join(',');
+    });
   downloadBlob([headers.join(','), ...rows].join('\n'), filename, 'text/csv;charset=utf-8');
 }
 

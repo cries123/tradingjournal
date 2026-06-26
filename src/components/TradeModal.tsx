@@ -3,6 +3,7 @@ import { ChevronDown, X } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import type { Trade, TradeGrade, TradeSide, AssetClass } from '../types';
 import { compressImage } from '../utils/compressImage';
+import { buildTradingViewReplayUrl } from '../utils/tradingView';
 
 interface TradeModalProps {
   trade?: Trade;
@@ -41,6 +42,7 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
   const [assetClass, setAssetClass] = useState<AssetClass | ''>(trade?.assetClass ?? '');
   const [ivRank, setIvRank] = useState(trade?.ivRank != null ? String(trade.ivRank) : '');
   const [imageUrls, setImageUrls] = useState<string[]>(trade?.imageUrls ?? []);
+  const [chartUrl, setChartUrl] = useState(trade?.chartUrl ?? '');
 
   useEffect(() => {
     if (!trade) return;
@@ -64,6 +66,7 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
     setAssetClass(trade.assetClass ?? '');
     setIvRank(trade.ivRank != null ? String(trade.ivRank) : '');
     setImageUrls(trade.imageUrls ?? []);
+    setChartUrl(trade.chartUrl ?? '');
   }, [trade]);
 
   const parseOptNum = (v: string) => {
@@ -124,6 +127,7 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
       assetClass: assetClass || undefined,
       ivRank: parseOptNum(ivRank),
       imageUrls: imageUrls.length ? imageUrls : undefined,
+      chartUrl: chartUrl.trim() || undefined,
       accountId: trade?.accountId,
       contract: trade?.contract,
       assetType: trade?.assetType,
@@ -280,6 +284,24 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
                     ))}
                   </div>
                 )}
+              </Field>
+              <Field label="TradingView / chart replay URL">
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={chartUrl}
+                    onChange={(e) => setChartUrl(e.target.value)}
+                    className="input-field flex-1"
+                    placeholder="https://www.tradingview.com/chart/…"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setChartUrl(buildTradingViewReplayUrl({ symbol, date, side }))}
+                    className="btn-secondary px-3 py-2 text-xs shrink-0"
+                  >
+                    Auto-link
+                  </button>
+                </div>
               </Field>
             </div>
           )}

@@ -3,37 +3,68 @@ import { effectivePnl, holdTimeMinutes, marketSessionFromTime, tradeTags } from 
 
 export function buildRoundTrips(trades: Trade[]): RoundTrip[] {
   const sorted = [...trades].sort((a, b) => a.date.localeCompare(b.date));
-  const byGroup = new Map<string, Trade[]>();
+  const byExplicit = new Map<string, Trade[]>();
+  const unassigned: Trade[] = [];
 
   for (const trade of sorted) {
-    const key = trade.roundTripId ?? `${trade.symbol}-${trade.date}-${trade.side ?? 'long'}`;
-    const list = byGroup.get(key) ?? [];
-    list.push(trade);
-    byGroup.set(key, list);
+    if (trade.roundTripId) {
+      const list = byExplicit.get(trade.roundTripId) ?? [];
+      list.push(trade);
+      byExplicit.set(trade.roundTripId, list);
+    } else {
+      unassigned.push(trade);
+    }
   }
 
-  return [...byGroup.entries()].map(([id, group]) => {
-    const dates = group.map((t) => t.date).sort();
-    const netPnl = group.reduce((s, t) => s + effectivePnl(t), 0);
-    const maeVals = group.map((t) => t.mae).filter((v): v is number => v != null);
-    const mfeVals = group.map((t) => t.mfe).filter((v): v is number => v != null);
-    const rVals = group.map((t) => t.rMultiple).filter((v): v is number => v != null);
-    const hold = group.map(holdTimeMinutes).find((v) => v != null) ?? null;
+  const bySymbol = new Map<string, Trade[]>();
+  for (const trade of unassigned) {
+    const key = `${trade.symbol}-${trade.side ?? 'long'}`;
+    const list = bySymbol.get(key) ?? [];
+    list.push(trade);
+    bySymbol.set(key, list);
+  }
 
-    return {
-      id,
-      symbol: group[0].symbol,
-      side: group[0].side,
-      openDate: dates[0],
-      closeDate: dates[dates.length - 1],
-      trades: group,
-      netPnl,
-      holdMinutes: hold,
-      mae: maeVals.length ? Math.min(...maeVals) : null,
-      mfe: mfeVals.length ? Math.max(...mfeVals) : null,
-      rMultiple: rVals.length ? rVals.reduce((a, b) => a + b, 0) / rVals.length : null,
-    };
-  });
+  const inferred: RoundTrip[] = [];
+  for (const [key, group] of bySymbol) {
+    let bucket: Trade[] = [];
+    for (const trade of group) {
+      bucket.push(trade);
+      const net = bucket.reduce((s, t) => s + effectivePnl(t), 0);
+      if (Math.abs(net) > 0.01 || bucket.length >= 2) {
+        inferred.push(buildRoundTripFromGroup(`${key}-${bucket[0].date}-${bucket.length}`, bucket));
+        bucket = [];
+      }
+    }
+    if (bucket.length > 0) {
+      inferred.push(buildRoundTripFromGroup(`${key}-${bucket[0].date}`, bucket));
+    }
+  }
+
+  const explicit = [...byExplicit.entries()].map(([id, group]) => buildRoundTripFromGroup(id, group));
+  return [...explicit, ...inferred].sort((a, b) => a.openDate.localeCompare(b.openDate));
+}
+
+function buildRoundTripFromGroup(id: string, group: Trade[]): RoundTrip {
+  const dates = group.map((t) => t.date).sort();
+  const netPnl = group.reduce((s, t) => s + effectivePnl(t), 0);
+  const maeVals = group.map((t) => t.mae).filter((v): v is number => v != null);
+  const mfeVals = group.map((t) => t.mfe).filter((v): v is number => v != null);
+  const rVals = group.map((t) => t.rMultiple).filter((v): v is number => v != null);
+  const hold = group.map(holdTimeMinutes).find((v) => v != null) ?? null;
+
+  return {
+    id,
+    symbol: group[0].symbol,
+    side: group[0].side,
+    openDate: dates[0],
+    closeDate: dates[dates.length - 1],
+    trades: group,
+    netPnl,
+    holdMinutes: hold,
+    mae: maeVals.length ? Math.min(...maeVals) : null,
+    mfe: mfeVals.length ? Math.max(...mfeVals) : null,
+    rMultiple: rVals.length ? rVals.reduce((a, b) => a + b, 0) / rVals.length : null,
+  };
 }
 
 export interface EquityPoint {

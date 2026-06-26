@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Trade } from '../../types';
 import { useSettings } from '../../context/SettingsContext';
 import { formatCurrency } from '../../utils/format';
+import { useLiveBenchmark } from '../../hooks/useLiveBenchmark';
 import {
   buildEquityCurve,
   computeDrawdown,
@@ -35,6 +36,7 @@ interface AdvancedAnalyticsSectionProps {
 export function AdvancedAnalyticsSection({ trades }: AdvancedAnalyticsSectionProps) {
   const { settings } = useSettings();
   const [tab, setTab] = useState<AnalyticsTab>('equity');
+  const { quote: liveBenchmark } = useLiveBenchmark(settings.benchmarkSymbol, settings.liveBenchmarkEnabled);
 
   const curve = useMemo(() => buildEquityCurve(trades), [trades]);
   const drawdown = useMemo(() => computeDrawdown(curve), [curve]);
@@ -54,6 +56,17 @@ export function AdvancedAnalyticsSection({ trades }: AdvancedAnalyticsSectionPro
     curve.length > 0 && drawdown.peakEquity !== 0
       ? ((curve[curve.length - 1].equity / Math.max(Math.abs(drawdown.peakEquity), 1)) * 100 - 100).toFixed(1)
       : '0';
+
+  const benchmarkPct = settings.liveBenchmarkEnabled && liveBenchmark
+    ? liveBenchmark.monthToDateReturnPct
+    : settings.benchmarkReturnPct;
+
+  const alphaLabel =
+    benchmarkPct != null && benchmarkPct !== 0
+      ? `${(Number(netReturnPct) - benchmarkPct).toFixed(1)}% alpha`
+      : settings.liveBenchmarkEnabled
+        ? 'Loading benchmark…'
+        : 'Set in Settings';
 
   return (
     <section className="panel-card p-3 md:p-4 space-y-3">
@@ -83,12 +96,8 @@ export function AdvancedAnalyticsSection({ trades }: AdvancedAnalyticsSectionPro
         <Metric label="Peak equity" value={formatCurrency(drawdown.peakEquity, settings.currency)} />
         <Metric label="Total fees" value={formatCurrency(fees, settings.currency)} />
         <Metric
-          label="vs Benchmark"
-          value={
-            settings.benchmarkReturnPct
-              ? `${(Number(netReturnPct) - settings.benchmarkReturnPct).toFixed(1)}% alpha`
-              : 'Set in Settings'
-          }
+          label={`vs ${settings.benchmarkSymbol}`}
+          value={alphaLabel}
         />
       </div>
 

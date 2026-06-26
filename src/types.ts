@@ -46,6 +46,8 @@ export interface Trade {
   checklistScore?: number;
   /** Base64 JPEG chart screenshots */
   imageUrls?: string[];
+  /** TradingView or external chart replay URL */
+  chartUrl?: string;
   roundTripId?: string;
   assetClass?: AssetClass;
   tickValue?: number;

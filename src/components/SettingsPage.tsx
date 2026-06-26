@@ -1,11 +1,20 @@
-import { useState } from 'react';
-import { ArrowLeft, Download, FileText, Plus, Trash2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { ArrowLeft, Copy, Download, FileText, Plus, Trash2 } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import type { CurrencyCode, ThemeAccent } from '../types/settings';
 import type { Trade } from '../types';
 import type { TradingStats } from '../utils/stats';
 import { exportMonthReport, exportTaxCsv, exportTradesCsv } from '../utils/exportTrades';
+import { BrokerConnectionsPanel } from './integrations/BrokerConnectionsPanel';
+import { useLiveBenchmark } from '../hooks/useLiveBenchmark';
+import {
+  coachShareUrl,
+  disableCoachShare,
+  enableCoachShare,
+  refreshCoachShare,
+} from '../services/coachShare';
+import { detectWashSales } from '../utils/washSale';
 
 interface SettingsPageProps {
   trades: Trade[];
@@ -13,14 +22,67 @@ interface SettingsPageProps {
   year: number;
   month: number;
   onBack: () => void;
+  onBrokerTradesImported?: (trades: Omit<Trade, 'id'>[]) => void;
 }
 
-export function SettingsPage({ trades, monthStats, year, month, onBack }: SettingsPageProps) {
+export function SettingsPage({ trades, monthStats, year, month, onBack, onBrokerTradesImported }: SettingsPageProps) {
   const { settings, updateSettings, addSetupTag, addStrategy, removeStrategy, addAccount, removeAccount, setActiveAccount } = useSettings();
   const { username, user, firebaseEnabled } = useAuth();
   const [newTag, setNewTag] = useState('');
   const [newAccount, setNewAccount] = useState('');
   const [newStrategy, setNewStrategy] = useState('');
+  const [coachBusy, setCoachBusy] = useState(false);
+  const [coachMessage, setCoachMessage] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const { quote: liveBenchmark, loading: benchmarkLoading } = useLiveBenchmark(
+    settings.benchmarkSymbol,
+    settings.liveBenchmarkEnabled,
+  );
+
+  const washSaleCount = detectWashSales(trades).length;
+
+  const syncCoachShare = useCallback(async () => {
+    if (!settings.coachShareEnabled || !user || !username || !settings.coachShareToken) return;
+    await refreshCoachShare(settings.coachShareToken, trades, monthStats, year, month, user.uid, username);
+  }, [settings.coachShareEnabled, settings.coachShareToken, user, username, trades, monthStats, year, month]);
+
+  useEffect(() => {
+    void syncCoachShare();
+  }, [syncCoachShare]);
+
+  const handleCoachToggle = async (enabled: boolean) => {
+    if (!user || !username) {
+      setCoachMessage('Sign in and set a username to enable coach sharing.');
+      return;
+    }
+    setCoachBusy(true);
+    setCoachMessage(null);
+    try {
+      if (enabled) {
+        const token = await enableCoachShare(user.uid, username, settings.coachShareToken, trades, monthStats, year, month);
+        updateSettings({ coachShareEnabled: true, coachShareToken: token });
+        setCoachMessage('Coach link ready — share the read-only URL below.');
+      } else if (settings.coachShareToken) {
+        await disableCoachShare(settings.coachShareToken);
+        updateSettings({ coachShareEnabled: false, coachShareToken: undefined });
+        setCoachMessage('Coach sharing disabled.');
+      } else {
+        updateSettings({ coachShareEnabled: false });
+      }
+    } catch (err) {
+      setCoachMessage(err instanceof Error ? err.message : 'Coach share update failed');
+    } finally {
+      setCoachBusy(false);
+    }
+  };
+
+  const copyCoachLink = async () => {
+    if (!settings.coachShareToken) return;
+    await navigator.clipboard.writeText(coachShareUrl(settings.coachShareToken));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <div className="pb-6">
@@ -262,8 +324,41 @@ export function SettingsPage({ trades, monthStats, year, month, onBack }: Settin
 
         <section className="panel-card p-5 space-y-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Benchmark & reminders</h2>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={settings.liveBenchmarkEnabled}
+              onChange={(e) => updateSettings({ liveBenchmarkEnabled: e.target.checked })}
+              className="rounded border-border"
+            />
+            Live {settings.benchmarkSymbol} benchmark (Yahoo Finance)
+          </label>
           <label className="block">
-            <span className="text-xs text-text-secondary mb-1 block">Monthly benchmark return % (e.g. SPY)</span>
+            <span className="text-xs text-text-secondary mb-1 block">Benchmark symbol</span>
+            <input
+              type="text"
+              value={settings.benchmarkSymbol}
+              onChange={(e) => updateSettings({ benchmarkSymbol: e.target.value.toUpperCase() })}
+              className="input-field"
+              maxLength={12}
+            />
+          </label>
+          {settings.liveBenchmarkEnabled && (
+            <div className="rounded-lg border border-border/60 bg-bg-tertiary/30 px-3 py-2 text-xs">
+              {benchmarkLoading ? (
+                <span className="text-text-secondary">Loading live benchmark…</span>
+              ) : liveBenchmark ? (
+                <span className="text-emerald-300">
+                  {liveBenchmark.symbol} MTD {liveBenchmark.monthToDateReturnPct >= 0 ? '+' : ''}
+                  {liveBenchmark.monthToDateReturnPct}% (as of {liveBenchmark.asOf})
+                </span>
+              ) : (
+                <span className="text-text-secondary">Live benchmark unavailable — enter manual % below.</span>
+              )}
+            </div>
+          )}
+          <label className="block">
+            <span className="text-xs text-text-secondary mb-1 block">Manual benchmark return % (fallback)</span>
             <input
               type="number"
               step="0.1"
@@ -280,29 +375,64 @@ export function SettingsPage({ trades, monthStats, year, month, onBack }: Settin
               onChange={(e) => updateSettings({ remindersEnabled: e.target.checked })}
               className="rounded border-border"
             />
-            End-of-day journal reminder (browser notification when supported)
+            End-of-day journal reminder
           </label>
+          {settings.remindersEnabled && (
+            <label className="block">
+              <span className="text-xs text-text-secondary mb-1 block">Reminder time (local)</span>
+              <input
+                type="time"
+                value={settings.reminderTime}
+                onChange={(e) => updateSettings({ reminderTime: e.target.value })}
+                className="input-field"
+              />
+            </label>
+          )}
         </section>
 
-        <section className="panel-card p-5 space-y-3">
+        <section className="panel-card p-5 space-y-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Integrations</h2>
-          <div className="rounded-lg border border-border/60 bg-bg-tertiary/30 p-3 space-y-2">
-            <p className="text-sm font-medium">Automated broker sync</p>
-            <p className="text-xs text-text-secondary">API connections for Schwab, TOS, Robinhood — coming soon. CSV & screenshot import remain available.</p>
-          </div>
+          <BrokerConnectionsPanel
+            onTradesImported={(imported) => {
+              onBrokerTradesImported?.(imported);
+            }}
+          />
           <div className="rounded-lg border border-border/60 bg-bg-tertiary/30 p-3 space-y-2">
             <p className="text-sm font-medium">TradingView / chart replay</p>
-            <p className="text-xs text-text-secondary">Attach chart screenshots per trade today. Deep chart linking planned.</p>
+            <p className="text-xs text-text-secondary">
+              Use &quot;Auto-link&quot; in the trade form advanced section, or open chart replay from any trade detail.
+            </p>
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={settings.coachShareEnabled}
-              onChange={(e) => updateSettings({ coachShareEnabled: e.target.checked })}
-              className="rounded border-border"
-            />
-            Enable read-only coach sharing (invite link — coming soon)
-          </label>
+          <div className="rounded-lg border border-border/60 bg-bg-tertiary/30 p-3 space-y-3">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={settings.coachShareEnabled}
+                disabled={coachBusy}
+                onChange={(e) => void handleCoachToggle(e.target.checked)}
+                className="rounded border-border"
+              />
+              Read-only coach sharing
+            </label>
+            {coachMessage && <p className="text-xs text-emerald-300">{coachMessage}</p>}
+            {settings.coachShareEnabled && settings.coachShareToken && (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={coachShareUrl(settings.coachShareToken)}
+                  className="input-field flex-1 text-xs"
+                />
+                <button type="button" onClick={() => void copyCoachLink()} className="btn-secondary px-3 py-2 text-xs inline-flex items-center gap-1">
+                  <Copy size={12} />
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+            )}
+            {!firebaseEnabled && (
+              <p className="text-[10px] text-text-secondary">Requires cloud sign-in.</p>
+            )}
+          </div>
         </section>
 
         <section className="panel-card p-5 space-y-3">
@@ -329,8 +459,11 @@ export function SettingsPage({ trades, monthStats, year, month, onBack }: Settin
             className="w-full flex items-center justify-center gap-2 btn-secondary py-2.5 text-sm"
           >
             <Download size={16} />
-            Export tax summary (realized P&L)
+            Export tax summary (wash-sale aware)
           </button>
+          {washSaleCount > 0 && (
+            <p className="text-xs text-amber-300">{washSaleCount} potential wash sale(s) flagged in export.</p>
+          )}
         </section>
       </div>
     </div>
