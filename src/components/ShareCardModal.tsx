@@ -160,12 +160,11 @@ function ShareCardPreview({
       <div className="p-4 md:p-5 border-b border-white/5 bg-white/[0.02]">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center font-extrabold text-bg-primary text-sm shrink-0 shadow-lg shadow-emerald-500/25">
-              TC
-            </div>
-            <div className="min-w-0">
-              <p className="text-base font-bold text-text-primary leading-tight">Trend Chasers</p>
-              <p className="text-[11px] text-text-secondary mt-0.5">Track · Analyze · Improve</p>
+            <img src="/logo-mark.svg" alt="" aria-hidden className="w-10 h-10 shrink-0" />
+            <div className="min-w-0 leading-none">
+              <p className="text-xs font-black tracking-[0.12em] text-[#6cd59f]">TREND</p>
+              <p className="text-xs font-black tracking-[0.12em] text-text-primary">CHASERS</p>
+              <p className="text-[10px] text-[#8e939d] mt-1">Track · Analyze · Improve</p>
             </div>
           </div>
           <span className="text-xs font-semibold text-emerald-300 shrink-0">@{username}</span>
@@ -198,9 +197,7 @@ function ShareCardPreview({
         </div>
 
         <div className="flex items-center gap-2 mt-5 pt-3 border-t border-border/30">
-          <div className="w-5 h-5 rounded-md bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center text-[8px] font-extrabold text-bg-primary">
-            TC
-          </div>
+          <img src="/logo-mark.svg" alt="" aria-hidden className="w-5 h-5 shrink-0" />
           <span className="text-xs text-text-secondary">{SHARE_SITE_URL}</span>
         </div>
       </div>

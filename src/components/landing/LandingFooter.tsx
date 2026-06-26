@@ -25,10 +25,10 @@ export function LandingFooter({ onPrivacy, onTerms, onHome, onBrokers }: Landing
           <div className="sm:col-span-2 lg:col-span-1">
             {onHome ? (
               <button type="button" onClick={onHome} className="text-left hover:opacity-90 transition-opacity">
-                <BrandLogo size="sm" />
+                <BrandLogo size="sm" variant="compact" />
               </button>
             ) : (
-              <BrandLogo size="sm" />
+              <BrandLogo size="sm" variant="compact" />
             )}
             <p className="mt-3 text-sm text-text-secondary leading-relaxed max-w-xs">
               A professional journal for active traders. Import manually — we never ask for your brokerage login.
@@ -126,10 +126,10 @@ export function LandingNav({ onLaunch, onHome, onBrokers, showBrokersLink = true
       <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
         {onHome ? (
           <button type="button" onClick={onHome} className="hover:opacity-90 transition-opacity">
-            <BrandLogo size="md" />
+            <BrandLogo size="sm" variant="compact" />
           </button>
         ) : (
-          <BrandLogo size="md" />
+          <BrandLogo size="sm" variant="compact" />
         )}
         <div className="flex items-center gap-3">
           {showBrokersLink && onBrokers && (

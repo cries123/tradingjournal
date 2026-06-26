@@ -44,7 +44,7 @@ export function OnboardingOverlay({ onDone }: OnboardingOverlayProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-end md:items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[90] flex items-end md:items-center justify-center bg-black/70 backdrop-blur-sm p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
       <div className="bg-bg-secondary border border-border/80 rounded-2xl p-6 md:p-8 w-full max-w-md shadow-2xl animate-scale-in relative">
         <button
           type="button"

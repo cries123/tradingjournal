@@ -5,6 +5,43 @@ export type SharePeriod = 'day' | 'month' | 'year';
 
 export const SHARE_SITE_URL = 'Trendchaser.net';
 
+const SHARE_LOGO_MARK = `<g transform="translate(40 36) scale(0.105)">
+  <g transform="translate(0, -30)">
+    <path d="M 300 270 A 120 120 0 1 1 500 130" fill="none" stroke="#6cd59f" stroke-width="14" stroke-linecap="round"/>
+    <path d="M 280 230 A 120 120 0 0 0 350 310" fill="none" stroke="#6cd59f" stroke-width="14" stroke-linecap="round"/>
+    <polygon points="400,50 415,110 400,125 385,110" fill="#6cd59f"/>
+    <polygon points="250,200 310,215 325,200 310,185" fill="#6cd59f"/>
+    <polygon points="550,200 490,185 475,200 490,215" fill="#6cd59f"/>
+    <polygon points="400,350 385,290 400,275 415,290" fill="#6cd59f"/>
+    <polygon points="294,94 325,125 310,140 295,125" fill="#6cd59f"/>
+    <polygon points="506,94 475,125 490,140 505,125" fill="#6cd59f"/>
+    <polygon points="310,280 340,250 355,265 325,295" fill="#6cd59f"/>
+    <rect x="540" y="80" width="8" height="12" rx="4" fill="#ff5757"/>
+    <rect x="555" y="65" width="8" height="27" rx="4" fill="#ff5757"/>
+    <rect x="570" y="50" width="8" height="42" rx="4" fill="#ff5757"/>
+    <path d="M 250 320 L 330 240 L 370 280 L 520 130 L 520 160 L 370 310 L 330 270 L 250 350 Z" fill="#4ba779"/>
+    <path d="M 235 305 L 330 210 L 380 260 L 520 120 L 520 135 L 380 275 L 330 225 L 235 320 Z" fill="#6cd59f"/>
+    <polygon points="540,100 460,110 520,170" fill="#6cd59f"/>
+    <polygon points="530,115 470,125 515,170" fill="#4ba779"/>
+  </g>
+</g>`;
+
+const SHARE_LOGO_MARK_SMALL = `<g transform="translate(40 348) scale(0.055)">
+  <g transform="translate(0, -30)">
+    <path d="M 300 270 A 120 120 0 1 1 500 130" fill="none" stroke="#6cd59f" stroke-width="14" stroke-linecap="round"/>
+    <path d="M 280 230 A 120 120 0 0 0 350 310" fill="none" stroke="#6cd59f" stroke-width="14" stroke-linecap="round"/>
+    <polygon points="400,50 415,110 400,125 385,110" fill="#6cd59f"/>
+    <polygon points="250,200 310,215 325,200 310,185" fill="#6cd59f"/>
+    <polygon points="550,200 490,185 475,200 490,215" fill="#6cd59f"/>
+    <polygon points="400,350 385,290 400,275 415,290" fill="#6cd59f"/>
+    <rect x="540" y="80" width="8" height="12" rx="4" fill="#ff5757"/>
+    <rect x="555" y="65" width="8" height="27" rx="4" fill="#ff5757"/>
+    <rect x="570" y="50" width="8" height="42" rx="4" fill="#ff5757"/>
+    <path d="M 235 305 L 330 210 L 380 260 L 520 120 L 520 135 L 380 275 L 330 225 L 235 320 Z" fill="#6cd59f"/>
+    <polygon points="540,100 460,110 520,170" fill="#6cd59f"/>
+  </g>
+</g>`;
+
 const PERIOD_BADGE: Record<SharePeriod, string> = {
   day: 'TRADING SESSION',
   month: 'MONTHLY RECAP',
@@ -119,10 +156,10 @@ export function buildShareSvg(data: ShareSvgInput): string {
   <rect x="1" y="1" width="598" height="398" rx="19" fill="none" stroke="url(#accent)" stroke-width="2"/>
   <rect x="24" y="24" width="552" height="72" rx="14" fill="rgba(15,20,31,0.65)" stroke="rgba(148,163,184,0.12)" stroke-width="1"/>
 
-  <rect x="40" y="40" width="40" height="40" rx="10" fill="url(#logo)"/>
-  <text x="60" y="67" fill="#042f2e" font-family="system-ui,-apple-system,sans-serif" font-size="16" font-weight="800" text-anchor="middle">TC</text>
-  <text x="92" y="58" fill="#f8fafc" font-family="system-ui,-apple-system,sans-serif" font-size="20" font-weight="700">Trend Chasers</text>
-  <text x="92" y="76" fill="#94a3b8" font-family="system-ui,-apple-system,sans-serif" font-size="11">Track · Analyze · Improve</text>
+  ${SHARE_LOGO_MARK}
+  <text x="92" y="52" fill="#6cd59f" font-family="Montserrat, system-ui, sans-serif" font-size="14" font-weight="900" letter-spacing="1.5">TREND</text>
+  <text x="92" y="68" fill="#f8fafc" font-family="Montserrat, system-ui, sans-serif" font-size="14" font-weight="900" letter-spacing="1.5">CHASERS</text>
+  <text x="92" y="82" fill="#8e939d" font-family="system-ui, sans-serif" font-size="10">Track · Analyze · Improve</text>
   <text x="552" y="62" fill="#6ee7b7" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="600" text-anchor="end">@${username}</text>
 
   <rect x="40" y="118" width="${badgeWidth}" height="26" rx="13" fill="rgba(52,211,153,0.12)" stroke="rgba(52,211,153,0.35)" stroke-width="1"/>
@@ -142,8 +179,7 @@ export function buildShareSvg(data: ShareSvgInput): string {
   <text x="400" y="296" fill="#64748b" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="600" letter-spacing="1">PROFIT FACTOR</text>
   <text x="400" y="322" fill="#f1f5f9" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="700">${escapeXml(data.profitFactor)}</text>
 
-  <rect x="40" y="352" width="22" height="22" rx="6" fill="url(#logo)"/>
-  <text x="51" y="367" fill="#042f2e" font-family="system-ui,-apple-system,sans-serif" font-size="9" font-weight="800" text-anchor="middle">TC</text>
+  ${SHARE_LOGO_MARK_SMALL}
   <text x="70" y="367" fill="#64748b" font-family="system-ui,-apple-system,sans-serif" font-size="13" font-weight="500">${SHARE_SITE_URL}</text>
 </svg>`;
 }
