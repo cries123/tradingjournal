@@ -49,6 +49,11 @@ export function TradeListItem({
           </span>
           <div className="flex-1 min-w-0">
             <span className="font-medium text-sm">{tradeBasicLabel(trade)}</span>
+            {trade.isGhost && (
+              <span className="ml-1.5 px-1 py-0.5 rounded text-[9px] font-bold uppercase bg-violet-500/15 text-violet-300 border border-violet-500/30">
+                Ghost
+              </span>
+            )}
             {subtitle && !expanded && (
               <p className="text-xs text-text-secondary truncate mt-0.5">{subtitle}</p>
             )}

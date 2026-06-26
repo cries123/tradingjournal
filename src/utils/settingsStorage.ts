@@ -13,6 +13,8 @@ export function loadSettings(userId?: string | null): UserSettings {
       ...DEFAULT_SETTINGS,
       ...parsed,
       setupTags: parsed.setupTags?.length ? parsed.setupTags : DEFAULT_SETTINGS.setupTags,
+      psychologyTags: parsed.psychologyTags?.length ? parsed.psychologyTags : DEFAULT_SETTINGS.psychologyTags,
+      marketContextTags: parsed.marketContextTags?.length ? parsed.marketContextTags : DEFAULT_SETTINGS.marketContextTags,
       accounts: parsed.accounts?.length ? parsed.accounts : DEFAULT_SETTINGS.accounts,
     };
   } catch {

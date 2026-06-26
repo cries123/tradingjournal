@@ -15,8 +15,10 @@ interface SettingsPageProps {
 }
 
 export function SettingsPage({ trades, monthStats, year, month, onBack }: SettingsPageProps) {
-  const { settings, updateSettings, addSetupTag, addAccount, removeAccount, setActiveAccount } = useSettings();
+  const { settings, updateSettings, addSetupTag, addPsychologyTag, addMarketContextTag, addAccount, removeAccount, setActiveAccount } = useSettings();
   const [newTag, setNewTag] = useState('');
+  const [newPsychologyTag, setNewPsychologyTag] = useState('');
+  const [newContextTag, setNewContextTag] = useState('');
   const [newAccount, setNewAccount] = useState('');
 
   return (
@@ -113,6 +115,80 @@ export function SettingsPage({ trades, monthStats, year, month, onBack }: Settin
               onClick={() => {
                 addSetupTag(newTag);
                 setNewTag('');
+              }}
+              className="btn-primary px-4 py-2 text-sm"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+        </section>
+
+        <section className="panel-card p-5 space-y-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Psychology tags</h2>
+          <p className="text-xs text-text-secondary">Options for the psychology check dropdown on each trade.</p>
+          <div className="flex flex-wrap gap-2">
+            {settings.psychologyTags.map((tag) => (
+              <span key={tag} className="px-2.5 py-1 rounded-full text-xs bg-bg-tertiary border border-border/60">
+                {tag}
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newPsychologyTag}
+              onChange={(e) => setNewPsychologyTag(e.target.value)}
+              placeholder="New psychology tag"
+              className="input-field flex-1"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  addPsychologyTag(newPsychologyTag);
+                  setNewPsychologyTag('');
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                addPsychologyTag(newPsychologyTag);
+                setNewPsychologyTag('');
+              }}
+              className="btn-primary px-4 py-2 text-sm"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+        </section>
+
+        <section className="panel-card p-5 space-y-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Market context tags</h2>
+          <p className="text-xs text-text-secondary">Environment tags for sessions — gap days, FOMC, VIX, etc.</p>
+          <div className="flex flex-wrap gap-2">
+            {settings.marketContextTags.map((tag) => (
+              <span key={tag} className="px-2.5 py-1 rounded-full text-xs bg-bg-tertiary border border-border/60">
+                {tag}
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newContextTag}
+              onChange={(e) => setNewContextTag(e.target.value)}
+              placeholder="New context tag"
+              className="input-field flex-1"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  addMarketContextTag(newContextTag);
+                  setNewContextTag('');
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                addMarketContextTag(newContextTag);
+                setNewContextTag('');
               }}
               className="btn-primary px-4 py-2 text-sm"
             >

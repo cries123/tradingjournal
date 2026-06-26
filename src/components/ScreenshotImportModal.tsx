@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Bot, Camera } from 'lucide-react';
 import { TradeListItem } from './TradeListItem';
+import {
+  TradeBehaviorFields,
+  EMPTY_BEHAVIOR,
+  serializeBehavior,
+  type TradeBehaviorValues,
+} from './TradeBehaviorFields';
 import type { ParsedTradeInput, Trade, TradeSide } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { checkParseServer, loadApiKey, parseScreenshot, saveApiKey } from '../utils/parseScreenshot';
@@ -36,6 +42,7 @@ export function ScreenshotImportModal({ onClose, onSave, targetDate }: Screensho
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [parseProgress, setParseProgress] = useState('');
   const [dragOver, setDragOver] = useState(false);
+  const [importBehavior, setImportBehavior] = useState<TradeBehaviorValues>(EMPTY_BEHAVIOR);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -141,9 +148,10 @@ export function ScreenshotImportModal({ onClose, onSave, targetDate }: Screensho
   };
 
   const handleSave = () => {
+    const behaviorPayload = serializeBehavior(importBehavior);
     const toSave = reviewTrades
       .filter((t) => t.selected)
-      .map(({ selected: _, id: __, sourceFile: ___, ...t }) => t)
+      .map(({ selected: _, id: __, sourceFile: ___, ...t }) => ({ ...t, ...behaviorPayload }))
       .filter((t) => t.symbol && !isNaN(t.pnl));
 
     if (toSave.length === 0) {
@@ -272,6 +280,13 @@ export function ScreenshotImportModal({ onClose, onSave, targetDate }: Screensho
 
             {error && <p className="text-sm text-red-400 mt-3">{error}</p>}
 
+            <TradeBehaviorFields
+              values={importBehavior}
+              onChange={setImportBehavior}
+              showGhostToggle={false}
+              compact
+            />
+
             <div className="flex gap-3 mt-5">
               <button
                 type="button"
@@ -394,6 +409,15 @@ export function ScreenshotImportModal({ onClose, onSave, targetDate }: Screensho
             </div>
 
             {error && <p className="text-sm text-yellow-400/80 mb-3">{error}</p>}
+
+            <TradeBehaviorFields
+              values={importBehavior}
+              onChange={setImportBehavior}
+              showGhostToggle={false}
+            />
+            <p className="text-[10px] text-text-secondary -mt-2 mb-4">
+              Optional session notes applied to all selected imports. Edit individual trades later for per-trade psychology.
+            </p>
 
             <div className="flex gap-3">
               <button

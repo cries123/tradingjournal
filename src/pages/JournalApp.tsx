@@ -170,6 +170,7 @@ export function JournalApp({ onHome }: JournalAppProps) {
             ) : (
               <DashboardView
                 trades={trades}
+                accountTrades={allTrades}
                 hasAnyTrades={allTrades.length > 0}
                 year={year}
                 month={month}

@@ -9,8 +9,12 @@ interface TradeDetailsProps {
 export function TradeDetails({ trade, compact }: TradeDetailsProps) {
   const rows: { label: string; value: string }[] = [];
 
+  if (trade.isGhost) rows.push({ label: 'Type', value: 'Ghost / missed trade' });
+  if (trade.psychology) rows.push({ label: 'Psychology', value: trade.psychology });
+  if (trade.ruleAdherence != null) rows.push({ label: 'Rule adherence', value: `${trade.ruleAdherence}/10` });
+  if (trade.marketContext?.length) rows.push({ label: 'Market context', value: trade.marketContext.join(', ') });
   if (trade.contract) rows.push({ label: 'Contract', value: trade.contract });
-  if (trade.optionType) rows.push({ label: 'Type', value: trade.optionType.toUpperCase() });
+  if (trade.optionType) rows.push({ label: 'Option type', value: trade.optionType.toUpperCase() });
   if (trade.expiration) rows.push({ label: 'Expiration', value: trade.expiration });
   if (trade.strike != null) rows.push({ label: 'Strike', value: `$${trade.strike}` });
   if (trade.quantity != null) rows.push({ label: 'Qty', value: String(trade.quantity) });
