@@ -14,7 +14,7 @@ export function TermsOfServicePage({ onHome, onLaunch, onPrivacy, onTerms, onBro
       <section>
         <h2>Agreement</h2>
         <p>
-          By using Trading Journal, you agree to these Terms of Service. If you do not agree, please do not
+          By using Trend Chasers, you agree to these Terms of Service. If you do not agree, please do not
           use the app.
         </p>
       </section>
@@ -22,7 +22,7 @@ export function TermsOfServicePage({ onHome, onLaunch, onPrivacy, onTerms, onBro
       <section>
         <h2>What this product is</h2>
         <p>
-          Trading Journal is a personal record-keeping tool for tracking trades and performance. It is not
+          Trend Chasers is a personal record-keeping tool for tracking trades and performance. It is not
           a broker, investment advisor, or financial institution. Nothing in the app constitutes financial,
           tax, or legal advice.
         </p>
@@ -63,7 +63,7 @@ export function TermsOfServicePage({ onHome, onLaunch, onPrivacy, onTerms, onBro
       <section>
         <h2>Limitation of liability</h2>
         <p>
-          Trading Journal is provided &quot;as is&quot; without warranties. To the fullest extent permitted by law,
+          Trend Chasers is provided &quot;as is&quot; without warranties. To the fullest extent permitted by law,
           we are not liable for trading losses, data loss, or damages arising from use of the app. You trade
           at your own risk.
         </p>

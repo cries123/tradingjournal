@@ -10,6 +10,7 @@ import {
   subscribeTrades,
 } from '../services/tradesFirestore';
 import { loadTrades, saveTrades } from '../utils/storage';
+import { resolveTradeAccountId } from '../utils/accounts';
 
 export type SyncStatus = 'loading' | 'local' | 'cloud' | 'syncing';
 
@@ -67,7 +68,7 @@ export function useTrades() {
 
   const accountTrades = useMemo(() => {
     const activeId = settings.activeAccountId;
-    return trades.filter((t) => !t.accountId || t.accountId === activeId);
+    return trades.filter((t) => resolveTradeAccountId(t.accountId) === activeId);
   }, [trades, settings.activeAccountId]);
 
   const filteredTrades = useMemo(() => {
@@ -160,7 +161,7 @@ export function useTrades() {
   const clearAll = useCallback(async () => {
     const activeId = settings.activeAccountId;
     const toRemove = new Set(
-      trades.filter((t) => !t.accountId || t.accountId === activeId).map((t) => t.id),
+      trades.filter((t) => resolveTradeAccountId(t.accountId) === activeId).map((t) => t.id),
     );
 
     if (user && firebaseEnabled) {

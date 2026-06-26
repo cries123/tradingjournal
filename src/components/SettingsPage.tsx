@@ -122,8 +122,8 @@ export function SettingsPage({ trades, monthStats, year, month, onBack }: Settin
         </section>
 
         <section className="panel-card p-5 space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Accounts</h2>
-          <p className="text-xs text-text-secondary">Separate journals for IRA, margin, or paper accounts.</p>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Journals</h2>
+          <p className="text-xs text-text-secondary">Each journal keeps its own trades — switch from the dashboard anytime.</p>
           <div className="space-y-2">
             {settings.accounts.map((account) => (
               <div

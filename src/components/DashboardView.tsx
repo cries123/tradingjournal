@@ -8,6 +8,7 @@ import {
   getWeekdayPnl,
   getWinRateSeries,
 } from '../utils/stats';
+import { AccountSwitcher } from './AccountSwitcher';
 import { DailyPnlChart } from './DailyPnlChart';
 import { DashboardCalendar } from './DashboardCalendar';
 import { StatsCards } from './StatsCards';
@@ -41,6 +42,8 @@ export function DashboardView({
 
   return (
     <div className="h-full flex flex-col gap-2 md:gap-3 min-h-0">
+      <AccountSwitcher />
+
       <DashboardCalendar
         year={year}
         month={month}
