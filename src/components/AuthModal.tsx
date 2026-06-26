@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { BrandLogo } from './BrandLogo';
+import { UsernameField } from './UsernameField';
 import { useAuth } from '../context/AuthContext';
+import { UsernameTakenError } from '../services/username';
+import { validateUsername } from '../utils/usernameValidation';
 
 type Mode = 'login' | 'signup' | 'reset';
 
@@ -21,6 +24,7 @@ function authErrorMessage(code: string): string {
     case 'auth/popup-closed-by-user':
       return 'Sign-in popup was closed.';
     default:
+      if (code.includes('username')) return code;
       return 'Authentication failed. Please try again.';
   }
 }
@@ -36,6 +40,7 @@ export function AuthModal() {
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resetSent, setResetSent] = useState(false);
@@ -58,16 +63,31 @@ export function AuthModal() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (mode === 'signup') {
+      const validation = validateUsername(username);
+      if (!validation.ok) {
+        setError(validation.error);
+        return;
+      }
+    }
+
     setBusy(true);
     try {
       if (mode === 'signup') {
-        await createAccount(email.trim(), password);
+        await createAccount(email.trim(), password, username);
       } else {
         await signInWithEmail(email.trim(), password);
       }
     } catch (err) {
-      const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
-      setError(authErrorMessage(code));
+      if (err instanceof UsernameTakenError) {
+        setError('That username is already taken. Try another.');
+      } else if (err instanceof Error && err.message && !('code' in err)) {
+        setError(err.message);
+      } else {
+        const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
+        setError(authErrorMessage(code));
+      }
     } finally {
       setBusy(false);
     }
@@ -200,6 +220,9 @@ export function AuthModal() {
                 placeholder={mode === 'signup' ? 'At least 6 characters' : 'Your password'}
               />
             </label>
+            {mode === 'signup' && (
+              <UsernameField value={username} onChange={setUsername} disabled={busy} />
+            )}
             {mode === 'login' && (
               <div className="text-right -mt-2">
                 <button
@@ -220,7 +243,7 @@ export function AuthModal() {
 
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || (mode === 'signup' && !validateUsername(username).ok)}
               className="w-full btn-primary py-3.5 text-base disabled:opacity-50 disabled:transform-none"
             >
               {busy ? 'Please wait…' : mode === 'login' ? 'Sign in to journal' : 'Create account'}

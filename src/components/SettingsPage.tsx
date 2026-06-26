@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft, Download, FileText, Plus, Trash2 } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
 import type { CurrencyCode, ThemeAccent } from '../types/settings';
 import type { Trade } from '../types';
 import type { TradingStats } from '../utils/stats';
@@ -16,6 +17,7 @@ interface SettingsPageProps {
 
 export function SettingsPage({ trades, monthStats, year, month, onBack }: SettingsPageProps) {
   const { settings, updateSettings, addSetupTag, addPsychologyTag, addMarketContextTag, addAccount, removeAccount, setActiveAccount } = useSettings();
+  const { username, user, firebaseEnabled } = useAuth();
   const [newTag, setNewTag] = useState('');
   const [newPsychologyTag, setNewPsychologyTag] = useState('');
   const [newContextTag, setNewContextTag] = useState('');
@@ -36,7 +38,18 @@ export function SettingsPage({ trades, monthStats, year, month, onBack }: Settin
         <div>
           <h1 className="text-2xl font-bold">Settings</h1>
           <p className="text-sm text-text-secondary mt-1">Preferences, accounts, and data export</p>
+          {firebaseEnabled && user && username && (
+            <p className="text-sm text-emerald-300 mt-2 font-medium">@{username}</p>
+          )}
         </div>
+
+        <section className="panel-card p-5 space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Trade psychology</h2>
+          <p className="text-xs text-text-secondary leading-relaxed">
+            When logging or editing a trade, use the <strong className="text-text-primary">Psychology &amp; context</strong> section:
+            psychology dropdown, 0–10 rule adherence slider, and market context chips. CSV imports leave these blank until you edit a trade.
+          </p>
+        </section>
 
         <section className="panel-card p-5 space-y-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Display</h2>

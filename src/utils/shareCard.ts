@@ -11,10 +11,9 @@ const PERIOD_BADGE: Record<SharePeriod, string> = {
   year: 'YEAR IN REVIEW',
 };
 
-export function resolveShareUsername(user: User | null): string {
+export function resolveShareUsername(user: User | null, profileUsername?: string | null): string {
+  if (profileUsername?.trim()) return profileUsername.trim();
   if (!user) return 'Trader';
-  const name = user.displayName?.trim();
-  if (name) return name;
   const email = user.email?.trim();
   if (email) return email.split('@')[0] ?? 'Trader';
   return 'Trader';

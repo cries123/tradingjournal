@@ -207,6 +207,10 @@ export function CsvImportModal({ onClose, onSave, targetDate }: CsvImportModalPr
 
             {error && <p className="text-sm text-red-400 mb-3">{error}</p>}
 
+            <p className="text-[11px] text-text-secondary mb-4 leading-relaxed">
+              Broker fields import as-is. Psychology, rule adherence, and market context stay blank — edit any trade after import to add them.
+            </p>
+
             <div className="flex gap-3">
               <button type="button" onClick={handleSave} className="flex-1 py-2.5 btn-primary text-sm">
                 Import {selectedCount} Trades
