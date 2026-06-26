@@ -1,9 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
 
-export type AppRoute = 'landing' | 'app';
+export type AppRoute = 'landing' | 'app' | 'privacy' | 'terms';
+
+const ROUTE_PATHS: Record<AppRoute, string> = {
+  landing: '/',
+  app: '/app',
+  privacy: '/privacy',
+  terms: '/terms',
+};
 
 function readRoute(): AppRoute {
-  return window.location.pathname.startsWith('/app') ? 'app' : 'landing';
+  const path = window.location.pathname;
+  if (path.startsWith('/app')) return 'app';
+  if (path.startsWith('/privacy')) return 'privacy';
+  if (path.startsWith('/terms')) return 'terms';
+  return 'landing';
 }
 
 export function useRoute() {
@@ -22,9 +33,9 @@ export function useRoute() {
   }, [route]);
 
   const navigate = useCallback((next: AppRoute) => {
-    const path = next === 'app' ? '/app' : '/';
-    window.history.pushState({}, '', path);
+    window.history.pushState({}, '', ROUTE_PATHS[next]);
     setRoute(next);
+    if (next !== 'app') window.scrollTo(0, 0);
   }, []);
 
   return { route, navigate };

@@ -169,3 +169,36 @@ body,
   outline: none;
   border-color: var(--color-accent);
 }
+
+.prose-legal section {
+  margin-bottom: 2rem;
+}
+
+.prose-legal h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 0.75rem;
+}
+
+.prose-legal p {
+  line-height: 1.7;
+}
+
+.prose-legal ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+  space-y: 0.5rem;
+}
+
+.prose-legal li {
+  margin-bottom: 0.5rem;
+}
+
+.prose-legal strong {
+  color: var(--color-text-primary);
+}
+
+details summary::-webkit-details-marker {
+  display: none;
+}

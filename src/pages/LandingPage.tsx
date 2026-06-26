@@ -1,8 +1,11 @@
 import { BrandLogo } from '../components/BrandLogo';
 import { DashboardPreview } from '../components/landing/DashboardPreview';
+import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 
 interface LandingPageProps {
   onLaunch: () => void;
+  onPrivacy: () => void;
+  onTerms: () => void;
 }
 
 const FEATURES = [
@@ -10,25 +13,25 @@ const FEATURES = [
     icon: '📅',
     title: 'P&L Calendar',
     description:
-      'See your month at a glance — green days for profit, red for loss. Click any day to import trades or review performance.',
+      'See your month at a glance — green days for profit, red for loss. Click any day to import trades or drill into that session.',
+  },
+  {
+    icon: '🤖',
+    title: 'AI Screenshot Parsing',
+    description:
+      'Upload brokerage screenshots and let AI extract P/L, symbols, and contract details. Review before saving — no typing required.',
   },
   {
     icon: '📄',
-    title: 'Schwab CSV Import',
+    title: 'CSV Statement Import',
     description:
-      'Upload your account statement export. Round-trip trades are matched automatically so you can review and import in seconds.',
-  },
-  {
-    icon: '📷',
-    title: 'Screenshot AI Import',
-    description:
-      'Snap your Thinkorswim position screen. AI reads P/L Day, contract details, and Greeks — then lets you pick what to log.',
+      'Drop in your account statement export. Round-trip trades are matched automatically so you can review and import in seconds.',
   },
   {
     icon: '✏️',
     title: 'Manual Trade Entry',
     description:
-      'Log trades by hand with symbol, P/L, side, setup tags, and notes. Perfect for quick entries between sessions.',
+      'Log trades by hand with symbol, P/L, side, setup tags, and notes. Perfect when you want full control.',
   },
   {
     icon: '📊',
@@ -38,70 +41,89 @@ const FEATURES = [
   },
   {
     icon: '☁️',
-    title: 'Firebase Cloud Sync',
+    title: 'Optional Cloud Sync',
     description:
-      'Sign in with Google or email. Your journal syncs to Firestore and follows you across devices — with local backup.',
+      'Sign in with Google or email to sync across devices — or stay local-only. Your journal, your choice.',
+  },
+];
+
+const SUPPORTED_BROKERS = [
+  { name: 'Thinkorswim', status: 'live' as const, detail: 'Screenshot AI + CSV' },
+  { name: 'Schwab', status: 'live' as const, detail: 'Account statement CSV' },
+  { name: 'Robinhood', status: 'live' as const, detail: 'Screenshot AI parsing' },
+];
+
+const FAQ = [
+  {
+    q: 'Do I need to log in to my broker?',
+    a: 'Never. Trading Journal never connects to your brokerage account. You upload CSV files, screenshots, or enter trades manually — completely separate from your broker login.',
+  },
+  {
+    q: 'Which brokers are supported today?',
+    a: 'Thinkorswim, Schwab, and Robinhood. AI screenshot parsing works across mobile brokerage apps. CSV import is optimized for Schwab account statements.',
+  },
+  {
+    q: 'I use a different broker. Can you add support?',
+    a: 'Yes — reach out via GitHub Issues or email (footer links). Tell us your broker and how you export trades; we can configure import support for your workflow.',
+  },
+  {
+    q: 'Is my trade data secure?',
+    a: 'Without an account, data stays in your browser. With an account, trades sync to Firebase under your user ID. Broker credentials are never collected.',
+  },
+  {
+    q: 'How accurate is AI import?',
+    a: 'AI is a starting point — always review parsed trades before saving. You can edit P/L, flip signs, and deselect rows before importing.',
   },
 ];
 
 const STEPS = [
-  { n: '01', title: 'Import or log trades', body: 'CSV, screenshot, or manual — get data in however you trade.' },
-  { n: '02', title: 'Review your calendar', body: 'Daily P&L colors show winning and losing sessions instantly.' },
-  { n: '03', title: 'Analyze and improve', body: 'Stats and charts reveal patterns in your weekday and trade performance.' },
+  { n: '01', title: 'Upload or log', body: 'Screenshot, CSV, or manual entry — however you already track trades.' },
+  { n: '02', title: 'Review on calendar', body: 'Daily P&L colors show winning and losing sessions at a glance.' },
+  { n: '03', title: 'Analyze your edge', body: 'Stats and charts reveal patterns across weekdays and trade size.' },
 ];
 
-export function LandingPage({ onLaunch }: LandingPageProps) {
+export function LandingPage({ onLaunch, onPrivacy, onTerms }: LandingPageProps) {
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden">
       <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
-
-      {/* Nav */}
-      <header className="relative z-10 border-b border-border/50 backdrop-blur-md bg-bg-primary/70 sticky top-0">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
-          <BrandLogo size="md" />
-          <button type="button" onClick={onLaunch} className="btn-primary text-sm px-5 py-2.5">
-            Open Journal
-          </button>
-        </div>
-      </header>
+      <LandingNav onLaunch={onLaunch} />
 
       {/* Hero */}
-      <section className="relative z-10 max-w-6xl mx-auto px-4 md:px-6 pt-12 md:pt-20 pb-16 md:pb-24">
+      <section className="relative z-10 max-w-6xl mx-auto px-4 md:px-6 pt-12 md:pt-20 pb-16 md:pb-20">
         <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs font-medium mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Built for Thinkorswim & Schwab traders
+              AI-powered imports · No broker login ever
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-[3.25rem] font-bold leading-[1.1] tracking-tight">
-              Your trading journal,{' '}
-              <span className="text-gradient">beautifully organized</span>
+              The trading journal that works with{' '}
+              <span className="text-gradient">your broker</span>
             </h1>
             <p className="mt-5 text-base md:text-lg text-text-secondary leading-relaxed max-w-xl">
-              Track daily P&L on a visual calendar, import trades from CSV or screenshots with AI,
-              and analyze win rate, profit factor, and more — all in one professional dashboard.
+              Track daily P&L on a visual calendar, import trades with AI screenshot parsing or CSV uploads,
+              and analyze your performance — without connecting to your brokerage account. Ever.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <button type="button" onClick={onLaunch} className="btn-primary text-base px-7 py-3.5">
                 Start journaling free
               </button>
-              <a href="#features" className="btn-secondary text-base px-7 py-3.5 text-center">
-                See all features
+              <a href="#brokers" className="btn-secondary text-base px-7 py-3.5 text-center">
+                See supported brokers
               </a>
             </div>
-            <div className="mt-10 flex flex-wrap gap-6 text-sm text-text-secondary">
+            <div className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-sm text-text-secondary">
               <span className="flex items-center gap-2">
-                <span className="text-emerald-400">✓</span> No spreadsheet required
+                <span className="text-emerald-400">✓</span> No brokerage login required
               </span>
               <span className="flex items-center gap-2">
-                <span className="text-emerald-400">✓</span> Works on mobile & desktop
+                <span className="text-emerald-400">✓</span> AI screenshot parsing
               </span>
               <span className="flex items-center gap-2">
-                <span className="text-emerald-400">✓</span> Cloud sync optional
+                <span className="text-emerald-400">✓</span> Mobile & desktop
               </span>
             </div>
           </div>
-
           <div className="relative">
             <div className="absolute -inset-4 bg-gradient-to-br from-emerald-500/20 via-transparent to-cyan-500/20 rounded-3xl blur-2xl" />
             <DashboardPreview />
@@ -109,20 +131,140 @@ export function LandingPage({ onLaunch }: LandingPageProps) {
         </div>
       </section>
 
+      {/* Security callout */}
+      <section id="security" className="relative z-10 border-y border-border/50 bg-emerald-500/5 py-10 md:py-12">
+        <div className="max-w-6xl mx-auto px-4 md:px-6">
+          <div className="glass-card rounded-2xl p-6 md:p-8 flex flex-col md:flex-row gap-6 md:gap-10 items-start md:items-center">
+            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-2xl shrink-0">
+              🔒
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl md:text-2xl font-bold mb-2">Your broker stays separate</h2>
+              <p className="text-text-secondary leading-relaxed">
+                We will <strong className="text-text-primary">never</strong> ask you to sign in with your brokerage.
+                No API keys, no OAuth, no account linking. You control what goes into your journal — upload a CSV,
+                snap a screenshot, or type trades yourself. Your brokerage login and your journal are completely independent.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* AI Import */}
+      <section className="relative z-10 py-16 md:py-24">
+        <div className="max-w-6xl mx-auto px-4 md:px-6">
+          <div className="grid lg:grid-cols-2 gap-10 items-center">
+            <div>
+              <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">AI Import</p>
+              <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+                Upload a screenshot. AI does the rest.
+              </h2>
+              <p className="text-text-secondary leading-relaxed mb-6">
+                Take a screenshot from your brokerage app — positions screen, P/L summary, or trade history.
+                Our AI reads the image and extracts trades so you can review and import with one click.
+                Works great for quick end-of-day logging when exporting CSV feels like overkill.
+              </p>
+              <ul className="space-y-3 text-sm text-text-secondary">
+                {[
+                  'Multi-screenshot upload — batch an entire session',
+                  'Review & edit before saving — flip P/L signs, fix symbols',
+                  'Extracts options details when visible (strike, Greeks, contract)',
+                  'Server-side AI — your API key stays secure on deploy',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <span className="text-emerald-400 mt-0.5">→</span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="glass-card rounded-2xl p-6 md:p-8 glow-border">
+              <p className="text-xs uppercase tracking-widest text-text-secondary mb-4">How AI import works</p>
+              <ol className="space-y-4">
+                {[
+                  { step: '1', text: 'Screenshot your positions or P/L from any supported broker app' },
+                  { step: '2', text: 'AI parses symbol, P/L Day, contract info, and date' },
+                  { step: '3', text: 'You select which trades to keep and import to your calendar' },
+                ].map((s) => (
+                  <li key={s.step} className="flex gap-4">
+                    <span className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0">
+                      {s.step}
+                    </span>
+                    <p className="text-sm text-text-secondary pt-1">{s.text}</p>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Brokers */}
+      <section id="brokers" className="relative z-10 border-t border-border/50 bg-bg-secondary/30 py-16 md:py-24">
+        <div className="max-w-6xl mx-auto px-4 md:px-6">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Brokers</p>
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Supported today — more coming</h2>
+            <p className="mt-4 text-text-secondary">
+              We currently support Thinkorswim, Schwab, and Robinhood. Additional brokers are on the roadmap.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-3 gap-4 mb-10">
+            {SUPPORTED_BROKERS.map((b) => (
+              <div key={b.name} className="glass-card rounded-xl p-5 text-center">
+                <div className="inline-flex px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-semibold uppercase tracking-wide mb-3">
+                  Live
+                </div>
+                <h3 className="text-lg font-semibold">{b.name}</h3>
+                <p className="text-sm text-text-secondary mt-1">{b.detail}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="glass-card rounded-2xl p-6 md:p-8 border-dashed border-2 border-emerald-500/25 text-center max-w-2xl mx-auto">
+            <h3 className="text-lg font-semibold mb-2">Use a different broker?</h3>
+            <p className="text-sm text-text-secondary leading-relaxed mb-5">
+              We&apos;re actively expanding support. If you trade with Interactive Brokers, Webull, Tastytrade,
+              or any other platform — reach out. Tell us your broker and how you export data, and we&apos;ll
+              configure import support for your workflow.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <a
+                href="https://github.com/cries123/tradingjournal/issues/new?title=Broker%20support%20request"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary text-sm px-6 py-2.5"
+              >
+                Request your broker
+              </a>
+              <a
+                href="mailto:support@tradingjournal.app?subject=Broker%20support%20request"
+                className="btn-secondary text-sm px-6 py-2.5"
+              >
+                Email us
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Features */}
-      <section id="features" className="relative z-10 border-t border-border/50 bg-bg-secondary/30 py-16 md:py-24">
+      <section id="features" className="relative z-10 py-16 md:py-24">
         <div className="max-w-6xl mx-auto px-4 md:px-6">
           <div className="text-center max-w-2xl mx-auto mb-12 md:mb-16">
             <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Features</p>
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Everything you need to review your edge</h2>
             <p className="mt-4 text-text-secondary">
-              From import to analysis — designed around how active traders actually work.
+              Built for active traders who want clarity — not another spreadsheet.
             </p>
           </div>
-
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
             {FEATURES.map((f) => (
-              <article key={f.title} className="glass-card rounded-xl p-5 md:p-6 hover:border-emerald-500/30 transition-colors group">
+              <article
+                key={f.title}
+                className="glass-card rounded-xl p-5 md:p-6 hover:border-emerald-500/30 transition-colors group"
+              >
                 <div className="w-10 h-10 rounded-lg bg-bg-primary/80 border border-border/60 flex items-center justify-center text-lg mb-4 group-hover:scale-105 transition-transform">
                   {f.icon}
                 </div>
@@ -134,17 +276,16 @@ export function LandingPage({ onLaunch }: LandingPageProps) {
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="relative z-10 py-16 md:py-24">
+      {/* Workflow */}
+      <section className="relative z-10 border-t border-border/50 bg-bg-secondary/20 py-16 md:py-24">
         <div className="max-w-6xl mx-auto px-4 md:px-6">
           <div className="text-center max-w-2xl mx-auto mb-12">
             <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">Workflow</p>
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Three steps to clarity</h2>
           </div>
-
           <div className="grid md:grid-cols-3 gap-6">
             {STEPS.map((step) => (
-              <div key={step.n} className="relative glass-card rounded-xl p-6 md:p-7">
+              <div key={step.n} className="glass-card rounded-xl p-6 md:p-7">
                 <span className="text-4xl font-bold text-gradient opacity-80">{step.n}</span>
                 <h3 className="text-lg font-semibold mt-3 mb-2">{step.title}</h3>
                 <p className="text-sm text-text-secondary leading-relaxed">{step.body}</p>
@@ -154,12 +295,35 @@ export function LandingPage({ onLaunch }: LandingPageProps) {
         </div>
       </section>
 
+      {/* FAQ */}
+      <section id="faq" className="relative z-10 py-16 md:py-24">
+        <div className="max-w-3xl mx-auto px-4 md:px-6">
+          <div className="text-center mb-12">
+            <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">FAQ</p>
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Common questions</h2>
+          </div>
+          <div className="space-y-4">
+            {FAQ.map((item) => (
+              <details key={item.q} className="glass-card rounded-xl group">
+                <summary className="px-5 py-4 cursor-pointer font-medium text-sm md:text-base list-none flex items-center justify-between gap-4">
+                  {item.q}
+                  <span className="text-text-secondary group-open:rotate-45 transition-transform text-lg">+</span>
+                </summary>
+                <p className="px-5 pb-4 text-sm text-text-secondary leading-relaxed">{item.a}</p>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* CTA */}
       <section className="relative z-10 border-t border-border/50 py-16 md:py-20">
         <div className="max-w-3xl mx-auto px-4 md:px-6 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Ready to track your edge?</h2>
+          <BrandLogo size="lg" />
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-8">Ready to track your edge?</h2>
           <p className="mt-4 text-text-secondary text-base md:text-lg">
             Open your journal, import this month&apos;s trades, and see your performance on the calendar.
+            No broker login. No credit card. Just your data, your way.
           </p>
           <button type="button" onClick={onLaunch} className="btn-primary text-base px-8 py-3.5 mt-8">
             Open Trading Journal
@@ -167,13 +331,7 @@ export function LandingPage({ onLaunch }: LandingPageProps) {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="relative z-10 border-t border-border/50 py-8">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <BrandLogo size="sm" />
-          <p className="text-xs text-text-secondary">© {new Date().getFullYear()} Trading Journal · Trade smarter</p>
-        </div>
-      </footer>
+      <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} />
     </div>
   );
 }
