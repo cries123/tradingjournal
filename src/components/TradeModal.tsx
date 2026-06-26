@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { TradeListItem } from './TradeListItem';
+import { X } from 'lucide-react';
+import { useSettings } from '../context/SettingsContext';
 import type { Trade, TradeSide } from '../types';
-import { formatCurrency } from '../utils/format';
 
 interface TradeModalProps {
   defaultDate?: string;
@@ -9,12 +9,11 @@ interface TradeModalProps {
   onSave: (trade: Omit<Trade, 'id'>) => void;
 }
 
-const SETUP_OPTIONS = ['BREAKOUT', 'FOMO', 'RSI CROSSED', 'REVERSAL'];
-
 export function TradeModal({ defaultDate, onClose, onSave }: TradeModalProps) {
+  const { settings } = useSettings();
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(defaultDate ?? today);
-  const [symbol, setSymbol] = useState('SPY');
+  const [symbol, setSymbol] = useState(settings.defaultSymbol);
   const [pnl, setPnl] = useState('');
   const [setup, setSetup] = useState('');
   const [side, setSide] = useState<TradeSide>('long');
@@ -37,12 +36,17 @@ export function TradeModal({ defaultDate, onClose, onSave }: TradeModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-backdrop-in motion-safe:animate-backdrop-in p-4" onClick={onClose}>
       <div
-        className="bg-bg-secondary border border-border rounded-lg p-6 w-full max-w-md shadow-xl"
+        className="bg-bg-secondary border border-border rounded-lg p-6 w-full max-w-md shadow-xl animate-scale-in motion-safe:animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-lg font-semibold mb-4">Add Trade</h3>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold">Add Trade</h3>
+          <button type="button" onClick={onClose} className="p-1 text-text-secondary hover:text-text-primary focus-ring rounded" aria-label="Close">
+            <X size={20} />
+          </button>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Field label="Date">
             <input
@@ -75,9 +79,6 @@ export function TradeModal({ defaultDate, onClose, onSave }: TradeModalProps) {
               className="input-field"
               required
             />
-            <p className="text-xs text-text-secondary mt-1">
-              Enter your daily P/L from Thinkorswim (positive = green, negative = red)
-            </p>
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
@@ -88,7 +89,7 @@ export function TradeModal({ defaultDate, onClose, onSave }: TradeModalProps) {
                 className="input-field"
               >
                 <option value="">None</option>
-                {SETUP_OPTIONS.map((s) => (
+                {settings.setupTags.map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>
@@ -119,135 +120,14 @@ export function TradeModal({ defaultDate, onClose, onSave }: TradeModalProps) {
           </Field>
 
           <div className="flex gap-3 pt-2">
-            <button
-              type="submit"
-              className="flex-1 py-2 bg-accent text-white rounded-md font-medium hover:opacity-90 transition-opacity"
-            >
+            <button type="submit" className="flex-1 btn-primary py-2.5 text-sm">
               Save Trade
             </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-border rounded-md text-text-secondary hover:text-text-primary transition-colors"
-            >
+            <button type="button" onClick={onClose} className="px-4 py-2.5 btn-secondary text-sm">
               Cancel
             </button>
           </div>
         </form>
-      </div>
-    </div>
-  );
-}
-
-interface DayDetailModalProps {
-  date: string;
-  trades: Trade[];
-  onClose: () => void;
-  onDelete: (id: string) => void;
-  onAddTrade: () => void;
-  onImportCsv: () => void;
-  onImportScreenshot: () => void;
-}
-
-export function DayDetailModal({
-  date,
-  trades,
-  onClose,
-  onDelete,
-  onAddTrade,
-  onImportCsv,
-  onImportScreenshot,
-}: DayDetailModalProps) {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const dayTrades = trades.filter((t) => t.date === date);
-  const totalPnl = dayTrades.reduce((sum, t) => sum + t.pnl, 0);
-  const formattedDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
-      <div
-        className="bg-bg-secondary border border-border rounded-lg p-6 w-full max-w-lg shadow-xl max-h-[80vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <h3 className="text-lg font-semibold">{formattedDate}</h3>
-            {dayTrades.length > 0 && (
-              <p className={`text-sm font-medium mt-1 ${totalPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                Total: {formatCurrency(totalPnl)} · {dayTrades.length} trades
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-text-secondary hover:text-text-primary text-xl leading-none"
-          >
-            ×
-          </button>
-        </div>
-
-        {dayTrades.length === 0 ? (
-          <p className="text-text-secondary text-sm mb-4">No trades yet — import or add trades for this day.</p>
-        ) : (
-          <div className="space-y-2 mb-4">
-            {dayTrades.map((trade) => (
-              <TradeListItem
-                key={trade.id}
-                trade={trade}
-                expanded={expandedId === trade.id}
-                onToggle={() =>
-                  setExpandedId((prev) => (prev === trade.id ? null : trade.id))
-                }
-                trailing={
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(trade.id);
-                    }}
-                    className="text-text-secondary hover:text-red-400 text-sm shrink-0 ml-2"
-                    aria-label="Delete trade"
-                  >
-                    ✕
-                  </button>
-                }
-              />
-            ))}
-          </div>
-        )}
-
-        <div className="space-y-2">
-          <p className="text-xs text-text-secondary font-medium uppercase tracking-wide">Import trades</p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={onImportCsv}
-              className="py-2.5 px-3 border border-border rounded-md text-sm text-text-primary hover:border-accent hover:bg-accent/10 transition-colors"
-            >
-              📄 Import CSV
-            </button>
-            <button
-              type="button"
-              onClick={onImportScreenshot}
-              className="py-2.5 px-3 border border-border rounded-md text-sm text-text-primary hover:border-accent hover:bg-accent/10 transition-colors"
-            >
-              📷 Screenshot
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={onAddTrade}
-            className="w-full py-2 border border-dashed border-border rounded-md text-text-secondary hover:text-text-primary hover:border-accent transition-colors text-sm"
-          >
-            + Log trade manually
-          </button>
-        </div>
       </div>
     </div>
   );

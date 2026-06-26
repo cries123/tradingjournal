@@ -54,6 +54,7 @@ async function readResponseJson(response: Response): Promise<Record<string, unkn
 export async function parseScreenshot(
   file: File,
   apiKey?: string,
+  userId?: string,
 ): Promise<ParseScreenshotResult> {
   const compressed = await compressImage(file);
   const base64 = await fileToBase64(compressed);
@@ -65,6 +66,7 @@ export async function parseScreenshot(
       image: base64,
       mimeType: compressed.type || 'image/jpeg',
       apiKey: apiKey || undefined,
+      userId: userId || undefined,
     }),
   });
 

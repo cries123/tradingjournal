@@ -1,24 +1,29 @@
+import { TrendingUp } from 'lucide-react';
+import { useSettings } from '../context/SettingsContext';
 import type { TradingStats } from '../utils/stats';
 import { formatCurrency } from '../utils/format';
+import { Sparkline } from './Sparkline';
 
 interface StatsCardsProps {
   stats: TradingStats;
+  cumulativeSeries?: number[];
+  winRateSeries?: number[];
 }
 
-export function StatsCards({ stats }: StatsCardsProps) {
+export function StatsCards({ stats, cumulativeSeries = [], winRateSeries = [] }: StatsCardsProps) {
+  const { settings } = useSettings();
   const winPct = stats.totalTrades > 0 ? stats.winRate : 0;
   const lossPct = 100 - winPct;
+  const fmt = (n: number) => formatCurrency(n, settings.currency);
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5 md:gap-3 shrink-0">
       <StatCard label="Net P&L">
         <span className={`text-sm md:text-2xl font-bold ${stats.netPnl >= 0 ? 'text-text-primary' : 'text-loss-bright'}`}>
-          {formatCurrency(stats.netPnl)}
+          {fmt(stats.netPnl)}
         </span>
-        {stats.netPnl > 0 && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/20 text-accent font-medium ml-2">
-            {stats.totalTrades > 0 ? '▲' : ''}
-          </span>
+        {cumulativeSeries.length >= 2 && (
+          <Sparkline values={cumulativeSeries} positive={stats.netPnl >= 0} className="ml-2" />
         )}
       </StatCard>
 
@@ -28,7 +33,7 @@ export function StatsCards({ stats }: StatsCardsProps) {
             stats.avgProfitPerTrade >= 0 ? 'text-text-primary' : 'text-loss-bright'
           }`}
         >
-          {stats.totalTrades > 0 ? formatCurrency(stats.avgProfitPerTrade) : '—'}
+          {stats.totalTrades > 0 ? fmt(stats.avgProfitPerTrade) : '—'}
         </span>
       </StatCard>
 
@@ -38,10 +43,10 @@ export function StatsCards({ stats }: StatsCardsProps) {
             stats.avgProfitPerDay >= 0 ? 'text-text-primary' : 'text-loss-bright'
           }`}
         >
-          {stats.tradingDays > 0 ? formatCurrency(stats.avgProfitPerDay) : '—'}
+          {stats.tradingDays > 0 ? fmt(stats.avgProfitPerDay) : '—'}
         </span>
         {stats.tradingDays > 0 && (
-          <p className="text-[9px] md:text-[10px] text-text-secondary mt-0.5 md:mt-1 hidden sm:block">
+          <p className="text-[9px] md:text-[10px] text-text-secondary mt-0.5 md:mt-1 hidden sm:block w-full">
             Across {stats.tradingDays} trading {stats.tradingDays === 1 ? 'day' : 'days'}
           </p>
         )}
@@ -49,6 +54,9 @@ export function StatsCards({ stats }: StatsCardsProps) {
 
       <StatCard label="Trade Win Rate">
         <span className="text-sm md:text-2xl font-bold">{stats.totalTrades > 0 ? `${winPct.toFixed(2)}%` : '—'}</span>
+        {winRateSeries.length >= 2 && (
+          <Sparkline values={winRateSeries} positive={winPct >= 50} className="ml-2" />
+        )}
         {stats.totalTrades > 0 && (
           <div className="mt-1.5 md:mt-2 h-1.5 rounded-full bg-bg-primary overflow-hidden flex w-full">
             <div className="bg-profit-bright h-full" style={{ width: `${winPct}%` }} />
@@ -61,9 +69,9 @@ export function StatsCards({ stats }: StatsCardsProps) {
         <span className="text-sm md:text-2xl font-bold">
           {stats.totalTrades > 0 ? stats.avgRR.toFixed(2) : '—'}
         </span>
-        <p className="text-[9px] md:text-[10px] text-text-secondary mt-0.5 md:mt-1 hidden sm:block">
-          Average win ÷ average loss
-        </p>
+        {stats.avgRR > 1 && stats.totalTrades > 0 && (
+          <TrendingUp size={16} className="ml-2 text-profit-bright shrink-0" />
+        )}
       </StatCard>
 
       <StatCard label="Profit Factor">

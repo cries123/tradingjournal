@@ -1,5 +1,8 @@
-import { COMING_SOON_BROKERS, SUPPORTED_BROKERS } from '../data/brokers';
+import { useEffect, useState } from 'react';
+import { ArrowLeft, Check } from 'lucide-react';
+import { brokerIdFromName, BrokerLogo } from '../components/brokers/BrokerLogo';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
+import { fetchBrokersConfig, type BrokerConfig } from '../services/brokersConfig';
 
 interface BrokersPageProps {
   onHome: () => void;
@@ -9,6 +12,16 @@ interface BrokersPageProps {
 }
 
 export function BrokersPage({ onHome, onLaunch, onPrivacy, onTerms }: BrokersPageProps) {
+  const [supported, setSupported] = useState<BrokerConfig[]>([]);
+  const [comingSoon, setComingSoon] = useState<string[]>([]);
+
+  useEffect(() => {
+    void fetchBrokersConfig().then((config) => {
+      setSupported(config.supported);
+      setComingSoon(config.comingSoon);
+    });
+  }, []);
+
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
       <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
@@ -19,9 +32,10 @@ export function BrokersPage({ onHome, onLaunch, onPrivacy, onTerms }: BrokersPag
           <button
             type="button"
             onClick={onHome}
-            className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-emerald-400 transition-colors mb-8"
+            className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-emerald-400 transition-colors mb-8 focus-ring rounded-lg px-1 py-1"
           >
-            <span aria-hidden>←</span> Back to home
+            <ArrowLeft size={16} />
+            Back to home
           </button>
 
           <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Brokers</p>
@@ -35,21 +49,21 @@ export function BrokersPage({ onHome, onLaunch, onPrivacy, onTerms }: BrokersPag
           </p>
 
           <div className="space-y-4 mb-12">
-            {SUPPORTED_BROKERS.map((b) => (
+            {supported.map((b) => (
               <article key={b.name} className="glass-card rounded-xl p-6 md:p-7">
                 <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
                   <div>
-                    <span className="inline-flex px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-semibold uppercase tracking-wide mb-2">
+                    <span className="inline-flex px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-semibold uppercase tracking-wide mb-3">
                       Live now
                     </span>
-                    <h2 className="text-xl font-semibold">{b.name}</h2>
-                    <p className="text-sm text-text-secondary mt-1">{b.detail}</p>
+                    <BrokerLogo broker={brokerIdFromName(b.name)} />
+                    <p className="text-sm text-text-secondary mt-2">{b.detail}</p>
                   </div>
                 </div>
                 <ul className="space-y-2">
                   {b.methods.map((m) => (
                     <li key={m} className="flex items-start gap-2 text-sm text-text-secondary">
-                      <span className="text-emerald-400 mt-0.5">✓</span>
+                      <Check size={14} className="text-emerald-400 mt-0.5 shrink-0" />
                       {m}
                     </li>
                   ))}
@@ -64,7 +78,7 @@ export function BrokersPage({ onHome, onLaunch, onPrivacy, onTerms }: BrokersPag
               We&apos;re expanding broker support. These platforms are on the roadmap:
             </p>
             <div className="flex flex-wrap gap-2">
-              {COMING_SOON_BROKERS.map((name) => (
+              {comingSoon.map((name) => (
                 <span
                   key={name}
                   className="px-3 py-1.5 rounded-full text-xs border border-border/60 text-text-secondary bg-bg-primary/50"
@@ -99,7 +113,7 @@ export function BrokersPage({ onHome, onLaunch, onPrivacy, onTerms }: BrokersPag
             </div>
           </div>
 
-          <div className="mt-10 text-center">
+          <div className="mt-12 text-center">
             <button type="button" onClick={onLaunch} className="btn-primary text-base px-8 py-3">
               Open Trading Journal
             </button>
