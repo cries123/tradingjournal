@@ -17,17 +17,6 @@ function isNonEmptyString(value: string | null | undefined): value is string {
 export function TradeDetails({ trade, compact }: TradeDetailsProps) {
   const rows: { label: string; value: string }[] = [];
 
-  if (trade.isGhost) rows.push({ label: 'Type', value: 'Ghost / missed trade' });
-  if (isNonEmptyString(trade.psychology)) rows.push({ label: 'Psychology', value: trade.psychology });
-  if (
-    trade.ruleAdherence != null &&
-    (trade.ruleAdherence !== 5 || isNonEmptyString(trade.psychology))
-  ) {
-    rows.push({ label: 'Rule adherence', value: `${trade.ruleAdherence}/10` });
-  }
-  if (trade.marketContext?.length) {
-    rows.push({ label: 'Market context', value: trade.marketContext.join(', ') });
-  }
   if (isNonEmptyString(trade.contract)) rows.push({ label: 'Contract', value: trade.contract });
   if (isNonEmptyString(trade.optionType)) rows.push({ label: 'Option type', value: trade.optionType.toUpperCase() });
   if (isNonEmptyString(trade.expiration)) rows.push({ label: 'Expiration', value: trade.expiration });

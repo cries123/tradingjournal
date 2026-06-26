@@ -10,8 +10,6 @@ interface SettingsContextValue {
   settings: UserSettings;
   updateSettings: (patch: Partial<UserSettings>) => void;
   addSetupTag: (tag: string) => void;
-  addPsychologyTag: (tag: string) => void;
-  addMarketContextTag: (tag: string) => void;
   addAccount: (name: string) => void;
   removeAccount: (id: string) => void;
   setActiveAccount: (id: string) => void;
@@ -91,24 +89,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [settings, persist],
   );
 
-  const addPsychologyTag = useCallback(
-    (tag: string) => {
-      const normalized = tag.trim().toUpperCase();
-      if (!normalized || settings.psychologyTags.includes(normalized)) return;
-      persist({ ...settings, psychologyTags: [...settings.psychologyTags, normalized] });
-    },
-    [settings, persist],
-  );
-
-  const addMarketContextTag = useCallback(
-    (tag: string) => {
-      const normalized = tag.trim().toUpperCase();
-      if (!normalized || settings.marketContextTags.includes(normalized)) return;
-      persist({ ...settings, marketContextTags: [...settings.marketContextTags, normalized] });
-    },
-    [settings, persist],
-  );
-
   const addAccount = useCallback(
     (name: string) => {
       const trimmed = name.trim();
@@ -150,13 +130,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       settings,
       updateSettings,
       addSetupTag,
-      addPsychologyTag,
-      addMarketContextTag,
       addAccount,
       removeAccount,
       setActiveAccount,
     }),
-    [settings, updateSettings, addSetupTag, addPsychologyTag, addMarketContextTag, addAccount, removeAccount, setActiveAccount],
+    [settings, updateSettings, addSetupTag, addAccount, removeAccount, setActiveAccount],
   );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

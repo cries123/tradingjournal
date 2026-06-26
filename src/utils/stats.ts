@@ -1,5 +1,4 @@
 import type { Trade } from '../types';
-import { executedTrades, isExecutedTrade } from './tradeFilters';
 
 export interface TradingStats {
   netPnl: number;
@@ -28,10 +27,6 @@ export interface WeekdayPnlPoint {
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export function computeStats(trades: Trade[]): TradingStats {
-  return computeStatsFromTrades(executedTrades(trades));
-}
-
-function computeStatsFromTrades(trades: Trade[]): TradingStats {
   if (trades.length === 0) {
     return {
       netPnl: 0,
@@ -74,7 +69,7 @@ export function getDailyPnlForMonth(trades: Trade[], year: number, month: number
   const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
   const byDay = new Map<string, number>();
 
-  for (const trade of executedTrades(trades)) {
+  for (const trade of trades) {
     if (!trade.date.startsWith(prefix)) continue;
     byDay.set(trade.date, (byDay.get(trade.date) ?? 0) + trade.pnl);
   }
@@ -92,7 +87,7 @@ export function getWeekdayPnl(trades: Trade[], year: number, month: number): Wee
   const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
   const totals = new Array(7).fill(0);
 
-  for (const trade of executedTrades(trades)) {
+  for (const trade of trades) {
     if (!trade.date.startsWith(prefix)) continue;
     const day = new Date(trade.date + 'T12:00:00').getDay();
     totals[day] += trade.pnl;
@@ -124,7 +119,7 @@ export function getMonthlyPnlForYear(trades: Trade[], year: number): MonthPnlPoi
     byMonth.set(m, { pnl: 0, trades: [], days: new Set() });
   }
 
-  for (const trade of executedTrades(trades)) {
+  for (const trade of trades) {
     if (!trade.date.startsWith(prefix)) continue;
     const month = Number(trade.date.slice(5, 7)) - 1;
     const bucket = byMonth.get(month);
@@ -163,7 +158,7 @@ export function getCumulativePnlSeries(trades: Trade[], year: number, month: num
 
 /** Daily win rate trend (rolling %) for sparklines. */
 export function getWinRateSeries(trades: Trade[], year: number, month: number): number[] {
-  const monthTrades = executedTrades(getMonthTrades(trades, year, month)).sort((a, b) => a.date.localeCompare(b.date));
+  const monthTrades = getMonthTrades(trades, year, month).sort((a, b) => a.date.localeCompare(b.date));
   const byDay = new Map<string, Trade[]>();
   for (const t of monthTrades) {
     const list = byDay.get(t.date) ?? [];
@@ -176,7 +171,6 @@ export function getWinRateSeries(trades: Trade[], year: number, month: number): 
   let total = 0;
   for (const [, dayTrades] of [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     for (const t of dayTrades) {
-      if (!isExecutedTrade(t)) continue;
       total += 1;
       if (t.pnl > 0) wins += 1;
     }
