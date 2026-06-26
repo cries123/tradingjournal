@@ -99,10 +99,6 @@ export function AuthModal() {
               </li>
             ))}
           </ul>
-
-          <p className="mt-6 text-[11px] text-text-secondary/80 hidden md:block">
-            Optional — you can use the journal locally without an account.
-          </p>
         </div>
 
         {/* Form panel */}
