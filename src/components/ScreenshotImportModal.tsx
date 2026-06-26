@@ -285,6 +285,7 @@ export function ScreenshotImportModal({ onClose, onSave, targetDate }: Screensho
               onChange={setImportBehavior}
               showGhostToggle={false}
               compact
+              collapsible
             />
 
             <div className="flex gap-3 mt-5">
@@ -414,10 +415,8 @@ export function ScreenshotImportModal({ onClose, onSave, targetDate }: Screensho
               values={importBehavior}
               onChange={setImportBehavior}
               showGhostToggle={false}
+              collapsible
             />
-            <p className="text-[10px] text-text-secondary -mt-2 mb-4">
-              Optional session notes applied to all selected imports. Edit individual trades later for per-trade psychology.
-            </p>
 
             <div className="flex gap-3">
               <button

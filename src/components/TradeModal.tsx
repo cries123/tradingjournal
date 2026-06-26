@@ -127,7 +127,7 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="input-field resize-none" placeholder="SPY 746P weekly, etc." />
           </Field>
 
-          <TradeBehaviorFields values={behavior} onChange={setBehavior} />
+          <TradeBehaviorFields values={behavior} onChange={setBehavior} collapsible />
 
           <div className="flex gap-3 pt-2">
             <button type="submit" className="flex-1 btn-primary py-2.5 text-sm">

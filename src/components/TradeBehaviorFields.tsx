@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import type { TradeBehaviorInput } from '../types';
 import { useSettings } from '../context/SettingsContext';
 
@@ -24,6 +26,15 @@ export function behaviorFromTrade(trade?: Partial<TradeBehaviorInput>): TradeBeh
   };
 }
 
+export function behaviorHasData(values: TradeBehaviorValues): boolean {
+  return (
+    values.isGhost ||
+    Boolean(values.psychology) ||
+    values.ruleAdherence !== 5 ||
+    values.marketContext.length > 0
+  );
+}
+
 export function serializeBehavior(values: TradeBehaviorValues): TradeBehaviorInput {
   const payload: TradeBehaviorInput = {};
   if (values.psychology) payload.psychology = values.psychology;
@@ -38,10 +49,20 @@ interface TradeBehaviorFieldsProps {
   onChange: (values: TradeBehaviorValues) => void;
   showGhostToggle?: boolean;
   compact?: boolean;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
 }
 
-export function TradeBehaviorFields({ values, onChange, showGhostToggle = true, compact }: TradeBehaviorFieldsProps) {
+export function TradeBehaviorFields({
+  values,
+  onChange,
+  showGhostToggle = true,
+  compact,
+  collapsible = false,
+  defaultOpen,
+}: TradeBehaviorFieldsProps) {
   const { settings } = useSettings();
+  const [open, setOpen] = useState(defaultOpen ?? (collapsible ? behaviorHasData(values) : true));
 
   const patch = (partial: Partial<TradeBehaviorValues>) => onChange({ ...values, ...partial });
 
@@ -52,17 +73,8 @@ export function TradeBehaviorFields({ values, onChange, showGhostToggle = true, 
     patch({ marketContext: next });
   };
 
-  return (
-    <div className={`space-y-4 ${compact ? '' : 'pt-2 border-t border-border/50'}`}>
-      {!compact && (
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-400/90 mb-1">Psychology & context</p>
-          <p className="text-[11px] text-text-secondary leading-relaxed">
-            Optional behavioral notes — never overwrite broker data. CSV imports start blank; add these anytime via edit.
-          </p>
-        </div>
-      )}
-
+  const fields = (
+    <div className="space-y-4">
       {showGhostToggle && (
         <div className="rounded-lg border border-border/60 bg-bg-primary/40 p-3 space-y-2">
           <label className="flex items-start gap-3 cursor-pointer">
@@ -140,6 +152,50 @@ export function TradeBehaviorFields({ values, onChange, showGhostToggle = true, 
           })}
         </div>
       </div>
+    </div>
+  );
+
+  if (collapsible) {
+    return (
+      <div className={`${compact ? '' : 'pt-2 border-t border-border/50'}`}>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="w-full flex items-center justify-between gap-2 py-2 text-left focus-ring rounded-lg"
+        >
+          <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+            Psychology &amp; context <span className="normal-case font-normal text-text-secondary/80">(optional)</span>
+          </span>
+          <ChevronDown
+            size={16}
+            className={`text-text-secondary shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+          />
+        </button>
+        {open && (
+          <div className="pt-2 pb-1">
+            {!compact && (
+              <p className="text-[11px] text-text-secondary leading-relaxed mb-4">
+                Optional behavioral notes — never overwrite broker data. CSV imports start blank; add these anytime via edit.
+              </p>
+            )}
+            {fields}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`space-y-4 ${compact ? '' : 'pt-2 border-t border-border/50'}`}>
+      {!compact && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-400/90 mb-1">Psychology & context</p>
+          <p className="text-[11px] text-text-secondary leading-relaxed">
+            Optional behavioral notes — never overwrite broker data. CSV imports start blank; add these anytime via edit.
+          </p>
+        </div>
+      )}
+      {fields}
     </div>
   );
 }
