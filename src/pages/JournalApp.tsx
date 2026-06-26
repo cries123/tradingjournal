@@ -147,12 +147,8 @@ export function JournalApp({ onHome }: JournalAppProps) {
       <div className="flex-1 flex flex-col min-w-0 min-h-0 w-full">
         {!isDesktop && <MobileHeader onOpenMenu={() => setMobileMenuOpen(true)} onHome={onHome} />}
 
-        <main
-          className={`flex-1 min-h-0 p-2 md:p-5 ${
-            isDesktop ? 'overflow-hidden' : 'overflow-y-auto'
-          }`}
-        >
-          <div className={`h-full ${isDesktop ? 'max-w-6xl mx-auto w-full' : ''}`}>
+        <main className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain p-2 md:p-5">
+          <div className="max-w-6xl mx-auto w-full min-h-0 pb-4">
             {appView === 'settings' ? (
               <SettingsPage
                 trades={allTrades}
