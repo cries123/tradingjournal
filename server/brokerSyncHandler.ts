@@ -1,4 +1,4 @@
-import type { BrokerIntegrationId, BrokerSyncRequest, BrokerSyncResult } from '../src/types/broker';
+import type { BrokerSyncRequest, BrokerSyncResult } from '../src/types/broker';
 import { parseBrokerCsv } from '../src/utils/parseCsvRouter';
 
 interface SchwabTransaction {
@@ -171,65 +171,4 @@ export async function handleBrokerSyncRequest(body: BrokerSyncRequest): Promise<
     skipped: 0,
     message: trades.length ? `Synced ${trades.length} trades` : 'No new trades in range',
   };
-}
-
-export function buildOAuthRedirectUrl(broker: BrokerIntegrationId, origin: string): string | null {
-  const schwabId = process.env.SCHWAB_CLIENT_ID;
-  const robinhoodId = process.env.ROBINHOOD_CLIENT_ID;
-
-  if ((broker === 'schwab' || broker === 'tos') && schwabId) {
-    const redirect = `${origin}/api/broker-oauth-callback`;
-    const params = new URLSearchParams({
-      client_id: schwabId,
-      redirect_uri: redirect,
-      response_type: 'code',
-      scope: 'readonly',
-    });
-    return `https://api.schwabapi.com/v1/oauth/authorize?${params.toString()}`;
-  }
-
-  if (broker === 'robinhood' && robinhoodId) {
-    const redirect = `${origin}/api/broker-oauth-callback?broker=robinhood`;
-    const params = new URLSearchParams({
-      client_id: robinhoodId,
-      redirect_uri: redirect,
-      response_type: 'code',
-      scope: 'read',
-    });
-    return `https://robinhood.com/oauth2/authorize/?${params.toString()}`;
-  }
-
-  return null;
-}
-
-export async function exchangeOAuthCode(
-  broker: BrokerIntegrationId,
-  code: string,
-  origin: string,
-): Promise<{ accessToken: string; refreshToken?: string }> {
-  const schwabSecret = process.env.SCHWAB_CLIENT_SECRET;
-  const schwabId = process.env.SCHWAB_CLIENT_ID;
-
-  if ((broker === 'schwab' || broker === 'tos') && schwabId && schwabSecret) {
-    const redirect = `${origin}/api/broker-oauth-callback`;
-    const basic = Buffer.from(`${schwabId}:${schwabSecret}`).toString('base64');
-    const res = await fetch('https://api.schwabapi.com/v1/oauth/token', {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${basic}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: redirect,
-      }).toString(),
-    });
-    if (!res.ok) throw new Error(`OAuth token exchange failed (${res.status})`);
-    const data = (await res.json()) as { access_token?: string; refresh_token?: string };
-    if (!data.access_token) throw new Error('No access token returned');
-    return { accessToken: data.access_token, refreshToken: data.refresh_token };
-  }
-
-  throw new Error('OAuth not configured for this broker — use API token connect instead.');
 }

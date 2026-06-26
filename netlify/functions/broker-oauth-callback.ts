@@ -1,8 +1,16 @@
 import type { Handler } from '@netlify/functions';
-import { buildOAuthRedirectUrl, exchangeOAuthCode } from '../../server/brokerSyncHandler';
+import {
+  buildOAuthRedirectUrl,
+  decodeOAuthState,
+  exchangeOAuthCode,
+  oauthNotConfiguredMessage,
+} from '../../server/brokerOAuth';
 import type { BrokerIntegrationId } from '../../src/types/broker';
 
 function originFromEvent(event: { headers: Record<string, string | undefined> }): string {
+  const siteUrl = process.env.URL?.replace(/\/$/, '');
+  if (siteUrl) return siteUrl;
+
   const host = event.headers.host ?? event.headers.Host;
   const proto = event.headers['x-forwarded-proto'] ?? 'https';
   return host ? `${proto}://${host}` : 'http://localhost:5173';
@@ -10,20 +18,33 @@ function originFromEvent(event: { headers: Record<string, string | undefined> })
 
 export const handler: Handler = async (event) => {
   const origin = originFromEvent(event);
-  const broker = (event.queryStringParameters?.broker ?? 'schwab') as BrokerIntegrationId;
-  const code = event.queryStringParameters?.code;
+  const query = event.queryStringParameters ?? {};
+  const brokerParam = (query.broker ?? 'schwab') as BrokerIntegrationId;
+  const broker = decodeOAuthState(query.state, brokerParam);
+  const code = query.code;
+  const oauthError = query.error;
+
+  if (oauthError) {
+    const desc = query.error_description ?? oauthError;
+    return {
+      statusCode: 302,
+      headers: { Location: `${origin}/app?broker_oauth_error=${encodeURIComponent(desc)}` },
+      body: '',
+    };
+  }
 
   if (code) {
     try {
       const tokens = await exchangeOAuthCode(broker, code, origin);
       const params = new URLSearchParams({
+        broker_oauth: '1',
         broker,
         access_token: tokens.accessToken,
         refresh_token: tokens.refreshToken ?? '',
       });
       return {
         statusCode: 302,
-        headers: { Location: `${origin}/app?broker_oauth=1&${params.toString()}` },
+        headers: { Location: `${origin}/app?${params.toString()}` },
         body: '',
       };
     } catch (err) {
@@ -38,10 +59,11 @@ export const handler: Handler = async (event) => {
 
   const url = buildOAuthRedirectUrl(broker, origin);
   if (!url) {
+    const message = encodeURIComponent(oauthNotConfiguredMessage(origin));
     return {
-      statusCode: 400,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'OAuth not configured. Use API token connect in Settings.' }),
+      statusCode: 302,
+      headers: { Location: `${origin}/app?broker_oauth_error=${message}` },
+      body: '',
     };
   }
 

@@ -10,6 +10,7 @@ import {
   markBrokerSyncError,
   syncBrokerTrades,
 } from '../../services/brokerIntegrations';
+import { fetchOAuthStatus, type OAuthStatusResponse } from '../../services/brokerOAuthStatus';
 import { BrokerLogo } from '../brokers/BrokerLogo';
 import type { ParsedTradeInput } from '../../types';
 
@@ -25,6 +26,11 @@ export function BrokerConnectionsPanel({ onTradesImported }: BrokerConnectionsPa
   const [tokenInput, setTokenInput] = useState('');
   const [accountId, setAccountId] = useState('');
   const [message, setMessage] = useState<string | null>(null);
+  const [oauthStatus, setOauthStatus] = useState<OAuthStatusResponse | null>(null);
+
+  useEffect(() => {
+    void fetchOAuthStatus().then(setOauthStatus);
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!user) return;
@@ -127,10 +133,26 @@ export function BrokerConnectionsPanel({ onTradesImported }: BrokerConnectionsPa
     );
   }
 
+  const schwabOAuthReady = oauthStatus?.schwabConfigured ?? false;
+
   return (
     <div className="space-y-3">
       {message && (
-        <p className="text-xs text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">{message}</p>
+        <p className={`text-xs rounded-lg px-3 py-2 border ${message.toLowerCase().includes('fail') || message.toLowerCase().includes('missing') || message.toLowerCase().includes('not configured') ? 'text-loss-bright bg-loss/10 border-loss/20' : 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20'}`}>
+          {message}
+        </p>
+      )}
+
+      {oauthStatus && (
+        <div className="rounded-lg border border-border/60 bg-bg-tertiary/30 px-3 py-2 text-[10px] text-text-secondary space-y-1">
+          <p>
+            Schwab OAuth: {oauthStatus.schwabConfigured ? 'configured' : 'not configured on server'}
+          </p>
+          <p className="break-all">Redirect URI: {oauthStatus.redirectUri}</p>
+          {!oauthStatus.schwabConfigured && oauthStatus.missingEnv.length > 0 && (
+            <p className="text-amber-300">Missing env: {oauthStatus.missingEnv.join('; ')}</p>
+          )}
+        </div>
       )}
 
       <div className="space-y-2">
@@ -206,15 +228,19 @@ export function BrokerConnectionsPanel({ onTradesImported }: BrokerConnectionsPa
                 <a
                   href={oauthUrl(broker.id) ?? '#'}
                   onClick={(e) => {
-                    if (!oauthUrl(broker.id)) {
+                    if (!schwabOAuthReady && (broker.id === 'schwab' || broker.id === 'tos')) {
                       e.preventDefault();
-                      setMessage('OAuth requires server env vars — use API token for now.');
+                      setMessage(
+                        oauthStatus?.missingEnv.length
+                          ? `Schwab OAuth not configured. Add to Netlify: ${oauthStatus.missingEnv.join(', ')}. Register redirect URI: ${oauthStatus.redirectUri}`
+                          : 'Schwab OAuth not configured on the server.',
+                      );
                     }
                   }}
                   className="btn-secondary px-3 py-1.5 text-xs inline-flex items-center gap-1"
                 >
                   <Link2 size={12} />
-                  OAuth
+                  Connect with Schwab OAuth
                 </a>
               </div>
             )}
