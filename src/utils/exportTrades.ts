@@ -2,19 +2,82 @@ import type { Trade } from '../types';
 import type { TradingStats } from './stats';
 import { formatCurrency, formatMonthYear } from './format';
 import type { CurrencyCode } from '../types/settings';
+import { effectivePnl } from './tradeHelpers';
+import { detectWashSales } from './washSale';
+
+const CSV_HEADERS = [
+  'date',
+  'symbol',
+  'pnl',
+  'side',
+  'setup',
+  'tags',
+  'notes',
+  'fees',
+  'grossPnl',
+  'grade',
+  'entryTime',
+  'exitTime',
+  'mae',
+  'mfe',
+  'rMultiple',
+  'checklistScore',
+  'assetClass',
+  'accountId',
+];
+
+function csvCell(val: unknown): string {
+  if (val === undefined || val === null) return '';
+  const str = Array.isArray(val) ? val.join(';') : String(val);
+  return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
+}
 
 export function exportTradesCsv(trades: Trade[], filename = 'trades.csv'): void {
-  const headers = ['date', 'symbol', 'pnl', 'side', 'setup', 'notes', 'accountId'];
   const rows = trades.map((t) =>
-    headers.map((h) => {
-      const val = t[h as keyof Trade];
-      const str = val === undefined ? '' : String(val);
-      return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
+    CSV_HEADERS.map((h) => {
+      if (h === 'tags') return csvCell(t.tags);
+      return csvCell(t[h as keyof Trade]);
     }).join(','),
   );
 
-  const csv = [headers.join(','), ...rows].join('\n');
+  const csv = [CSV_HEADERS.join(','), ...rows].join('\n');
   downloadBlob(csv, filename, 'text/csv;charset=utf-8');
+}
+
+export function exportTaxCsv(trades: Trade[], filename = 'tax-summary.csv'): void {
+  const washSales = detectWashSales(trades);
+  const washByLossId = new Map(washSales.map((w) => [w.lossTradeId, w]));
+
+  const headers = [
+    'date',
+    'symbol',
+    'realized_pnl',
+    'fees',
+    'net_pnl',
+    'asset_class',
+    'wash_sale',
+    'disallowed_loss',
+    'replacement_date',
+  ];
+  const rows = trades
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((t) => {
+      const wash = washByLossId.get(t.id);
+      return [
+        t.date,
+        t.symbol,
+        t.pnl,
+        t.fees ?? 0,
+        effectivePnl(t),
+        t.assetClass ?? 'stock',
+        wash ? 'YES' : 'NO',
+        wash?.disallowedLoss ?? 0,
+        wash?.replacementDate ?? '',
+      ]
+        .map(csvCell)
+        .join(',');
+    });
+  downloadBlob([headers.join(','), ...rows].join('\n'), filename, 'text/csv;charset=utf-8');
 }
 
 export function exportMonthReport(

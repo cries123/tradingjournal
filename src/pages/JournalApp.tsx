@@ -15,6 +15,7 @@ import { UsernameSetupModal } from '../components/UsernameSetupModal';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useIsDesktop } from '../hooks/useMediaQuery';
+import { useJournalReminder } from '../hooks/useJournalReminder';
 import { useTrades } from '../hooks/useTrades';
 import type { Trade } from '../types';
 import { computeStats, getMonthTrades } from '../utils/stats';
@@ -65,6 +66,8 @@ export function JournalApp({ onHome }: JournalAppProps) {
 
   const monthTrades = useMemo(() => getMonthTrades(allTrades, year, month), [allTrades, year, month]);
   const monthStats = useMemo(() => computeStats(monthTrades), [monthTrades]);
+
+  useJournalReminder(settings.remindersEnabled, settings.reminderTime, allTrades);
 
   const filterSetups = useMemo(
     () => [...new Set([...settings.setupTags, ...setups])].sort(),

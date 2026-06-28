@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -44,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [username, setUsername] = useState<string | null>(null);
   const [loading, setLoading] = useState(isFirebaseConfigured());
   const [profileLoading, setProfileLoading] = useState(false);
+  const previousUidRef = useRef<string | null>(null);
 
   const firebaseEnabled = isFirebaseConfigured();
 
@@ -63,18 +65,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user || !firebaseEnabled) {
       setUsername(null);
+      previousUidRef.current = null;
       setProfileLoading(false);
       return;
+    }
+
+    const switchedAccount =
+      previousUidRef.current !== null && previousUidRef.current !== user.uid;
+    previousUidRef.current = user.uid;
+
+    if (switchedAccount) {
+      setUsername(null);
     }
 
     let cancelled = false;
     setProfileLoading(true);
     void fetchUsername(user.uid)
       .then((name) => {
-        if (!cancelled) setUsername(name);
+        if (!cancelled) {
+          // Keep username from signup claim if Firestore fetch races ahead of the write
+          setUsername((prev) => name ?? prev);
+        }
       })
       .catch(() => {
-        if (!cancelled) setUsername(null);
+        if (!cancelled) setUsername((prev) => prev);
       })
       .finally(() => {
         if (!cancelled) setProfileLoading(false);
@@ -118,11 +132,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const auth = getFirebaseAuth();
       const result = await createUserWithEmailAndPassword(auth, email, password);
-      await ensureUserProfile(result.user, true);
 
       try {
         const claimed = await claimUsernameDoc(result.user.uid, validation.normalized);
         setUsername(claimed);
+        await ensureUserProfile(result.user, true);
       } catch (err) {
         if (err instanceof UsernameTakenError) {
           throw err;

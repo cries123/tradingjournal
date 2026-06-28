@@ -3,6 +3,7 @@ import { useAuth } from './AuthContext';
 import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
 import type { ThemeAccent, UserSettings } from '../types/settings';
 import { DEFAULT_SETTINGS } from '../types/settings';
+import type { Strategy } from '../types/strategy';
 import { loadSettings, saveSettings } from '../utils/settingsStorage';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
@@ -10,6 +11,8 @@ interface SettingsContextValue {
   settings: UserSettings;
   updateSettings: (patch: Partial<UserSettings>) => void;
   addSetupTag: (tag: string) => void;
+  addStrategy: (name: string, description?: string) => void;
+  removeStrategy: (id: string) => void;
   addAccount: (name: string) => void;
   removeAccount: (id: string) => void;
   setActiveAccount: (id: string) => void;
@@ -89,6 +92,29 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [settings, persist],
   );
 
+  const addStrategy = useCallback(
+    (name: string, description?: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      const strategy: Strategy = {
+        id: crypto.randomUUID(),
+        name: trimmed,
+        description: description?.trim() || undefined,
+        criteria: [],
+        defaultTags: [],
+      };
+      persist({ ...settings, strategies: [...settings.strategies, strategy] });
+    },
+    [settings, persist],
+  );
+
+  const removeStrategy = useCallback(
+    (id: string) => {
+      persist({ ...settings, strategies: settings.strategies.filter((s) => s.id !== id) });
+    },
+    [settings, persist],
+  );
+
   const addAccount = useCallback(
     (name: string) => {
       const trimmed = name.trim();
@@ -130,11 +156,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       settings,
       updateSettings,
       addSetupTag,
+      addStrategy,
+      removeStrategy,
       addAccount,
       removeAccount,
       setActiveAccount,
     }),
-    [settings, updateSettings, addSetupTag, addAccount, removeAccount, setActiveAccount],
+    [settings, updateSettings, addSetupTag, addStrategy, removeStrategy, addAccount, removeAccount, setActiveAccount],
   );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

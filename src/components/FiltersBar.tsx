@@ -8,6 +8,8 @@ interface FiltersBarProps {
 }
 
 export function FiltersBar({ filters, symbols, setups, onChange }: FiltersBarProps) {
+  const hasFilter = Boolean(filters.symbol || filters.setup || filters.side || filters.tag);
+
   return (
     <div className="flex flex-wrap gap-2 shrink-0">
       <FilterSelect
@@ -23,15 +25,21 @@ export function FiltersBar({ filters, symbols, setups, onChange }: FiltersBarPro
         onChange={(setup) => onChange({ ...filters, setup })}
       />
       <FilterSelect
+        label="Tag"
+        value={filters.tag}
+        options={setups}
+        onChange={(tag) => onChange({ ...filters, tag })}
+      />
+      <FilterSelect
         label="Side"
         value={filters.side}
         options={['long', 'short']}
         onChange={(side) => onChange({ ...filters, side })}
       />
-      {(filters.symbol || filters.setup || filters.side) && (
+      {hasFilter && (
         <button
           type="button"
-          onClick={() => onChange({ symbol: '', setup: '', side: '' })}
+          onClick={() => onChange({ symbol: '', setup: '', side: '', tag: '' })}
           className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary border border-border rounded-md transition-colors"
         >
           Clear filters

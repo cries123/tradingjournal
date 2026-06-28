@@ -16,6 +16,7 @@ import { FadeIn } from '../components/motion/FadeIn';
 
 interface LandingPageProps {
   onLaunch: () => void;
+  onHome: () => void;
   onPrivacy: () => void;
   onTerms: () => void;
   onBrokers: () => void;
@@ -89,11 +90,11 @@ const STEPS = [
   { n: '03', title: 'Analyze your edge', body: 'Stats and charts reveal patterns in your performance over time.' },
 ];
 
-export function LandingPage({ onLaunch, onPrivacy, onTerms, onBrokers }: LandingPageProps) {
+export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers }: LandingPageProps) {
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
       <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
-      <LandingNav onLaunch={onLaunch} onBrokers={onBrokers} />
+      <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} />
 
       {/* Hero */}
       <section className="relative z-10 max-w-6xl mx-auto px-4 md:px-6 pt-12 md:pt-20 pb-16 md:pb-20">

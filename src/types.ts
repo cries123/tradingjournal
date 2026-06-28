@@ -1,6 +1,8 @@
 export type TradeSide = 'long' | 'short';
 export type AssetType = 'stock' | 'option';
 export type OptionType = 'call' | 'put';
+export type TradeGrade = 'A' | 'B' | 'C' | 'D' | 'F';
+export type AssetClass = 'stock' | 'option' | 'future' | 'forex' | 'crypto';
 
 export interface Trade {
   id: string;
@@ -27,6 +29,30 @@ export interface Trade {
   theta?: number;
   vega?: number;
   accountType?: string;
+  /** Multiple setup/strategy tags */
+  tags?: string[];
+  strategyId?: string;
+  /** Commissions & fees (subtracted from gross for net pnl when grossPnl set) */
+  fees?: number;
+  grossPnl?: number;
+  entryTime?: string;
+  exitTime?: string;
+  /** Max adverse / favorable excursion in $ */
+  mae?: number;
+  mfe?: number;
+  rMultiple?: number;
+  grade?: TradeGrade;
+  /** 0–100 checklist adherence */
+  checklistScore?: number;
+  /** Base64 JPEG chart screenshots */
+  imageUrls?: string[];
+  /** TradingView or external chart replay URL */
+  chartUrl?: string;
+  roundTripId?: string;
+  assetClass?: AssetClass;
+  tickValue?: number;
+  contractSize?: number;
+  ivRank?: number;
 }
 
 export interface DailySummary {
@@ -47,6 +73,21 @@ export interface Filters {
   symbol: string;
   setup: string;
   side: string;
+  tag: string;
 }
 
 export type ParsedTradeInput = Omit<Trade, 'id'>;
+
+export interface RoundTrip {
+  id: string;
+  symbol: string;
+  side?: TradeSide;
+  openDate: string;
+  closeDate: string;
+  trades: Trade[];
+  netPnl: number;
+  holdMinutes: number | null;
+  mae: number | null;
+  mfe: number | null;
+  rMultiple: number | null;
+}

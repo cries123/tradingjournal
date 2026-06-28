@@ -1,29 +1,41 @@
 import { useCallback, useEffect, useState } from 'react';
 
-export type AppRoute = 'landing' | 'app' | 'brokers' | 'privacy' | 'terms';
+export type AppRoute = 'landing' | 'app' | 'brokers' | 'privacy' | 'terms' | 'coach' | 'report-bug' | 'admin';
 
-const ROUTE_PATHS: Record<AppRoute, string> = {
+const ROUTE_PATHS: Record<Exclude<AppRoute, 'coach'>, string> = {
   landing: '/',
   app: '/app',
   brokers: '/brokers',
   privacy: '/privacy',
   terms: '/terms',
+  'report-bug': '/report-bug',
+  admin: '/admin',
 };
 
-function readRoute(): AppRoute {
+interface RouteState {
+  route: AppRoute;
+  coachToken?: string;
+}
+
+function readRoute(): RouteState {
   const path = window.location.pathname;
-  if (path.startsWith('/app')) return 'app';
-  if (path.startsWith('/brokers')) return 'brokers';
-  if (path.startsWith('/privacy')) return 'privacy';
-  if (path.startsWith('/terms')) return 'terms';
-  return 'landing';
+  const coachMatch = path.match(/^\/coach\/([a-zA-Z0-9]+)/);
+  if (coachMatch) return { route: 'coach', coachToken: coachMatch[1] };
+  if (path.startsWith('/app')) return { route: 'app' };
+  if (path.startsWith('/brokers')) return { route: 'brokers' };
+  if (path.startsWith('/privacy')) return { route: 'privacy' };
+  if (path.startsWith('/terms')) return { route: 'terms' };
+  if (path.startsWith('/report-bug')) return { route: 'report-bug' };
+  if (path.startsWith('/admin')) return { route: 'admin' };
+  return { route: 'landing' };
 }
 
 export function useRoute() {
-  const [route, setRoute] = useState<AppRoute>(readRoute);
+  const [state, setState] = useState<RouteState>(readRoute);
+  const { route, coachToken } = state;
 
   useEffect(() => {
-    const onPopState = () => setRoute(readRoute());
+    const onPopState = () => setState(readRoute());
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
@@ -55,11 +67,11 @@ export function useRoute() {
     return () => mobileQuery.removeEventListener('change', applyRouteStyles);
   }, [route]);
 
-  const navigate = useCallback((next: AppRoute) => {
+  const navigate = useCallback((next: Exclude<AppRoute, 'coach'>) => {
     window.history.pushState({}, '', ROUTE_PATHS[next]);
-    setRoute(next);
+    setState({ route: next });
     if (next !== 'app') window.scrollTo(0, 0);
   }, []);
 
-  return { route, navigate };
+  return { route, coachToken, navigate };
 }
