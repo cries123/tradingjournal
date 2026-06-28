@@ -71,7 +71,7 @@ const FAQ = [
   },
   {
     q: 'I use a different broker. Can you add support?',
-    a: 'Yes — reach out via GitHub Issues or email (footer links). Tell us your broker and how you export trades; we can configure import support for your workflow.',
+    a: 'Yes — reach out via GitHub Issues or Report a bug (footer links). Tell us your broker and how you export trades; we can configure import support for your workflow.',
   },
   {
     q: 'Is my trade data secure?',

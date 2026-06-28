@@ -81,9 +81,9 @@ export function ReportBugPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers 
 
         {!firebaseEnabled ? (
           <div className="glass-card rounded-xl p-6 text-sm text-text-secondary">
-            Bug reporting requires the app to be connected to our backend. Please email{' '}
-            <a href="mailto:support@tradingjournal.app" className="text-emerald-400 hover:underline">
-              support@tradingjournal.app
+            Bug reporting requires the app to be connected to our backend. Please use{' '}
+            <a href="https://github.com/cries123/tradingjournal/issues/new" className="text-emerald-400 hover:underline">
+              GitHub Issues
             </a>{' '}
             instead.
           </div>

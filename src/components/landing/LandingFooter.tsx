@@ -104,14 +104,6 @@ export function LandingFooter({ onPrivacy, onTerms, onHome, onBrokers }: Landing
                 </a>
               </li>
               <li>
-                <a
-                  href="mailto:support@tradingjournal.app?subject=Support%20request"
-                  className="hover:text-emerald-400 transition-colors"
-                >
-                  Email us
-                </a>
-              </li>
-              <li>
                 <a href="/admin" className="hover:text-emerald-400 transition-colors opacity-60">
                   Admin
                 </a>

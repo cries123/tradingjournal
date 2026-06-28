@@ -85,7 +85,7 @@ export function PrivacyPolicyPage({ onHome, onLaunch, onPrivacy, onTerms, onBrok
       <section>
         <h2>Contact</h2>
         <p>
-          Questions about privacy? Reach out via GitHub Issues or email listed in the site footer.
+          Questions about privacy? Reach out via GitHub Issues or Report a bug in the site footer.
         </p>
       </section>
     </LegalPageLayout>

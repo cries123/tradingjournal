@@ -105,12 +105,6 @@ export function BrokersPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }:
               >
                 Request your broker
               </a>
-              <a
-                href="mailto:support@tradingjournal.app?subject=Broker%20support%20request"
-                className="btn-secondary text-sm px-6 py-2.5"
-              >
-                Email us
-              </a>
             </div>
           </div>
 
