@@ -24,11 +24,17 @@ export function LandingFooter({ onPrivacy, onTerms, onHome, onBrokers }: Landing
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
           <div className="sm:col-span-2 lg:col-span-1">
             {onHome ? (
-              <button type="button" onClick={onHome} className="text-left hover:opacity-90 transition-opacity">
+              <button
+                type="button"
+                onClick={onHome}
+                className="inline-flex items-center justify-start shrink-0 w-fit max-w-none p-0 m-0 border-0 bg-transparent text-left hover:opacity-90 transition-opacity cursor-pointer"
+              >
                 <BrandLogo size="sm" variant="compact" />
               </button>
             ) : (
-              <BrandLogo size="sm" variant="compact" />
+              <div className="inline-flex items-center justify-start shrink-0 w-fit max-w-none">
+                <BrandLogo size="sm" variant="compact" />
+              </div>
             )}
             <p className="mt-3 text-sm text-text-secondary leading-relaxed max-w-xs">
               A professional journal for active traders. Import manually — we never ask for your brokerage login.
@@ -130,18 +136,28 @@ interface LandingNavProps {
   showBrokersLink?: boolean;
 }
 
+function NavBrand({ onHome }: { onHome?: () => void }) {
+  const logo = <BrandLogo size="sm" variant="compact" />;
+  const shellClass =
+    'inline-flex items-center justify-start shrink-0 w-fit max-w-none p-0 m-0 border-0 bg-transparent text-left hover:opacity-90 transition-opacity focus-ring rounded';
+
+  if (onHome) {
+    return (
+      <button type="button" onClick={onHome} className={`${shellClass} cursor-pointer`}>
+        {logo}
+      </button>
+    );
+  }
+
+  return <div className={shellClass}>{logo}</div>;
+}
+
 export function LandingNav({ onLaunch, onHome, onBrokers, showBrokersLink = true }: LandingNavProps) {
   return (
     <header className="relative z-10 border-b border-border/50 backdrop-blur-md bg-bg-primary/70 sticky top-0">
-      <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
-        {onHome ? (
-          <button type="button" onClick={onHome} className="hover:opacity-90 transition-opacity">
-            <BrandLogo size="sm" variant="compact" />
-          </button>
-        ) : (
-          <BrandLogo size="sm" variant="compact" />
-        )}
-        <div className="flex items-center gap-3">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-4">
+        <NavBrand onHome={onHome} />
+        <div className="flex items-center gap-3 shrink-0">
           {showBrokersLink && onBrokers && (
             <button
               type="button"

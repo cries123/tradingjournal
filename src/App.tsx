@@ -56,6 +56,7 @@ export default function App() {
   return (
     <LandingPage
       onLaunch={goApp}
+      onHome={goHome}
       onPrivacy={goPrivacy}
       onTerms={goTerms}
       onBrokers={goBrokers}
