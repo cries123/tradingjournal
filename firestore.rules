@@ -20,6 +20,21 @@ service cloud.firestore {
         );
     }
 
+    function validBrokerSupportCreate() {
+      return request.resource.data.brokerName is string
+        && request.resource.data.brokerName.size() >= 2
+        && request.resource.data.exportMethod is string
+        && request.resource.data.exportMethod.size() >= 3
+        && request.resource.data.email is string
+        && request.resource.data.email.size() > 0
+        && request.resource.data.status == 'open'
+        && request.resource.data.createdAt is string
+        && (
+          (request.auth != null && request.resource.data.uid == request.auth.uid)
+          || (request.auth == null && request.resource.data.uid == null)
+        );
+    }
+
     match /config/brokers {
       allow read: if true;
       allow write: if false;
@@ -37,6 +52,12 @@ service cloud.firestore {
 
     match /bugReports/{reportId} {
       allow create: if validBugReportCreate();
+      allow read, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    match /brokerSupportRequests/{requestId} {
+      allow create: if validBrokerSupportCreate();
       allow read, update: if isAdmin();
       allow delete: if false;
     }

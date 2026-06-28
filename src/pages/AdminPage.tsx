@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, Lock, ShieldCheck, Users } from 'lucide-react';
+import { ArrowLeft, Building2, Lock, ShieldCheck, Users } from 'lucide-react';
 import { AuthModal } from '../components/AuthModal';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import { useAuth } from '../context/AuthContext';
 import { claimOrVerifyAdmin, fetchSignedUpUserCount, type AdminAccessResult } from '../services/admin';
+import {
+  fetchBrokerSupportRequests,
+  updateBrokerSupportStatus,
+  type BrokerSupportRequest,
+  type BrokerSupportStatus,
+} from '../services/brokerSupportRequests';
 import {
   fetchBugReports,
   updateBugReportStatus,
@@ -19,20 +25,22 @@ interface AdminPageProps {
   onBrokers?: () => void;
 }
 
+type RequestStatus = BugReportStatus | BrokerSupportStatus;
+
 type AdminState =
   | { phase: 'loading' }
   | { phase: 'unavailable' }
   | { phase: 'auth-required' }
   | { phase: 'denied' }
-  | { phase: 'ready'; isNewClaim: boolean; reports: BugReport[]; userCount: number };
+  | { phase: 'ready'; isNewClaim: boolean; reports: BugReport[]; brokerRequests: BrokerSupportRequest[]; userCount: number };
 
-const STATUS_LABELS: Record<BugReportStatus, string> = {
+const STATUS_LABELS: Record<RequestStatus, string> = {
   open: 'Open',
   resolved: 'Resolved',
   closed: 'Closed',
 };
 
-function statusBadgeClass(status: BugReportStatus): string {
+function statusBadgeClass(status: RequestStatus): string {
   switch (status) {
     case 'open':
       return 'bg-amber-500/15 text-amber-400';
@@ -46,7 +54,7 @@ function statusBadgeClass(status: BugReportStatus): string {
 export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: AdminPageProps) {
   const { user, username, loading, firebaseEnabled, logout } = useAuth();
   const [state, setState] = useState<AdminState>({ phase: 'loading' });
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [updatingKey, setUpdatingKey] = useState<string | null>(null);
 
   const loadAdmin = useCallback(async () => {
     if (!firebaseEnabled) {
@@ -80,10 +88,20 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
     }
 
     try {
-      const [reports, userCount] = await Promise.all([fetchBugReports(), fetchSignedUpUserCount()]);
-      setState({ phase: 'ready', isNewClaim: access.isNewClaim, reports, userCount });
+      const [reports, brokerRequests, userCount] = await Promise.all([
+        fetchBugReports(),
+        fetchBrokerSupportRequests(),
+        fetchSignedUpUserCount(),
+      ]);
+      setState({ phase: 'ready', isNewClaim: access.isNewClaim, reports, brokerRequests, userCount });
     } catch {
-      setState({ phase: 'ready', isNewClaim: access.isNewClaim, reports: [], userCount: 0 });
+      setState({
+        phase: 'ready',
+        isNewClaim: access.isNewClaim,
+        reports: [],
+        brokerRequests: [],
+        userCount: 0,
+      });
     }
   }, [firebaseEnabled, loading, user, username]);
 
@@ -91,8 +109,8 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
     void loadAdmin();
   }, [loadAdmin]);
 
-  const handleStatusChange = async (reportId: string, status: BugReportStatus) => {
-    setUpdatingId(reportId);
+  const handleBugStatusChange = async (reportId: string, status: BugReportStatus) => {
+    setUpdatingKey(`bug:${reportId}`);
     try {
       await updateBugReportStatus(reportId, status);
       setState((prev) => {
@@ -103,12 +121,33 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
         };
       });
     } finally {
-      setUpdatingId(null);
+      setUpdatingKey(null);
     }
   };
 
-  const openCount =
+  const handleBrokerStatusChange = async (requestId: string, status: BrokerSupportStatus) => {
+    setUpdatingKey(`broker:${requestId}`);
+    try {
+      await updateBrokerSupportStatus(requestId, status);
+      setState((prev) => {
+        if (prev.phase !== 'ready') return prev;
+        return {
+          ...prev,
+          brokerRequests: prev.brokerRequests.map((r) =>
+            r.id === requestId ? { ...r, status } : r,
+          ),
+        };
+      });
+    } finally {
+      setUpdatingKey(null);
+    }
+  };
+
+  const openBugCount =
     state.phase === 'ready' ? state.reports.filter((r) => r.status === 'open').length : 0;
+  const openBrokerCount =
+    state.phase === 'ready' ? state.brokerRequests.filter((r) => r.status === 'open').length : 0;
+  const openCount = openBugCount + openBrokerCount;
 
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
@@ -195,7 +234,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
               </button>
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-4 mb-8">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
               <div className="glass-card rounded-xl p-5 md:p-6">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
@@ -220,11 +259,84 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                 </div>
                 <p className="text-3xl font-bold tracking-tight">{state.reports.length.toLocaleString()}</p>
                 <p className="text-xs text-text-secondary mt-2">
-                  {openCount > 0 ? `${openCount} open · ` : ''}
+                  {openBugCount > 0 ? `${openBugCount} open · ` : ''}
                   {state.reports.filter((r) => r.status === 'resolved').length} resolved
                 </p>
               </div>
+
+              <div className="glass-card rounded-xl p-5 md:p-6 sm:col-span-2 lg:col-span-1">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
+                    <Building2 size={18} />
+                  </div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                    Broker requests
+                  </p>
+                </div>
+                <p className="text-3xl font-bold tracking-tight">
+                  {state.brokerRequests.length.toLocaleString()}
+                </p>
+                <p className="text-xs text-text-secondary mt-2">
+                  {openBrokerCount > 0 ? `${openBrokerCount} open · ` : ''}
+                  {state.brokerRequests.filter((r) => r.status === 'resolved').length} resolved
+                </p>
+              </div>
             </div>
+
+            <h2 className="text-lg font-semibold mb-4">Broker support requests</h2>
+
+            {state.brokerRequests.length === 0 ? (
+              <div className="glass-card rounded-xl p-8 text-center text-text-secondary text-sm mb-10">
+                No broker support requests yet.
+              </div>
+            ) : (
+              <div className="space-y-4 mb-10">
+                {state.brokerRequests.map((request) => (
+                  <article key={request.id} className="glass-card rounded-xl p-5 md:p-6">
+                    <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+                      <div>
+                        <span
+                          className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${statusBadgeClass(request.status)}`}
+                        >
+                          {STATUS_LABELS[request.status]}
+                        </span>
+                        <p className="text-sm font-semibold mt-2">{request.brokerName}</p>
+                        <p className="text-xs text-text-secondary mt-1">
+                          {new Date(request.createdAt).toLocaleString()}
+                          {' · '}
+                          {request.email}
+                          {request.username ? ` (@${request.username})` : ''}
+                        </p>
+                      </div>
+                      <select
+                        value={request.status}
+                        disabled={updatingKey === `broker:${request.id}`}
+                        onChange={(e) =>
+                          void handleBrokerStatusChange(request.id, e.target.value as BrokerSupportStatus)
+                        }
+                        className="input-field text-sm py-1.5 px-2 min-w-[120px]"
+                        aria-label="Update broker request status"
+                      >
+                        <option value="open">Open</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="closed">Closed</option>
+                      </select>
+                    </div>
+
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed">{request.exportMethod}</p>
+
+                    {request.details && (
+                      <div className="mt-4 pt-4 border-t border-border/50">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-2">
+                          Additional details
+                        </p>
+                        <p className="text-sm text-text-secondary whitespace-pre-wrap">{request.details}</p>
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            )}
 
             <h2 className="text-lg font-semibold mb-4">Bug reports</h2>
 
@@ -252,9 +364,9 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                       </div>
                       <select
                         value={report.status}
-                        disabled={updatingId === report.id}
+                        disabled={updatingKey === `bug:${report.id}`}
                         onChange={(e) =>
-                          void handleStatusChange(report.id, e.target.value as BugReportStatus)
+                          void handleBugStatusChange(report.id, e.target.value as BugReportStatus)
                         }
                         className="input-field text-sm py-1.5 px-2 min-w-[120px]"
                         aria-label="Update report status"

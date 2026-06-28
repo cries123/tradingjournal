@@ -7,6 +7,7 @@ import { LandingPage } from './pages/LandingPage';
 import { JournalApp } from './pages/JournalApp';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { ReportBugPage } from './pages/ReportBugPage';
+import { RequestBrokerPage } from './pages/RequestBrokerPage';
 import { TermsOfServicePage } from './pages/TermsOfServicePage';
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
   const goBrokers = () => navigate('brokers');
   const goPrivacy = () => navigate('privacy');
   const goTerms = () => navigate('terms');
+  const goRequestBroker = () => navigate('request-broker');
 
   const publicPageProps = {
     onHome: goHome,
@@ -24,6 +26,7 @@ export default function App() {
     onPrivacy: goPrivacy,
     onTerms: goTerms,
     onBrokers: goBrokers,
+    onRequestBroker: goRequestBroker,
   };
 
   let content;
@@ -40,6 +43,8 @@ export default function App() {
     content = <TermsOfServicePage {...publicPageProps} />;
   } else if (route === 'report-bug') {
     content = <ReportBugPage {...publicPageProps} />;
+  } else if (route === 'request-broker') {
+    content = <RequestBrokerPage {...publicPageProps} />;
   } else if (route === 'admin') {
     content = <AdminPage {...publicPageProps} />;
   } else if (route === 'app') {

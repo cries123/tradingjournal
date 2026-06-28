@@ -94,21 +94,8 @@ export function LandingFooter({ onPrivacy, onTerms, onHome, onBrokers }: Landing
                 </a>
               </li>
               <li>
-                <a
-                  href="https://github.com/cries123/tradingjournal/issues/new"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-emerald-400 transition-colors"
-                >
+                <a href="/request-broker" className="hover:text-emerald-400 transition-colors">
                   Request broker support
-                </a>
-              </li>
-              <li>
-                <a
-                  href="mailto:support@tradingjournal.app?subject=Support%20request"
-                  className="hover:text-emerald-400 transition-colors"
-                >
-                  Email us
                 </a>
               </li>
               <li>

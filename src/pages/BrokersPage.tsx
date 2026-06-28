@@ -10,9 +10,17 @@ interface BrokersPageProps {
   onPrivacy: () => void;
   onTerms: () => void;
   onBrokers: () => void;
+  onRequestBroker?: () => void;
 }
 
-export function BrokersPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: BrokersPageProps) {
+export function BrokersPage({
+  onHome,
+  onLaunch,
+  onPrivacy,
+  onTerms,
+  onBrokers,
+  onRequestBroker,
+}: BrokersPageProps) {
   const [supported, setSupported] = useState<BrokerConfig[]>([]);
   const [comingSoon, setComingSoon] = useState<string[]>([]);
 
@@ -97,20 +105,15 @@ export function BrokersPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }:
               We&apos;ll configure import support for your workflow.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <a
-                href="https://github.com/cries123/tradingjournal/issues/new?title=Broker%20support%20request"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-primary text-sm px-6 py-2.5"
-              >
-                Request your broker
-              </a>
-              <a
-                href="mailto:support@tradingjournal.app?subject=Broker%20support%20request"
-                className="btn-secondary text-sm px-6 py-2.5"
-              >
-                Email us
-              </a>
+              {onRequestBroker ? (
+                <button type="button" onClick={onRequestBroker} className="btn-primary text-sm px-6 py-2.5">
+                  Request your broker
+                </button>
+              ) : (
+                <a href="/request-broker" className="btn-primary text-sm px-6 py-2.5">
+                  Request your broker
+                </a>
+              )}
             </div>
           </div>
 
