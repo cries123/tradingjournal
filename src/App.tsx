@@ -6,6 +6,7 @@ import { LandingPage } from './pages/LandingPage';
 import { JournalApp } from './pages/JournalApp';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { ReportBugPage } from './pages/ReportBugPage';
+import { RequestBrokerPage } from './pages/RequestBrokerPage';
 import { TermsOfServicePage } from './pages/TermsOfServicePage';
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
   const goBrokers = () => navigate('brokers');
   const goPrivacy = () => navigate('privacy');
   const goTerms = () => navigate('terms');
+  const goRequestBroker = () => navigate('request-broker');
 
   const publicPageProps = {
     onHome: goHome,
@@ -23,6 +25,7 @@ export default function App() {
     onPrivacy: goPrivacy,
     onTerms: goTerms,
     onBrokers: goBrokers,
+    onRequestBroker: goRequestBroker,
   };
 
   if (route === 'coach' && coachToken) {
@@ -43,6 +46,10 @@ export default function App() {
 
   if (route === 'report-bug') {
     return <ReportBugPage {...publicPageProps} />;
+  }
+
+  if (route === 'request-broker') {
+    return <RequestBrokerPage {...publicPageProps} />;
   }
 
   if (route === 'admin') {
