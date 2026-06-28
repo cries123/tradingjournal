@@ -43,8 +43,9 @@ export function UsernameSetupModal() {
         <p className="text-sm text-text-secondary leading-relaxed mb-6">
           {user?.email ? (
             <>
-              Welcome back! Pick a unique <strong className="text-text-primary">@username</strong> for your account
-              ({user.email}). It appears on share cards and is permanent once claimed.
+              Signed in as {user.email}. If you already claimed a username, we&apos;re loading it now.
+              New here? Pick a unique <strong className="text-text-primary">@username</strong> — it appears on
+              share cards and is permanent once claimed.
             </>
           ) : (
             <>

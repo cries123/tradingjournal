@@ -20,7 +20,7 @@ import {
 } from 'firebase/auth';
 import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebase';
 import { ensureUserProfile } from '../services/userProfile';
-import { UsernameTakenError, claimUsername as claimUsernameDoc, fetchUsername } from '../services/username';
+import { UsernameTakenError, claimUsername as claimUsernameDoc, cacheUsername, clearCachedUsername, fetchUsername, readCachedUsername } from '../services/username';
 import { validateUsername } from '../utils/usernameValidation';
 
 interface AuthContextValue {
@@ -39,6 +39,30 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+async function loadUsername(uid: string): Promise<string | null> {
+  const auth = getFirebaseAuth();
+  try {
+    await auth.currentUser?.getIdToken();
+  } catch {
+    // continue — Firestore may still work with cached token
+  }
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const name = await fetchUsername(uid);
+      if (name) {
+        cacheUsername(uid, name);
+        return name;
+      }
+    } catch {
+      if (attempt === 2) break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
+  }
+
+  return null;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -74,21 +98,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       previousUidRef.current !== null && previousUidRef.current !== user.uid;
     previousUidRef.current = user.uid;
 
-    if (switchedAccount) {
+    const cached = readCachedUsername(user.uid);
+    if (cached) {
+      setUsername(cached);
+    } else if (switchedAccount) {
       setUsername(null);
     }
 
     let cancelled = false;
     setProfileLoading(true);
-    void fetchUsername(user.uid)
+    void loadUsername(user.uid)
       .then((name) => {
         if (!cancelled) {
-          // Keep username from signup claim if Firestore fetch races ahead of the write
           setUsername((prev) => name ?? prev);
         }
       })
       .catch(() => {
-        if (!cancelled) setUsername((prev) => prev);
+        if (!cancelled) setUsername((prev) => prev ?? cached);
       })
       .finally(() => {
         if (!cancelled) setProfileLoading(false);
@@ -117,12 +143,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isNew =
       result.user.metadata.creationTime === result.user.metadata.lastSignInTime;
     await ensureUserProfile(result.user, isNew);
+    const name = await loadUsername(result.user.uid);
+    if (name) setUsername(name);
   }, []);
 
   const signInWithEmail = useCallback(async (email: string, password: string) => {
     const auth = getFirebaseAuth();
     const result = await signInWithEmailAndPassword(auth, email, password);
     await ensureUserProfile(result.user, false);
+    const name = await loadUsername(result.user.uid);
+    if (name) setUsername(name);
   }, []);
 
   const createAccount = useCallback(
@@ -154,7 +184,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     const auth = getFirebaseAuth();
+    const uid = auth.currentUser?.uid;
     await signOut(auth);
+    if (uid) clearCachedUsername(uid);
     setUsername(null);
   }, []);
 
