@@ -1,4 +1,5 @@
 import { useRoute } from './hooks/useRoute';
+import { PageTransition } from './components/motion/FadeIn';
 import { AdminPage } from './pages/AdminPage';
 import { BrokersPage } from './pages/BrokersPage';
 import { CoachViewPage } from './pages/CoachViewPage';
@@ -25,41 +26,35 @@ export default function App() {
     onBrokers: goBrokers,
   };
 
+  let content;
+  let routeKey: string = route;
+
   if (route === 'coach' && coachToken) {
-    return <CoachViewPage token={coachToken} onHome={goHome} />;
+    routeKey = `coach-${coachToken}`;
+    content = <CoachViewPage token={coachToken} onHome={goHome} />;
+  } else if (route === 'brokers') {
+    content = <BrokersPage {...publicPageProps} />;
+  } else if (route === 'privacy') {
+    content = <PrivacyPolicyPage {...publicPageProps} />;
+  } else if (route === 'terms') {
+    content = <TermsOfServicePage {...publicPageProps} />;
+  } else if (route === 'report-bug') {
+    content = <ReportBugPage {...publicPageProps} />;
+  } else if (route === 'admin') {
+    content = <AdminPage {...publicPageProps} />;
+  } else if (route === 'app') {
+    content = <JournalApp onHome={goHome} />;
+  } else {
+    content = (
+      <LandingPage
+        onLaunch={goApp}
+        onHome={goHome}
+        onPrivacy={goPrivacy}
+        onTerms={goTerms}
+        onBrokers={goBrokers}
+      />
+    );
   }
 
-  if (route === 'brokers') {
-    return <BrokersPage {...publicPageProps} />;
-  }
-
-  if (route === 'privacy') {
-    return <PrivacyPolicyPage {...publicPageProps} />;
-  }
-
-  if (route === 'terms') {
-    return <TermsOfServicePage {...publicPageProps} />;
-  }
-
-  if (route === 'report-bug') {
-    return <ReportBugPage {...publicPageProps} />;
-  }
-
-  if (route === 'admin') {
-    return <AdminPage {...publicPageProps} />;
-  }
-
-  if (route === 'app') {
-    return <JournalApp onHome={goHome} />;
-  }
-
-  return (
-    <LandingPage
-      onLaunch={goApp}
-      onHome={goHome}
-      onPrivacy={goPrivacy}
-      onTerms={goTerms}
-      onBrokers={goBrokers}
-    />
-  );
+  return <PageTransition routeKey={routeKey}>{content}</PageTransition>;
 }
