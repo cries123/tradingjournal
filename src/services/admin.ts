@@ -1,4 +1,4 @@
-import { doc, getDoc, runTransaction } from 'firebase/firestore';
+import { collection, doc, getCountFromServer, getDoc, runTransaction } from 'firebase/firestore';
 import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
 
 export interface AdminConfig {
@@ -59,4 +59,10 @@ export async function claimOrVerifyAdmin(
 
     return { ok: false as const, reason: 'denied' as const };
   }) as Promise<AdminAccessResult>;
+}
+
+export async function fetchSignedUpUserCount(): Promise<number> {
+  if (!isFirebaseConfigured()) return 0;
+  const snap = await getCountFromServer(collection(getFirebaseDb(), 'users'));
+  return snap.data().count;
 }

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, Lock, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Lock, ShieldCheck, Users } from 'lucide-react';
 import { AuthModal } from '../components/AuthModal';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import { useAuth } from '../context/AuthContext';
-import { claimOrVerifyAdmin, type AdminAccessResult } from '../services/admin';
+import { claimOrVerifyAdmin, fetchSignedUpUserCount, type AdminAccessResult } from '../services/admin';
 import {
   fetchBugReports,
   updateBugReportStatus,
@@ -24,7 +24,7 @@ type AdminState =
   | { phase: 'unavailable' }
   | { phase: 'auth-required' }
   | { phase: 'denied' }
-  | { phase: 'ready'; isNewClaim: boolean; reports: BugReport[] };
+  | { phase: 'ready'; isNewClaim: boolean; reports: BugReport[]; userCount: number };
 
 const STATUS_LABELS: Record<BugReportStatus, string> = {
   open: 'Open',
@@ -80,10 +80,10 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
     }
 
     try {
-      const reports = await fetchBugReports();
-      setState({ phase: 'ready', isNewClaim: access.isNewClaim, reports });
+      const [reports, userCount] = await Promise.all([fetchBugReports(), fetchSignedUpUserCount()]);
+      setState({ phase: 'ready', isNewClaim: access.isNewClaim, reports, userCount });
     } catch {
-      setState({ phase: 'ready', isNewClaim: access.isNewClaim, reports: [] });
+      setState({ phase: 'ready', isNewClaim: access.isNewClaim, reports: [], userCount: 0 });
     }
   }, [firebaseEnabled, loading, user, username]);
 
@@ -194,6 +194,39 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                 Refresh
               </button>
             </div>
+
+            <div className="grid sm:grid-cols-2 gap-4 mb-8">
+              <div className="glass-card rounded-xl p-5 md:p-6">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+                    <Users size={18} />
+                  </div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                    Signed up users
+                  </p>
+                </div>
+                <p className="text-3xl font-bold tracking-tight">{state.userCount.toLocaleString()}</p>
+                <p className="text-xs text-text-secondary mt-2">Accounts with a Trend Chasers profile</p>
+              </div>
+
+              <div className="glass-card rounded-xl p-5 md:p-6">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
+                    <ShieldCheck size={18} />
+                  </div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                    Bug reports
+                  </p>
+                </div>
+                <p className="text-3xl font-bold tracking-tight">{state.reports.length.toLocaleString()}</p>
+                <p className="text-xs text-text-secondary mt-2">
+                  {openCount > 0 ? `${openCount} open · ` : ''}
+                  {state.reports.filter((r) => r.status === 'resolved').length} resolved
+                </p>
+              </div>
+            </div>
+
+            <h2 className="text-lg font-semibold mb-4">Bug reports</h2>
 
             {state.reports.length === 0 ? (
               <div className="glass-card rounded-xl p-8 text-center text-text-secondary text-sm">
