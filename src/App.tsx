@@ -48,7 +48,11 @@ export default function App() {
   } else if (route === 'admin') {
     content = <AdminPage {...publicPageProps} />;
   } else if (route === 'app') {
-    content = <JournalApp onHome={goHome} />;
+    content = (
+      <div className="h-full min-h-0 flex flex-col">
+        <JournalApp onHome={goHome} />
+      </div>
+    );
   } else {
     content = (
       <LandingPage
