@@ -50,7 +50,7 @@ export default function App() {
   } else if (route === 'app') {
     content = (
       <div className="h-full min-h-0 flex flex-col">
-        <JournalApp onHome={goHome} />
+        <JournalApp onHome={goHome} onBrokers={goBrokers} />
       </div>
     );
   } else {
