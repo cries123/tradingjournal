@@ -22,11 +22,12 @@ import { computeStats, getMonthTrades } from '../utils/stats';
 
 interface JournalAppProps {
   onHome?: () => void;
+  onBrokers?: () => void;
 }
 
 type AppView = 'dashboard' | 'settings';
 
-export function JournalApp({ onHome }: JournalAppProps) {
+export function JournalApp({ onHome, onBrokers }: JournalAppProps) {
   const isDesktop = useIsDesktop();
   const { user, loading, firebaseEnabled, needsUsername, profileLoading } = useAuth();
   const { settings } = useSettings();
@@ -135,6 +136,11 @@ export function JournalApp({ onHome }: JournalAppProps) {
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
   const sidebarActions = {
+    appView,
+    onDashboard: () => {
+      setAppView('dashboard');
+      closeMobileMenu();
+    },
     onAddTrade: () => openAddTrade(),
     onImportScreenshot: () => openImportScreenshot(),
     onImportCsv: () => openImportCsv(),
@@ -143,6 +149,7 @@ export function JournalApp({ onHome }: JournalAppProps) {
       setAppView('settings');
       closeMobileMenu();
     },
+    onBrokers,
   };
 
   return (
