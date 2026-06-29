@@ -7,6 +7,7 @@ import { DayDetailDrawer } from '../components/DayDetailDrawer';
 import { MobileBottomNav, MobileDrawer, MobileHeader } from '../components/MobileNav';
 import { hasCompletedOnboarding, OnboardingOverlay } from '../components/OnboardingOverlay';
 import { SettingsPage } from '../components/SettingsPage';
+import { ShareCardModal } from '../components/ShareCardModal';
 import { Sidebar } from '../components/Sidebar';
 import { CsvImportModal } from '../components/CsvImportModal';
 import { ScreenshotImportModal } from '../components/ScreenshotImportModal';
@@ -23,11 +24,12 @@ import { computeStats, getMonthTrades } from '../utils/stats';
 interface JournalAppProps {
   onHome?: () => void;
   onBrokers?: () => void;
+  onAdmin?: () => void;
 }
 
 type AppView = 'dashboard' | 'settings';
 
-export function JournalApp({ onHome, onBrokers }: JournalAppProps) {
+export function JournalApp({ onHome, onBrokers, onAdmin }: JournalAppProps) {
   const isDesktop = useIsDesktop();
   const { user, loading, firebaseEnabled, needsUsername, profileLoading } = useAuth();
   const { settings } = useSettings();
@@ -59,6 +61,7 @@ export function JournalApp({ onHome, onBrokers }: JournalAppProps) {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showShareCard, setShowShareCard] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => !hasCompletedOnboarding());
 
   const showAuthModal = firebaseEnabled && !loading && !user;
@@ -150,6 +153,13 @@ export function JournalApp({ onHome, onBrokers }: JournalAppProps) {
       closeMobileMenu();
     },
     onBrokers,
+    onShareCard: () => {
+      setAppView('dashboard');
+      setShowShareCard(true);
+      closeMobileMenu();
+    },
+    shareCardEnabled: monthStats.totalTrades > 0,
+    onAdmin,
   };
 
   return (
@@ -219,6 +229,16 @@ export function JournalApp({ onHome, onBrokers }: JournalAppProps) {
         <MobileDrawer open={mobileMenuOpen} onClose={closeMobileMenu}>
           <Sidebar variant="drawer" onHome={onHome} {...sidebarActions} onNavigate={closeMobileMenu} />
         </MobileDrawer>
+      )}
+
+      {showShareCard && (
+        <ShareCardModal
+          period="month"
+          stats={monthStats}
+          year={year}
+          month={month}
+          onClose={() => setShowShareCard(false)}
+        />
       )}
 
       {showOnboarding && !showAuthModal && !showUsernameModal && appView === 'dashboard' && (

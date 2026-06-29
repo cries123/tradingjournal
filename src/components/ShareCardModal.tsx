@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Copy, Download, Share2, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import type { TradingStats } from '../utils/stats';
 import { formatCurrency } from '../utils/format';
 import {
@@ -11,8 +12,10 @@ import {
   downloadSharePng,
   formatSharePeriodLabel,
   formatShareStats,
+  resolveShareCardOrientation,
   resolveShareUsername,
   shareDownloadSlug,
+  type ShareCardOrientation,
   type SharePeriod,
 } from '../utils/shareCard';
 
@@ -41,6 +44,8 @@ export function ShareCardModal({ period, stats, dateKey = '', year, month = 0, o
   const { settings } = useSettings();
   const { user, username: profileUsername } = useAuth();
   const [copied, setCopied] = useState(false);
+  const isMobileViewport = useMediaQuery('(max-width: 767px)');
+  const orientation: ShareCardOrientation = resolveShareCardOrientation(isMobileViewport);
 
   const username = resolveShareUsername(user, profileUsername);
   const periodLabel = formatSharePeriodLabel(period, dateKey, year, month);
@@ -53,18 +58,25 @@ export function ShareCardModal({ period, stats, dateKey = '', year, month = 0, o
   const shareText = buildShareText(period, periodLabel, username, stats, pnlStr);
 
   const downloadImage = async () => {
-    const svg = buildShareSvg({
-      period,
-      periodLabel,
-      username,
-      pnlStr,
-      sign,
-      winRate: formatted.winRate,
-      trades: formatted.trades,
-      profitFactor: formatted.profitFactor,
-      isProfit,
-    });
-    await downloadSharePng(svg, `trend-chasers-${shareDownloadSlug(period, dateKey, year, month)}.png`);
+    const svg = buildShareSvg(
+      {
+        period,
+        periodLabel,
+        username,
+        pnlStr,
+        sign,
+        winRate: formatted.winRate,
+        trades: formatted.trades,
+        profitFactor: formatted.profitFactor,
+        isProfit,
+      },
+      orientation,
+    );
+    await downloadSharePng(
+      svg,
+      `trend-chasers-${shareDownloadSlug(period, dateKey, year, month)}.png`,
+      orientation,
+    );
   };
 
   const copyText = async () => {
@@ -87,15 +99,22 @@ export function ShareCardModal({ period, stats, dateKey = '', year, month = 0, o
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-backdrop-in"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-backdrop-in overflow-y-auto"
       onClick={onClose}
     >
       <div
-        className="bg-bg-secondary border border-border rounded-xl p-5 md:p-6 w-full max-w-lg shadow-xl animate-scale-in"
+        className={`bg-bg-secondary border border-border rounded-2xl p-5 md:p-6 w-full shadow-xl animate-scale-in my-auto ${
+          orientation === 'portrait' ? 'max-w-sm' : 'max-w-lg'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">{MODAL_TITLE[period]}</h3>
+          <div>
+            <h3 className="text-lg font-semibold">{MODAL_TITLE[period]}</h3>
+            {orientation === 'portrait' && (
+              <p className="text-[11px] text-text-secondary mt-0.5">Story format for phone</p>
+            )}
+          </div>
           <button type="button" onClick={onClose} className="p-1 text-text-secondary hover:text-text-primary focus-ring rounded" aria-label="Close">
             <X size={20} />
           </button>
@@ -111,6 +130,7 @@ export function ShareCardModal({ period, stats, dateKey = '', year, month = 0, o
           winRate={formatted.winRate}
           trades={formatted.trades}
           profitFactor={formatted.profitFactor}
+          orientation={orientation}
         />
 
         <div className="grid grid-cols-3 gap-2 mt-4">
@@ -142,6 +162,7 @@ interface ShareCardPreviewProps {
   winRate: string;
   trades: string;
   profitFactor: string;
+  orientation: ShareCardOrientation;
 }
 
 function ShareCardPreview({
@@ -154,9 +175,58 @@ function ShareCardPreview({
   winRate,
   trades,
   profitFactor,
+  orientation,
 }: ShareCardPreviewProps) {
+  const shellClass =
+    'overflow-hidden border-2 border-emerald-500/25 bg-gradient-to-b from-[#111827] via-[#0a0f18] to-[#07090f] shadow-lg shadow-black/30';
+
+  if (orientation === 'portrait') {
+    return (
+      <div className={`${shellClass} rounded-[2rem] max-w-[280px] mx-auto`}>
+        <div className="px-5 pt-6 pb-4 text-center border-b border-white/5">
+          <img src="/logo-mark.svg" alt="" aria-hidden className="w-12 h-12 mx-auto mb-3" />
+          <p className="text-xs font-black tracking-[0.12em] text-[#6cd59f]">TREND CHASERS</p>
+          <p className="text-[10px] text-[#8e939d] mt-1">Track · Analyze · Improve</p>
+          <p className="text-xs font-semibold text-emerald-300 mt-3">@{username}</p>
+        </div>
+
+        <div className="px-5 py-5 text-center">
+          <span className="inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 mb-3">
+            {PERIOD_BADGE[period]}
+          </span>
+          <p className="text-xs text-text-secondary uppercase tracking-widest mb-2">{periodLabel}</p>
+          <p className={`text-4xl font-extrabold ${isProfit ? 'text-profit-bright' : 'text-loss-bright'}`}>
+            {sign}
+            {pnlStr}
+          </p>
+
+          <div className="space-y-2.5 mt-6">
+            {[
+              { label: 'Win rate', value: winRate },
+              { label: 'Trades', value: trades },
+              { label: 'Profit factor', value: profitFactor },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className="rounded-2xl border border-border/40 bg-white/[0.03] px-4 py-3"
+              >
+                <p className="text-[10px] text-text-secondary uppercase tracking-wide">{stat.label}</p>
+                <p className="text-lg font-bold mt-0.5">{stat.value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-center gap-2 mt-6 pt-4 border-t border-border/30">
+            <img src="/logo-mark.svg" alt="" aria-hidden className="w-5 h-5 shrink-0" />
+            <span className="text-xs text-text-secondary">{SHARE_SITE_URL}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="rounded-xl overflow-hidden border border-emerald-500/25 bg-gradient-to-b from-[#111827] via-[#0a0f18] to-[#07090f]">
+    <div className={`${shellClass} rounded-[1.75rem]`}>
       <div className="p-4 md:p-5 border-b border-white/5 bg-white/[0.02]">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">

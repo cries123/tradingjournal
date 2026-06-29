@@ -4,8 +4,17 @@ import type { TradingStats } from './stats';
 import { SITE_DOMAIN } from '../config/site';
 
 export type SharePeriod = 'day' | 'month' | 'year';
+export type ShareCardOrientation = 'landscape' | 'portrait';
 
 export const SHARE_SITE_URL = SITE_DOMAIN;
+
+export function getShareCardDimensions(orientation: ShareCardOrientation): { width: number; height: number } {
+  return orientation === 'portrait' ? { width: 450, height: 800 } : { width: 600, height: 400 };
+}
+
+export function resolveShareCardOrientation(isMobileViewport: boolean): ShareCardOrientation {
+  return isMobileViewport ? 'portrait' : 'landscape';
+}
 
 const SHARE_LOGO_MARK = `<g transform="translate(40 36) scale(0.105)">
   <g transform="translate(0, -30)">
@@ -118,7 +127,12 @@ export interface ShareSvgInput {
   isProfit: boolean;
 }
 
-export function buildShareSvg(data: ShareSvgInput): string {
+export function buildShareSvg(data: ShareSvgInput, orientation: ShareCardOrientation = 'landscape'): string {
+  if (orientation === 'portrait') return buildShareSvgPortrait(data);
+  return buildShareSvgLandscape(data);
+}
+
+function buildShareSvgLandscape(data: ShareSvgInput): string {
   const pnlColor = data.isProfit ? '#34d399' : '#f87171';
   const badge = PERIOD_BADGE[data.period];
   const badgeWidth = data.period === 'day' ? 168 : data.period === 'month' ? 148 : 152;
@@ -153,10 +167,10 @@ export function buildShareSvg(data: ShareSvgInput): string {
     </pattern>
   </defs>
 
-  <rect width="600" height="400" rx="20" fill="url(#bg)"/>
-  <rect width="600" height="400" rx="20" fill="url(#grid)"/>
-  <rect x="1" y="1" width="598" height="398" rx="19" fill="none" stroke="url(#accent)" stroke-width="2"/>
-  <rect x="24" y="24" width="552" height="72" rx="14" fill="rgba(15,20,31,0.65)" stroke="rgba(148,163,184,0.12)" stroke-width="1"/>
+  <rect width="600" height="400" rx="32" fill="url(#bg)"/>
+  <rect width="600" height="400" rx="32" fill="url(#grid)"/>
+  <rect x="1" y="1" width="598" height="398" rx="31" fill="none" stroke="url(#accent)" stroke-width="2"/>
+  <rect x="24" y="24" width="552" height="72" rx="20" fill="rgba(15,20,31,0.65)" stroke="rgba(148,163,184,0.12)" stroke-width="1"/>
 
   ${SHARE_LOGO_MARK}
   <text x="92" y="52" fill="#6cd59f" font-family="Montserrat, system-ui, sans-serif" font-size="14" font-weight="900" letter-spacing="1.5">TREND</text>
@@ -186,11 +200,90 @@ export function buildShareSvg(data: ShareSvgInput): string {
 </svg>`;
 }
 
+function buildShareSvgPortrait(data: ShareSvgInput): string {
+  const pnlColor = data.isProfit ? '#34d399' : '#f87171';
+  const badge = PERIOD_BADGE[data.period];
+  const badgeWidth = data.period === 'day' ? 168 : data.period === 'month' ? 148 : 152;
+  const username = escapeXml(data.username);
+  const periodLabel = escapeXml(data.periodLabel.toUpperCase());
+  const pnlDisplay = escapeXml(`${data.sign}${data.pnlStr}`);
+  const badgeX = (450 - badgeWidth) / 2;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="450" height="800" viewBox="0 0 450 800">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0%" stop-color="#111827"/>
+      <stop offset="55%" stop-color="#0a0f18"/>
+      <stop offset="100%" stop-color="#07090f"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#34d399" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#22d3ee" stop-opacity="0.15"/>
+    </linearGradient>
+    <filter id="pnlGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(52,211,153,0.04)" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="450" height="800" rx="40" fill="url(#bg)"/>
+  <rect width="450" height="800" rx="40" fill="url(#grid)"/>
+  <rect x="1" y="1" width="448" height="798" rx="39" fill="none" stroke="url(#accent)" stroke-width="2"/>
+
+  <g transform="translate(185 52) scale(0.09)">
+    <g transform="translate(0, -30)">
+      <path d="M 300 270 A 120 120 0 1 1 500 130" fill="none" stroke="#6cd59f" stroke-width="14" stroke-linecap="round"/>
+      <path d="M 280 230 A 120 120 0 0 0 350 310" fill="none" stroke="#6cd59f" stroke-width="14" stroke-linecap="round"/>
+      <polygon points="400,50 415,110 400,125 385,110" fill="#6cd59f"/>
+      <rect x="540" y="80" width="8" height="12" rx="4" fill="#ff5757"/>
+      <rect x="555" y="65" width="8" height="27" rx="4" fill="#ff5757"/>
+      <rect x="570" y="50" width="8" height="42" rx="4" fill="#ff5757"/>
+      <path d="M 235 305 L 330 210 L 380 260 L 520 120 L 520 135 L 380 275 L 330 225 L 235 320 Z" fill="#6cd59f"/>
+    </g>
+  </g>
+  <text x="225" y="118" fill="#6cd59f" font-family="Montserrat, system-ui, sans-serif" font-size="15" font-weight="900" letter-spacing="1.5" text-anchor="middle">TREND CHASERS</text>
+  <text x="225" y="138" fill="#8e939d" font-family="system-ui, sans-serif" font-size="11" text-anchor="middle">Track · Analyze · Improve</text>
+  <text x="225" y="168" fill="#6ee7b7" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="600" text-anchor="middle">@${username}</text>
+
+  <rect x="${badgeX}" y="196" width="${badgeWidth}" height="28" rx="14" fill="rgba(52,211,153,0.12)" stroke="rgba(52,211,153,0.35)" stroke-width="1"/>
+  <text x="225" y="215" fill="#6ee7b7" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="700" letter-spacing="1.2" text-anchor="middle">${badge}</text>
+  <text x="225" y="252" fill="#94a3b8" font-family="system-ui,-apple-system,sans-serif" font-size="12" font-weight="600" letter-spacing="1.2" text-anchor="middle">${periodLabel}</text>
+
+  <text x="225" y="340" fill="${pnlColor}" font-family="system-ui,-apple-system,sans-serif" font-size="58" font-weight="800" text-anchor="middle" filter="url(#pnlGlow)">${pnlDisplay}</text>
+
+  <rect x="40" y="390" width="370" height="72" rx="18" fill="rgba(15,20,31,0.55)" stroke="rgba(148,163,184,0.12)" stroke-width="1"/>
+  <text x="225" y="418" fill="#64748b" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="600" letter-spacing="1" text-anchor="middle">WIN RATE</text>
+  <text x="225" y="448" fill="#f1f5f9" font-family="system-ui,-apple-system,sans-serif" font-size="24" font-weight="700" text-anchor="middle">${escapeXml(data.winRate)}</text>
+
+  <rect x="40" y="478" width="370" height="72" rx="18" fill="rgba(15,20,31,0.55)" stroke="rgba(148,163,184,0.12)" stroke-width="1"/>
+  <text x="225" y="506" fill="#64748b" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="600" letter-spacing="1" text-anchor="middle">TRADES</text>
+  <text x="225" y="536" fill="#f1f5f9" font-family="system-ui,-apple-system,sans-serif" font-size="24" font-weight="700" text-anchor="middle">${escapeXml(data.trades)}</text>
+
+  <rect x="40" y="566" width="370" height="72" rx="18" fill="rgba(15,20,31,0.55)" stroke="rgba(148,163,184,0.12)" stroke-width="1"/>
+  <text x="225" y="594" fill="#64748b" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="600" letter-spacing="1" text-anchor="middle">PROFIT FACTOR</text>
+  <text x="225" y="624" fill="#f1f5f9" font-family="system-ui,-apple-system,sans-serif" font-size="24" font-weight="700" text-anchor="middle">${escapeXml(data.profitFactor)}</text>
+
+  <line x1="40" y1="680" x2="410" y2="680" stroke="rgba(148,163,184,0.18)" stroke-width="1"/>
+  <text x="225" y="720" fill="#64748b" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="500" text-anchor="middle">${SHARE_SITE_URL}</text>
+</svg>`;
+}
+
 function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-export async function downloadSharePng(svg: string, filename: string): Promise<void> {
+export async function downloadSharePng(
+  svg: string,
+  filename: string,
+  orientation: ShareCardOrientation = 'landscape',
+): Promise<void> {
+  const { width, height } = getShareCardDimensions(orientation);
   const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const img = new Image();
@@ -202,16 +295,16 @@ export async function downloadSharePng(svg: string, filename: string): Promise<v
   });
 
   const canvas = document.createElement('canvas');
-  canvas.width = 600;
-  canvas.height = 400;
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext('2d');
   if (!ctx) {
     URL.revokeObjectURL(url);
     return;
   }
   ctx.fillStyle = '#07090f';
-  ctx.fillRect(0, 0, 600, 400);
-  ctx.drawImage(img, 0, 0);
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(img, 0, 0, width, height);
   URL.revokeObjectURL(url);
 
   await new Promise<void>((resolve) => {
