@@ -22,6 +22,7 @@ export interface BugReport {
   createdAt: string;
   userAgent: string;
   pageUrl: string;
+  adminNote?: string;
 }
 
 export interface SubmitBugReportInput {
@@ -71,4 +72,9 @@ export async function updateBugReportStatus(
 ): Promise<void> {
   if (!isFirebaseConfigured()) return;
   await updateDoc(doc(getFirebaseDb(), 'bugReports', reportId), { status });
+}
+
+export async function updateBugReportAdminNote(reportId: string, adminNote: string): Promise<void> {
+  if (!isFirebaseConfigured()) return;
+  await updateDoc(doc(getFirebaseDb(), 'bugReports', reportId), { adminNote: adminNote.trim() });
 }

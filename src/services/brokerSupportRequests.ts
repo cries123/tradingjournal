@@ -23,6 +23,7 @@ export interface BrokerSupportRequest {
   createdAt: string;
   userAgent: string;
   pageUrl: string;
+  adminNote?: string;
 }
 
 export interface SubmitBrokerSupportInput {
@@ -74,4 +75,14 @@ export async function updateBrokerSupportStatus(
 ): Promise<void> {
   if (!isFirebaseConfigured()) return;
   await updateDoc(doc(getFirebaseDb(), 'brokerSupportRequests', requestId), { status });
+}
+
+export async function updateBrokerSupportAdminNote(
+  requestId: string,
+  adminNote: string,
+): Promise<void> {
+  if (!isFirebaseConfigured()) return;
+  await updateDoc(doc(getFirebaseDb(), 'brokerSupportRequests', requestId), {
+    adminNote: adminNote.trim(),
+  });
 }
