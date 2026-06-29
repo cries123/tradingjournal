@@ -148,7 +148,7 @@ export function JournalApp({ onHome }: JournalAppProps) {
   return (
     <div
       className={`flex w-full bg-bg-primary dashboard-bg ${
-        isDesktop ? 'min-h-dvh' : 'h-full min-h-0 overflow-hidden'
+        isDesktop ? 'min-h-dvh' : 'h-full min-h-0 flex-1 flex flex-col overflow-hidden'
       }`}
     >
       {isDesktop && <Sidebar variant="desktop" onHome={onHome} {...sidebarActions} />}
@@ -158,7 +158,9 @@ export function JournalApp({ onHome }: JournalAppProps) {
 
         <main
           className={`flex-1 p-2 md:p-5 ${
-            isDesktop ? 'overflow-visible' : 'min-h-0 h-0 overflow-y-auto overscroll-y-contain'
+            isDesktop
+              ? 'overflow-visible'
+              : 'min-h-0 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]'
           }`}
         >
           <div className="max-w-6xl mx-auto w-full pb-6 md:pb-10">
