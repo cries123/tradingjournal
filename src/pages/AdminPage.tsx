@@ -88,12 +88,19 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
     }
 
     try {
-      const [reports, brokerRequests, userCount] = await Promise.all([
+      const [reportsResult, brokerResult, userCountResult] = await Promise.allSettled([
         fetchBugReports(),
         fetchBrokerSupportRequests(),
         fetchSignedUpUserCount(),
       ]);
-      setState({ phase: 'ready', isNewClaim: access.isNewClaim, reports, brokerRequests, userCount });
+
+      setState({
+        phase: 'ready',
+        isNewClaim: access.isNewClaim,
+        reports: reportsResult.status === 'fulfilled' ? reportsResult.value : [],
+        brokerRequests: brokerResult.status === 'fulfilled' ? brokerResult.value : [],
+        userCount: userCountResult.status === 'fulfilled' ? userCountResult.value : 0,
+      });
     } catch {
       setState({
         phase: 'ready',

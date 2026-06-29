@@ -1,4 +1,4 @@
-import { collection, doc, getCountFromServer, getDoc, runTransaction } from 'firebase/firestore';
+import { collection, doc, getCountFromServer, getDoc, getDocs, runTransaction } from 'firebase/firestore';
 import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
 
 export interface AdminConfig {
@@ -61,8 +61,29 @@ export async function claimOrVerifyAdmin(
   }) as Promise<AdminAccessResult>;
 }
 
+async function countCollection(name: string): Promise<number | null> {
+  const db = getFirebaseDb();
+  try {
+    const snap = await getCountFromServer(collection(db, name));
+    return snap.data().count;
+  } catch {
+    try {
+      const docs = await getDocs(collection(db, name));
+      return docs.size;
+    } catch {
+      return null;
+    }
+  }
+}
+
+/** Count registered accounts — users collection, with usernames as fallback. */
 export async function fetchSignedUpUserCount(): Promise<number> {
   if (!isFirebaseConfigured()) return 0;
-  const snap = await getCountFromServer(collection(getFirebaseDb(), 'users'));
-  return snap.data().count;
+
+  const [users, usernames] = await Promise.all([
+    countCollection('users'),
+    countCollection('usernames'),
+  ]);
+
+  return Math.max(users ?? 0, usernames ?? 0);
 }
