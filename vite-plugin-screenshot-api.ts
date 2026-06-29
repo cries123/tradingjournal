@@ -63,10 +63,34 @@ export function screenshotApiPlugin(): Plugin {
     configureServer(server) {
       server.middlewares.use('/api/health', (req, res) => handleHealth(req, res, () => envApiKey));
       server.middlewares.use('/api/parse-screenshot', createParseHandler(() => envApiKey));
+      server.middlewares.use('/api/benchmark', (req, res) => {
+        void (async () => {
+          try {
+            const url = new URL(req.url ?? '', 'http://localhost');
+            const { handleBenchmarkRequest } = await import('./server/benchmarkHandler');
+            const result = await handleBenchmarkRequest(url.searchParams.get('symbol'));
+            sendJson(res, result.statusCode, result.body);
+          } catch {
+            sendJson(res, 502, { error: 'Benchmark fetch failed' });
+          }
+        })();
+      });
     },
     configurePreviewServer(server) {
       server.middlewares.use('/api/health', (req, res) => handleHealth(req, res, () => envApiKey));
       server.middlewares.use('/api/parse-screenshot', createParseHandler(() => envApiKey));
+      server.middlewares.use('/api/benchmark', (req, res) => {
+        void (async () => {
+          try {
+            const url = new URL(req.url ?? '', 'http://localhost');
+            const { handleBenchmarkRequest } = await import('./server/benchmarkHandler');
+            const result = await handleBenchmarkRequest(url.searchParams.get('symbol'));
+            sendJson(res, result.statusCode, result.body);
+          } catch {
+            sendJson(res, 502, { error: 'Benchmark fetch failed' });
+          }
+        })();
+      });
     },
   };
 }
