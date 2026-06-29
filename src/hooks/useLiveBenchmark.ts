@@ -18,7 +18,13 @@ export function useLiveBenchmark(symbol: string, enabled: boolean) {
 
     void fetchLiveBenchmark(symbol)
       .then((q) => {
-        if (!cancelled) setQuote(q);
+        if (cancelled) return;
+        if (q) {
+          setQuote(q);
+        } else {
+          setQuote(null);
+          setError('Could not load live benchmark');
+        }
       })
       .catch(() => {
         if (!cancelled) setError('Could not load live benchmark');
