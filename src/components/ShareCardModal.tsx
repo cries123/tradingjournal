@@ -44,6 +44,7 @@ export function ShareCardModal({ period, stats, dateKey = '', year, month = 0, o
   const { settings } = useSettings();
   const { user, username: profileUsername } = useAuth();
   const [copied, setCopied] = useState(false);
+  const [saveHint, setSaveHint] = useState<string | null>(null);
   const isMobileViewport = useMediaQuery('(max-width: 767px)');
   const orientation: ShareCardOrientation = resolveShareCardOrientation(isMobileViewport);
 
@@ -72,11 +73,19 @@ export function ShareCardModal({ period, stats, dateKey = '', year, month = 0, o
       },
       orientation,
     );
-    await downloadSharePng(
+    const result = await downloadSharePng(
       svg,
       `trend-chasers-${shareDownloadSlug(period, dateKey, year, month)}.png`,
       orientation,
     );
+
+    if (result === 'shared') {
+      setSaveHint('Choose Save Image to add it to your Photos.');
+      setTimeout(() => setSaveHint(null), 5000);
+    } else if (result === 'downloaded') {
+      setSaveHint('Image downloaded.');
+      setTimeout(() => setSaveHint(null), 3000);
+    }
   };
 
   const copyText = async () => {
@@ -144,9 +153,10 @@ export function ShareCardModal({ period, stats, dateKey = '', year, month = 0, o
           </button>
           <button type="button" onClick={() => void downloadImage()} className="flex flex-col items-center gap-1 py-3 btn-secondary text-xs">
             <Download size={16} />
-            PNG
+            {isMobileViewport ? 'Save photo' : 'PNG'}
           </button>
         </div>
+        {saveHint && <p className="text-[11px] text-emerald-300 text-center mt-3">{saveHint}</p>}
       </div>
     </div>
   );

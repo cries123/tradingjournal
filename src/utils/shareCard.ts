@@ -278,49 +278,82 @@ function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-export async function downloadSharePng(
+export async function renderSharePngBlob(
   svg: string,
-  filename: string,
   orientation: ShareCardOrientation = 'landscape',
-): Promise<void> {
+): Promise<Blob | null> {
   const { width, height } = getShareCardDimensions(orientation);
   const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const img = new Image();
 
-  await new Promise<void>((resolve, reject) => {
-    img.onload = () => resolve();
-    img.onerror = () => reject(new Error('Failed to render share image'));
-    img.src = url;
-  });
-
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    URL.revokeObjectURL(url);
-    return;
-  }
-  ctx.fillStyle = '#07090f';
-  ctx.fillRect(0, 0, width, height);
-  ctx.drawImage(img, 0, 0, width, height);
-  URL.revokeObjectURL(url);
-
-  await new Promise<void>((resolve) => {
-    canvas.toBlob((png) => {
-      if (!png) {
-        resolve();
-        return;
-      }
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(png);
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(a.href);
-      resolve();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('Failed to render share image'));
+      img.src = url;
     });
-  });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.fillStyle = '#07090f';
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(img, 0, 0, width, height);
+
+    return await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((png) => resolve(png), 'image/png', 1);
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function prefersGallerySave(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(max-width: 767px)').matches;
+}
+
+/** On phone, opens the share sheet so users can tap Save Image → Photos. Desktop downloads a file. */
+export async function saveSharePngToGallery(blob: Blob, filename: string): Promise<'shared' | 'downloaded' | 'cancelled'> {
+  const file = new File([blob], filename, { type: 'image/png' });
+
+  if (prefersGallerySave() && typeof navigator.share === 'function') {
+    const canShareFiles =
+      typeof navigator.canShare !== 'function' || navigator.canShare({ files: [file] });
+
+    if (canShareFiles) {
+      try {
+        await navigator.share({ files: [file], title: 'Trend Chasers share card' });
+        return 'shared';
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          return 'cancelled';
+        }
+      }
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+  return 'downloaded';
+}
+
+export async function downloadSharePng(
+  svg: string,
+  filename: string,
+  orientation: ShareCardOrientation = 'landscape',
+): Promise<'shared' | 'downloaded' | 'cancelled' | 'failed'> {
+  const png = await renderSharePngBlob(svg, orientation);
+  if (!png) return 'failed';
+  return saveSharePngToGallery(png, filename);
 }
 
 export function formatShareStats(stats: TradingStats) {
