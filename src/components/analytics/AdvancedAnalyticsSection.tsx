@@ -36,7 +36,10 @@ interface AdvancedAnalyticsSectionProps {
 export function AdvancedAnalyticsSection({ trades }: AdvancedAnalyticsSectionProps) {
   const { settings } = useSettings();
   const [tab, setTab] = useState<AnalyticsTab>('equity');
-  const { quote: liveBenchmark } = useLiveBenchmark(settings.benchmarkSymbol, settings.liveBenchmarkEnabled);
+  const { quote: liveBenchmark, loading: benchmarkLoading, error: benchmarkError } = useLiveBenchmark(
+    settings.benchmarkSymbol,
+    settings.liveBenchmarkEnabled,
+  );
 
   const curve = useMemo(() => buildEquityCurve(trades), [trades]);
   const drawdown = useMemo(() => computeDrawdown(curve), [curve]);
@@ -57,16 +60,24 @@ export function AdvancedAnalyticsSection({ trades }: AdvancedAnalyticsSectionPro
       ? ((curve[curve.length - 1].equity / Math.max(Math.abs(drawdown.peakEquity), 1)) * 100 - 100).toFixed(1)
       : '0';
 
-  const benchmarkPct = settings.liveBenchmarkEnabled && liveBenchmark
-    ? liveBenchmark.monthToDateReturnPct
-    : settings.benchmarkReturnPct;
+  const alphaLabel = (() => {
+    if (settings.liveBenchmarkEnabled) {
+      if (benchmarkLoading) return 'Loading…';
+      if (liveBenchmark) {
+        return `${(Number(netReturnPct) - liveBenchmark.monthToDateReturnPct).toFixed(1)}% alpha`;
+      }
+      if (settings.benchmarkReturnPct !== 0) {
+        return `${(Number(netReturnPct) - settings.benchmarkReturnPct).toFixed(1)}% alpha (manual)`;
+      }
+      return benchmarkError ? 'Live unavailable' : 'Set in Settings';
+    }
 
-  const alphaLabel =
-    benchmarkPct != null && benchmarkPct !== 0
-      ? `${(Number(netReturnPct) - benchmarkPct).toFixed(1)}% alpha`
-      : settings.liveBenchmarkEnabled
-        ? 'Loading benchmark…'
-        : 'Set in Settings';
+    if (settings.benchmarkReturnPct !== 0) {
+      return `${(Number(netReturnPct) - settings.benchmarkReturnPct).toFixed(1)}% alpha`;
+    }
+
+    return 'Set in Settings';
+  })();
 
   return (
     <section className="panel-card p-3 md:p-4 space-y-3">
