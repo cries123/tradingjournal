@@ -8,7 +8,10 @@ import { MobileBottomNav, MobileDrawer, MobileHeader } from '../components/Mobil
 import { hasCompletedOnboarding, OnboardingOverlay } from '../components/OnboardingOverlay';
 import { SettingsPage } from '../components/SettingsPage';
 import { ShareCardModal } from '../components/ShareCardModal';
-import { Sidebar } from '../components/Sidebar';
+import { Sidebar, type SidebarAppView } from '../components/Sidebar';
+import { BrokersContent } from '../components/support/BrokersContent';
+import { ReportBugContent } from '../components/support/ReportBugContent';
+import { RequestBrokerContent } from '../components/support/RequestBrokerContent';
 import { CsvImportModal } from '../components/CsvImportModal';
 import { ScreenshotImportModal } from '../components/ScreenshotImportModal';
 import { TradeModal } from '../components/TradeModal';
@@ -23,13 +26,12 @@ import { computeStats, getMonthTrades } from '../utils/stats';
 
 interface JournalAppProps {
   onHome?: () => void;
-  onBrokers?: () => void;
   onAdmin?: () => void;
 }
 
-type AppView = 'dashboard' | 'settings';
+type AppView = SidebarAppView;
 
-export function JournalApp({ onHome, onBrokers, onAdmin }: JournalAppProps) {
+export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   const isDesktop = useIsDesktop();
   const { user, loading, firebaseEnabled, needsUsername, profileLoading } = useAuth();
   const { settings } = useSettings();
@@ -152,7 +154,18 @@ export function JournalApp({ onHome, onBrokers, onAdmin }: JournalAppProps) {
       setAppView('settings');
       closeMobileMenu();
     },
-    onBrokers,
+    onBrokers: () => {
+      setAppView('brokers');
+      closeMobileMenu();
+    },
+    onReportBug: () => {
+      setAppView('report-bug');
+      closeMobileMenu();
+    },
+    onRequestBroker: () => {
+      setAppView('request-broker');
+      closeMobileMenu();
+    },
     onShareCard: () => {
       setAppView('dashboard');
       setShowShareCard(true);
@@ -189,6 +202,15 @@ export function JournalApp({ onHome, onBrokers, onAdmin }: JournalAppProps) {
                 month={month}
                 onBack={() => setAppView('dashboard')}
               />
+            ) : appView === 'brokers' ? (
+              <BrokersContent
+                onBack={() => setAppView('dashboard')}
+                onRequestBroker={() => setAppView('request-broker')}
+              />
+            ) : appView === 'report-bug' ? (
+              <ReportBugContent onBack={() => setAppView('dashboard')} />
+            ) : appView === 'request-broker' ? (
+              <RequestBrokerContent onBack={() => setAppView('dashboard')} />
             ) : isLoading ? (
               <DashboardSkeleton />
             ) : (
