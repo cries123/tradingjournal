@@ -15,7 +15,12 @@ import { SidebarJournalPicker } from './SidebarJournalPicker';
 import { useAuth } from '../context/AuthContext';
 import { isCurrentUserAdmin } from '../services/admin';
 
-export type SidebarAppView = 'dashboard' | 'settings';
+export type SidebarAppView =
+  | 'dashboard'
+  | 'settings'
+  | 'brokers'
+  | 'report-bug'
+  | 'request-broker';
 
 interface SidebarProps {
   appView: SidebarAppView;
@@ -25,11 +30,13 @@ interface SidebarProps {
   onImportCsv: () => void;
   onClearAll: () => void;
   onSettings: () => void;
+  onBrokers: () => void;
+  onReportBug: () => void;
+  onRequestBroker: () => void;
   onShareCard?: () => void;
   shareCardEnabled?: boolean;
   onAdmin?: () => void;
   onHome?: () => void;
-  onBrokers?: () => void;
   variant?: 'desktop' | 'drawer';
   onNavigate?: () => void;
 }
@@ -48,11 +55,13 @@ export function Sidebar({
   onImportCsv,
   onClearAll,
   onSettings,
+  onBrokers,
+  onReportBug,
+  onRequestBroker,
   onShareCard,
   shareCardEnabled = false,
   onAdmin,
   onHome,
-  onBrokers,
   variant = 'desktop',
   onNavigate,
 }: SidebarProps) {
@@ -140,38 +149,30 @@ export function Sidebar({
             Help
           </p>
           <div className="space-y-0.5">
-            {onBrokers ? (
-              <button
-                type="button"
-                onClick={wrap(onBrokers)}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60 transition-colors focus-ring"
-              >
-                <Building2 size={15} />
-                Supported brokers
-              </button>
-            ) : (
-              <a
-                href="/brokers"
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60 transition-colors focus-ring"
-              >
-                <Building2 size={15} />
-                Supported brokers
-              </a>
-            )}
-            <a
-              href="/report-bug"
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60 transition-colors focus-ring"
+            <button
+              type="button"
+              onClick={wrap(onBrokers)}
+              className={navItemClass(appView === 'brokers')}
+            >
+              <Building2 size={15} />
+              Supported brokers
+            </button>
+            <button
+              type="button"
+              onClick={wrap(onReportBug)}
+              className={navItemClass(appView === 'report-bug')}
             >
               <HelpCircle size={15} />
               Report a bug
-            </a>
-            <a
-              href="/request-broker"
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60 transition-colors focus-ring"
+            </button>
+            <button
+              type="button"
+              onClick={wrap(onRequestBroker)}
+              className={navItemClass(appView === 'request-broker')}
             >
               <MessageSquarePlus size={15} />
               Request broker
-            </a>
+            </button>
             {isAdmin && onAdmin && (
               <button
                 type="button"
