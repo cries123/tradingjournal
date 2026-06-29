@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, Building2, Lock, ShieldCheck, Users } from 'lucide-react';
+import { ArrowLeft, Building2, ChevronDown, Lock, ShieldCheck, Users } from 'lucide-react';
 import { AuthModal } from '../components/AuthModal';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import { useAuth } from '../context/AuthContext';
-import { claimOrVerifyAdmin, fetchSignedUpUserCount, type AdminAccessResult } from '../services/admin';
+import { claimOrVerifyAdmin, fetchSignedUpUserCount, fetchSignedUpUsers, type AdminAccessResult, type AdminUserSummary } from '../services/admin';
 import {
   fetchBrokerSupportRequests,
   updateBrokerSupportStatus,
@@ -32,7 +32,7 @@ type AdminState =
   | { phase: 'unavailable' }
   | { phase: 'auth-required' }
   | { phase: 'denied' }
-  | { phase: 'ready'; isNewClaim: boolean; reports: BugReport[]; brokerRequests: BrokerSupportRequest[]; userCount: number };
+  | { phase: 'ready'; isNewClaim: boolean; reports: BugReport[]; brokerRequests: BrokerSupportRequest[]; userCount: number; users: AdminUserSummary[] };
 
 const STATUS_LABELS: Record<RequestStatus, string> = {
   open: 'Open',
@@ -88,10 +88,11 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
     }
 
     try {
-      const [reportsResult, brokerResult, userCountResult] = await Promise.allSettled([
+      const [reportsResult, brokerResult, userCountResult, usersResult] = await Promise.allSettled([
         fetchBugReports(),
         fetchBrokerSupportRequests(),
         fetchSignedUpUserCount(),
+        fetchSignedUpUsers(),
       ]);
 
       setState({
@@ -100,6 +101,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
         reports: reportsResult.status === 'fulfilled' ? reportsResult.value : [],
         brokerRequests: brokerResult.status === 'fulfilled' ? brokerResult.value : [],
         userCount: userCountResult.status === 'fulfilled' ? userCountResult.value : 0,
+        users: usersResult.status === 'fulfilled' ? usersResult.value : [],
       });
     } catch {
       setState({
@@ -108,6 +110,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
         reports: [],
         brokerRequests: [],
         userCount: 0,
+        users: [],
       });
     }
   }, [firebaseEnabled, loading, user, username]);
@@ -253,6 +256,41 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                 </div>
                 <p className="text-3xl font-bold tracking-tight">{state.userCount.toLocaleString()}</p>
                 <p className="text-xs text-text-secondary mt-2">Accounts with a Trend Chasers profile</p>
+
+                <details className="mt-4 group">
+                  <summary className="flex items-center gap-1.5 text-xs font-medium text-emerald-400 cursor-pointer hover:text-emerald-300 list-none [&::-webkit-details-marker]:hidden">
+                    <ChevronDown
+                      size={14}
+                      className="transition-transform group-open:rotate-180"
+                      aria-hidden
+                    />
+                    View users ({state.users.length})
+                  </summary>
+                  {state.users.length === 0 ? (
+                    <p className="mt-3 text-xs text-text-secondary">No users loaded.</p>
+                  ) : (
+                    <ul className="mt-3 space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {state.users.map((entry) => (
+                        <li
+                          key={entry.uid}
+                          className="rounded-lg border border-border/40 bg-bg-tertiary/40 px-3 py-2 text-xs"
+                        >
+                          <p className="font-semibold text-text-primary">
+                            {entry.username ? `@${entry.username}` : 'No username'}
+                          </p>
+                          <p className="text-text-secondary mt-0.5 truncate">
+                            {entry.email || 'Email not stored'}
+                          </p>
+                          {entry.lastLoginAt && (
+                            <p className="text-[10px] text-text-secondary mt-1">
+                              Last login {new Date(entry.lastLoginAt).toLocaleDateString()}
+                            </p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </details>
               </div>
 
               <div className="glass-card rounded-xl p-5 md:p-6">
