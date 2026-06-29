@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   Building2,
   Camera,
@@ -6,10 +7,13 @@ import {
   LayoutDashboard,
   MessageSquarePlus,
   Settings,
+  Share2,
+  ShieldCheck,
 } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
 import { SidebarJournalPicker } from './SidebarJournalPicker';
 import { useAuth } from '../context/AuthContext';
+import { isCurrentUserAdmin } from '../services/admin';
 
 export type SidebarAppView = 'dashboard' | 'settings';
 
@@ -21,6 +25,9 @@ interface SidebarProps {
   onImportCsv: () => void;
   onClearAll: () => void;
   onSettings: () => void;
+  onShareCard?: () => void;
+  shareCardEnabled?: boolean;
+  onAdmin?: () => void;
   onHome?: () => void;
   onBrokers?: () => void;
   variant?: 'desktop' | 'drawer';
@@ -41,12 +48,30 @@ export function Sidebar({
   onImportCsv,
   onClearAll,
   onSettings,
+  onShareCard,
+  shareCardEnabled = false,
+  onAdmin,
   onHome,
   onBrokers,
   variant = 'desktop',
   onNavigate,
 }: SidebarProps) {
   const { user, loading, firebaseEnabled, logout, username } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!user?.uid || !firebaseEnabled) {
+      setIsAdmin(false);
+      return;
+    }
+    let cancelled = false;
+    void isCurrentUserAdmin(user.uid).then((ok) => {
+      if (!cancelled) setIsAdmin(ok);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid, firebaseEnabled]);
 
   const wrap = (fn: () => void) => () => {
     fn();
@@ -93,6 +118,17 @@ export function Sidebar({
             <Settings size={16} />
             Settings
           </button>
+          {onShareCard && (
+            <button
+              type="button"
+              onClick={wrap(onShareCard)}
+              disabled={!shareCardEnabled}
+              className={`${navItemClass(false)} disabled:opacity-40 disabled:cursor-not-allowed`}
+            >
+              <Share2 size={16} />
+              Share month
+            </button>
+          )}
         </nav>
 
         <div className="px-3 pt-4">
@@ -136,6 +172,16 @@ export function Sidebar({
               <MessageSquarePlus size={15} />
               Request broker
             </a>
+            {isAdmin && onAdmin && (
+              <button
+                type="button"
+                onClick={wrap(onAdmin)}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-amber-300/90 hover:text-amber-200 hover:bg-amber-500/10 transition-colors focus-ring"
+              >
+                <ShieldCheck size={15} />
+                Admin
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -19,6 +19,7 @@ export default function App() {
   const goPrivacy = () => navigate('privacy');
   const goTerms = () => navigate('terms');
   const goRequestBroker = () => navigate('request-broker');
+  const goAdmin = () => navigate('admin');
 
   const publicPageProps = {
     onHome: goHome,
@@ -50,7 +51,7 @@ export default function App() {
   } else if (route === 'app') {
     content = (
       <div className="h-full min-h-0 flex flex-col">
-        <JournalApp onHome={goHome} onBrokers={goBrokers} />
+        <JournalApp onHome={goHome} onBrokers={goBrokers} onAdmin={goAdmin} />
       </div>
     );
   } else {
