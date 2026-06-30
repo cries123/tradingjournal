@@ -14,7 +14,7 @@ const PAGE_SEO: Record<Exclude<AppRoute, 'coach'>, PageSeo> = {
   landing: {
     title: 'Trend Chasers — Trading Journal & P&L Calendar',
     description:
-      'Track wins and losses day by day on a visual calendar. Import via AI screenshot or CSV from your brokerage — never connect your broker login. Free.',
+      'Free trading journal to track and improve your performance. Visual P&L calendar, import from your brokerage via screenshot or CSV — no broker login required.',
     path: '/',
   },
   brokers: {
