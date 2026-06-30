@@ -1,6 +1,7 @@
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import type { Trade } from '../types';
 import type { TradingStats } from '../utils/stats';
+import { stripUndefinedDeep } from '../utils/firestoreData';
 import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
 
 export interface CoachShareSnapshot {
@@ -61,13 +62,13 @@ export async function enableCoachShare(
         date: t.date,
         symbol: t.symbol,
         pnl: t.pnl,
-        setup: t.setup,
-        side: t.side,
-        grade: t.grade,
+        ...(t.setup ? { setup: t.setup } : {}),
+        ...(t.side ? { side: t.side } : {}),
+        ...(t.grade ? { grade: t.grade } : {}),
       })),
   };
 
-  await setDoc(doc(getFirebaseDb(), 'coachShares', nextToken), snapshot);
+  await setDoc(doc(getFirebaseDb(), 'coachShares', nextToken), stripUndefinedDeep(snapshot));
   return nextToken;
 }
 

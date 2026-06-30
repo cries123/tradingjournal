@@ -5,6 +5,7 @@ import type { ThemeAccent, UserSettings } from '../types/settings';
 import { DEFAULT_SETTINGS } from '../types/settings';
 import type { Strategy } from '../types/strategy';
 import { loadSettings, saveSettings } from '../utils/settingsStorage';
+import { stripUndefinedDeep } from '../utils/firestoreData';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 interface SettingsContextValue {
@@ -68,9 +69,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setSettings(next);
       saveSettings(next, user?.uid);
       if (user && isFirebaseConfigured()) {
-        void setDoc(doc(getFirebaseDb(), 'users', user.uid, 'settings', 'preferences'), next, {
-          merge: true,
-        });
+        void setDoc(
+          doc(getFirebaseDb(), 'users', user.uid, 'settings', 'preferences'),
+          stripUndefinedDeep(next),
+          { merge: true },
+        );
       }
     },
     [user],
