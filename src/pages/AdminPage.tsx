@@ -618,9 +618,9 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                             </p>
                             <p className="text-[10px] text-text-secondary mt-1">
                               {entry.tradeCount > 0
-                                ? `${entry.tradeCount} trades · last ${formatDate(entry.lastTradeDate)}`
+                                ? `${entry.tradeCount} trades · last trade ${formatDate(entry.lastTradeDate)}`
                                 : 'No trades'}
-                              {entry.lastLoginAt && ` · login ${formatDate(entry.lastLoginAt)}`}
+                              {entry.lastLoginAt && ` · last login ${formatDate(entry.lastLoginAt)}`}
                             </p>
                           </button>
                         </li>
