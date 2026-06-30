@@ -80,14 +80,28 @@ export function LandingFooter({ onPrivacy, onTerms, onHome, onBrokers }: Landing
             <p className="text-xs font-semibold uppercase tracking-wider text-text-primary mb-3">Legal</p>
             <ul className="space-y-2 text-sm text-text-secondary">
               <li>
-                <button type="button" onClick={onPrivacy} className="hover:text-emerald-400 transition-colors">
+                <a
+                  href="/privacy"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onPrivacy();
+                  }}
+                  className="hover:text-emerald-400 transition-colors"
+                >
                   Privacy Policy
-                </button>
+                </a>
               </li>
               <li>
-                <button type="button" onClick={onTerms} className="hover:text-emerald-400 transition-colors">
+                <a
+                  href="/terms"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onTerms();
+                  }}
+                  className="hover:text-emerald-400 transition-colors"
+                >
                   Terms of Service
-                </button>
+                </a>
               </li>
             </ul>
           </div>

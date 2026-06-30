@@ -14,13 +14,13 @@ const PAGE_SEO: Record<Exclude<AppRoute, 'coach'>, PageSeo> = {
   landing: {
     title: 'Trend Chasers — Trading Journal & P&L Calendar',
     description:
-      'Track wins and losses day by day on a visual calendar. Import via AI screenshot or CSV from Schwab, Robinhood & TOS — never connect your broker. Free.',
+      'Track wins and losses day by day on a visual calendar. Import via AI screenshot or CSV from your brokerage — never connect your broker login. Free.',
     path: '/',
   },
   brokers: {
     title: 'Supported Brokers — Trend Chasers Trading Journal',
     description:
-      'Schwab, Robinhood & Thinkorswim — import trades with AI screenshot parsing or CSV. No brokerage login, no API keys. See how each broker works with Trend Chasers.',
+      'Import trades from your brokerage with AI screenshot parsing or CSV. No brokerage login, no API keys. See how Trend Chasers fits your workflow.',
     path: '/brokers',
   },
   privacy: {
