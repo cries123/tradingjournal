@@ -75,6 +75,22 @@ export function screenshotApiPlugin(): Plugin {
           }
         })();
       });
+      server.middlewares.use('/api/admin-user', (req, res) => {
+        if (req.method !== 'POST') {
+          sendJson(res, 405, { error: 'Method not allowed' });
+          return;
+        }
+        void (async () => {
+          try {
+            const body = (await readJsonBody(req)) as import('./server/adminUserHandler').AdminUserRequestBody;
+            const { handleAdminUserRequest } = await import('./server/adminUserHandler');
+            const result = await handleAdminUserRequest(req.headers, body);
+            sendJson(res, result.statusCode, result.body);
+          } catch {
+            sendJson(res, 500, { error: 'Internal server error' });
+          }
+        })();
+      });
     },
     configurePreviewServer(server) {
       server.middlewares.use('/api/health', (req, res) => handleHealth(req, res, () => envApiKey));
@@ -88,6 +104,22 @@ export function screenshotApiPlugin(): Plugin {
             sendJson(res, result.statusCode, result.body);
           } catch {
             sendJson(res, 502, { error: 'Benchmark fetch failed' });
+          }
+        })();
+      });
+      server.middlewares.use('/api/admin-user', (req, res) => {
+        if (req.method !== 'POST') {
+          sendJson(res, 405, { error: 'Method not allowed' });
+          return;
+        }
+        void (async () => {
+          try {
+            const body = (await readJsonBody(req)) as import('./server/adminUserHandler').AdminUserRequestBody;
+            const { handleAdminUserRequest } = await import('./server/adminUserHandler');
+            const result = await handleAdminUserRequest(req.headers, body);
+            sendJson(res, result.statusCode, result.body);
+          } catch {
+            sendJson(res, 500, { error: 'Internal server error' });
           }
         })();
       });

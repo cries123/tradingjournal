@@ -7,11 +7,10 @@ import {
   Download,
   Lock,
   ShieldCheck,
-  User,
   Users,
-  X,
 } from 'lucide-react';
 import { AuthModal } from '../components/AuthModal';
+import { AdminUserDetailModal } from '../components/admin/AdminUserDetailModal';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -152,79 +151,6 @@ function AdminNoteField({
         aria-label={label}
       />
       {saving && <p className="text-[10px] text-text-secondary mt-1">Saving…</p>}
-    </div>
-  );
-}
-
-function UserDetailModal({
-  user,
-  onClose,
-}: {
-  user: AdminUserSummary;
-  onClose: () => void;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="user-detail-title"
-      onClick={onClose}
-    >
-      <div
-        className="glass-card rounded-xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2">
-            <User size={18} className="text-emerald-400" />
-            <h3 id="user-detail-title" className="text-lg font-semibold">
-              {user.username ? `@${user.username}` : 'User details'}
-            </h3>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1 rounded-lg text-text-secondary hover:text-text-primary"
-            aria-label="Close"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <dl className="space-y-3 text-sm">
-          <div>
-            <dt className="text-xs text-text-secondary uppercase tracking-wider">Email</dt>
-            <dd className="mt-0.5">{user.email || 'Not stored'}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-text-secondary uppercase tracking-wider">UID</dt>
-            <dd className="mt-0.5 font-mono text-xs break-all">{user.uid}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-text-secondary uppercase tracking-wider">Signed up</dt>
-            <dd className="mt-0.5">{formatDateTime(user.createdAt)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-text-secondary uppercase tracking-wider">Last login</dt>
-            <dd className="mt-0.5">{formatDateTime(user.lastLoginAt)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-text-secondary uppercase tracking-wider">Trades</dt>
-            <dd className="mt-0.5">
-              {user.tradeCount > 0 ? `${user.tradeCount} trades` : 'No trades imported'}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-text-secondary uppercase tracking-wider">Last trade</dt>
-            <dd className="mt-0.5">{user.lastTradeDate ? formatDate(user.lastTradeDate) : '—'}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-text-secondary uppercase tracking-wider">Coach share</dt>
-            <dd className="mt-0.5">{user.coachShareEnabled ? 'On' : 'Off'}</dd>
-          </div>
-        </dl>
-      </div>
     </div>
   );
 }
@@ -934,7 +860,34 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
         )}
       </main>
 
-      {selectedUser && <UserDetailModal user={selectedUser} onClose={() => setSelectedUser(null)} />}
+      {selectedUser && user && (
+        <AdminUserDetailModal
+          user={selectedUser}
+          adminUid={user.uid}
+          onClose={() => setSelectedUser(null)}
+          onUserUpdated={(uid, patch) => {
+            setState((prev) => {
+              if (prev.phase !== 'ready') return prev;
+              return {
+                ...prev,
+                users: prev.users.map((u) => (u.uid === uid ? { ...u, ...patch } : u)),
+              };
+            });
+            setSelectedUser((prev) => (prev?.uid === uid ? { ...prev, ...patch } : prev));
+          }}
+          onUserDeleted={(uid) => {
+            setState((prev) => {
+              if (prev.phase !== 'ready') return prev;
+              return {
+                ...prev,
+                users: prev.users.filter((u) => u.uid !== uid),
+                userCount: Math.max(0, prev.userCount - 1),
+              };
+            });
+            setSelectedUser(null);
+          }}
+        />
+      )}
 
       <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} onHome={onHome} onBrokers={onBrokers} />
     </div>
