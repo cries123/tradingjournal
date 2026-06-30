@@ -106,7 +106,8 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers }:
               AI-powered imports · No broker login ever
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-[3.25rem] font-bold leading-[1.1] tracking-tight">
-              The journal built for{' '}
+              <span className="text-gradient">Trend Chasers</span>
+              {' — '}the journal built for{' '}
               <span className="text-gradient">your broker</span>
             </h1>
             <p className="mt-5 text-base md:text-lg text-text-secondary leading-relaxed max-w-xl">

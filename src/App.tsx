@@ -1,4 +1,6 @@
 import { useRoute } from './hooks/useRoute';
+import { usePageMeta } from './hooks/usePageMeta';
+import { getPageSeo } from './seo/pageMeta';
 import { PageTransition } from './components/motion/FadeIn';
 import { AdminPage } from './pages/AdminPage';
 import { BrokersPage } from './pages/BrokersPage';
@@ -12,6 +14,7 @@ import { TermsOfServicePage } from './pages/TermsOfServicePage';
 
 export default function App() {
   const { route, coachToken, navigate } = useRoute();
+  usePageMeta(getPageSeo(route, coachToken));
 
   const goHome = () => navigate('landing');
   const goApp = () => navigate('app');
