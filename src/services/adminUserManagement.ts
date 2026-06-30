@@ -1,5 +1,6 @@
 import { sendPasswordResetEmail } from 'firebase/auth';
 import type { AdminUserAction } from '../../server/adminUserHandler';
+import { deleteUserViaFirestore } from './adminDeleteUserClient';
 import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebase';
 
 async function adminApiPost(payload: {
@@ -62,5 +63,13 @@ export async function adminUpdateUserPassword(
 }
 
 export async function adminDeleteUser(targetUid: string): Promise<{ message: string }> {
-  return adminApiPost({ action: 'deleteUser', targetUid });
+  try {
+    return await adminApiPost({ action: 'deleteUser', targetUid });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '';
+    if (msg.includes('not configured') || msg.includes('503')) {
+      return deleteUserViaFirestore(targetUid);
+    }
+    throw err;
+  }
 }
