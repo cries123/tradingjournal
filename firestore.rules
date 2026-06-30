@@ -7,6 +7,17 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/config/admin).data.uid == request.auth.uid;
     }
 
+    function isSiteAdminUser(userId) {
+      return exists(/databases/$(database)/documents/config/admin)
+        && get(/databases/$(database)/documents/config/admin).data.uid == userId;
+    }
+
+    function adminCanDeleteUser(userId) {
+      return isAdmin()
+        && request.auth.uid != userId
+        && !isSiteAdminUser(userId);
+    }
+
     function validBugReportCreate() {
       return request.resource.data.description is string
         && request.resource.data.description.size() >= 10
@@ -64,17 +75,20 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow write: if request.auth != null && request.auth.uid == userId;
+      allow delete: if adminCanDeleteUser(userId);
       allow get: if request.auth != null && request.auth.uid == userId;
       allow get, list: if isAdmin();
     }
 
     match /users/{userId}/settings/{docId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow delete: if adminCanDeleteUser(userId);
       allow get, list: if isAdmin();
     }
 
     match /users/{userId}/trades/{tradeId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow delete: if adminCanDeleteUser(userId);
       allow get, list: if isAdmin();
     }
 
@@ -82,7 +96,8 @@ service cloud.firestore {
       allow read: if true;
       allow list: if isAdmin();
       allow create, update: if request.auth != null && request.auth.uid == request.resource.data.ownerUid;
-      allow delete: if request.auth != null && request.auth.uid == resource.data.ownerUid;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.ownerUid
+        || (isAdmin() && adminCanDeleteUser(resource.data.ownerUid));
     }
 
     match /usernames/{usernameId} {
@@ -91,6 +106,15 @@ service cloud.firestore {
         && !exists(/databases/$(database)/documents/usernames/$(usernameId))
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.username == usernameId;
+      allow delete: if isAdmin()
+        && resource.data.uid is string
+        && adminCanDeleteUser(resource.data.uid);
+      allow update: if false;
+    }
+
+    match /deletedAccounts/{userId} {
+      allow get: if request.auth != null && request.auth.uid == userId;
+      allow create: if adminCanDeleteUser(userId);
       allow update, delete: if false;
     }
   }

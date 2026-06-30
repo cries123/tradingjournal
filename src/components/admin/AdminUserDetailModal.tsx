@@ -218,7 +218,7 @@ export function AdminUserDetailModal({
       {confirmDelete && (
         <ConfirmDialog
           title="Delete this user?"
-          message={`Permanently delete ${user.email || user.uid}? This removes their auth account, trades, and profile data.`}
+          message={`Remove ${user.email || user.uid}? This deletes their trades, profile, and username, and blocks them from signing in.`}
           confirmLabel="Delete user"
           danger
           onCancel={() => setConfirmDelete(false)}

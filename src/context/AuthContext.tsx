@@ -19,6 +19,7 @@ import {
   type User,
 } from 'firebase/auth';
 import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebase';
+import { isAccountDeleted } from '../services/deletedAccounts';
 import { ensureUserProfile } from '../services/userProfile';
 import { UsernameTakenError, claimUsername as claimUsernameDoc, cacheUsername, clearCachedUsername, fetchUsername, readCachedUsername } from '../services/username';
 import { validateUsername } from '../utils/usernameValidation';
@@ -81,8 +82,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const auth = getFirebaseAuth();
     return onAuthStateChanged(auth, (nextUser) => {
-      setUser(nextUser);
-      setLoading(false);
+      if (!nextUser) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      void (async () => {
+        try {
+          if (await isAccountDeleted(nextUser.uid)) {
+            await signOut(auth);
+            setUser(null);
+            return;
+          }
+        } catch {
+          // If the check fails, still allow session — don't lock out on network blips.
+        }
+        setUser(nextUser);
+      })().finally(() => {
+        setLoading(false);
+      });
     });
   }, [firebaseEnabled]);
 
@@ -140,6 +159,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const auth = getFirebaseAuth();
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
+    if (await isAccountDeleted(result.user.uid)) {
+      await signOut(auth);
+      throw new Error('This account has been removed.');
+    }
     const isNew =
       result.user.metadata.creationTime === result.user.metadata.lastSignInTime;
     await ensureUserProfile(result.user, isNew);
@@ -150,6 +173,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithEmail = useCallback(async (email: string, password: string) => {
     const auth = getFirebaseAuth();
     const result = await signInWithEmailAndPassword(auth, email, password);
+    if (await isAccountDeleted(result.user.uid)) {
+      await signOut(auth);
+      throw new Error('This account has been removed.');
+    }
     await ensureUserProfile(result.user, false);
     const name = await loadUsername(result.user.uid);
     if (name) setUsername(name);
