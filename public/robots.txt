@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /coach/
+
+Sitemap: https://trendchasers.net/sitemap.xml
