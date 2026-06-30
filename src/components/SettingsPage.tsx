@@ -31,6 +31,7 @@ export function SettingsPage({ trades, monthStats, year, month, onBack }: Settin
   const [newStrategy, setNewStrategy] = useState('');
   const [coachBusy, setCoachBusy] = useState(false);
   const [coachMessage, setCoachMessage] = useState<string | null>(null);
+  const [coachMessageIsError, setCoachMessageIsError] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const { quote: liveBenchmark, loading: benchmarkLoading } = useLiveBenchmark(
@@ -42,7 +43,11 @@ export function SettingsPage({ trades, monthStats, year, month, onBack }: Settin
 
   const syncCoachShare = useCallback(async () => {
     if (!settings.coachShareEnabled || !user || !username || !settings.coachShareToken) return;
-    await refreshCoachShare(settings.coachShareToken, trades, monthStats, year, month, user.uid, username);
+    try {
+      await refreshCoachShare(settings.coachShareToken, trades, monthStats, year, month, user.uid, username);
+    } catch {
+      // Background sync — errors surface when toggling manually.
+    }
   }, [settings.coachShareEnabled, settings.coachShareToken, user, username, trades, monthStats, year, month]);
 
   useEffect(() => {
@@ -51,11 +56,13 @@ export function SettingsPage({ trades, monthStats, year, month, onBack }: Settin
 
   const handleCoachToggle = async (enabled: boolean) => {
     if (!user || !username) {
+      setCoachMessageIsError(true);
       setCoachMessage('Sign in and set a username to enable coach sharing.');
       return;
     }
     setCoachBusy(true);
     setCoachMessage(null);
+    setCoachMessageIsError(false);
     try {
       if (enabled) {
         const token = await enableCoachShare(user.uid, username, settings.coachShareToken, trades, monthStats, year, month);
@@ -69,6 +76,7 @@ export function SettingsPage({ trades, monthStats, year, month, onBack }: Settin
         updateSettings({ coachShareEnabled: false });
       }
     } catch (err) {
+      setCoachMessageIsError(true);
       setCoachMessage(err instanceof Error ? err.message : 'Coach share update failed');
     } finally {
       setCoachBusy(false);
@@ -407,7 +415,9 @@ export function SettingsPage({ trades, monthStats, year, month, onBack }: Settin
               />
               Read-only coach sharing
             </label>
-            {coachMessage && <p className="text-xs text-emerald-300">{coachMessage}</p>}
+            {coachMessage && (
+              <p className={`text-xs ${coachMessageIsError ? 'text-red-400' : 'text-emerald-300'}`}>{coachMessage}</p>
+            )}
             {settings.coachShareEnabled && settings.coachShareToken && (
               <div className="flex gap-2">
                 <input
