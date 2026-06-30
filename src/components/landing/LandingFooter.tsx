@@ -51,9 +51,16 @@ export function LandingFooter({ onPrivacy, onTerms, onHome, onBrokers }: Landing
               </li>
               <li>
                 {onBrokers ? (
-                  <button type="button" onClick={onBrokers} className="hover:text-emerald-400 transition-colors">
+                  <a
+                    href="/brokers"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onBrokers();
+                    }}
+                    className="hover:text-emerald-400 transition-colors"
+                  >
                     Supported brokers
-                  </button>
+                  </a>
                 ) : (
                   <a href="/brokers" className="hover:text-emerald-400 transition-colors">Supported brokers</a>
                 )}
