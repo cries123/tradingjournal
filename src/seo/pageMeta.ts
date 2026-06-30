@@ -14,34 +14,36 @@ const PAGE_SEO: Record<Exclude<AppRoute, 'coach'>, PageSeo> = {
   landing: {
     title: 'Trend Chasers — Trading Journal & P&L Calendar',
     description:
-      'Trend Chasers is a free trading journal with a P&L calendar, AI screenshot import, broker CSV uploads, and performance analytics.',
+      'Free trading journal to track and improve your performance. Visual P&L calendar, import from your brokerage via screenshot or CSV — no broker login required.',
     path: '/',
   },
   brokers: {
     title: 'Supported Brokers — Trend Chasers Trading Journal',
     description:
-      'Import trades into Trend Chasers from Thinkorswim, Schwab, and Robinhood via CSV or AI screenshot parsing — no brokerage login required.',
+      'Import trades from your brokerage with AI screenshot parsing or CSV. No brokerage login, no API keys. See how Trend Chasers fits your workflow.',
     path: '/brokers',
   },
   privacy: {
     title: 'Privacy Policy — Trend Chasers',
-    description: 'How Trend Chasers handles your trading journal data, cloud sync, and account information.',
+    description:
+      'Your trades stay yours. Learn how Trend Chasers handles journal data, optional cloud sync, and account info — without ever touching your brokerage.',
     path: '/privacy',
   },
   terms: {
     title: 'Terms of Service — Trend Chasers',
-    description: 'Terms of service for the Trend Chasers trading journal web app.',
+    description: 'Terms of use for Trend Chasers, the free trading journal with P&L calendar and broker imports.',
     path: '/terms',
   },
   'report-bug': {
     title: 'Report a Bug — Trend Chasers',
-    description: 'Report an issue with Trend Chasers so we can fix it quickly.',
+    description: 'Found something broken? Tell us and we will fix it.',
     path: '/report-bug',
     noindex: true,
   },
   'request-broker': {
     title: 'Request Broker Support — Trend Chasers',
-    description: 'Request CSV or screenshot import support for your brokerage on Trend Chasers.',
+    description:
+      'Trade with a broker we do not support yet? Request CSV or screenshot import — we will configure it for your workflow.',
     path: '/request-broker',
   },
   app: {
