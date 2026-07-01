@@ -11,6 +11,26 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://trendchasers.net/guides</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://trendchasers.net/guides/free-trading-journal</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.65</priority>
+  </url>
+  <url>
+    <loc>https://trendchasers.net/guides/trading-journal-without-broker-login</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.65</priority>
+  </url>
+  <url>
+    <loc>https://trendchasers.net/guides/pnl-calendar-trading-journal</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.65</priority>
+  </url>
+  <url>
     <loc>https://trendchasers.net/request-broker</loc>
     <changefreq>yearly</changefreq>
     <priority>0.4</priority>
