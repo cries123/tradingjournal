@@ -15,7 +15,18 @@ const root = path.resolve(__dirname, '..');
 const distDir = path.join(root, 'dist');
 const host = '127.0.0.1';
 
-const ROUTES = ['/', '/brokers', '/privacy', '/terms', '/request-broker', '/report-bug'];
+const ROUTES = [
+  '/',
+  '/brokers',
+  '/guides',
+  '/guides/free-trading-journal',
+  '/guides/trading-journal-without-broker-login',
+  '/guides/pnl-calendar-trading-journal',
+  '/privacy',
+  '/terms',
+  '/request-broker',
+  '/report-bug',
+];
 
 function findFreePort(start = 4173) {
   return new Promise((resolve, reject) => {

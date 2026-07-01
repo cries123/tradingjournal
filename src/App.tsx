@@ -1,10 +1,13 @@
 import { useRoute } from './hooks/useRoute';
 import { usePageMeta } from './hooks/usePageMeta';
+import { useStructuredData } from './hooks/useStructuredData';
 import { getPageSeo } from './seo/pageMeta';
 import { PageTransition } from './components/motion/FadeIn';
 import { AdminPage } from './pages/AdminPage';
 import { BrokersPage } from './pages/BrokersPage';
 import { CoachViewPage } from './pages/CoachViewPage';
+import { GuidePage } from './pages/GuidePage';
+import { GuidesIndexPage } from './pages/GuidesIndexPage';
 import { LandingPage } from './pages/LandingPage';
 import { JournalApp } from './pages/JournalApp';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
@@ -13,8 +16,9 @@ import { RequestBrokerPage } from './pages/RequestBrokerPage';
 import { TermsOfServicePage } from './pages/TermsOfServicePage';
 
 export default function App() {
-  const { route, coachToken, navigate } = useRoute();
-  usePageMeta(getPageSeo(route, coachToken));
+  const { route, coachToken, guideSlug, navigate, navigateGuide } = useRoute();
+  usePageMeta(getPageSeo(route, coachToken, guideSlug));
+  useStructuredData(route, guideSlug);
 
   const goHome = () => navigate('landing');
   const goApp = () => navigate('app');
@@ -23,6 +27,7 @@ export default function App() {
   const goTerms = () => navigate('terms');
   const goRequestBroker = () => navigate('request-broker');
   const goAdmin = () => navigate('admin');
+  const goGuides = () => navigate('guides');
 
   const publicPageProps = {
     onHome: goHome,
@@ -31,6 +36,8 @@ export default function App() {
     onTerms: goTerms,
     onBrokers: goBrokers,
     onRequestBroker: goRequestBroker,
+    onGuides: goGuides,
+    onGuide: navigateGuide,
   };
 
   let content;
@@ -39,6 +46,11 @@ export default function App() {
   if (route === 'coach' && coachToken) {
     routeKey = `coach-${coachToken}`;
     content = <CoachViewPage token={coachToken} onHome={goHome} />;
+  } else if (route === 'guides') {
+    content = <GuidesIndexPage {...publicPageProps} />;
+  } else if (route === 'guide' && guideSlug) {
+    routeKey = `guide-${guideSlug}`;
+    content = <GuidePage slug={guideSlug} {...publicPageProps} />;
   } else if (route === 'brokers') {
     content = <BrokersPage {...publicPageProps} />;
   } else if (route === 'privacy') {
@@ -65,6 +77,8 @@ export default function App() {
         onPrivacy={goPrivacy}
         onTerms={goTerms}
         onBrokers={goBrokers}
+        onGuides={goGuides}
+        onGuide={navigateGuide}
       />
     );
   }

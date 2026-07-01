@@ -13,6 +13,8 @@ import { BrandLogo } from '../components/BrandLogo';
 import { DashboardPreview } from '../components/landing/DashboardPreview';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import { FadeIn } from '../components/motion/FadeIn';
+import { LANDING_FAQ } from '../seo/faq';
+import { GUIDE_ARTICLES } from '../seo/guides';
 
 interface LandingPageProps {
   onLaunch: () => void;
@@ -20,6 +22,8 @@ interface LandingPageProps {
   onPrivacy: () => void;
   onTerms: () => void;
   onBrokers: () => void;
+  onGuides?: () => void;
+  onGuide?: (slug: string) => void;
 }
 
 const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
@@ -61,28 +65,7 @@ const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
   },
 ];
 
-const FAQ = [
-  {
-    q: 'Do I need to log in to my broker?',
-    a: 'Never. Trend Chasers never connects to your brokerage account. You upload CSV files, screenshots, or enter trades manually — completely separate from your broker login.',
-  },
-  {
-    q: 'Which brokers are supported today?',
-    a: 'Thinkorswim, Schwab, and Robinhood. AI screenshot parsing works across mobile brokerage apps. CSV import is optimized for Schwab account statements.',
-  },
-  {
-    q: 'I use a different broker. Can you add support?',
-    a: 'Yes — use Request broker support in the footer. Tell us your broker and how you export trades; we can configure import support for your workflow.',
-  },
-  {
-    q: 'Is my trade data secure?',
-    a: 'Without an account, data stays in your browser. With an account, trades sync to Firebase under your user ID. Broker credentials are never collected.',
-  },
-  {
-    q: 'How accurate is AI import?',
-    a: 'AI is a starting point — always review parsed trades before saving. You can edit P/L, flip signs, and deselect rows before importing.',
-  },
-];
+const FAQ = LANDING_FAQ.map((item) => ({ q: item.question, a: item.answer }));
 
 const STEPS = [
   { n: '01', title: 'Upload or log', body: 'Screenshot, CSV, or manual entry — get your trades into the journal in seconds.' },
@@ -90,11 +73,11 @@ const STEPS = [
   { n: '03', title: 'Analyze your edge', body: 'Stats and charts reveal patterns in your performance over time.' },
 ];
 
-export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers }: LandingPageProps) {
+export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, onGuides, onGuide }: LandingPageProps) {
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
       <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
-      <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} />
+      <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} />
 
       {/* Hero */}
       <section className="relative z-10 max-w-6xl mx-auto px-4 md:px-6 pt-12 md:pt-20 pb-16 md:pb-20">
@@ -278,6 +261,45 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers }:
         </div>
       </section>
 
+      {/* Guides */}
+      <section id="guides" className="relative z-10 border-t border-border/50 bg-bg-secondary/20 py-16 md:py-24">
+        <div className="max-w-6xl mx-auto px-4 md:px-6">
+          <FadeIn className="text-center max-w-2xl mx-auto mb-10">
+            <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">Guides</p>
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Free trading journal resources</h2>
+            <p className="mt-3 text-text-secondary text-sm md:text-base">
+              Learn how to track performance, use a P&L calendar, and journal without connecting your brokerage.
+            </p>
+          </FadeIn>
+          <div className="grid md:grid-cols-3 gap-4">
+            {GUIDE_ARTICLES.map((guide, i) => (
+              <FadeIn key={guide.slug} delay={i * 60}>
+                <a
+                  href={guide.path}
+                  onClick={(e) => {
+                    if (onGuide) {
+                      e.preventDefault();
+                      onGuide(guide.slug);
+                    }
+                  }}
+                  className="block glass-card rounded-xl p-5 h-full hover:border-emerald-500/30 transition-colors"
+                >
+                  <h3 className="font-semibold text-base mb-2">{guide.title}</h3>
+                  <p className="text-sm text-text-secondary leading-relaxed">{guide.description}</p>
+                </a>
+              </FadeIn>
+            ))}
+          </div>
+          {onGuides && (
+            <div className="text-center mt-8">
+              <button type="button" onClick={onGuides} className="btn-secondary text-sm px-5 py-2.5">
+                View all guides
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* FAQ */}
       <section id="faq" className="relative z-10 py-16 md:py-24">
         <div className="max-w-3xl mx-auto px-4 md:px-6">
@@ -321,7 +343,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers }:
         </FadeIn>
       </section>
 
-      <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} onBrokers={onBrokers} />
+      <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} onBrokers={onBrokers} onGuides={onGuides} onGuide={onGuide} />
     </div>
   );
 }
