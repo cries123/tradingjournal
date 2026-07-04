@@ -22,6 +22,27 @@ export interface VisitorStats {
   dailyLast7: { date: string; label: string; visitors: number }[];
 }
 
+export interface VisitorStatsResult {
+  stats: VisitorStats;
+  error: string | null;
+}
+
+function emptyVisitorStats(signupsLast7Days: number): VisitorStats {
+  return {
+    totalUniqueVisitors: 0,
+    totalConverted: 0,
+    conversionRate: 0,
+    last7DaysVisitors: 0,
+    last7DaysSignups: signupsLast7Days,
+    last7DaysConversionRate: 0,
+    dailyLast7: last7DayKeys().map((date) => ({
+      date,
+      label: new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short' }),
+      visitors: 0,
+    })),
+  };
+}
+
 export function getVisitorId(): string | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -106,8 +127,11 @@ export async function markVisitorConverted(visitorId: string, uid: string): Prom
   );
 }
 
-export async function fetchVisitorStats(signupsLast7Days: number): Promise<VisitorStats | null> {
-  if (!isFirebaseConfigured()) return null;
+export async function fetchVisitorStats(signupsLast7Days: number): Promise<VisitorStatsResult> {
+  const empty = emptyVisitorStats(signupsLast7Days);
+  if (!isFirebaseConfigured()) {
+    return { stats: empty, error: null };
+  }
 
   const db = getFirebaseDb();
   const dayKeys = last7DayKeys();
@@ -152,15 +176,22 @@ export async function fetchVisitorStats(signupsLast7Days: number): Promise<Visit
       last7DaysVisitors > 0 ? (signupsLast7Days / last7DaysVisitors) * 100 : 0;
 
     return {
-      totalUniqueVisitors,
-      totalConverted,
-      conversionRate,
-      last7DaysVisitors,
-      last7DaysSignups: signupsLast7Days,
-      last7DaysConversionRate,
-      dailyLast7,
+      stats: {
+        totalUniqueVisitors,
+        totalConverted,
+        conversionRate,
+        last7DaysVisitors,
+        last7DaysSignups: signupsLast7Days,
+        last7DaysConversionRate,
+        dailyLast7,
+      },
+      error: null,
     };
   } catch {
-    return null;
+    return {
+      stats: empty,
+      error:
+        'Could not load visitor stats. Run: firebase deploy --only firestore:rules',
+    };
   }
 }
