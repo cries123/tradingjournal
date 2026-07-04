@@ -5,6 +5,7 @@ import {
   Building2,
   ChevronDown,
   Download,
+  Eye,
   Lock,
   ShieldCheck,
   Users,
@@ -40,6 +41,7 @@ import {
   type BugReport,
   type BugReportStatus,
 } from '../services/bugReports';
+import { fetchVisitorStats, type VisitorStats } from '../services/visitorAnalytics';
 
 interface AdminPageProps {
   onHome: () => void;
@@ -65,6 +67,7 @@ type AdminState =
       userCount: number;
       users: AdminUserSummary[];
       health: AdminHealthStatus | null;
+      visitorStats: VisitorStats | null;
     };
 
 const STATUS_LABELS: Record<RequestStatus, string> = {
@@ -277,14 +280,20 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
           fetchAdminHealth(),
         ]);
 
+      const users =
+        usersResult.status === 'fulfilled' ? usersResult.value : [];
+      const signupStats = computeSignupStats(users);
+      const visitorStatsResult = await fetchVisitorStats(signupStats.last7Days).catch(() => null);
+
       setState({
         phase: 'ready',
         isNewClaim: access.isNewClaim,
         reports: reportsResult.status === 'fulfilled' ? reportsResult.value : [],
         brokerRequests: brokerResult.status === 'fulfilled' ? brokerResult.value : [],
         userCount: userCountResult.status === 'fulfilled' ? userCountResult.value : 0,
-        users: usersResult.status === 'fulfilled' ? usersResult.value : [],
+        users,
         health: healthResult.status === 'fulfilled' ? healthResult.value : null,
+        visitorStats: visitorStatsResult,
       });
     } catch {
       setState({
@@ -295,6 +304,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
         userCount: 0,
         users: [],
         health: null,
+        visitorStats: null,
       });
     }
   }, [firebaseEnabled, loading, user, username]);
@@ -432,6 +442,12 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
 
   const usersWithTrades = ready?.users.filter((u) => u.tradeCount > 0).length ?? 0;
   const maxDailySignup = Math.max(1, ...(signupStats?.dailyLast7.map((d) => d.count) ?? [1]));
+  const maxDailyVisitors = Math.max(
+    1,
+    ...(state.phase === 'ready' && state.visitorStats
+      ? state.visitorStats.dailyLast7.map((d) => d.visitors)
+      : [1]),
+  );
 
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
@@ -555,8 +571,56 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
               </div>
             )}
 
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               <div className="glass-card rounded-xl p-5 md:p-6">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
+                    <Eye size={18} />
+                  </div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                    Anonymous visitors
+                  </p>
+                </div>
+                {ready.visitorStats ? (
+                  <>
+                    <p className="text-3xl font-bold tracking-tight">
+                      {ready.visitorStats.totalUniqueVisitors.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-text-secondary mt-2">
+                      {ready.visitorStats.last7DaysVisitors} unique in the last 7 days
+                    </p>
+                    <p className="text-xs text-emerald-300 mt-2">
+                      {ready.visitorStats.conversionRate.toFixed(1)}% all-time signup rate
+                    </p>
+                    <p className="text-xs text-text-secondary mt-0.5">
+                      {ready.visitorStats.last7DaysConversionRate.toFixed(1)}% last 7 days (
+                      {ready.visitorStats.last7DaysSignups} signups /{' '}
+                      {ready.visitorStats.last7DaysVisitors} visitors)
+                    </p>
+                    {ready.visitorStats.dailyLast7.some((d) => d.visitors > 0) && (
+                      <div className="mt-4 flex items-end gap-1 h-12">
+                        {ready.visitorStats.dailyLast7.map((day) => (
+                          <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
+                            <div
+                              className="w-full bg-cyan-500/40 rounded-sm min-h-[2px]"
+                              style={{ height: `${(day.visitors / maxDailyVisitors) * 100}%` }}
+                              title={`${day.visitors} visitor${day.visitors === 1 ? '' : 's'}`}
+                            />
+                            <span className="text-[9px] text-text-secondary">{day.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-text-secondary">
+                    Visitor tracking starts after deploy. Logged-out visits are counted once per day per
+                    browser.
+                  </p>
+                )}
+              </div>
+
+              <div className="glass-card rounded-xl p-5 md:p-6 sm:col-span-1 lg:col-span-1">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
                     <Users size={18} />

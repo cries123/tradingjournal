@@ -112,6 +112,51 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    function validVisitorDailyCreate() {
+      return request.resource.data.keys().hasAll(['visitorId', 'date', 'path', 'createdAt'])
+        && request.resource.data.visitorId is string
+        && request.resource.data.visitorId.size() >= 8
+        && request.resource.data.date is string
+        && request.resource.data.date.size() == 10
+        && request.resource.data.path is string
+        && request.resource.data.path.size() > 0
+        && request.resource.data.createdAt is string;
+    }
+
+    function validVisitorProfileWrite() {
+      return request.resource.data.visitorId is string
+        && request.resource.data.visitorId == visitorId
+        && request.resource.data.visitorId.size() >= 8
+        && request.resource.data.lastSeenAt is string
+        && request.resource.data.lastPath is string;
+    }
+
+    function validVisitorConversionWrite() {
+      return request.resource.data.converted == true
+        && request.resource.data.convertedAt is string
+        && request.resource.data.signupUid is string;
+    }
+
+    match /analyticsDailyVisitors/{docId} {
+      allow create: if validVisitorDailyCreate()
+        && docId == request.resource.data.date + '_' + request.resource.data.visitorId;
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    match /analyticsVisitors/{visitorId} {
+      allow create: if validVisitorProfileWrite()
+        && request.resource.data.converted == false
+        && request.resource.data.firstSeenAt is string;
+      allow update: if resource.data.visitorId == visitorId
+        && (
+          (validVisitorProfileWrite() && !('converted' in request.resource.data))
+          || (resource.data.converted == false && validVisitorConversionWrite())
+        );
+      allow read: if isAdmin();
+      allow delete: if false;
+    }
+
     match /deletedAccounts/{userId} {
       allow get: if request.auth != null && request.auth.uid == userId;
       allow create: if adminCanDeleteUser(userId);

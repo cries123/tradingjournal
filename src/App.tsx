@@ -1,6 +1,7 @@
 import { useRoute } from './hooks/useRoute';
 import { usePageMeta } from './hooks/usePageMeta';
 import { useStructuredData } from './hooks/useStructuredData';
+import { useVisitorTracking } from './hooks/useVisitorTracking';
 import { getPageSeo } from './seo/pageMeta';
 import { PageTransition } from './components/motion/FadeIn';
 import { AdminPage } from './pages/AdminPage';
@@ -19,6 +20,7 @@ export default function App() {
   const { route, coachToken, guideSlug, navigate, navigateGuide } = useRoute();
   usePageMeta(getPageSeo(route, coachToken, guideSlug));
   useStructuredData(route, guideSlug);
+  useVisitorTracking(route, guideSlug);
 
   const goHome = () => navigate('landing');
   const goApp = () => navigate('app');
