@@ -67,7 +67,8 @@ type AdminState =
       userCount: number;
       users: AdminUserSummary[];
       health: AdminHealthStatus | null;
-      visitorStats: VisitorStats | null;
+      visitorStats: VisitorStats;
+      visitorStatsError: string | null;
     };
 
 const STATUS_LABELS: Record<RequestStatus, string> = {
@@ -283,7 +284,18 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
       const users =
         usersResult.status === 'fulfilled' ? usersResult.value : [];
       const signupStats = computeSignupStats(users);
-      const visitorStatsResult = await fetchVisitorStats(signupStats.last7Days).catch(() => null);
+      const visitorResult = await fetchVisitorStats(signupStats.last7Days).catch(() => ({
+        stats: {
+          totalUniqueVisitors: 0,
+          totalConverted: 0,
+          conversionRate: 0,
+          last7DaysVisitors: 0,
+          last7DaysSignups: signupStats.last7Days,
+          last7DaysConversionRate: 0,
+          dailyLast7: [],
+        },
+        error: 'Could not load visitor stats',
+      }));
 
       setState({
         phase: 'ready',
@@ -293,7 +305,8 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
         userCount: userCountResult.status === 'fulfilled' ? userCountResult.value : 0,
         users,
         health: healthResult.status === 'fulfilled' ? healthResult.value : null,
-        visitorStats: visitorStatsResult,
+        visitorStats: visitorResult.stats,
+        visitorStatsError: visitorResult.error,
       });
     } catch {
       setState({
@@ -304,7 +317,16 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
         userCount: 0,
         users: [],
         health: null,
-        visitorStats: null,
+        visitorStats: {
+          totalUniqueVisitors: 0,
+          totalConverted: 0,
+          conversionRate: 0,
+          last7DaysVisitors: 0,
+          last7DaysSignups: 0,
+          last7DaysConversionRate: 0,
+          dailyLast7: [],
+        },
+        visitorStatsError: null,
       });
     }
   }, [firebaseEnabled, loading, user, username]);
@@ -581,42 +603,39 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                     Anonymous visitors
                   </p>
                 </div>
-                {ready.visitorStats ? (
-                  <>
-                    <p className="text-3xl font-bold tracking-tight">
-                      {ready.visitorStats.totalUniqueVisitors.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-text-secondary mt-2">
-                      {ready.visitorStats.last7DaysVisitors} unique in the last 7 days
-                    </p>
-                    <p className="text-xs text-emerald-300 mt-2">
-                      {ready.visitorStats.conversionRate.toFixed(1)}% all-time signup rate
-                    </p>
-                    <p className="text-xs text-text-secondary mt-0.5">
-                      {ready.visitorStats.last7DaysConversionRate.toFixed(1)}% last 7 days (
-                      {ready.visitorStats.last7DaysSignups} signups /{' '}
-                      {ready.visitorStats.last7DaysVisitors} visitors)
-                    </p>
-                    {ready.visitorStats.dailyLast7.some((d) => d.visitors > 0) && (
-                      <div className="mt-4 flex items-end gap-1 h-12">
-                        {ready.visitorStats.dailyLast7.map((day) => (
-                          <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
-                            <div
-                              className="w-full bg-cyan-500/40 rounded-sm min-h-[2px]"
-                              style={{ height: `${(day.visitors / maxDailyVisitors) * 100}%` }}
-                              title={`${day.visitors} visitor${day.visitors === 1 ? '' : 's'}`}
-                            />
-                            <span className="text-[9px] text-text-secondary">{day.label}</span>
-                          </div>
-                        ))}
+                {ready.visitorStatsError && (
+                  <p className="text-xs text-amber-400 mt-2">{ready.visitorStatsError}</p>
+                )}
+                <p className="text-3xl font-bold tracking-tight">
+                  {ready.visitorStats.totalUniqueVisitors.toLocaleString()}
+                </p>
+                <p className="text-xs text-text-secondary mt-2">
+                  {ready.visitorStats.last7DaysVisitors} unique in the last 7 days
+                </p>
+                <p className="text-xs text-emerald-300 mt-2">
+                  {ready.visitorStats.conversionRate.toFixed(1)}% all-time signup rate
+                </p>
+                <p className="text-xs text-text-secondary mt-0.5">
+                  {ready.visitorStats.last7DaysConversionRate.toFixed(1)}% last 7 days (
+                  {ready.visitorStats.last7DaysSignups} signups /{' '}
+                  {ready.visitorStats.last7DaysVisitors} visitors)
+                </p>
+                <p className="text-[10px] text-text-secondary mt-2">
+                  Counts logged-out visits only · once per browser per day
+                </p>
+                {ready.visitorStats.dailyLast7.some((d) => d.visitors > 0) && (
+                  <div className="mt-4 flex items-end gap-1 h-12">
+                    {ready.visitorStats.dailyLast7.map((day) => (
+                      <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
+                        <div
+                          className="w-full bg-cyan-500/40 rounded-sm min-h-[2px]"
+                          style={{ height: `${(day.visitors / maxDailyVisitors) * 100}%` }}
+                          title={`${day.visitors} visitor${day.visitors === 1 ? '' : 's'}`}
+                        />
+                        <span className="text-[9px] text-text-secondary">{day.label}</span>
                       </div>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-sm text-text-secondary">
-                    Visitor tracking starts after deploy. Logged-out visits are counted once per day per
-                    browser.
-                  </p>
+                    ))}
+                  </div>
                 )}
               </div>
 
