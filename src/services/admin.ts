@@ -9,7 +9,7 @@ import {
 import type { BrokerSupportRequest } from './brokerSupportRequests';
 import type { BugReport } from './bugReports';
 import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
-import { normalizeTradeDate } from '../utils/format';
+import { normalizeTradeDate, maxDateKey, maxIsoTimestamp } from '../utils/format';
 
 export interface AdminConfig {
   uid: string;
@@ -164,6 +164,8 @@ export async function fetchSignedUpUsers(): Promise<AdminUserSummary[]> {
       username?: string;
       lastLoginAt?: unknown;
       createdAt?: unknown;
+      lastTradeActivityAt?: unknown;
+      lastTradeSessionDate?: string;
     };
 
     byUid.set(docSnap.id, {
@@ -173,8 +175,8 @@ export async function fetchSignedUpUsers(): Promise<AdminUserSummary[]> {
       lastLoginAt: firestoreTimestampToIso(data.lastLoginAt),
       createdAt: firestoreTimestampToIso(data.createdAt),
       tradeCount: 0,
-      lastTradeDate: null,
-      lastTradeActivityAt: null,
+      lastTradeDate: normalizeTradeDate(data.lastTradeSessionDate),
+      lastTradeActivityAt: firestoreTimestampToIso(data.lastTradeActivityAt),
       coachShareEnabled: false,
     });
   }
@@ -212,17 +214,9 @@ export async function fetchSignedUpUsers(): Promise<AdminUserSummary[]> {
   });
 }
 
-function tradeDocumentActivityAt(
-  tradeDoc: { data: () => { savedAt?: string } },
-  savedAt?: string,
-): string | null {
-  if (savedAt?.trim()) return savedAt.trim();
-  const meta = tradeDoc as unknown as {
-    updateTime?: { toDate: () => Date };
-    createTime?: { toDate: () => Date };
-  };
-  const timestamp = meta.updateTime ?? meta.createTime;
-  return timestamp ? timestamp.toDate().toISOString() : null;
+function tradeSavedAt(data: { savedAt?: string }): string | null {
+  const savedAt = data.savedAt?.trim();
+  return savedAt || null;
 }
 
 async function fetchUserTradeStats(
@@ -252,7 +246,7 @@ async function fetchUserTradeStats(
         lastTradeDate = sessionDate;
       }
 
-      const activityAt = tradeDocumentActivityAt(tradeDoc, data.savedAt);
+      const activityAt = tradeSavedAt(data);
       if (activityAt && (!lastTradeActivityAt || activityAt > lastTradeActivityAt)) {
         lastTradeActivityAt = activityAt;
       }
@@ -281,8 +275,11 @@ async function enrichUsersWithActivity(users: AdminUserSummary[]): Promise<void>
         fetchCoachShareEnabled(user.uid),
       ]);
       user.tradeCount = tradeStats.tradeCount;
-      user.lastTradeDate = tradeStats.lastTradeDate;
-      user.lastTradeActivityAt = tradeStats.lastTradeActivityAt;
+      user.lastTradeDate = maxDateKey(user.lastTradeDate, tradeStats.lastTradeDate);
+      user.lastTradeActivityAt = maxIsoTimestamp(
+        user.lastTradeActivityAt,
+        tradeStats.lastTradeActivityAt,
+      );
       user.coachShareEnabled = coachShareEnabled;
     }),
   );

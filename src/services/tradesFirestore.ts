@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore';
 import type { Trade } from '../types';
 import { getFirebaseDb } from '../lib/firebase';
+import { touchUserTradeActivity } from './userTradeActivity';
 
 function tradesCollection(uid: string) {
   return collection(getFirebaseDb(), 'users', uid, 'trades');
@@ -37,14 +38,19 @@ export function subscribeTrades(uid: string, onChange: (trades: Trade[]) => void
 }
 
 export async function saveTrade(uid: string, trade: Trade): Promise<void> {
-  const payload = stripUndefined({
-    ...(trade as unknown as Record<string, unknown>),
-    savedAt: new Date().toISOString(),
-  });
-  await setDoc(doc(tradesCollection(uid), trade.id), payload);
+  const savedAt = new Date().toISOString();
+  await setDoc(
+    doc(tradesCollection(uid), trade.id),
+    stripUndefined({
+      ...(trade as unknown as Record<string, unknown>),
+      savedAt,
+    }),
+  );
+  await touchUserTradeActivity(uid, [trade.date], savedAt);
 }
 
 export async function saveTradesBatch(uid: string, trades: Trade[]): Promise<void> {
+  if (trades.length === 0) return;
   const batch = writeBatch(getFirebaseDb());
   const savedAt = new Date().toISOString();
   for (const trade of trades) {
@@ -57,6 +63,11 @@ export async function saveTradesBatch(uid: string, trades: Trade[]): Promise<voi
     );
   }
   await batch.commit();
+  await touchUserTradeActivity(
+    uid,
+    trades.map((t) => t.date),
+    savedAt,
+  );
 }
 
 export async function deleteTradeDoc(uid: string, tradeId: string): Promise<void> {

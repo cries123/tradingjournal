@@ -707,15 +707,9 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                             </p>
                             <p className="text-[10px] text-text-secondary mt-1">
                               {entry.tradeCount > 0
-                                ? [
-                                    `${entry.tradeCount} trades`,
-                                    entry.lastTradeActivityAt &&
-                                      `last journaled ${formatDate(entry.lastTradeActivityAt)}`,
-                                    entry.lastTradeDate &&
-                                      `last session ${formatDate(entry.lastTradeDate)}`,
-                                  ]
-                                    .filter(Boolean)
-                                    .join(' · ')
+                                ? `${entry.tradeCount} trades · last trade ${formatDate(
+                                    entry.lastTradeActivityAt ?? entry.lastTradeDate,
+                                  )}`
                                 : 'No trades'}
                               {entry.lastLoginAt && ` · last login ${formatDate(entry.lastLoginAt)}`}
                             </p>

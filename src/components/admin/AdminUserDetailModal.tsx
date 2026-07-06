@@ -120,15 +120,23 @@ export function AdminUserDetailModal({
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-text-secondary uppercase tracking-wider">Last journaled</dt>
+              <dt className="text-xs text-text-secondary uppercase tracking-wider">Last trade</dt>
               <dd className="mt-0.5">
-                {user.lastTradeActivityAt ? formatDateTime(user.lastTradeActivityAt) : '—'}
+                {user.lastTradeActivityAt
+                  ? formatDateTime(user.lastTradeActivityAt)
+                  : user.lastTradeDate
+                    ? formatDate(user.lastTradeDate)
+                    : '—'}
               </dd>
             </div>
-            <div>
-              <dt className="text-xs text-text-secondary uppercase tracking-wider">Latest session</dt>
-              <dd className="mt-0.5">{user.lastTradeDate ? formatDate(user.lastTradeDate) : '—'}</dd>
-            </div>
+            {user.tradeCount > 0 && user.lastTradeDate && (
+              <div>
+                <dt className="text-xs text-text-secondary uppercase tracking-wider">
+                  Latest session
+                </dt>
+                <dd className="mt-0.5">{formatDate(user.lastTradeDate)}</dd>
+              </div>
+            )}
             <div>
               <dt className="text-xs text-text-secondary uppercase tracking-wider">Coach share</dt>
               <dd className="mt-0.5">{user.coachShareEnabled ? 'On' : 'Off'}</dd>

@@ -68,6 +68,18 @@ export function normalizeTradeDate(value: string | undefined | null): string | n
   return null;
 }
 
+export function maxDateKey(a: string | null, b: string | null): string | null {
+  if (!a) return b;
+  if (!b) return a;
+  return a > b ? a : b;
+}
+
+export function maxIsoTimestamp(a: string | null, b: string | null): string | null {
+  if (!a) return b;
+  if (!b) return a;
+  return a > b ? a : b;
+}
+
 export function monthInputValue(year: number, month: number): string {
   return `${year}-${String(month + 1).padStart(2, '0')}`;
 }

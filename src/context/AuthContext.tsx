@@ -106,6 +106,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [firebaseEnabled]);
 
   useEffect(() => {
+    if (!user || !firebaseEnabled) return;
+    void ensureUserProfile(user, false);
+  }, [user, firebaseEnabled]);
+
+  useEffect(() => {
     if (!user || !firebaseEnabled) {
       setUsername(null);
       previousUidRef.current = null;

@@ -9,6 +9,7 @@ import {
   saveTradesBatch,
   subscribeTrades,
 } from '../services/tradesFirestore';
+import { syncUserTradeActivityFromTrades } from '../services/userTradeActivity';
 import { clearLegacyTradesStorage, clearTrades, loadTrades, saveTrades } from '../utils/storage';
 import { resolveTradeAccountId } from '../utils/accounts';
 import { tradeTags } from '../utils/tradeHelpers';
@@ -21,6 +22,7 @@ export function useTrades() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('loading');
   const migratedRef = useRef(false);
+  const activitySyncedRef = useRef(false);
   const activeUidRef = useRef<string | null>(null);
 
   const [filters, setFilters] = useState<Filters>({
@@ -32,6 +34,7 @@ export function useTrades() {
 
   useEffect(() => {
     migratedRef.current = false;
+    activitySyncedRef.current = false;
     activeUidRef.current = user?.uid ?? null;
     setTrades([]);
     setSyncStatus('loading');
@@ -67,6 +70,10 @@ export function useTrades() {
         setTrades(cloudTrades);
         saveTrades(cloudTrades, uid);
         setSyncStatus('cloud');
+        if (!activitySyncedRef.current) {
+          activitySyncedRef.current = true;
+          void syncUserTradeActivityFromTrades(uid, cloudTrades);
+        }
       });
     };
 
