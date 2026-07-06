@@ -37,13 +37,24 @@ export function subscribeTrades(uid: string, onChange: (trades: Trade[]) => void
 }
 
 export async function saveTrade(uid: string, trade: Trade): Promise<void> {
-  await setDoc(doc(tradesCollection(uid), trade.id), stripUndefined(trade as unknown as Record<string, unknown>));
+  const payload = stripUndefined({
+    ...(trade as unknown as Record<string, unknown>),
+    savedAt: new Date().toISOString(),
+  });
+  await setDoc(doc(tradesCollection(uid), trade.id), payload);
 }
 
 export async function saveTradesBatch(uid: string, trades: Trade[]): Promise<void> {
   const batch = writeBatch(getFirebaseDb());
+  const savedAt = new Date().toISOString();
   for (const trade of trades) {
-    batch.set(doc(tradesCollection(uid), trade.id), stripUndefined(trade as unknown as Record<string, unknown>));
+    batch.set(
+      doc(tradesCollection(uid), trade.id),
+      stripUndefined({
+        ...(trade as unknown as Record<string, unknown>),
+        savedAt,
+      }),
+    );
   }
   await batch.commit();
 }

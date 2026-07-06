@@ -9,6 +9,7 @@ import {
 import type { BrokerSupportRequest } from './brokerSupportRequests';
 import type { BugReport } from './bugReports';
 import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
+import { normalizeTradeDate } from '../utils/format';
 
 export interface AdminConfig {
   uid: string;
@@ -92,7 +93,10 @@ export interface AdminUserSummary {
   lastLoginAt: string | null;
   createdAt: string | null;
   tradeCount: number;
+  /** Latest trade session date (YYYY-MM-DD). */
   lastTradeDate: string | null;
+  /** When the user last added or edited a trade in Firestore. */
+  lastTradeActivityAt: string | null;
   coachShareEnabled: boolean;
 }
 
@@ -170,6 +174,7 @@ export async function fetchSignedUpUsers(): Promise<AdminUserSummary[]> {
       createdAt: firestoreTimestampToIso(data.createdAt),
       tradeCount: 0,
       lastTradeDate: null,
+      lastTradeActivityAt: null,
       coachShareEnabled: false,
     });
   }
@@ -192,6 +197,7 @@ export async function fetchSignedUpUsers(): Promise<AdminUserSummary[]> {
         createdAt: firestoreTimestampToIso(data.createdAt),
         tradeCount: 0,
         lastTradeDate: null,
+        lastTradeActivityAt: null,
         coachShareEnabled: false,
       });
     }
@@ -206,9 +212,26 @@ export async function fetchSignedUpUsers(): Promise<AdminUserSummary[]> {
   });
 }
 
+function tradeDocumentActivityAt(
+  tradeDoc: { data: () => { savedAt?: string } },
+  savedAt?: string,
+): string | null {
+  if (savedAt?.trim()) return savedAt.trim();
+  const meta = tradeDoc as unknown as {
+    updateTime?: { toDate: () => Date };
+    createTime?: { toDate: () => Date };
+  };
+  const timestamp = meta.updateTime ?? meta.createTime;
+  return timestamp ? timestamp.toDate().toISOString() : null;
+}
+
 async function fetchUserTradeStats(
   uid: string,
-): Promise<{ tradeCount: number; lastTradeDate: string | null }> {
+): Promise<{
+  tradeCount: number;
+  lastTradeDate: string | null;
+  lastTradeActivityAt: string | null;
+}> {
   const db = getFirebaseDb();
   const tradesCol = collection(db, 'users', uid, 'trades');
 
@@ -216,20 +239,27 @@ async function fetchUserTradeStats(
     const countSnap = await getCountFromServer(tradesCol);
     const tradeCount = countSnap.data().count;
     if (tradeCount === 0) {
-      return { tradeCount: 0, lastTradeDate: null };
+      return { tradeCount: 0, lastTradeDate: null, lastTradeActivityAt: null };
     }
 
     const snap = await getDocs(tradesCol);
     let lastTradeDate: string | null = null;
+    let lastTradeActivityAt: string | null = null;
     for (const tradeDoc of snap.docs) {
-      const date = (tradeDoc.data() as { date?: string }).date;
-      if (date && (!lastTradeDate || date > lastTradeDate)) {
-        lastTradeDate = date;
+      const data = tradeDoc.data() as { date?: string; savedAt?: string };
+      const sessionDate = normalizeTradeDate(data.date);
+      if (sessionDate && (!lastTradeDate || sessionDate > lastTradeDate)) {
+        lastTradeDate = sessionDate;
+      }
+
+      const activityAt = tradeDocumentActivityAt(tradeDoc, data.savedAt);
+      if (activityAt && (!lastTradeActivityAt || activityAt > lastTradeActivityAt)) {
+        lastTradeActivityAt = activityAt;
       }
     }
-    return { tradeCount, lastTradeDate };
+    return { tradeCount, lastTradeDate, lastTradeActivityAt };
   } catch {
-    return { tradeCount: 0, lastTradeDate: null };
+    return { tradeCount: 0, lastTradeDate: null, lastTradeActivityAt: null };
   }
 }
 
@@ -252,6 +282,7 @@ async function enrichUsersWithActivity(users: AdminUserSummary[]): Promise<void>
       ]);
       user.tradeCount = tradeStats.tradeCount;
       user.lastTradeDate = tradeStats.lastTradeDate;
+      user.lastTradeActivityAt = tradeStats.lastTradeActivityAt;
       user.coachShareEnabled = coachShareEnabled;
     }),
   );
