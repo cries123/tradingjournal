@@ -29,7 +29,7 @@ export function exportUsersCsv(users: AdminUserSummary[]): void {
       'signed_up',
       'last_login',
       'trade_count',
-      'last_trade',
+      'last_journaled',
       'latest_session',
       'coach_share',
     ],
@@ -40,9 +40,7 @@ export function exportUsersCsv(users: AdminUserSummary[]): void {
       u.createdAt ? new Date(u.createdAt).toISOString() : '',
       u.lastLoginAt ? new Date(u.lastLoginAt).toISOString() : '',
       String(u.tradeCount),
-      u.lastTradeActivityAt
-        ? new Date(u.lastTradeActivityAt).toISOString()
-        : u.lastTradeDate ?? '',
+      u.lastTradeActivityAt ? new Date(u.lastTradeActivityAt).toISOString() : '',
       u.lastTradeDate ?? '',
       u.coachShareEnabled ? 'yes' : 'no',
     ]),
