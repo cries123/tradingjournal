@@ -3,6 +3,12 @@
   publish = "dist"
   functions = "netlify/functions"
 
+[build.environment]
+  PLAYWRIGHT_BROWSERS_PATH = ".cache/ms-playwright"
+
+[build.cache]
+  paths = [".cache/ms-playwright"]
+
 [functions]
   node_bundler = "esbuild"
 

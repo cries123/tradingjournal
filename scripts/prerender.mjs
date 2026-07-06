@@ -75,17 +75,54 @@ function startPreviewServer(port) {
       cwd: root,
       stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env, NODE_ENV: 'production' },
+      detached: process.platform !== 'win32',
     });
 
     child.on('error', reject);
-    child.stderr.on('data', (chunk) => {
-      process.stderr.write(chunk);
-    });
-    child.stdout.on('data', (chunk) => {
-      process.stdout.write(chunk);
-    });
 
     resolve({ child });
+  });
+}
+
+function stopPreviewServer(child) {
+  return new Promise((resolve) => {
+    if (!child || child.exitCode !== null) {
+      resolve();
+      return;
+    }
+
+    child.stdout?.destroy();
+    child.stderr?.destroy();
+
+    const finish = () => {
+      clearTimeout(forceKill);
+      resolve();
+    };
+
+    const forceKill = setTimeout(() => {
+      try {
+        if (process.platform !== 'win32' && child.pid) {
+          process.kill(-child.pid, 'SIGKILL');
+        } else {
+          child.kill('SIGKILL');
+        }
+      } catch {
+        // already exited
+      }
+      finish();
+    }, 3000);
+
+    child.once('exit', finish);
+
+    try {
+      if (process.platform !== 'win32' && child.pid) {
+        process.kill(-child.pid, 'SIGTERM');
+      } else {
+        child.kill('SIGTERM');
+      }
+    } catch {
+      finish();
+    }
   });
 }
 
@@ -146,11 +183,15 @@ async function main() {
     await browser.close();
     console.log('Prerender complete.');
   } finally {
-    server.kill('SIGTERM');
+    await stopPreviewServer(server);
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+main()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
