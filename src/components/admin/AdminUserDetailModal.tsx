@@ -24,7 +24,13 @@ function formatDateTime(iso: string | null): string {
 
 function formatDate(iso: string | null): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString(undefined, {
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(iso)
+    ? (() => {
+        const [y, m, d] = iso.split('-').map(Number);
+        return new Date(y, m - 1, d);
+      })()
+    : new Date(iso);
+  return date.toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -114,7 +120,13 @@ export function AdminUserDetailModal({
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-text-secondary uppercase tracking-wider">Last trade</dt>
+              <dt className="text-xs text-text-secondary uppercase tracking-wider">Last journaled</dt>
+              <dd className="mt-0.5">
+                {user.lastTradeActivityAt ? formatDateTime(user.lastTradeActivityAt) : '—'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-text-secondary uppercase tracking-wider">Latest session</dt>
               <dd className="mt-0.5">{user.lastTradeDate ? formatDate(user.lastTradeDate) : '—'}</dd>
             </div>
             <div>

@@ -47,6 +47,27 @@ export function parseDateKey(key: string): Date {
   return new Date(y, m - 1, d);
 }
 
+/** Normalize trade session dates to YYYY-MM-DD for reliable comparisons. */
+export function normalizeTradeDate(value: string | undefined | null): string | null {
+  if (!value?.trim()) return null;
+  const raw = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+  const slash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (slash) {
+    const [, m, d, y] = slash;
+    const year = y.length === 2 ? 2000 + parseInt(y, 10) : parseInt(y, 10);
+    return `${year}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
+
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    return toDateKey(parsed);
+  }
+
+  return null;
+}
+
 export function monthInputValue(year: number, month: number): string {
   return `${year}-${String(month + 1).padStart(2, '0')}`;
 }

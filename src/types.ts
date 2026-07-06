@@ -9,6 +9,8 @@ export interface Trade {
   date: string;
   symbol: string;
   pnl: number;
+  /** ISO timestamp when this trade was last saved to cloud storage. */
+  savedAt?: string;
   setup?: string;
   side?: TradeSide;
   notes?: string;

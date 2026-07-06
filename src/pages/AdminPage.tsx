@@ -90,7 +90,13 @@ function statusBadgeClass(status: RequestStatus): string {
 
 function formatDate(iso: string | null): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString(undefined, {
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(iso)
+    ? (() => {
+        const [y, m, d] = iso.split('-').map(Number);
+        return new Date(y, m - 1, d);
+      })()
+    : new Date(iso);
+  return date.toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -701,7 +707,15 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                             </p>
                             <p className="text-[10px] text-text-secondary mt-1">
                               {entry.tradeCount > 0
-                                ? `${entry.tradeCount} trades · last trade ${formatDate(entry.lastTradeDate)}`
+                                ? [
+                                    `${entry.tradeCount} trades`,
+                                    entry.lastTradeActivityAt &&
+                                      `last journaled ${formatDate(entry.lastTradeActivityAt)}`,
+                                    entry.lastTradeDate &&
+                                      `last session ${formatDate(entry.lastTradeDate)}`,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' · ')
                                 : 'No trades'}
                               {entry.lastLoginAt && ` · last login ${formatDate(entry.lastLoginAt)}`}
                             </p>
