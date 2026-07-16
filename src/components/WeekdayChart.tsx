@@ -36,7 +36,7 @@ export function WeekdayChart({ data }: WeekdayChartProps) {
             <div className="flex-1 h-3.5 bg-bg-primary rounded overflow-hidden relative">
               {point.pnl !== 0 && (
                 <div
-                  className={`h-full rounded chart-bar-h ${isProfit ? 'bg-profit-bright' : 'bg-loss-bright'}`}
+                  className={`h-full rounded chart-bar-h ${isProfit ? 'bar-profit-h' : 'bar-loss-h'}`}
                   style={{
                     width: animate ? `${Math.max(widthPct, 2)}%` : '0%',
                     transitionDelay: `${i * 50}ms`,
