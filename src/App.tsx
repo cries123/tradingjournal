@@ -1,20 +1,35 @@
+import { Suspense, lazy } from 'react';
 import { useRoute } from './hooks/useRoute';
 import { usePageMeta } from './hooks/usePageMeta';
 import { useStructuredData } from './hooks/useStructuredData';
 import { useVisitorTracking } from './hooks/useVisitorTracking';
 import { getPageSeo } from './seo/pageMeta';
 import { PageTransition } from './components/motion/FadeIn';
-import { AdminPage } from './pages/AdminPage';
-import { BrokersPage } from './pages/BrokersPage';
-import { CoachViewPage } from './pages/CoachViewPage';
-import { GuidePage } from './pages/GuidePage';
-import { GuidesIndexPage } from './pages/GuidesIndexPage';
 import { LandingPage } from './pages/LandingPage';
-import { JournalApp } from './pages/JournalApp';
-import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
-import { ReportBugPage } from './pages/ReportBugPage';
-import { RequestBrokerPage } from './pages/RequestBrokerPage';
-import { TermsOfServicePage } from './pages/TermsOfServicePage';
+
+const AdminPage = lazy(() => import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })));
+const BrokersPage = lazy(() => import('./pages/BrokersPage').then((m) => ({ default: m.BrokersPage })));
+const CoachViewPage = lazy(() => import('./pages/CoachViewPage').then((m) => ({ default: m.CoachViewPage })));
+const GuidePage = lazy(() => import('./pages/GuidePage').then((m) => ({ default: m.GuidePage })));
+const GuidesIndexPage = lazy(() => import('./pages/GuidesIndexPage').then((m) => ({ default: m.GuidesIndexPage })));
+const JournalApp = lazy(() => import('./pages/JournalApp').then((m) => ({ default: m.JournalApp })));
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage').then((m) => ({ default: m.PrivacyPolicyPage })));
+const ReportBugPage = lazy(() => import('./pages/ReportBugPage').then((m) => ({ default: m.ReportBugPage })));
+const RequestBrokerPage = lazy(() => import('./pages/RequestBrokerPage').then((m) => ({ default: m.RequestBrokerPage })));
+const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage').then((m) => ({ default: m.TermsOfServicePage })));
+
+function RouteLoading() {
+  return (
+    <div
+      data-route-loading
+      className="min-h-dvh flex items-center justify-center bg-bg-primary"
+      aria-busy="true"
+      aria-label="Loading page"
+    >
+      <div className="w-8 h-8 rounded-full border-2 border-emerald-400/30 border-t-emerald-400 animate-spin" />
+    </div>
+  );
+}
 
 export default function App() {
   const { route, coachToken, guideSlug, navigate, navigateGuide } = useRoute();
@@ -85,5 +100,9 @@ export default function App() {
     );
   }
 
-  return <PageTransition routeKey={routeKey}>{content}</PageTransition>;
+  return (
+    <Suspense fallback={<RouteLoading />}>
+      <PageTransition routeKey={routeKey}>{content}</PageTransition>
+    </Suspense>
+  );
 }

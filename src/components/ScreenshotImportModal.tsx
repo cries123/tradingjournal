@@ -143,7 +143,13 @@ export function ScreenshotImportModal({ onClose, onSave, targetDate }: Screensho
   const handleSave = () => {
     const toSave = reviewTrades
       .filter((t) => t.selected)
-      .map(({ selected: _, id: __, sourceFile: ___, ...t }) => t)
+      .map((row) => {
+        const { selected, id, sourceFile, ...t } = row;
+        void selected;
+        void id;
+        void sourceFile;
+        return t;
+      })
       .filter((t) => t.symbol && !isNaN(t.pnl));
 
     if (toSave.length === 0) {
