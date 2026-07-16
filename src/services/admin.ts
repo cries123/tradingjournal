@@ -9,7 +9,7 @@ import {
 import type { BrokerSupportRequest } from './brokerSupportRequests';
 import type { BugReport } from './bugReports';
 import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
-import { normalizeTradeDate, maxDateKey, maxIsoTimestamp } from '../utils/format';
+import { normalizeTradeDate, maxDateKey, maxIsoTimestamp, toDateKey } from '../utils/format';
 
 export interface AdminConfig {
   uid: string;
@@ -97,7 +97,30 @@ export interface AdminUserSummary {
   lastTradeDate: string | null;
   /** When the user last added or edited a trade in Firestore. */
   lastTradeActivityAt: string | null;
+  /** Earliest trade session date (YYYY-MM-DD). */
+  firstTradeDate: string | null;
+  /** Net P&L across all trades (null when no trades). */
+  totalPnl: number | null;
+  /** Percent of trades with positive P&L (null when no trades). */
+  winRate: number | null;
+  /** Trades added or edited in the last 7 days (by savedAt). */
+  tradesSavedLast7Days: number;
   coachShareEnabled: boolean;
+}
+
+export interface AdminPlatformStats {
+  totalTrades: number;
+  usersWithTrades: number;
+  /** Percent of users who imported at least one trade. */
+  activationRate: number;
+  /** Users whose lastLoginAt is within the last 7 days. */
+  activeLast7Days: number;
+  /** Users who added/edited trades within the last 7 days. */
+  journaledLast7Days: number;
+  /** Trades added or edited across all users in the last 7 days. */
+  tradesSavedLast7Days: number;
+  /** Combined net P&L across all users. */
+  combinedPnl: number;
 }
 
 export interface AdminSignupStats {
@@ -177,6 +200,10 @@ export async function fetchSignedUpUsers(): Promise<AdminUserSummary[]> {
       tradeCount: 0,
       lastTradeDate: normalizeTradeDate(data.lastTradeSessionDate),
       lastTradeActivityAt: firestoreTimestampToIso(data.lastTradeActivityAt),
+      firstTradeDate: null,
+      totalPnl: null,
+      winRate: null,
+      tradesSavedLast7Days: 0,
       coachShareEnabled: false,
     });
   }
@@ -200,6 +227,10 @@ export async function fetchSignedUpUsers(): Promise<AdminUserSummary[]> {
         tradeCount: 0,
         lastTradeDate: null,
         lastTradeActivityAt: null,
+        firstTradeDate: null,
+        totalPnl: null,
+        winRate: null,
+        tradesSavedLast7Days: 0,
         coachShareEnabled: false,
       });
     }
@@ -214,47 +245,118 @@ export async function fetchSignedUpUsers(): Promise<AdminUserSummary[]> {
   });
 }
 
-function tradeSavedAt(data: { savedAt?: string }): string | null {
-  const savedAt = data.savedAt?.trim();
-  return savedAt || null;
-}
-
-async function fetchUserTradeStats(
-  uid: string,
-): Promise<{
+interface UserTradeStats {
   tradeCount: number;
   lastTradeDate: string | null;
   lastTradeActivityAt: string | null;
-}> {
+  firstTradeDate: string | null;
+  totalPnl: number | null;
+  winRate: number | null;
+  tradesSavedLast7Days: number;
+}
+
+const EMPTY_TRADE_STATS: UserTradeStats = {
+  tradeCount: 0,
+  lastTradeDate: null,
+  lastTradeActivityAt: null,
+  firstTradeDate: null,
+  totalPnl: null,
+  winRate: null,
+  tradesSavedLast7Days: 0,
+};
+
+/** Single scan over a user's trades computing all admin-facing stats. */
+async function fetchUserTradeStats(uid: string): Promise<UserTradeStats> {
   const db = getFirebaseDb();
   const tradesCol = collection(db, 'users', uid, 'trades');
 
+  const weekAgoIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
   try {
-    const countSnap = await getCountFromServer(tradesCol);
-    const tradeCount = countSnap.data().count;
-    if (tradeCount === 0) {
-      return { tradeCount: 0, lastTradeDate: null, lastTradeActivityAt: null };
-    }
-
     const snap = await getDocs(tradesCol);
+    if (snap.empty) return EMPTY_TRADE_STATS;
+
     let lastTradeDate: string | null = null;
+    let firstTradeDate: string | null = null;
     let lastTradeActivityAt: string | null = null;
+    let totalPnl = 0;
+    let wins = 0;
+    let decided = 0;
+    let tradesSavedLast7Days = 0;
+
     for (const tradeDoc of snap.docs) {
-      const data = tradeDoc.data() as { date?: string; savedAt?: string };
+      const data = tradeDoc.data() as { date?: string; savedAt?: string; pnl?: number };
+
       const sessionDate = normalizeTradeDate(data.date);
-      if (sessionDate && (!lastTradeDate || sessionDate > lastTradeDate)) {
-        lastTradeDate = sessionDate;
+      if (sessionDate) {
+        if (!lastTradeDate || sessionDate > lastTradeDate) lastTradeDate = sessionDate;
+        if (!firstTradeDate || sessionDate < firstTradeDate) firstTradeDate = sessionDate;
       }
 
-      const activityAt = tradeSavedAt(data);
-      if (activityAt && (!lastTradeActivityAt || activityAt > lastTradeActivityAt)) {
-        lastTradeActivityAt = activityAt;
+      const savedAt = data.savedAt?.trim() || null;
+      if (savedAt) {
+        if (!lastTradeActivityAt || savedAt > lastTradeActivityAt) lastTradeActivityAt = savedAt;
+        if (savedAt >= weekAgoIso) tradesSavedLast7Days++;
+      }
+
+      const pnl = typeof data.pnl === 'number' && Number.isFinite(data.pnl) ? data.pnl : 0;
+      totalPnl += pnl;
+      if (pnl !== 0) {
+        decided++;
+        if (pnl > 0) wins++;
       }
     }
-    return { tradeCount, lastTradeDate, lastTradeActivityAt };
+
+    return {
+      tradeCount: snap.size,
+      lastTradeDate,
+      lastTradeActivityAt,
+      firstTradeDate,
+      totalPnl,
+      winRate: decided > 0 ? (wins / decided) * 100 : null,
+      tradesSavedLast7Days,
+    };
   } catch {
-    return { tradeCount: 0, lastTradeDate: null, lastTradeActivityAt: null };
+    return EMPTY_TRADE_STATS;
   }
+}
+
+export function computePlatformStats(users: AdminUserSummary[]): AdminPlatformStats {
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  let totalTrades = 0;
+  let usersWithTrades = 0;
+  let activeLast7Days = 0;
+  let journaledLast7Days = 0;
+  let tradesSavedLast7Days = 0;
+  let combinedPnl = 0;
+
+  for (const user of users) {
+    totalTrades += user.tradeCount;
+    if (user.tradeCount > 0) usersWithTrades++;
+    combinedPnl += user.totalPnl ?? 0;
+    tradesSavedLast7Days += user.tradesSavedLast7Days;
+
+    if (user.lastLoginAt) {
+      const lastLogin = new Date(user.lastLoginAt);
+      if (!Number.isNaN(lastLogin.getTime()) && lastLogin >= weekAgo) activeLast7Days++;
+    }
+
+    if (user.lastTradeActivityAt) {
+      const lastActivity = new Date(user.lastTradeActivityAt);
+      if (!Number.isNaN(lastActivity.getTime()) && lastActivity >= weekAgo) journaledLast7Days++;
+    }
+  }
+
+  return {
+    totalTrades,
+    usersWithTrades,
+    activationRate: users.length > 0 ? (usersWithTrades / users.length) * 100 : 0,
+    activeLast7Days,
+    journaledLast7Days,
+    tradesSavedLast7Days,
+    combinedPnl,
+  };
 }
 
 async function fetchCoachShareEnabled(uid: string): Promise<boolean> {
@@ -280,6 +382,10 @@ async function enrichUsersWithActivity(users: AdminUserSummary[]): Promise<void>
         user.lastTradeActivityAt,
         tradeStats.lastTradeActivityAt,
       );
+      user.firstTradeDate = tradeStats.firstTradeDate;
+      user.totalPnl = tradeStats.totalPnl;
+      user.winRate = tradeStats.winRate;
+      user.tradesSavedLast7Days = tradeStats.tradesSavedLast7Days;
       user.coachShareEnabled = coachShareEnabled;
     }),
   );
@@ -298,7 +404,7 @@ export function computeSignupStats(users: AdminUserSummary[]): AdminSignupStats 
     const d = new Date(now);
     d.setDate(d.getDate() - i);
     d.setHours(0, 0, 0, 0);
-    dailyCounts.set(d.toISOString().slice(0, 10), 0);
+    dailyCounts.set(toDateKey(d), 0);
   }
 
   let last7Days = 0;
@@ -311,7 +417,7 @@ export function computeSignupStats(users: AdminUserSummary[]): AdminSignupStats 
 
     if (created >= weekAgo) {
       last7Days++;
-      const key = created.toISOString().slice(0, 10);
+      const key = toDateKey(created);
       if (dailyCounts.has(key)) {
         dailyCounts.set(key, (dailyCounts.get(key) ?? 0) + 1);
       }

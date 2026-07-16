@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   ArrowLeft,
+  BarChart3,
   Building2,
-  ChevronDown,
   Download,
   Eye,
   Lock,
+  Search,
   ShieldCheck,
   Users,
 } from 'lucide-react';
@@ -17,6 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   buildActivityFeed,
   claimOrVerifyAdmin,
+  computePlatformStats,
   computeSignupStats,
   computeTopBrokers,
   fetchSignedUpUserCount,
@@ -25,6 +27,7 @@ import {
   type AdminActivityItem,
   type AdminUserSummary,
 } from '../services/admin';
+import { formatCurrency } from '../utils/format';
 import { exportBrokerRequestsCsv, exportBugReportsCsv, exportUsersCsv } from '../services/adminExport';
 import { fetchAdminHealth, type AdminHealthStatus } from '../services/adminHealth';
 import {
@@ -53,6 +56,48 @@ interface AdminPageProps {
 
 type RequestStatus = BugReportStatus | BrokerSupportStatus;
 type StatusFilter = 'all' | RequestStatus;
+
+type UserSortKey = 'activity' | 'login' | 'trades' | 'newest' | 'name';
+
+const USER_SORTS: { key: UserSortKey; label: string }[] = [
+  { key: 'activity', label: 'Recent journaling' },
+  { key: 'login', label: 'Recent login' },
+  { key: 'trades', label: 'Most trades' },
+  { key: 'newest', label: 'Newest signup' },
+  { key: 'name', label: 'Name A–Z' },
+];
+
+function timeValue(iso: string | null): number {
+  if (!iso) return 0;
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
+function sortUsers(users: AdminUserSummary[], sort: UserSortKey): AdminUserSummary[] {
+  const sorted = [...users];
+  switch (sort) {
+    case 'activity':
+      sorted.sort((a, b) => timeValue(b.lastTradeActivityAt) - timeValue(a.lastTradeActivityAt));
+      break;
+    case 'login':
+      sorted.sort((a, b) => timeValue(b.lastLoginAt) - timeValue(a.lastLoginAt));
+      break;
+    case 'trades':
+      sorted.sort((a, b) => b.tradeCount - a.tradeCount);
+      break;
+    case 'newest':
+      sorted.sort((a, b) => timeValue(b.createdAt) - timeValue(a.createdAt));
+      break;
+    case 'name':
+      sorted.sort((a, b) => {
+        const aLabel = a.username ?? a.email ?? a.uid;
+        const bLabel = b.username ?? b.email ?? b.uid;
+        return aLabel.localeCompare(bLabel, undefined, { sensitivity: 'base' });
+      });
+      break;
+  }
+  return sorted;
+}
 
 type AdminState =
   | { phase: 'loading' }
@@ -245,6 +290,8 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
   const [bugFilter, setBugFilter] = useState<StatusFilter>('all');
   const [brokerFilter, setBrokerFilter] = useState<StatusFilter>('all');
   const [selectedUser, setSelectedUser] = useState<AdminUserSummary | null>(null);
+  const [userSearch, setUserSearch] = useState('');
+  const [userSort, setUserSort] = useState<UserSortKey>('activity');
 
   const loadAdmin = useCallback(async () => {
     if (!firebaseEnabled) {
@@ -415,6 +462,25 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
     () => (ready ? computeSignupStats(ready.users) : null),
     [ready],
   );
+
+  const platformStats = useMemo(
+    () => (ready ? computePlatformStats(ready.users) : null),
+    [ready],
+  );
+
+  const visibleUsers = useMemo(() => {
+    if (!ready) return [];
+    const term = userSearch.trim().toLowerCase();
+    const matched = term
+      ? ready.users.filter(
+          (u) =>
+            u.username?.toLowerCase().includes(term)
+            || u.email.toLowerCase().includes(term)
+            || u.uid.toLowerCase().includes(term),
+        )
+      : ready.users;
+    return sortUsers(matched, userSort);
+  }, [ready, userSearch, userSort]);
 
   const topBrokers = useMemo(
     () => (ready ? computeTopBrokers(ready.brokerRequests) : []),
@@ -678,53 +744,6 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                     ))}
                   </div>
                 )}
-
-                <details className="mt-4 group">
-                  <summary className="flex items-center gap-1.5 text-xs font-medium text-emerald-400 cursor-pointer hover:text-emerald-300 list-none [&::-webkit-details-marker]:hidden">
-                    <ChevronDown
-                      size={14}
-                      className="transition-transform group-open:rotate-180"
-                      aria-hidden
-                    />
-                    View users ({ready.users.length})
-                  </summary>
-                  {ready.users.length === 0 ? (
-                    <p className="mt-3 text-xs text-text-secondary">No users loaded.</p>
-                  ) : (
-                    <ul className="mt-3 space-y-2 max-h-56 overflow-y-auto pr-1">
-                      {ready.users.map((entry) => (
-                        <li key={entry.uid}>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedUser(entry)}
-                            className="w-full text-left rounded-lg border border-border/40 bg-bg-tertiary/40 px-3 py-2 text-xs hover:border-emerald-500/30 transition-colors"
-                          >
-                            <p className="font-semibold text-text-primary">
-                              {entry.username ? `@${entry.username}` : 'No username'}
-                            </p>
-                            <p className="text-text-secondary mt-0.5 truncate">
-                              {entry.email || 'Email not stored'}
-                            </p>
-                            <p className="text-[10px] text-text-secondary mt-1">
-                              {entry.tradeCount > 0
-                                ? [
-                                    `${entry.tradeCount} trades`,
-                                    entry.lastTradeActivityAt &&
-                                      `last journaled ${formatDate(entry.lastTradeActivityAt)}`,
-                                    entry.lastTradeDate &&
-                                      `last session ${formatDate(entry.lastTradeDate)}`,
-                                  ]
-                                    .filter(Boolean)
-                                    .join(' · ')
-                                : 'No trades'}
-                              {entry.lastLoginAt && ` · last login ${formatDate(entry.lastLoginAt)}`}
-                            </p>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </details>
               </div>
 
               <div className="glass-card rounded-xl p-5 md:p-6">
@@ -770,6 +789,159 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                   </ul>
                 )}
               </div>
+            </div>
+
+            {platformStats && (
+              <div className="glass-card rounded-xl p-5 md:p-6 mb-8">
+                <div className="flex items-center gap-2 mb-4">
+                  <BarChart3 size={16} className="text-emerald-400" />
+                  <h2 className="text-sm font-semibold">Journaling activity</h2>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
+                  <div>
+                    <p className="text-2xl font-bold tracking-tight">
+                      {platformStats.totalTrades.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-text-secondary mt-1">Total trades</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold tracking-tight">
+                      {platformStats.tradesSavedLast7Days.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-text-secondary mt-1">Trades saved (7d)</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold tracking-tight">
+                      {platformStats.activeLast7Days.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-text-secondary mt-1">Users logged in (7d)</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold tracking-tight">
+                      {platformStats.journaledLast7Days.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-text-secondary mt-1">Users journaled (7d)</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold tracking-tight">
+                      {platformStats.activationRate.toFixed(0)}%
+                    </p>
+                    <p className="text-xs text-text-secondary mt-1">Users with trades</p>
+                  </div>
+                  <div>
+                    <p
+                      className={`text-2xl font-bold tracking-tight ${
+                        platformStats.combinedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'
+                      }`}
+                    >
+                      {formatCurrency(platformStats.combinedPnl)}
+                    </p>
+                    <p className="text-xs text-text-secondary mt-1">Combined P&L</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="glass-card rounded-xl p-5 md:p-6 mb-8">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <Users size={16} className="text-emerald-400" />
+                  <h2 className="text-sm font-semibold">Users ({ready.users.length})</h2>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative">
+                    <Search
+                      size={14}
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-secondary"
+                      aria-hidden
+                    />
+                    <input
+                      type="search"
+                      value={userSearch}
+                      onChange={(e) => setUserSearch(e.target.value)}
+                      placeholder="Search username, email, UID…"
+                      className="input-field text-xs py-1.5 pl-8 pr-3 w-52"
+                      aria-label="Search users"
+                    />
+                  </div>
+                  <select
+                    value={userSort}
+                    onChange={(e) => setUserSort(e.target.value as UserSortKey)}
+                    className="input-field text-xs py-1.5 px-2"
+                    aria-label="Sort users"
+                  >
+                    {USER_SORTS.map((s) => (
+                      <option key={s.key} value={s.key}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {visibleUsers.length === 0 ? (
+                <p className="text-xs text-text-secondary">
+                  {ready.users.length === 0 ? 'No users loaded.' : 'No users match this search.'}
+                </p>
+              ) : (
+                <ul className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                  {visibleUsers.map((entry) => (
+                    <li key={entry.uid}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedUser(entry)}
+                        className="w-full text-left rounded-lg border border-border/40 bg-bg-tertiary/40 px-3 py-2.5 text-xs hover:border-emerald-500/30 transition-colors"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-semibold text-text-primary">
+                              {entry.username ? `@${entry.username}` : 'No username'}
+                              {entry.coachShareEnabled && (
+                                <span className="ml-2 inline-flex px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400 text-[9px] font-medium uppercase tracking-wide">
+                                  Coach share
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-text-secondary mt-0.5 truncate">
+                              {entry.email || 'Email not stored'}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="font-semibold text-text-primary">
+                              {entry.tradeCount > 0 ? `${entry.tradeCount} trades` : 'No trades'}
+                            </p>
+                            {entry.totalPnl != null && entry.tradeCount > 0 && (
+                              <p
+                                className={`mt-0.5 font-medium ${
+                                  entry.totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'
+                                }`}
+                              >
+                                {formatCurrency(entry.totalPnl)}
+                                {entry.winRate != null && (
+                                  <span className="text-text-secondary font-normal">
+                                    {' '}· {entry.winRate.toFixed(0)}% win
+                                  </span>
+                                )}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-text-secondary mt-1.5">
+                          {[
+                            entry.lastTradeActivityAt &&
+                              `last journaled ${formatDate(entry.lastTradeActivityAt)}`,
+                            entry.lastTradeDate && `last session ${formatDate(entry.lastTradeDate)}`,
+                            entry.lastLoginAt && `last login ${formatDate(entry.lastLoginAt)}`,
+                            entry.createdAt && `joined ${formatDate(entry.createdAt)}`,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ') || 'No activity recorded'}
+                        </p>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             <div className="grid md:grid-cols-2 gap-6 mb-8">
