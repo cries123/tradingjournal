@@ -36,7 +36,7 @@ export function BrokersPage({
         </div>
       </main>
 
-      <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} onHome={onHome} onBrokers={() => {}} />
+      <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} onHome={onHome} onBrokers={onBrokers} />
     </div>
   );
 }
