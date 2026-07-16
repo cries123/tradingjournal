@@ -8,6 +8,7 @@ import {
   adminUpdateUserEmail,
   adminUpdateUserPassword,
 } from '../../services/adminUserManagement';
+import { formatCurrency } from '../../utils/format';
 
 interface AdminUserDetailModalProps {
   user: AdminUserSummary;
@@ -117,8 +118,24 @@ export function AdminUserDetailModal({
               <dt className="text-xs text-text-secondary uppercase tracking-wider">Trades</dt>
               <dd className="mt-0.5">
                 {user.tradeCount > 0 ? `${user.tradeCount} trades` : 'No trades imported'}
+                {user.tradesSavedLast7Days > 0 && (
+                  <span className="text-text-secondary"> · {user.tradesSavedLast7Days} saved in last 7 days</span>
+                )}
               </dd>
             </div>
+            {user.tradeCount > 0 && user.totalPnl != null && (
+              <div>
+                <dt className="text-xs text-text-secondary uppercase tracking-wider">Performance</dt>
+                <dd className="mt-0.5">
+                  <span className={user.totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                    {formatCurrency(user.totalPnl)} net
+                  </span>
+                  {user.winRate != null && (
+                    <span className="text-text-secondary"> · {user.winRate.toFixed(0)}% win rate</span>
+                  )}
+                </dd>
+              </div>
+            )}
             <div>
               <dt className="text-xs text-text-secondary uppercase tracking-wider">Last journaled</dt>
               <dd className="mt-0.5">
@@ -126,8 +143,14 @@ export function AdminUserDetailModal({
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-text-secondary uppercase tracking-wider">Latest session</dt>
-              <dd className="mt-0.5">{user.lastTradeDate ? formatDate(user.lastTradeDate) : '—'}</dd>
+              <dt className="text-xs text-text-secondary uppercase tracking-wider">Sessions</dt>
+              <dd className="mt-0.5">
+                {user.firstTradeDate || user.lastTradeDate
+                  ? `${user.firstTradeDate ? formatDate(user.firstTradeDate) : '—'} → ${
+                      user.lastTradeDate ? formatDate(user.lastTradeDate) : '—'
+                    }`
+                  : '—'}
+              </dd>
             </div>
             <div>
               <dt className="text-xs text-text-secondary uppercase tracking-wider">Coach share</dt>
