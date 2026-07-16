@@ -38,6 +38,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   const {
     trades,
     allTrades,
+    everyTrade,
     filters,
     setFilters,
     symbols,
@@ -46,6 +47,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
     addTrades,
     updateTrade,
     deleteTrade,
+    restoreTrades,
     clearAll,
     syncStatus,
   } = useTrades();
@@ -197,10 +199,12 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
             {appView === 'settings' ? (
               <SettingsPage
                 trades={allTrades}
+                everyTrade={everyTrade}
                 monthStats={monthStats}
                 year={year}
                 month={month}
                 onBack={() => setAppView('dashboard')}
+                onRestoreTrades={restoreTrades}
               />
             ) : appView === 'brokers' ? (
               <BrokersContent

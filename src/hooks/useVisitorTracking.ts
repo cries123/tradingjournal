@@ -15,7 +15,7 @@ const ROUTE_PATHS: Partial<Record<AppRoute, string>> = {
 };
 
 /** Track anonymous site visits for admin conversion metrics. */
-export function useVisitorTracking(route: AppRoute, guideSlug?: string) {
+export function useVisitorTracking(route: AppRoute, guideSlug?: string, brokerSlug?: string) {
   const { user, loading, firebaseEnabled } = useAuth();
 
   useEffect(() => {
@@ -25,8 +25,10 @@ export function useVisitorTracking(route: AppRoute, guideSlug?: string) {
     const path =
       route === 'guide' && guideSlug
         ? `/guides/${guideSlug}`
-        : ROUTE_PATHS[route] ?? '/';
+        : route === 'broker-guide' && brokerSlug
+          ? `/brokers/${brokerSlug}`
+          : ROUTE_PATHS[route] ?? '/';
 
     void recordAnonymousVisit(path);
-  }, [route, guideSlug, user, loading, firebaseEnabled]);
+  }, [route, guideSlug, brokerSlug, user, loading, firebaseEnabled]);
 }

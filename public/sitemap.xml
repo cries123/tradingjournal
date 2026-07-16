@@ -11,6 +11,21 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://trendchasers.net/brokers/thinkorswim</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  <url>
+    <loc>https://trendchasers.net/brokers/charles-schwab</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  <url>
+    <loc>https://trendchasers.net/brokers/robinhood</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  <url>
     <loc>https://trendchasers.net/guides</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>

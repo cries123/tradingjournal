@@ -2,6 +2,22 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, Check } from 'lucide-react';
 import { brokerIdFromName, BrokerLogo } from '../brokers/BrokerLogo';
 import { fetchBrokersConfig, type BrokerConfig } from '../../services/brokersConfig';
+import { BROKER_GUIDES } from '../../seo/brokerGuides';
+
+function brokerGuidePath(brokerName: string): string | null {
+  const normalized = brokerName.trim().toLowerCase();
+  if (!normalized) return null;
+  const guide = BROKER_GUIDES.find((g) => {
+    const guideName = g.brokerName.toLowerCase();
+    return (
+      guideName === normalized
+      || guideName.includes(normalized)
+      || normalized.includes(guideName)
+      || g.slug === normalized.replace(/\s+/g, '-')
+    );
+  });
+  return guide?.path ?? null;
+}
 
 interface BrokersContentProps {
   onBack: () => void;
@@ -57,6 +73,14 @@ export function BrokersContent({ onBack, backLabel = 'Back to dashboard', onRequ
                   </li>
                 ))}
               </ul>
+              {brokerGuidePath(b.name) && (
+                <a
+                  href={brokerGuidePath(b.name)!}
+                  className="inline-block mt-4 text-sm text-emerald-400 hover:underline"
+                >
+                  How to journal {b.name} trades →
+                </a>
+              )}
             </article>
           ))}
         </div>

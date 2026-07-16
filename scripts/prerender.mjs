@@ -18,6 +18,9 @@ const host = '127.0.0.1';
 const ROUTES = [
   '/',
   '/brokers',
+  '/brokers/thinkorswim',
+  '/brokers/charles-schwab',
+  '/brokers/robinhood',
   '/guides',
   '/guides/free-trading-journal',
   '/guides/trading-journal-without-broker-login',

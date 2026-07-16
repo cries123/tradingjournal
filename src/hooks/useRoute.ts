@@ -4,6 +4,7 @@ export type AppRoute =
   | 'landing'
   | 'app'
   | 'brokers'
+  | 'broker-guide'
   | 'privacy'
   | 'terms'
   | 'coach'
@@ -13,7 +14,7 @@ export type AppRoute =
   | 'guides'
   | 'guide';
 
-const ROUTE_PATHS: Record<Exclude<AppRoute, 'coach' | 'guide'>, string> = {
+const ROUTE_PATHS: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>, string> = {
   landing: '/',
   app: '/app',
   brokers: '/brokers',
@@ -29,6 +30,7 @@ interface RouteState {
   route: AppRoute;
   coachToken?: string;
   guideSlug?: string;
+  brokerSlug?: string;
 }
 
 function readRoute(): RouteState {
@@ -42,6 +44,11 @@ function readRoute(): RouteState {
   }
   if (path === '/guides') return { route: 'guides' };
 
+  if (path.startsWith('/brokers/')) {
+    const slug = path.slice('/brokers/'.length).replace(/\/$/, '');
+    if (slug) return { route: 'broker-guide', brokerSlug: slug };
+  }
+
   if (path.startsWith('/app')) return { route: 'app' };
   if (path.startsWith('/brokers')) return { route: 'brokers' };
   if (path.startsWith('/privacy')) return { route: 'privacy' };
@@ -54,7 +61,7 @@ function readRoute(): RouteState {
 
 export function useRoute() {
   const [state, setState] = useState<RouteState>(readRoute);
-  const { route, coachToken, guideSlug } = state;
+  const { route, coachToken, guideSlug, brokerSlug } = state;
 
   useEffect(() => {
     const onPopState = () => setState(readRoute());
@@ -89,7 +96,7 @@ export function useRoute() {
     return () => mobileQuery.removeEventListener('change', applyRouteStyles);
   }, [route]);
 
-  const navigate = useCallback((next: Exclude<AppRoute, 'coach' | 'guide'>) => {
+  const navigate = useCallback((next: Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>) => {
     window.history.pushState({}, '', ROUTE_PATHS[next]);
     setState({ route: next });
     if (next !== 'app') window.scrollTo(0, 0);
@@ -101,5 +108,11 @@ export function useRoute() {
     window.scrollTo(0, 0);
   }, []);
 
-  return { route, coachToken, guideSlug, navigate, navigateGuide };
+  const navigateBrokerGuide = useCallback((slug: string) => {
+    window.history.pushState({}, '', `/brokers/${slug}`);
+    setState({ route: 'broker-guide', brokerSlug: slug });
+    window.scrollTo(0, 0);
+  }, []);
+
+  return { route, coachToken, guideSlug, brokerSlug, navigate, navigateGuide, navigateBrokerGuide };
 }

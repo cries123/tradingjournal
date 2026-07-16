@@ -90,8 +90,8 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-[3.25rem] font-bold leading-[1.1] tracking-tight">
               <span className="text-gradient">Trend Chasers</span>
-              {' — '}the journal built for{' '}
-              <span className="text-gradient">your broker</span>
+              {' — '}the trading journal that never asks for your{' '}
+              <span className="text-gradient">broker login</span>
             </h1>
             <p className="mt-5 text-base md:text-lg text-text-secondary leading-relaxed max-w-xl">
               Track daily P&L on a visual calendar, import trades with AI or CSV, and review your performance —
@@ -105,8 +105,11 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
                 See supported brokers
               </button>
             </div>
-            <div className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-sm text-text-secondary">
-              {['No brokerage login required', 'Clean manual trade entry', 'AI screenshot parsing'].map((item) => (
+            <p className="mt-3 text-xs text-text-secondary">
+              No signup needed to try it — your journal stays in your browser until you choose to sync.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-text-secondary">
+              {['No brokerage login required', 'Free — no credit card', 'AI screenshot parsing'].map((item) => (
                 <span key={item} className="flex items-center gap-2">
                   <Check size={14} className="text-emerald-400" />
                   {item}
@@ -170,6 +173,9 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
                   </li>
                 ))}
               </ul>
+              <button type="button" onClick={onLaunch} className="btn-primary text-sm px-6 py-2.5 mt-6">
+                Try AI import free
+              </button>
             </div>
             </FadeIn>
             <FadeIn delay={100}>
@@ -200,9 +206,20 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
         <FadeIn className="max-w-6xl mx-auto px-4 md:px-6 text-center">
           <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Brokers</p>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">Thinkorswim · Schwab · Robinhood</h2>
-          <p className="text-text-secondary max-w-xl mx-auto mb-8">
+          <p className="text-text-secondary max-w-xl mx-auto mb-6">
             AI screenshot parsing and CSV imports — no brokerage login required. More brokers coming soon.
           </p>
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 mb-8 text-sm">
+            {[
+              { name: 'Thinkorswim journal guide', path: '/brokers/thinkorswim' },
+              { name: 'Schwab journal guide', path: '/brokers/charles-schwab' },
+              { name: 'Robinhood journal guide', path: '/brokers/robinhood' },
+            ].map((link) => (
+              <a key={link.path} href={link.path} className="text-emerald-400 hover:underline">
+                {link.name} →
+              </a>
+            ))}
+          </div>
           <button type="button" onClick={onBrokers} className="btn-secondary px-8 py-3">
             View all supported brokers →
           </button>

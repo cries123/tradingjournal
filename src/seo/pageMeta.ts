@@ -1,4 +1,5 @@
 import type { AppRoute } from '../hooks/useRoute';
+import { getBrokerGuideBySlug } from './brokerGuides';
 import { getGuideBySlug } from './guides';
 
 export const SITE_ORIGIN = 'https://trendchasers.net';
@@ -11,7 +12,7 @@ export interface PageSeo {
   noindex?: boolean;
 }
 
-const PAGE_SEO: Record<Exclude<AppRoute, 'coach' | 'guide'>, PageSeo> = {
+const PAGE_SEO: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>, PageSeo> = {
   landing: {
     title: 'Trend Chasers — Trading Journal & P&L Calendar',
     description:
@@ -74,7 +75,12 @@ const COACH_SEO: PageSeo = {
   noindex: true,
 };
 
-export function getPageSeo(route: AppRoute, coachToken?: string, guideSlug?: string): PageSeo {
+export function getPageSeo(
+  route: AppRoute,
+  coachToken?: string,
+  guideSlug?: string,
+  brokerSlug?: string,
+): PageSeo {
   if (route === 'coach') {
     return coachToken ? { ...COACH_SEO, path: `/coach/${coachToken}` } : COACH_SEO;
   }
@@ -96,13 +102,33 @@ export function getPageSeo(route: AppRoute, coachToken?: string, guideSlug?: str
     };
   }
 
-  return PAGE_SEO[route as Exclude<AppRoute, 'coach' | 'guide'>];
+  if (route === 'broker-guide' && brokerSlug) {
+    const guide = getBrokerGuideBySlug(brokerSlug);
+    if (guide) {
+      return {
+        title: guide.title,
+        description: guide.description,
+        path: guide.path,
+      };
+    }
+    return {
+      title: 'Broker Guide — Trend Chasers',
+      description: 'Broker import guide on Trend Chasers.',
+      path: `/brokers/${brokerSlug}`,
+      noindex: true,
+    };
+  }
+
+  return PAGE_SEO[route as Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>];
 }
 
 /** Public marketing routes prerendered at build time for crawlers. */
 export const PRERENDER_ROUTES = [
   '/',
   '/brokers',
+  '/brokers/thinkorswim',
+  '/brokers/charles-schwab',
+  '/brokers/robinhood',
   '/guides',
   '/guides/free-trading-journal',
   '/guides/trading-journal-without-broker-login',

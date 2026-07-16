@@ -1,4 +1,5 @@
 import type { AppRoute } from '../hooks/useRoute';
+import { getBrokerGuideBySlug } from './brokerGuides';
 import { LANDING_FAQ } from './faq';
 import { GUIDE_ARTICLES, getGuideBySlug } from './guides';
 import { SITE_ORIGIN } from './pageMeta';
@@ -116,7 +117,45 @@ function articleSchema(guideSlug: string) {
   };
 }
 
-export function buildStructuredData(route: AppRoute, guideSlug?: string): Record<string, unknown>[] {
+function brokerGuideSchemas(brokerSlug: string): Record<string, unknown>[] {
+  const guide = getBrokerGuideBySlug(brokerSlug);
+  if (!guide) return [];
+
+  return [
+    {
+      '@type': 'Article',
+      '@id': `${SITE_ORIGIN}${guide.path}#article`,
+      headline: guide.title,
+      description: guide.description,
+      author: { '@id': `${SITE_ORIGIN}/#organization` },
+      publisher: { '@id': `${SITE_ORIGIN}/#organization` },
+      mainEntityOfPage: `${SITE_ORIGIN}${guide.path}`,
+      url: `${SITE_ORIGIN}${guide.path}`,
+      image: `${SITE_ORIGIN}/og-image.png`,
+      articleSection: 'Broker import guides',
+    },
+    {
+      '@type': 'FAQPage',
+      '@id': `${SITE_ORIGIN}${guide.path}#faq`,
+      mainEntity: guide.faq.map((item) => ({
+        '@type': 'Question',
+        name: item.question,
+        acceptedAnswer: { '@type': 'Answer', text: item.answer },
+      })),
+    },
+    breadcrumb([
+      { name: 'Home', path: '/' },
+      { name: 'Supported Brokers', path: '/brokers' },
+      { name: `${guide.brokerName} Trading Journal`, path: guide.path },
+    ]),
+  ];
+}
+
+export function buildStructuredData(
+  route: AppRoute,
+  guideSlug?: string,
+  brokerSlug?: string,
+): Record<string, unknown>[] {
   const graph: Record<string, unknown>[] = [
     ORGANIZATION,
     WEBSITE,
@@ -163,6 +202,10 @@ export function buildStructuredData(route: AppRoute, guideSlug?: string): Record
         { name: 'Supported Brokers', path: '/brokers' },
       ]),
     );
+  }
+
+  if (route === 'broker-guide' && brokerSlug) {
+    graph.push(...brokerGuideSchemas(brokerSlug));
   }
 
   return graph;

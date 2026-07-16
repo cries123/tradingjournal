@@ -1,11 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Copy, Download, FileText, Plus, Trash2 } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { ArrowLeft, Copy, Download, FileText, Plus, Trash2, Upload } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import type { CurrencyCode, ThemeAccent } from '../types/settings';
 import type { Trade } from '../types';
 import type { TradingStats } from '../utils/stats';
+import { downloadBackup, parseBackup, type ParsedBackup } from '../utils/backup';
 import { exportMonthReport, exportTaxCsv, exportTradesCsv } from '../utils/exportTrades';
+import { ConfirmDialog } from './ConfirmDialog';
 import {
   coachShareUrl,
   disableCoachShare,
@@ -16,13 +18,24 @@ import { detectWashSales } from '../utils/washSale';
 
 interface SettingsPageProps {
   trades: Trade[];
+  /** Every trade across all journals — used for full backups. */
+  everyTrade: Trade[];
   monthStats: TradingStats;
   year: number;
   month: number;
   onBack: () => void;
+  onRestoreTrades: (trades: Trade[]) => Promise<void>;
 }
 
-export function SettingsPage({ trades, monthStats, year, month, onBack }: SettingsPageProps) {
+export function SettingsPage({
+  trades,
+  everyTrade,
+  monthStats,
+  year,
+  month,
+  onBack,
+  onRestoreTrades,
+}: SettingsPageProps) {
   const { settings, updateSettings, addSetupTag, addStrategy, removeStrategy, addAccount, removeAccount, setActiveAccount } = useSettings();
   const { username, user, firebaseEnabled } = useAuth();
   const [newTag, setNewTag] = useState('');
@@ -32,8 +45,52 @@ export function SettingsPage({ trades, monthStats, year, month, onBack }: Settin
   const [coachMessage, setCoachMessage] = useState<string | null>(null);
   const [coachMessageIsError, setCoachMessageIsError] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [pendingBackup, setPendingBackup] = useState<ParsedBackup | null>(null);
+  const [restoring, setRestoring] = useState(false);
+  const [backupMessage, setBackupMessage] = useState<string | null>(null);
+  const [backupMessageIsError, setBackupMessageIsError] = useState(false);
+  const backupInputRef = useRef<HTMLInputElement>(null);
 
   const washSaleCount = detectWashSales(trades).length;
+
+  const handleBackupFile = async (file: File | null) => {
+    if (!file) return;
+    setBackupMessage(null);
+    try {
+      const parsed = parseBackup(await file.text());
+      if (parsed.trades.length === 0 && Object.keys(parsed.settings).length === 0) {
+        throw new Error('This backup is empty.');
+      }
+      setPendingBackup(parsed);
+    } catch (err) {
+      setBackupMessageIsError(true);
+      setBackupMessage(err instanceof Error ? err.message : 'Could not read backup file.');
+    } finally {
+      if (backupInputRef.current) backupInputRef.current.value = '';
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!pendingBackup) return;
+    setRestoring(true);
+    setBackupMessage(null);
+    try {
+      await onRestoreTrades(pendingBackup.trades);
+      if (Object.keys(pendingBackup.settings).length > 0) {
+        updateSettings(pendingBackup.settings);
+      }
+      setBackupMessageIsError(false);
+      setBackupMessage(
+        `Restored ${pendingBackup.trades.length} trade${pendingBackup.trades.length === 1 ? '' : 's'} and settings.`,
+      );
+      setPendingBackup(null);
+    } catch (err) {
+      setBackupMessageIsError(true);
+      setBackupMessage(err instanceof Error ? err.message : 'Restore failed. Try again.');
+    } finally {
+      setRestoring(false);
+    }
+  };
 
   const syncCoachShare = useCallback(async () => {
     if (!settings.coachShareEnabled || !user || !username || !settings.coachShareToken) return;
@@ -418,7 +475,61 @@ export function SettingsPage({ trades, monthStats, year, month, onBack }: Settin
             <p className="text-xs text-amber-300">{washSaleCount} potential wash sale(s) flagged in export.</p>
           )}
         </section>
+
+        <section className="panel-card p-5 space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Backup & restore</h2>
+          <p className="text-xs text-text-secondary">
+            Download a full backup of every journal — all trades, tags, accounts, and preferences —
+            as one file. Restore it here on any device.
+          </p>
+          <button
+            type="button"
+            onClick={() => downloadBackup(everyTrade, settings)}
+            className="w-full flex items-center justify-center gap-2 btn-secondary py-2.5 text-sm"
+          >
+            <Download size={16} />
+            Download full backup ({everyTrade.length} trade{everyTrade.length === 1 ? '' : 's'})
+          </button>
+          <button
+            type="button"
+            disabled={restoring}
+            onClick={() => backupInputRef.current?.click()}
+            className="w-full flex items-center justify-center gap-2 btn-secondary py-2.5 text-sm disabled:opacity-50"
+          >
+            <Upload size={16} />
+            {restoring ? 'Restoring…' : 'Restore from backup'}
+          </button>
+          <input
+            ref={backupInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={(e) => void handleBackupFile(e.target.files?.[0] ?? null)}
+            aria-label="Choose backup file"
+          />
+          {backupMessage && (
+            <p className={`text-xs ${backupMessageIsError ? 'text-red-400' : 'text-emerald-300'}`}>
+              {backupMessage}
+            </p>
+          )}
+        </section>
       </div>
+
+      {pendingBackup && (
+        <ConfirmDialog
+          title="Restore this backup?"
+          message={`This will restore ${pendingBackup.trades.length} trade(s)${
+            pendingBackup.exportedAt
+              ? ` from a backup made ${new Date(pendingBackup.exportedAt).toLocaleDateString()}`
+              : ''
+          } plus your tags, journals, and preferences. Existing trades with the same IDs are updated; nothing is deleted.`}
+          confirmLabel="Restore backup"
+          onCancel={() => setPendingBackup(null)}
+          onConfirm={() => {
+            void handleRestore();
+          }}
+        />
+      )}
     </div>
   );
 }
