@@ -1,4 +1,5 @@
 import { BrandLogo } from '../BrandLogo';
+import { BROKER_GUIDES } from '../../seo/brokerGuides';
 import { GUIDE_ARTICLES } from '../../seo/guides';
 
 interface LandingFooterProps {
@@ -112,6 +113,13 @@ export function LandingFooter({
                     className="hover:text-emerald-400 transition-colors"
                   >
                     {guide.title.replace(' — Trend Chasers', '').slice(0, 42)}
+                  </a>
+                </li>
+              ))}
+              {BROKER_GUIDES.map((guide) => (
+                <li key={guide.slug}>
+                  <a href={guide.path} className="hover:text-emerald-400 transition-colors">
+                    {guide.brokerName} journal guide
                   </a>
                 </li>
               ))}

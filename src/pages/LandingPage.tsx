@@ -49,19 +49,19 @@ const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
     icon: Pencil,
     title: 'Manual Trade Entry',
     description:
-      'Log trades by hand with symbol, P/L, side, setup tags, and notes — a clean form without extra clutter.',
+      'Log a trade in seconds — symbol, P/L, side, setup tags, and notes. Tag your setups so the analytics can tell you which ones actually pay.',
   },
   {
     icon: BarChart3,
-    title: 'Performance Analytics',
+    title: 'Trading Insights',
     description:
-      'Net P&L, win rate, profit factor, avg profit per trade & day, weekday breakdown, and daily gross charts.',
+      'Win rate, profit factor, and expectancy — plus streak tracking, your best and worst days, and which symbols are making or costing you money.',
   },
   {
     icon: Cloud,
     title: 'Optional Cloud Sync',
     description:
-      'Sign in with Google or email to sync across devices — or stay local-only. Your journal, your choice.',
+      'Sign in with Google or email to sync across devices — or stay local-only. One-click backup puts your entire journal in a file you own.',
   },
 ];
 
@@ -70,7 +70,7 @@ const FAQ = LANDING_FAQ.map((item) => ({ q: item.question, a: item.answer }));
 const STEPS = [
   { n: '01', title: 'Upload or log', body: 'Screenshot, CSV, or manual entry — get your trades into the journal in seconds.' },
   { n: '02', title: 'Review on calendar', body: 'Daily P&L colors show winning and losing sessions at a glance.' },
-  { n: '03', title: 'Analyze your edge', body: 'Stats and charts reveal patterns in your performance over time.' },
+  { n: '03', title: 'Analyze your edge', body: 'See which setups pay and which bleed — streaks, expectancy, and your best and worst days.' },
 ];
 
 export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, onGuides, onGuide }: LandingPageProps) {
