@@ -1,4 +1,6 @@
 import type { Trade } from '../types';
+import { tradeTags } from './tradeHelpers';
+import { toDateKey } from './format';
 
 export interface DayResult {
   date: string;
@@ -7,6 +9,13 @@ export interface DayResult {
 
 export interface SymbolResult {
   symbol: string;
+  pnl: number;
+  trades: number;
+  winRate: number;
+}
+
+export interface SetupResult {
+  setup: string;
   pnl: number;
   trades: number;
   winRate: number;
@@ -34,6 +43,8 @@ export interface TradingInsights {
   streaks: StreakInfo;
   topSymbols: SymbolResult[];
   bottomSymbols: SymbolResult[];
+  topSetups: SetupResult[];
+  bottomSetups: SetupResult[];
   /** Net P&L of the most recent 5 trading days. */
   recentNet: number;
   /** Net P&L of the 5 trading days before that (null when not enough history). */
@@ -96,6 +107,33 @@ export function computeTradingInsights(trades: Trade[]): TradingInsights | null 
     .sort((a, b) => a.pnl - b.pnl)
     .slice(0, 3);
 
+  const bySetup = new Map<string, { pnl: number; trades: number; wins: number }>();
+  for (const t of trades) {
+    for (const tag of tradeTags(t)) {
+      const key = tag.trim();
+      if (!key) continue;
+      const entry = bySetup.get(key) ?? { pnl: 0, trades: 0, wins: 0 };
+      entry.pnl += t.pnl;
+      entry.trades += 1;
+      if (t.pnl > 0) entry.wins += 1;
+      bySetup.set(key, entry);
+    }
+  }
+  const setupResults: SetupResult[] = [...bySetup.entries()].map(([setup, s]) => ({
+    setup,
+    pnl: s.pnl,
+    trades: s.trades,
+    winRate: s.trades > 0 ? (s.wins / s.trades) * 100 : 0,
+  }));
+  const topSetups = setupResults
+    .filter((s) => s.pnl > 0)
+    .sort((a, b) => b.pnl - a.pnl)
+    .slice(0, 3);
+  const bottomSetups = setupResults
+    .filter((s) => s.pnl < 0)
+    .sort((a, b) => a.pnl - b.pnl)
+    .slice(0, 3);
+
   const recentDays = days.slice(-5);
   const priorDays = days.slice(-10, -5);
   const recentNet = recentDays.reduce((s, d) => s + d.pnl, 0);
@@ -128,10 +166,113 @@ export function computeTradingInsights(trades: Trade[]): TradingInsights | null 
     streaks,
     topSymbols,
     bottomSymbols,
+    topSetups,
+    bottomSetups,
     recentNet,
     priorNet,
     equitySeries,
   };
+}
+
+export interface WeeklyRecap {
+  net: number;
+  greenDays: number;
+  redDays: number;
+  tradeCount: number;
+  bestDay: DayResult | null;
+  worstDay: DayResult | null;
+  topSetup: SetupResult | null;
+  /** Net P&L of the 7 days before this window (null when no history). */
+  prevNet: number | null;
+}
+
+/** Recap of the last 7 calendar days vs the 7 before that. */
+export function computeWeeklyRecap(trades: Trade[], now = new Date()): WeeklyRecap | null {
+  const dayKey = (offset: number) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() - offset);
+    return toDateKey(d);
+  };
+  const weekStart = dayKey(6);
+  const prevStart = dayKey(13);
+
+  const thisWeek = trades.filter((t) => t.date >= weekStart && t.date <= dayKey(0));
+  if (thisWeek.length === 0) return null;
+  const prevWeek = trades.filter((t) => t.date >= prevStart && t.date < weekStart);
+
+  const byDay = new Map<string, number>();
+  for (const t of thisWeek) {
+    byDay.set(t.date, (byDay.get(t.date) ?? 0) + t.pnl);
+  }
+  const days: DayResult[] = [...byDay.entries()].map(([date, pnl]) => ({ date, pnl }));
+
+  let bestDay: DayResult | null = null;
+  let worstDay: DayResult | null = null;
+  for (const day of days) {
+    if (day.pnl > 0 && (!bestDay || day.pnl > bestDay.pnl)) bestDay = day;
+    if (day.pnl < 0 && (!worstDay || day.pnl < worstDay.pnl)) worstDay = day;
+  }
+
+  const bySetup = new Map<string, { pnl: number; trades: number; wins: number }>();
+  for (const t of thisWeek) {
+    for (const tag of tradeTags(t)) {
+      const entry = bySetup.get(tag) ?? { pnl: 0, trades: 0, wins: 0 };
+      entry.pnl += t.pnl;
+      entry.trades += 1;
+      if (t.pnl > 0) entry.wins += 1;
+      bySetup.set(tag, entry);
+    }
+  }
+  let topSetup: SetupResult | null = null;
+  for (const [setup, s] of bySetup) {
+    if (!topSetup || s.pnl > topSetup.pnl) {
+      topSetup = {
+        setup,
+        pnl: s.pnl,
+        trades: s.trades,
+        winRate: s.trades > 0 ? (s.wins / s.trades) * 100 : 0,
+      };
+    }
+  }
+
+  return {
+    net: thisWeek.reduce((s, t) => s + t.pnl, 0),
+    greenDays: days.filter((d) => d.pnl > 0).length,
+    redDays: days.filter((d) => d.pnl < 0).length,
+    tradeCount: thisWeek.length,
+    bestDay,
+    worstDay,
+    topSetup,
+    prevNet: prevWeek.length > 0 ? prevWeek.reduce((s, t) => s + t.pnl, 0) : null,
+  };
+}
+
+/**
+ * Consecutive days journaled, counting back from today (or yesterday if
+ * today has no entries yet). Weekends don't break the streak.
+ */
+export function computeJournalingStreak(trades: Trade[], now = new Date()): number {
+  if (trades.length === 0) return 0;
+  const journaled = new Set(trades.map((t) => t.date));
+
+  const cursor = new Date(now);
+  const todayKey = toDateKey(cursor);
+  if (!journaled.has(todayKey)) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  let streak = 0;
+  for (let i = 0; i < 366; i++) {
+    const key = toDateKey(cursor);
+    const weekday = cursor.getDay();
+    if (journaled.has(key)) {
+      streak++;
+    } else if (weekday !== 0 && weekday !== 6) {
+      break;
+    }
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
 }
 
 function computeStreaks(days: DayResult[]): StreakInfo {

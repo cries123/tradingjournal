@@ -18,6 +18,8 @@ export interface UserSettings {
   activeAccountId: string;
   strategies: Strategy[];
   tradingRules: TradingRules;
+  /** Monthly net P&L target — 0 disables the goal tracker. */
+  monthlyGoalPnl: number;
   remindersEnabled: boolean;
   /** Local HH:MM for end-of-day journal reminder */
   reminderTime: string;
@@ -34,6 +36,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   activeAccountId: 'default',
   strategies: [],
   tradingRules: DEFAULT_TRADING_RULES,
+  monthlyGoalPnl: 0,
   remindersEnabled: false,
   reminderTime: '16:00',
   coachShareEnabled: false,

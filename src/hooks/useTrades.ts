@@ -12,6 +12,7 @@ import {
 import { syncUserTradeActivityFromTrades } from '../services/userTradeActivity';
 import { clearLegacyTradesStorage, clearTrades, loadTrades, saveTrades } from '../utils/storage';
 import { resolveTradeAccountId } from '../utils/accounts';
+import { buildSampleTrades, isSampleTrade } from '../utils/sampleData';
 import { tradeTags } from '../utils/tradeHelpers';
 
 export type SyncStatus = 'loading' | 'local' | 'cloud' | 'syncing';
@@ -20,6 +21,8 @@ export function useTrades() {
   const { user, firebaseEnabled } = useAuth();
   const { settings } = useSettings();
   const [trades, setTrades] = useState<Trade[]>([]);
+  /** Example trades shown in the UI only — never persisted or synced. */
+  const [sampleTrades, setSampleTrades] = useState<Trade[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('loading');
   const migratedRef = useRef(false);
   const activitySyncedRef = useRef(false);
@@ -53,7 +56,7 @@ export function useTrades() {
       clearLegacyTradesStorage();
 
       if (!migratedRef.current) {
-        const anonymousTrades = loadTrades(null);
+        const anonymousTrades = loadTrades(null).filter((t) => !isSampleTrade(t));
         const migrated = await migrateLocalTrades(uid, anonymousTrades);
         migratedRef.current = true;
         if (migrated > 0) {
@@ -90,10 +93,15 @@ export function useTrades() {
     }
   }, [trades, syncStatus]);
 
+  const combinedTrades = useMemo(
+    () => (sampleTrades.length > 0 ? [...trades, ...sampleTrades] : trades),
+    [trades, sampleTrades],
+  );
+
   const accountTrades = useMemo(() => {
     const activeId = settings.activeAccountId;
-    return trades.filter((t) => resolveTradeAccountId(t.accountId) === activeId);
-  }, [trades, settings.activeAccountId]);
+    return combinedTrades.filter((t) => resolveTradeAccountId(t.accountId) === activeId);
+  }, [combinedTrades, settings.activeAccountId]);
 
   const filteredTrades = useMemo(() => {
     return accountTrades.filter((trade) => {
@@ -115,8 +123,17 @@ export function useTrades() {
     [accountTrades],
   );
 
+  const loadSampleData = useCallback(() => {
+    setSampleTrades(buildSampleTrades(settings.activeAccountId));
+  }, [settings.activeAccountId]);
+
+  const clearSampleData = useCallback(() => {
+    setSampleTrades([]);
+  }, []);
+
   const persistTrade = useCallback(
     async (trade: Trade) => {
+      setSampleTrades([]);
       if (user && firebaseEnabled) {
         setSyncStatus('syncing');
         await saveTrade(user.uid, trade);
@@ -149,6 +166,7 @@ export function useTrades() {
 
   const addTrades = useCallback(
     async (newTrades: Omit<Trade, 'id'>[]) => {
+      setSampleTrades([]);
       const withIds = newTrades.map((trade) => ({
         ...withAccount(trade),
         id: crypto.randomUUID(),
@@ -246,5 +264,8 @@ export function useTrades() {
     restoreTrades,
     clearAll,
     syncStatus,
+    sampleActive: sampleTrades.length > 0,
+    loadSampleData,
+    clearSampleData,
   };
 }

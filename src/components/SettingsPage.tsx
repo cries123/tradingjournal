@@ -380,7 +380,23 @@ export function SettingsPage({
         </section>
 
         <section className="panel-card p-5 space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Reminders</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Goals & reminders</h2>
+          <label className="block">
+            <span className="text-xs text-text-secondary mb-1 block">
+              Monthly P&L goal (0 to disable)
+            </span>
+            <input
+              type="number"
+              step="50"
+              min="0"
+              value={settings.monthlyGoalPnl || ''}
+              onChange={(e) =>
+                updateSettings({ monthlyGoalPnl: Math.max(0, Number(e.target.value) || 0) })
+              }
+              className="input-field"
+              placeholder="2000"
+            />
+          </label>
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"

@@ -11,7 +11,10 @@ import {
   getYearTrades,
 } from '../utils/stats';
 import { formatMonthYear } from '../utils/format';
+import { computeJournalingStreak } from '../utils/insights';
+import { useSettings } from '../context/SettingsContext';
 import { AccountSwitcher } from './AccountSwitcher';
+import { WeeklyRecapCard } from './WeeklyRecapCard';
 import { DailyPnlChart } from './DailyPnlChart';
 import { DashboardCalendar } from './DashboardCalendar';
 import { EmptyDashboard } from './EmptyDashboard';
@@ -43,6 +46,9 @@ interface DashboardViewProps {
   onAddTrade: () => void;
   onImportCsv: () => void;
   onImportScreenshot: () => void;
+  sampleActive?: boolean;
+  onLoadSample?: () => void;
+  onClearSample?: () => void;
 }
 
 export function DashboardView({
@@ -64,7 +70,11 @@ export function DashboardView({
   onAddTrade,
   onImportCsv,
   onImportScreenshot,
+  sampleActive = false,
+  onLoadSample,
+  onClearSample,
 }: DashboardViewProps) {
+  const { settings } = useSettings();
   const [mode, setMode] = useState<DashboardMode>('month');
   const [showShare, setShowShare] = useState(false);
 
@@ -79,6 +89,7 @@ export function DashboardView({
 
   const hasFilters = Boolean(filters.symbol || filters.setup || filters.side || filters.tag);
   const analyticsTrades = mode === 'month' ? monthTrades : yearTrades;
+  const streakDays = useMemo(() => computeJournalingStreak(trades), [trades]);
 
   return (
     <div className="flex flex-col gap-2 md:gap-3 pb-2">
@@ -121,7 +132,29 @@ export function DashboardView({
       </div>
 
       {!hasAnyTrades && (
-        <EmptyDashboard onAddTrade={onAddTrade} onImportCsv={onImportCsv} onImportScreenshot={onImportScreenshot} />
+        <EmptyDashboard
+          onAddTrade={onAddTrade}
+          onImportCsv={onImportCsv}
+          onImportScreenshot={onImportScreenshot}
+          onLoadSample={onLoadSample}
+        />
+      )}
+
+      {sampleActive && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 shrink-0">
+          <p className="text-xs text-amber-300">
+            You're viewing example data — it disappears when you add your own trades or refresh.
+          </p>
+          {onClearSample && (
+            <button
+              type="button"
+              onClick={onClearSample}
+              className="text-xs font-medium text-amber-300 hover:text-amber-200 underline focus-ring rounded"
+            >
+              Clear examples
+            </button>
+          )}
+        </div>
       )}
 
       {hasAnyTrades && (
@@ -130,8 +163,12 @@ export function DashboardView({
           cumulativeSeries={mode === 'month' ? cumulativeSeries : []}
           winRateSeries={mode === 'month' ? winRateSeries : []}
           periodLabel={mode === 'month' ? formatMonthYear(year, month) : String(year)}
+          streakDays={streakDays}
+          goalPnl={mode === 'month' ? settings.monthlyGoalPnl : 0}
         />
       )}
+
+      {hasAnyTrades && <WeeklyRecapCard trades={trades} />}
 
       {mode === 'month' ? (
         <DashboardCalendar

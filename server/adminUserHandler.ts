@@ -61,6 +61,7 @@ async function deleteUserFirestoreData(uid: string): Promise<void> {
 
   await deleteCollectionDocs(`users/${uid}/trades`);
   await deleteCollectionDocs(`users/${uid}/settings`);
+  await deleteCollectionDocs(`users/${uid}/dayNotes`);
 
   const usernames = await db.collection('usernames').where('uid', '==', uid).get();
   if (!usernames.empty) {
