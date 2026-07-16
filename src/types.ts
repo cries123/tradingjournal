@@ -79,17 +79,3 @@ export interface Filters {
 }
 
 export type ParsedTradeInput = Omit<Trade, 'id'>;
-
-export interface RoundTrip {
-  id: string;
-  symbol: string;
-  side?: TradeSide;
-  openDate: string;
-  closeDate: string;
-  trades: Trade[];
-  netPnl: number;
-  holdMinutes: number | null;
-  mae: number | null;
-  mfe: number | null;
-  rMultiple: number | null;
-}

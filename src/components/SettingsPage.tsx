@@ -6,7 +6,6 @@ import type { CurrencyCode, ThemeAccent } from '../types/settings';
 import type { Trade } from '../types';
 import type { TradingStats } from '../utils/stats';
 import { exportMonthReport, exportTaxCsv, exportTradesCsv } from '../utils/exportTrades';
-import { useLiveBenchmark } from '../hooks/useLiveBenchmark';
 import {
   coachShareUrl,
   disableCoachShare,
@@ -33,11 +32,6 @@ export function SettingsPage({ trades, monthStats, year, month, onBack }: Settin
   const [coachMessage, setCoachMessage] = useState<string | null>(null);
   const [coachMessageIsError, setCoachMessageIsError] = useState(false);
   const [copied, setCopied] = useState(false);
-
-  const { quote: liveBenchmark, loading: benchmarkLoading } = useLiveBenchmark(
-    settings.benchmarkSymbol,
-    settings.liveBenchmarkEnabled,
-  );
 
   const washSaleCount = detectWashSales(trades).length;
 
@@ -329,51 +323,7 @@ export function SettingsPage({ trades, monthStats, year, month, onBack }: Settin
         </section>
 
         <section className="panel-card p-5 space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Benchmark & reminders</h2>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={settings.liveBenchmarkEnabled}
-              onChange={(e) => updateSettings({ liveBenchmarkEnabled: e.target.checked })}
-              className="rounded border-border"
-            />
-            Live {settings.benchmarkSymbol} benchmark (Yahoo Finance)
-          </label>
-          <label className="block">
-            <span className="text-xs text-text-secondary mb-1 block">Benchmark symbol</span>
-            <input
-              type="text"
-              value={settings.benchmarkSymbol}
-              onChange={(e) => updateSettings({ benchmarkSymbol: e.target.value.toUpperCase() })}
-              className="input-field"
-              maxLength={12}
-            />
-          </label>
-          {settings.liveBenchmarkEnabled && (
-            <div className="rounded-lg border border-border/60 bg-bg-tertiary/30 px-3 py-2 text-xs">
-              {benchmarkLoading ? (
-                <span className="text-text-secondary">Loading live benchmark…</span>
-              ) : liveBenchmark ? (
-                <span className="text-emerald-300">
-                  {liveBenchmark.symbol} MTD {liveBenchmark.monthToDateReturnPct >= 0 ? '+' : ''}
-                  {liveBenchmark.monthToDateReturnPct}% (as of {liveBenchmark.asOf})
-                </span>
-              ) : (
-                <span className="text-text-secondary">Live benchmark unavailable — enter manual % below.</span>
-              )}
-            </div>
-          )}
-          <label className="block">
-            <span className="text-xs text-text-secondary mb-1 block">Manual benchmark return % (fallback)</span>
-            <input
-              type="number"
-              step="0.1"
-              value={settings.benchmarkReturnPct || ''}
-              onChange={(e) => updateSettings({ benchmarkReturnPct: Number(e.target.value) || 0 })}
-              className="input-field"
-              placeholder="2.5"
-            />
-          </label>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Reminders</h2>
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"

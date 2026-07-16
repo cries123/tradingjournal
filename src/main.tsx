@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { AuthProvider } from './context/AuthContext'
 import { SettingsProvider } from './context/SettingsContext'
 import './index.css'
@@ -11,10 +12,12 @@ rootEl.classList.add(isApp ? 'route-app' : 'route-public')
 
 createRoot(rootEl).render(
   <StrictMode>
-    <AuthProvider>
-      <SettingsProvider>
-        <App />
-      </SettingsProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <SettingsProvider>
+          <App />
+        </SettingsProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   </StrictMode>,
 )

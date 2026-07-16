@@ -18,10 +18,6 @@ export interface UserSettings {
   activeAccountId: string;
   strategies: Strategy[];
   tradingRules: TradingRules;
-  /** Manual monthly benchmark return % — used when live benchmark is off */
-  benchmarkReturnPct: number;
-  benchmarkSymbol: string;
-  liveBenchmarkEnabled: boolean;
   remindersEnabled: boolean;
   /** Local HH:MM for end-of-day journal reminder */
   reminderTime: string;
@@ -38,9 +34,6 @@ export const DEFAULT_SETTINGS: UserSettings = {
   activeAccountId: 'default',
   strategies: [],
   tradingRules: DEFAULT_TRADING_RULES,
-  benchmarkReturnPct: 0,
-  benchmarkSymbol: 'SPY',
-  liveBenchmarkEnabled: true,
   remindersEnabled: false,
   reminderTime: '16:00',
   coachShareEnabled: false,

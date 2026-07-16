@@ -134,6 +134,10 @@ function outputPathForRoute(route) {
 async function prerenderRoute(page, baseUrl, route) {
   await page.goto(`${baseUrl}${route}`, { waitUntil: 'load', timeout: 30_000 });
   await page.waitForSelector('#root > *', { timeout: 15_000 });
+  // Lazy-loaded routes show a [data-route-loading] fallback until their chunk resolves.
+  await page.waitForFunction(() => !document.querySelector('[data-route-loading]'), {
+    timeout: 15_000,
+  });
   await page.waitForFunction(() => document.title.length > 0);
   await page.waitForTimeout(400);
 

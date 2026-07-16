@@ -4,7 +4,7 @@ import type { Trade } from '../../types';
 import { useSettings } from '../../context/SettingsContext';
 import { formatCurrency } from '../../utils/format';
 import { computeTradingInsights } from '../../utils/insights';
-import { checkRuleViolations } from '../../utils/advancedStats';
+import { checkRuleViolations } from '../../utils/tradingRules';
 
 interface TradingInsightsSectionProps {
   trades: Trade[];

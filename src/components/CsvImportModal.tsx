@@ -92,7 +92,12 @@ export function CsvImportModal({ onClose, onSave, targetDate }: CsvImportModalPr
   const handleSave = () => {
     const toSave = trades
       .filter((t) => t.selected)
-      .map(({ id: _, selected: __, ...t }) => t);
+      .map((row) => {
+        const { id, selected, ...t } = row;
+        void id;
+        void selected;
+        return t;
+      });
 
     if (toSave.length === 0) {
       setError('Select at least one trade to import');
