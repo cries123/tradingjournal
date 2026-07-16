@@ -190,6 +190,28 @@ export function useTrades() {
     [persistTrade],
   );
 
+  /** Restore trades from a backup — merges by trade id, preserving ids. */
+  const restoreTrades = useCallback(
+    async (backupTrades: Trade[]) => {
+      if (backupTrades.length === 0) return;
+      if (user && firebaseEnabled) {
+        setSyncStatus('syncing');
+        await saveTradesBatch(user.uid, backupTrades);
+      } else {
+        setTrades((prev) => {
+          const byId = new Map(prev.map((t) => [t.id, t]));
+          for (const trade of backupTrades) {
+            byId.set(trade.id, trade);
+          }
+          const next = [...byId.values()];
+          saveTrades(next, null);
+          return next;
+        });
+      }
+    },
+    [user, firebaseEnabled],
+  );
+
   const clearAll = useCallback(async () => {
     const activeId = settings.activeAccountId;
     const toRemove = new Set(
@@ -211,6 +233,8 @@ export function useTrades() {
   return {
     trades: filteredTrades,
     allTrades: accountTrades,
+    /** Every trade across all journals/accounts — for full backups. */
+    everyTrade: trades,
     filters,
     setFilters,
     symbols,
@@ -219,6 +243,7 @@ export function useTrades() {
     addTrades,
     updateTrade,
     deleteTrade,
+    restoreTrades,
     clearAll,
     syncStatus,
   };

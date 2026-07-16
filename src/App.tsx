@@ -8,6 +8,7 @@ import { PageTransition } from './components/motion/FadeIn';
 import { LandingPage } from './pages/LandingPage';
 
 const AdminPage = lazy(() => import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })));
+const BrokerGuidePage = lazy(() => import('./pages/BrokerGuidePage').then((m) => ({ default: m.BrokerGuidePage })));
 const BrokersPage = lazy(() => import('./pages/BrokersPage').then((m) => ({ default: m.BrokersPage })));
 const CoachViewPage = lazy(() => import('./pages/CoachViewPage').then((m) => ({ default: m.CoachViewPage })));
 const GuidePage = lazy(() => import('./pages/GuidePage').then((m) => ({ default: m.GuidePage })));
@@ -32,10 +33,10 @@ function RouteLoading() {
 }
 
 export default function App() {
-  const { route, coachToken, guideSlug, navigate, navigateGuide } = useRoute();
-  usePageMeta(getPageSeo(route, coachToken, guideSlug));
-  useStructuredData(route, guideSlug);
-  useVisitorTracking(route, guideSlug);
+  const { route, coachToken, guideSlug, brokerSlug, navigate, navigateGuide } = useRoute();
+  usePageMeta(getPageSeo(route, coachToken, guideSlug, brokerSlug));
+  useStructuredData(route, guideSlug, brokerSlug);
+  useVisitorTracking(route, guideSlug, brokerSlug);
 
   const goHome = () => navigate('landing');
   const goApp = () => navigate('app');
@@ -68,6 +69,9 @@ export default function App() {
   } else if (route === 'guide' && guideSlug) {
     routeKey = `guide-${guideSlug}`;
     content = <GuidePage slug={guideSlug} {...publicPageProps} />;
+  } else if (route === 'broker-guide' && brokerSlug) {
+    routeKey = `broker-guide-${brokerSlug}`;
+    content = <BrokerGuidePage slug={brokerSlug} {...publicPageProps} />;
   } else if (route === 'brokers') {
     content = <BrokersPage {...publicPageProps} />;
   } else if (route === 'privacy') {

@@ -49,20 +49,28 @@ export async function saveTrade(uid: string, trade: Trade): Promise<void> {
   await touchUserTradeActivity(uid, [trade.date], savedAt);
 }
 
+// Firestore limits a WriteBatch to 500 operations.
+const BATCH_LIMIT = 400;
+
 export async function saveTradesBatch(uid: string, trades: Trade[]): Promise<void> {
   if (trades.length === 0) return;
-  const batch = writeBatch(getFirebaseDb());
   const savedAt = new Date().toISOString();
-  for (const trade of trades) {
-    batch.set(
-      doc(tradesCollection(uid), trade.id),
-      stripUndefined({
-        ...(trade as unknown as Record<string, unknown>),
-        savedAt,
-      }),
-    );
+
+  for (let offset = 0; offset < trades.length; offset += BATCH_LIMIT) {
+    const chunk = trades.slice(offset, offset + BATCH_LIMIT);
+    const batch = writeBatch(getFirebaseDb());
+    for (const trade of chunk) {
+      batch.set(
+        doc(tradesCollection(uid), trade.id),
+        stripUndefined({
+          ...(trade as unknown as Record<string, unknown>),
+          savedAt,
+        }),
+      );
+    }
+    await batch.commit();
   }
-  await batch.commit();
+
   await touchUserTradeActivity(
     uid,
     trades.map((t) => t.date),

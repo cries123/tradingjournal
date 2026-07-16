@@ -4,9 +4,9 @@ import { buildStructuredData } from '../seo/structuredData';
 
 const SCRIPT_ID = 'structured-data-dynamic';
 
-export function useStructuredData(route: AppRoute, guideSlug?: string) {
+export function useStructuredData(route: AppRoute, guideSlug?: string, brokerSlug?: string) {
   useLayoutEffect(() => {
-    const graph = buildStructuredData(route, guideSlug);
+    const graph = buildStructuredData(route, guideSlug, brokerSlug);
     let el = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
 
     if (!el) {
@@ -24,5 +24,5 @@ export function useStructuredData(route: AppRoute, guideSlug?: string) {
     return () => {
       el?.remove();
     };
-  }, [route, guideSlug]);
+  }, [route, guideSlug, brokerSlug]);
 }
