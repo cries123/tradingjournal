@@ -181,52 +181,56 @@ export function TradingInsightsSection({ trades }: TradingInsightsSectionProps) 
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-        <div className="rounded-lg bg-bg-tertiary/50 border border-border/40 p-2.5">
-          <p className="text-[9px] uppercase tracking-wide text-text-secondary mb-1.5 flex items-center gap-1">
-            <TrendingUp size={11} className="text-emerald-400" /> Making you money
-          </p>
-          {insights.topSymbols.length === 0 ? (
-            <p className="text-[10px] text-text-secondary">No profitable symbols yet.</p>
-          ) : (
-            <ul className="space-y-1">
-              {insights.topSymbols.map((s) => (
-                <li key={s.symbol} className="flex items-center justify-between text-xs">
-                  <span className="font-medium">{s.symbol}</span>
-                  <span className="text-text-secondary text-[10px]">
-                    {s.trades} trade{s.trades === 1 ? '' : 's'} · {s.winRate.toFixed(0)}% win
-                  </span>
-                  <span className="font-semibold text-profit-bright">
-                    {formatCurrency(s.pnl, currency)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="rounded-lg bg-bg-tertiary/50 border border-border/40 p-2.5">
-          <p className="text-[9px] uppercase tracking-wide text-text-secondary mb-1.5 flex items-center gap-1">
-            <TrendingDown size={11} className="text-red-400" /> Costing you money
-          </p>
-          {insights.bottomSymbols.length === 0 ? (
-            <p className="text-[10px] text-text-secondary">No losing symbols. Nice.</p>
-          ) : (
-            <ul className="space-y-1">
-              {insights.bottomSymbols.map((s) => (
-                <li key={s.symbol} className="flex items-center justify-between text-xs">
-                  <span className="font-medium">{s.symbol}</span>
-                  <span className="text-text-secondary text-[10px]">
-                    {s.trades} trade{s.trades === 1 ? '' : 's'} · {s.winRate.toFixed(0)}% win
-                  </span>
-                  <span className="font-semibold text-loss-bright">
-                    {formatCurrency(s.pnl, currency)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <BreakdownPanel
+          title="Making you money"
+          tone="profit"
+          emptyText="No profitable symbols yet."
+          rows={insights.topSymbols.map((s) => ({
+            key: s.symbol,
+            label: s.symbol,
+            detail: `${s.trades} trade${s.trades === 1 ? '' : 's'} · ${s.winRate.toFixed(0)}% win`,
+            value: formatCurrency(s.pnl, currency),
+          }))}
+        />
+        <BreakdownPanel
+          title="Costing you money"
+          tone="loss"
+          emptyText="No losing symbols. Nice."
+          rows={insights.bottomSymbols.map((s) => ({
+            key: s.symbol,
+            label: s.symbol,
+            detail: `${s.trades} trade${s.trades === 1 ? '' : 's'} · ${s.winRate.toFixed(0)}% win`,
+            value: formatCurrency(s.pnl, currency),
+          }))}
+        />
       </div>
+
+      {(insights.topSetups.length > 0 || insights.bottomSetups.length > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <BreakdownPanel
+            title="Setups that pay"
+            tone="profit"
+            emptyText="No profitable setups tagged yet."
+            rows={insights.topSetups.map((s) => ({
+              key: s.setup,
+              label: s.setup,
+              detail: `${s.trades} trade${s.trades === 1 ? '' : 's'} · ${s.winRate.toFixed(0)}% win`,
+              value: formatCurrency(s.pnl, currency),
+            }))}
+          />
+          <BreakdownPanel
+            title="Setups that bleed"
+            tone="loss"
+            emptyText="No losing setups. Keep it up."
+            rows={insights.bottomSetups.map((s) => ({
+              key: s.setup,
+              label: s.setup,
+              detail: `${s.trades} trade${s.trades === 1 ? '' : 's'} · ${s.winRate.toFixed(0)}% win`,
+              value: formatCurrency(s.pnl, currency),
+            }))}
+          />
+        </div>
+      )}
 
       <div className="rounded-lg bg-bg-tertiary/50 border border-border/40 p-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
@@ -251,6 +255,50 @@ export function TradingInsightsSection({ trades }: TradingInsightsSectionProps) 
         <p className="text-[9px] text-text-secondary mt-1">Cumulative net P&L by session</p>
       </div>
     </section>
+  );
+}
+
+function BreakdownPanel({
+  title,
+  tone,
+  emptyText,
+  rows,
+}: {
+  title: string;
+  tone: 'profit' | 'loss';
+  emptyText: string;
+  rows: { key: string; label: string; detail: string; value: string }[];
+}) {
+  return (
+    <div className="rounded-lg bg-bg-tertiary/50 border border-border/40 p-2.5">
+      <p className="text-[9px] uppercase tracking-wide text-text-secondary mb-1.5 flex items-center gap-1">
+        {tone === 'profit' ? (
+          <TrendingUp size={11} className="text-emerald-400" />
+        ) : (
+          <TrendingDown size={11} className="text-red-400" />
+        )}{' '}
+        {title}
+      </p>
+      {rows.length === 0 ? (
+        <p className="text-[10px] text-text-secondary">{emptyText}</p>
+      ) : (
+        <ul className="space-y-1">
+          {rows.map((row) => (
+            <li key={row.key} className="flex items-center justify-between gap-2 text-xs">
+              <span className="font-medium truncate">{row.label}</span>
+              <span className="text-text-secondary text-[10px] shrink-0">{row.detail}</span>
+              <span
+                className={`font-semibold shrink-0 ${
+                  tone === 'profit' ? 'text-profit-bright' : 'text-loss-bright'
+                }`}
+              >
+                {row.value}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

@@ -50,6 +50,9 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
     restoreTrades,
     clearAll,
     syncStatus,
+    sampleActive,
+    loadSampleData,
+    clearSampleData,
   } = useTrades();
 
   const now = new Date();
@@ -64,13 +67,16 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   const [importTargetDate, setImportTargetDate] = useState<string | undefined>();
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [clearConfirmStage, setClearConfirmStage] = useState<0 | 1 | 2>(0);
   const [showShareCard, setShowShareCard] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => !hasCompletedOnboarding());
 
   const showAuthModal = firebaseEnabled && !loading && !user;
   const showUsernameModal = firebaseEnabled && !loading && !profileLoading && needsUsername;
   const isLoading = syncStatus === 'loading';
+
+  const activeJournalName =
+    settings.accounts.find((a) => a.id === settings.activeAccountId)?.name ?? 'this journal';
 
   const monthTrades = useMemo(() => getMonthTrades(allTrades, year, month), [allTrades, year, month]);
   const monthStats = useMemo(() => computeStats(monthTrades), [monthTrades]);
@@ -151,7 +157,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
     onAddTrade: () => openAddTrade(),
     onImportScreenshot: () => openImportScreenshot(),
     onImportCsv: () => openImportCsv(),
-    onClearAll: () => setShowClearConfirm(true),
+    onClearAll: () => setClearConfirmStage(1),
     onSettings: () => {
       setAppView('settings');
       closeMobileMenu();
@@ -237,6 +243,9 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 onAddTrade={() => openAddTrade()}
                 onImportCsv={() => openImportCsv()}
                 onImportScreenshot={() => openImportScreenshot()}
+                sampleActive={sampleActive}
+                onLoadSample={loadSampleData}
+                onClearSample={clearSampleData}
               />
             )}
           </div>
@@ -275,17 +284,29 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
 
       {showUsernameModal && <UsernameSetupModal />}
 
-      {showClearConfirm && (
+      {clearConfirmStage === 1 && (
         <ConfirmDialog
-          title="Clear all trades?"
-          message="This permanently deletes every trade in the active journal. This cannot be undone."
-          confirmLabel="Delete all trades"
+          title={`Clear "${activeJournalName}"?`}
+          message={`This deletes all ${allTrades.length} trade${allTrades.length === 1 ? '' : 's'} in "${activeJournalName}" only. Your other journals are not touched.`}
+          confirmLabel="Continue"
+          danger
+          onConfirm={() => setClearConfirmStage(2)}
+          onCancel={() => setClearConfirmStage(0)}
+        />
+      )}
+
+      {clearConfirmStage === 2 && (
+        <ConfirmDialog
+          title="Are you absolutely sure?"
+          message={`Last check: every trade in "${activeJournalName}" will be permanently deleted. This cannot be undone. Consider downloading a backup from Settings first.`}
+          confirmLabel="Yes, wipe this journal"
+          cancelLabel="Keep my trades"
           danger
           onConfirm={() => {
             void clearAll();
-            setShowClearConfirm(false);
+            setClearConfirmStage(0);
           }}
-          onCancel={() => setShowClearConfirm(false)}
+          onCancel={() => setClearConfirmStage(0)}
         />
       )}
 

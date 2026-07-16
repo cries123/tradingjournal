@@ -1,12 +1,13 @@
-import { Camera, FileSpreadsheet, Plus } from 'lucide-react';
+import { Camera, FileSpreadsheet, Plus, Sparkles } from 'lucide-react';
 
 interface EmptyDashboardProps {
   onAddTrade: () => void;
   onImportCsv: () => void;
   onImportScreenshot: () => void;
+  onLoadSample?: () => void;
 }
 
-export function EmptyDashboard({ onAddTrade, onImportCsv, onImportScreenshot }: EmptyDashboardProps) {
+export function EmptyDashboard({ onAddTrade, onImportCsv, onImportScreenshot, onLoadSample }: EmptyDashboardProps) {
   return (
     <div className="panel-card p-6 md:p-8 text-center shrink-0">
       <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center mx-auto mb-4">
@@ -30,6 +31,16 @@ export function EmptyDashboard({ onAddTrade, onImportCsv, onImportScreenshot }: 
           Log trade
         </button>
       </div>
+      {onLoadSample && (
+        <button
+          type="button"
+          onClick={onLoadSample}
+          className="mt-4 inline-flex items-center gap-1.5 text-sm text-emerald-400 hover:text-emerald-300 hover:underline transition-colors focus-ring rounded px-1 py-0.5"
+        >
+          <Sparkles size={14} />
+          Or explore with an example month
+        </button>
+      )}
     </div>
   );
 }

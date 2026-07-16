@@ -3,7 +3,9 @@ import { Camera, FileText, Pencil, Plus, Share2, X } from 'lucide-react';
 import { TradeListItem } from './TradeListItem';
 import { ShareCardModal } from './ShareCardModal';
 import type { Trade } from '../types';
+import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
+import { fetchDayNote, saveDayNote } from '../services/dayNotes';
 import { formatCurrency } from '../utils/format';
 import { computeStats } from '../utils/stats';
 
@@ -29,13 +31,52 @@ export function DayDetailDrawer({
   onImportScreenshot,
 }: DayDetailDrawerProps) {
   const { settings } = useSettings();
+  const { user, firebaseEnabled } = useAuth();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [noteDraft, setNoteDraft] = useState('');
+  const [discipline, setDiscipline] = useState<number | null>(null);
+  const [noteLoadedFor, setNoteLoadedFor] = useState<string | null>(null);
+  const [noteStatus, setNoteStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
+  const noteUid = firebaseEnabled && user ? user.uid : null;
+  const noteLoading = noteLoadedFor !== date;
 
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true));
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchDayNote(noteUid, date)
+      .then((note) => {
+        if (cancelled) return;
+        setNoteDraft(note?.note ?? '');
+        setDiscipline(note?.discipline ?? null);
+        setNoteLoadedFor(date);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setNoteDraft('');
+        setDiscipline(null);
+        setNoteLoadedFor(date);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [noteUid, date]);
+
+  const persistNote = async (nextNote: string, nextDiscipline: number | null) => {
+    setNoteStatus('saving');
+    try {
+      await saveDayNote(noteUid, date, nextNote, nextDiscipline ?? undefined);
+      setNoteStatus('saved');
+      setTimeout(() => setNoteStatus((s) => (s === 'saved' ? 'idle' : s)), 1500);
+    } catch {
+      setNoteStatus('error');
+    }
+  };
 
   const handleClose = () => {
     setVisible(false);
@@ -104,6 +145,54 @@ export function DayDetailDrawer({
         )}
 
         <div className="flex-1 overflow-y-auto p-5">
+          <div className="mb-5 pb-5 border-b border-border/50">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
+                Session notes
+              </p>
+              <span className="text-[10px] text-text-secondary">
+                {noteStatus === 'saving' && 'Saving…'}
+                {noteStatus === 'saved' && <span className="text-emerald-400">Saved</span>}
+                {noteStatus === 'error' && <span className="text-red-400">Could not save</span>}
+              </span>
+            </div>
+            <textarea
+              value={noteDraft}
+              onChange={(e) => setNoteDraft(e.target.value)}
+              onBlur={() => void persistNote(noteDraft, discipline)}
+              disabled={noteLoading}
+              rows={3}
+              placeholder="How did the session go? What worked, what will you do differently…"
+              className="input-field text-sm w-full resize-y min-h-[72px]"
+              aria-label="Session notes"
+            />
+            <div className="flex items-center gap-2 mt-2.5">
+              <span className="text-[10px] uppercase tracking-wide text-text-secondary">Discipline</span>
+              <div className="flex gap-1" role="radiogroup" aria-label="Discipline rating">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    role="radio"
+                    aria-checked={discipline === n}
+                    onClick={() => {
+                      const next = discipline === n ? null : n;
+                      setDiscipline(next);
+                      void persistNote(noteDraft, next);
+                    }}
+                    className={`w-7 h-7 rounded-md text-xs font-semibold transition-colors focus-ring ${
+                      discipline != null && n <= discipline
+                        ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/40'
+                        : 'bg-bg-tertiary/60 text-text-secondary border border-border/40 hover:text-text-primary'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           {dayTrades.length === 0 ? (
             <p className="text-text-secondary text-sm">No trades yet — import or add trades for this day.</p>
           ) : (

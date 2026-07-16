@@ -245,7 +245,7 @@ export function Sidebar({
           onClick={wrap(onClearAll)}
           className="w-full py-1 text-[10px] text-text-secondary/70 hover:text-red-400 transition-colors focus-ring rounded"
         >
-          Clear all trades
+          Clear journal
         </button>
       </div>
     </aside>

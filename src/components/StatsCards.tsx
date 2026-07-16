@@ -1,3 +1,4 @@
+import { Flame, Target } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import type { TradingStats } from '../utils/stats';
 import { formatCurrency } from '../utils/format';
@@ -8,6 +9,10 @@ interface StatsCardsProps {
   cumulativeSeries?: number[];
   winRateSeries?: number[];
   periodLabel?: string;
+  /** Consecutive days journaled (weekends don't break it). */
+  streakDays?: number;
+  /** Monthly P&L goal — renders a progress bar when > 0. */
+  goalPnl?: number;
 }
 
 export function StatsCards({
@@ -15,6 +20,8 @@ export function StatsCards({
   cumulativeSeries = [],
   winRateSeries = [],
   periodLabel,
+  streakDays = 0,
+  goalPnl = 0,
 }: StatsCardsProps) {
   const { settings } = useSettings();
   const hasTrades = stats.totalTrades > 0;
@@ -58,6 +65,12 @@ export function StatsCards({
 
         {hasTrades && (
           <div className="flex flex-wrap items-center gap-1.5 md:gap-2 md:ml-auto md:justify-end md:max-w-[46%]">
+            {streakDays >= 2 && (
+              <span className="stat-chip border-amber-500/30">
+                <Flame size={11} className="text-amber-400" />
+                <span className="chip-value text-amber-300">{streakDays}-day streak</span>
+              </span>
+            )}
             <span className="stat-chip">
               Win rate{' '}
               <span className={`chip-value ${winPct >= 50 ? 'text-profit-bright' : 'text-loss-bright'}`}>
@@ -99,6 +112,30 @@ export function StatsCards({
             className="h-full bg-gradient-to-r from-red-500/60 to-red-400/80"
             style={{ width: `${100 - winPct}%` }}
           />
+        </div>
+      )}
+
+      {goalPnl > 0 && (
+        <div className="relative mt-3 flex items-center gap-2.5">
+          <Target size={13} className="text-sky-400 shrink-0" />
+          <div className="flex-1 h-1.5 rounded-full bg-bg-primary/80 overflow-hidden">
+            <div
+              className={`h-full rounded-full ${
+                stats.netPnl >= goalPnl
+                  ? 'bg-gradient-to-r from-emerald-400 to-teal-300'
+                  : 'bg-gradient-to-r from-sky-500 to-sky-300'
+              }`}
+              style={{ width: `${Math.min(100, Math.max(0, (stats.netPnl / goalPnl) * 100))}%` }}
+            />
+          </div>
+          <span className="text-[10px] md:text-xs text-text-secondary shrink-0">
+            Goal {fmt(goalPnl)} ·{' '}
+            <span className={stats.netPnl >= goalPnl ? 'text-profit-bright font-semibold' : 'text-text-primary'}>
+              {stats.netPnl >= goalPnl
+                ? 'hit 🎯'
+                : `${Math.max(0, (stats.netPnl / goalPnl) * 100).toFixed(0)}%`}
+            </span>
+          </span>
         </div>
       )}
     </div>

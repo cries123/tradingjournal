@@ -35,7 +35,7 @@ async function deleteCollection(path: string, field?: string, value?: string): P
   }
 }
 
-async function deleteUserSubcollection(uid: string, name: 'trades' | 'settings'): Promise<void> {
+async function deleteUserSubcollection(uid: string, name: 'trades' | 'settings' | 'dayNotes'): Promise<void> {
   const db = getFirebaseDb();
 
   while (true) {
@@ -97,6 +97,7 @@ export async function deleteUserViaFirestore(targetUid: string): Promise<{ messa
 
   await deleteUserSubcollection(targetUid, 'trades');
   await deleteUserSubcollection(targetUid, 'settings');
+  await deleteUserSubcollection(targetUid, 'dayNotes');
   await deleteCoachSharesForUid(targetUid);
   await deleteUsernamesForUid(targetUid);
   await markAccountDeleted(targetUid);
