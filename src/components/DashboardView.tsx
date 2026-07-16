@@ -19,7 +19,7 @@ import { ShareCardModal } from './ShareCardModal';
 import { StatsCards } from './StatsCards';
 import { WeekdayChart } from './WeekdayChart';
 import { YearHeatmap } from './YearHeatmap';
-import { AdvancedAnalyticsSection } from './analytics/AdvancedAnalyticsSection';
+import { TradingInsightsSection } from './analytics/TradingInsightsSection';
 
 type DashboardMode = 'month' | 'year';
 
@@ -181,7 +181,7 @@ export function DashboardView({
         </div>
       )}
 
-      {hasAnyTrades && <AdvancedAnalyticsSection trades={analyticsTrades} />}
+      {hasAnyTrades && <TradingInsightsSection trades={analyticsTrades} />}
 
       {showShare && (
         <ShareCardModal
