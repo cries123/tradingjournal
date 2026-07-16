@@ -12,7 +12,7 @@ export const LANDING_FAQ: FaqItem[] = [
   {
     question: 'Which brokers are supported today?',
     answer:
-      'Thinkorswim, Schwab, and Robinhood. AI screenshot parsing works across mobile brokerage apps. CSV import is optimized for Schwab account statements.',
+      'Thinkorswim, Charles Schwab, and Robinhood have dedicated import guides. AI screenshot parsing works across mobile brokerage apps, and CSV import handles Schwab and Thinkorswim statement exports.',
   },
   {
     question: 'I use a different broker. Can you add support?',
@@ -20,9 +20,19 @@ export const LANDING_FAQ: FaqItem[] = [
       'Yes — use Request broker support in the footer. Tell us your broker and how you export trades; we can configure import support for your workflow.',
   },
   {
+    question: 'Can I use Trend Chasers on my phone?',
+    answer:
+      'Yes. The journal is built mobile-first — log trades, snap screenshots for AI import, and review your calendar from your phone. Use Add to Home Screen to install it like an app.',
+  },
+  {
+    question: 'Does it work for options, futures, and crypto?',
+    answer:
+      'Yes. Options imports capture strikes, expirations, and Greeks when visible. Manual entry supports stocks, options, futures, forex, and crypto with per-trade tags and notes.',
+  },
+  {
     question: 'Is my trade data secure?',
     answer:
-      'Without an account, data stays in your browser. With an account, trades sync to Firebase under your user ID. Broker credentials are never collected.',
+      'Without an account, your journal never leaves your browser. With an account, trades sync encrypted in transit and only your login can read them. Broker credentials are never collected — there is nothing to leak.',
   },
   {
     question: 'How accurate is AI import?',
