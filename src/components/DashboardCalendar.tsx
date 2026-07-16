@@ -33,6 +33,21 @@ export function DashboardCalendar({
   const weeks = useMemo(() => buildCalendarWeeks(year, month, summaries), [year, month, summaries]);
   const monthTotal = useMemo(() => getMonthTotalPnl(summaries, year, month), [summaries, year, month]);
 
+  const maxDayAbs = useMemo(() => {
+    let max = 0;
+    for (const week of weeks) {
+      for (const day of week.days) {
+        if (day.summary && day.summary.tradeCount > 0) {
+          max = Math.max(max, Math.abs(day.summary.totalPnl));
+        }
+      }
+    }
+    return max;
+  }, [weeks]);
+
+  const today = new Date();
+  const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+
   return (
     <div className="panel-card p-2 md:p-4 shrink-0">
       <div className="flex flex-wrap items-center justify-between mb-1.5 md:mb-3 gap-x-2 gap-y-1">
@@ -70,6 +85,12 @@ export function DashboardCalendar({
               key={`${day.date?.toISOString() ?? 'e'}-${di}`}
               dayNumber={day.date?.getDate() ?? null}
               summary={day.summary}
+              intensity={
+                day.summary && day.summary.tradeCount > 0 && maxDayAbs > 0
+                  ? Math.abs(day.summary.totalPnl) / maxDayAbs
+                  : 0
+              }
+              isToday={isCurrentMonth && day.date?.getDate() === today.getDate()}
               onClick={
                 day.date
                   ? () => onDayClick(`${year}-${String(month + 1).padStart(2, '0')}-${String(day.date!.getDate()).padStart(2, '0')}`)

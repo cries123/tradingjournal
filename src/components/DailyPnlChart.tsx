@@ -36,7 +36,7 @@ export function DailyPnlChart({ data }: DailyPnlChartProps) {
             </span>
             <div className="w-full flex-1 flex items-end justify-center min-h-0">
               <div
-                className={`w-full max-w-[28px] rounded-t-sm chart-bar ${isProfit ? 'bg-profit-bright' : 'bg-loss-bright'}`}
+                className={`w-full max-w-[28px] rounded-t-md chart-bar ${isProfit ? 'bar-profit' : 'bar-loss'}`}
                 style={{
                   height: animate ? `${Math.max(heightPct, 4)}%` : '0%',
                   transitionDelay: `${i * 60}ms`,
