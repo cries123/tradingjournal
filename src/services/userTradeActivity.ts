@@ -72,5 +72,12 @@ export async function syncUserTradeActivityFromTrades(
   const lastTradeSessionDate = maxDateKey(latestSession, prevSession);
   if (!lastTradeSessionDate) return;
 
-  await setDoc(userRef, { lastTradeSessionDate }, { merge: true });
+  await setDoc(
+    userRef,
+    {
+      lastTradeSessionDate,
+      lastTradeActivityAt: `${lastTradeSessionDate}T23:59:59.000Z`,
+    },
+    { merge: true },
+  );
 }

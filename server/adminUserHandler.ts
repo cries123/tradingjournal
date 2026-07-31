@@ -1,4 +1,5 @@
 import type { IncomingHttpHeaders } from 'http';
+import { AdminRequestError, assertCallerIsAdmin, getBearerToken } from './adminAuth';
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin';
 
 export type AdminUserAction = 'updateEmail' | 'updatePassword' | 'deleteUser';
@@ -8,36 +9,6 @@ export interface AdminUserRequestBody {
   targetUid: string;
   email?: string;
   password?: string;
-}
-
-function getBearerToken(headers: IncomingHttpHeaders): string | null {
-  const auth = headers.authorization ?? headers.Authorization;
-  if (!auth || typeof auth !== 'string') return null;
-  const match = /^Bearer\s+(.+)$/i.exec(auth.trim());
-  return match?.[1] ?? null;
-}
-
-async function assertCallerIsAdmin(idToken: string): Promise<string> {
-  const decoded = await getAdminAuth().verifyIdToken(idToken);
-  const adminSnap = await getAdminFirestore().doc('config/admin').get();
-  if (!adminSnap.exists) {
-    throw new AdminUserError('Admin is not configured', 403);
-  }
-  const adminUid = (adminSnap.data() as { uid?: string }).uid;
-  if (adminUid !== decoded.uid) {
-    throw new AdminUserError('Forbidden', 403);
-  }
-  return decoded.uid;
-}
-
-class AdminUserError extends Error {
-  statusCode: number;
-
-  constructor(message: string, statusCode: number) {
-    super(message);
-    this.name = 'AdminUserError';
-    this.statusCode = statusCode;
-  }
 }
 
 async function deleteCollectionDocs(collectionPath: string): Promise<number> {
@@ -83,7 +54,7 @@ async function deleteUserFirestoreData(uid: string): Promise<void> {
 async function handleUpdateEmail(targetUid: string, email: string): Promise<{ message: string }> {
   const trimmed = email.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-    throw new AdminUserError('Invalid email address', 400);
+    throw new AdminRequestError('Invalid email address', 400);
   }
 
   await getAdminAuth().updateUser(targetUid, { email: trimmed, emailVerified: false });
@@ -94,7 +65,7 @@ async function handleUpdateEmail(targetUid: string, email: string): Promise<{ me
 
 async function handleUpdatePassword(targetUid: string, password: string): Promise<{ message: string }> {
   if (password.length < 6) {
-    throw new AdminUserError('Password must be at least 6 characters', 400);
+    throw new AdminRequestError('Password must be at least 6 characters', 400);
   }
 
   await getAdminAuth().updateUser(targetUid, { password });
@@ -103,13 +74,13 @@ async function handleUpdatePassword(targetUid: string, password: string): Promis
 
 async function handleDeleteUser(callerUid: string, targetUid: string): Promise<{ message: string }> {
   if (callerUid === targetUid) {
-    throw new AdminUserError('You cannot delete your own account from here', 400);
+    throw new AdminRequestError('You cannot delete your own account from here', 400);
   }
 
   const adminSnap = await getAdminFirestore().doc('config/admin').get();
   const siteAdminUid = (adminSnap.data() as { uid?: string } | undefined)?.uid;
   if (siteAdminUid && targetUid === siteAdminUid) {
-    throw new AdminUserError('The site admin account cannot be deleted', 400);
+    throw new AdminRequestError('The site admin account cannot be deleted', 400);
   }
 
   await deleteUserFirestoreData(targetUid);
@@ -166,7 +137,7 @@ export async function handleAdminUserRequest(
         return { statusCode: 400, body: { error: 'Unknown action' } };
     }
   } catch (err) {
-    if (err instanceof AdminUserError) {
+    if (err instanceof AdminRequestError) {
       return { statusCode: err.statusCode, body: { error: err.message } };
     }
     const message = err instanceof Error ? err.message : 'Request failed';
