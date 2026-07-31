@@ -21,7 +21,6 @@ import {
   computePlatformStats,
   computeSignupStats,
   computeTopBrokers,
-  fetchSignedUpUserCount,
   fetchSignedUpUsers,
   type AdminAccessResult,
   type AdminActivityItem,
@@ -45,6 +44,7 @@ import {
   type BugReportStatus,
 } from '../services/bugReports';
 import { fetchVisitorStats, type VisitorStats } from '../services/visitorAnalytics';
+import { fetchAdminServerStats, type AdminServerStats } from '../services/adminStats';
 
 interface AdminPageProps {
   onHome: () => void;
@@ -114,6 +114,8 @@ type AdminState =
       health: AdminHealthStatus | null;
       visitorStats: VisitorStats;
       visitorStatsError: string | null;
+      serverStats: AdminServerStats | null;
+      serverStatsError: string | null;
     };
 
 const STATUS_LABELS: Record<RequestStatus, string> = {
@@ -325,41 +327,46 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
     }
 
     try {
-      const [reportsResult, brokerResult, userCountResult, usersResult, healthResult] =
+      const [reportsResult, brokerResult, usersResult, healthResult] =
         await Promise.allSettled([
           fetchBugReports(),
           fetchBrokerSupportRequests(),
-          fetchSignedUpUserCount(),
           fetchSignedUpUsers(),
           fetchAdminHealth(),
         ]);
 
       const users =
         usersResult.status === 'fulfilled' ? usersResult.value : [];
+      const userCount = users.length;
       const signupStats = computeSignupStats(users);
-      const visitorResult = await fetchVisitorStats(signupStats.last7Days).catch(() => ({
-        stats: {
-          totalUniqueVisitors: 0,
-          totalConverted: 0,
-          conversionRate: 0,
-          last7DaysVisitors: 0,
-          last7DaysSignups: signupStats.last7Days,
-          last7DaysConversionRate: 0,
-          dailyLast7: [],
-        },
-        error: 'Could not load visitor stats',
-      }));
+      const [visitorResult, serverResult] = await Promise.all([
+        fetchVisitorStats(signupStats.last7Days).catch(() => ({
+          stats: {
+            totalUniqueVisitors: 0,
+            totalConverted: 0,
+            conversionRate: 0,
+            last7DaysVisitors: 0,
+            last7DaysSignups: signupStats.last7Days,
+            last7DaysConversionRate: 0,
+            dailyLast7: [],
+          },
+          error: 'Could not load visitor stats',
+        })),
+        fetchAdminServerStats(),
+      ]);
 
       setState({
         phase: 'ready',
         isNewClaim: access.isNewClaim,
         reports: reportsResult.status === 'fulfilled' ? reportsResult.value : [],
         brokerRequests: brokerResult.status === 'fulfilled' ? brokerResult.value : [],
-        userCount: userCountResult.status === 'fulfilled' ? userCountResult.value : 0,
+        userCount,
         users,
         health: healthResult.status === 'fulfilled' ? healthResult.value : null,
         visitorStats: visitorResult.stats,
         visitorStatsError: visitorResult.error,
+        serverStats: serverResult.stats,
+        serverStatsError: serverResult.error,
       });
     } catch {
       setState({
@@ -380,6 +387,8 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
           dailyLast7: [],
         },
         visitorStatsError: null,
+        serverStats: null,
+        serverStatsError: null,
       });
     }
   }, [firebaseEnabled, loading, user, username]);
@@ -726,6 +735,23 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                     {signupStats.last7Days} new in the last 7 days · {signupStats.thisMonth} this month
                   </p>
                 )}
+                {ready.serverStats && (
+                  <p className="text-xs text-text-secondary mt-1">
+                    {ready.serverStats.authUserCount} Firebase Auth accounts
+                    {ready.serverStats.authSignupsLast7Days > 0 && (
+                      <> · {ready.serverStats.authSignupsLast7Days} Auth signups (7d)</>
+                    )}
+                  </p>
+                )}
+                {ready.serverStats && ready.serverStats.authUsersMissingProfile > 0 && (
+                  <p className="text-xs text-amber-400 mt-1">
+                    {ready.serverStats.authUsersMissingProfile} Auth account
+                    {ready.serverStats.authUsersMissingProfile === 1 ? '' : 's'} missing a Firestore profile
+                  </p>
+                )}
+                {ready.serverStatsError && (
+                  <p className="text-xs text-text-secondary mt-1">{ready.serverStatsError}</p>
+                )}
                 <p className="text-xs text-text-secondary mt-1">
                   {usersWithTrades} with trades imported
                 </p>
@@ -795,7 +821,12 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
               <div className="glass-card rounded-xl p-5 md:p-6 mb-8">
                 <div className="flex items-center gap-2 mb-4">
                   <BarChart3 size={16} className="text-emerald-400" />
-                  <h2 className="text-sm font-semibold">Journaling activity</h2>
+                  <div>
+                    <h2 className="text-sm font-semibold">Journaling activity</h2>
+                    <p className="text-[10px] text-text-secondary mt-0.5">
+                      Journaled (7d) counts saved trades and session dates in the last week
+                    </p>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
                   <div>

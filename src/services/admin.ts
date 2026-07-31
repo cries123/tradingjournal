@@ -1,7 +1,6 @@
 import {
   collection,
   doc,
-  getCountFromServer,
   getDoc,
   getDocs,
   runTransaction,
@@ -71,21 +70,6 @@ export async function claimOrVerifyAdmin(
   }) as Promise<AdminAccessResult>;
 }
 
-async function countCollection(name: string): Promise<number | null> {
-  const db = getFirebaseDb();
-  try {
-    const snap = await getCountFromServer(collection(db, name));
-    return snap.data().count;
-  } catch {
-    try {
-      const docs = await getDocs(collection(db, name));
-      return docs.size;
-    } catch {
-      return null;
-    }
-  }
-}
-
 export interface AdminUserSummary {
   uid: string;
   email: string;
@@ -105,6 +89,8 @@ export interface AdminUserSummary {
   winRate: number | null;
   /** Trades added or edited in the last 7 days (by savedAt). */
   tradesSavedLast7Days: number;
+  /** Trades with a session date in the last 7 calendar days. */
+  tradesSessionLast7Days: number;
   coachShareEnabled: boolean;
 }
 
@@ -169,6 +155,31 @@ function firestoreTimestampToIso(value: unknown): string | null {
   return null;
 }
 
+/** Rolling 7-day window start (ISO) for savedAt comparisons. */
+function weekAgoIso(): string {
+  return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+}
+
+/** Rolling 7-day window start (YYYY-MM-DD) for trade session dates. */
+function weekAgoDateKey(): string {
+  return toDateKey(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+}
+
+/** Synthetic activity timestamp from a trade session date when savedAt is missing. */
+function sessionDateToActivityIso(sessionDate: string): string {
+  return `${sessionDate}T23:59:59.000Z`;
+}
+
+function userJournaledRecently(user: AdminUserSummary, weekAgo: Date, weekStartDateKey: string): boolean {
+  if (user.tradesSavedLast7Days > 0 || user.tradesSessionLast7Days > 0) return true;
+  if (user.lastTradeDate && user.lastTradeDate >= weekStartDateKey) return true;
+  if (user.lastTradeActivityAt) {
+    const lastActivity = new Date(user.lastTradeActivityAt);
+    if (!Number.isNaN(lastActivity.getTime()) && lastActivity >= weekAgo) return true;
+  }
+  return false;
+}
+
 /** List registered accounts for the admin panel. */
 export async function fetchSignedUpUsers(): Promise<AdminUserSummary[]> {
   if (!isFirebaseConfigured()) return [];
@@ -204,6 +215,7 @@ export async function fetchSignedUpUsers(): Promise<AdminUserSummary[]> {
       totalPnl: null,
       winRate: null,
       tradesSavedLast7Days: 0,
+      tradesSessionLast7Days: 0,
       coachShareEnabled: false,
     });
   }
@@ -215,15 +227,17 @@ export async function fetchSignedUpUsers(): Promise<AdminUserSummary[]> {
 
     const name = data.username?.trim() || docSnap.id;
     const existing = byUid.get(uid);
+    const usernameCreatedAt = firestoreTimestampToIso(data.createdAt);
     if (existing) {
       if (!existing.username) existing.username = name;
+      if (!existing.createdAt && usernameCreatedAt) existing.createdAt = usernameCreatedAt;
     } else {
       byUid.set(uid, {
         uid,
         email: '',
         username: name,
         lastLoginAt: null,
-        createdAt: firestoreTimestampToIso(data.createdAt),
+        createdAt: usernameCreatedAt,
         tradeCount: 0,
         lastTradeDate: null,
         lastTradeActivityAt: null,
@@ -231,6 +245,7 @@ export async function fetchSignedUpUsers(): Promise<AdminUserSummary[]> {
         totalPnl: null,
         winRate: null,
         tradesSavedLast7Days: 0,
+        tradesSessionLast7Days: 0,
         coachShareEnabled: false,
       });
     }
@@ -253,6 +268,7 @@ interface UserTradeStats {
   totalPnl: number | null;
   winRate: number | null;
   tradesSavedLast7Days: number;
+  tradesSessionLast7Days: number;
 }
 
 const EMPTY_TRADE_STATS: UserTradeStats = {
@@ -263,6 +279,7 @@ const EMPTY_TRADE_STATS: UserTradeStats = {
   totalPnl: null,
   winRate: null,
   tradesSavedLast7Days: 0,
+  tradesSessionLast7Days: 0,
 };
 
 /** Single scan over a user's trades computing all admin-facing stats. */
@@ -270,7 +287,8 @@ async function fetchUserTradeStats(uid: string): Promise<UserTradeStats> {
   const db = getFirebaseDb();
   const tradesCol = collection(db, 'users', uid, 'trades');
 
-  const weekAgoIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const savedSince = weekAgoIso();
+  const sessionSince = weekAgoDateKey();
 
   try {
     const snap = await getDocs(tradesCol);
@@ -283,6 +301,7 @@ async function fetchUserTradeStats(uid: string): Promise<UserTradeStats> {
     let wins = 0;
     let decided = 0;
     let tradesSavedLast7Days = 0;
+    let tradesSessionLast7Days = 0;
 
     for (const tradeDoc of snap.docs) {
       const data = tradeDoc.data() as { date?: string; savedAt?: string; pnl?: number };
@@ -291,12 +310,18 @@ async function fetchUserTradeStats(uid: string): Promise<UserTradeStats> {
       if (sessionDate) {
         if (!lastTradeDate || sessionDate > lastTradeDate) lastTradeDate = sessionDate;
         if (!firstTradeDate || sessionDate < firstTradeDate) firstTradeDate = sessionDate;
+        if (sessionDate >= sessionSince) tradesSessionLast7Days++;
       }
 
       const savedAt = data.savedAt?.trim() || null;
       if (savedAt) {
         if (!lastTradeActivityAt || savedAt > lastTradeActivityAt) lastTradeActivityAt = savedAt;
-        if (savedAt >= weekAgoIso) tradesSavedLast7Days++;
+        if (savedAt >= savedSince) tradesSavedLast7Days++;
+      } else if (sessionDate) {
+        const inferred = sessionDateToActivityIso(sessionDate);
+        if (!lastTradeActivityAt || inferred > lastTradeActivityAt) {
+          lastTradeActivityAt = inferred;
+        }
       }
 
       const pnl = typeof data.pnl === 'number' && Number.isFinite(data.pnl) ? data.pnl : 0;
@@ -315,6 +340,7 @@ async function fetchUserTradeStats(uid: string): Promise<UserTradeStats> {
       totalPnl,
       winRate: decided > 0 ? (wins / decided) * 100 : null,
       tradesSavedLast7Days,
+      tradesSessionLast7Days,
     };
   } catch {
     return EMPTY_TRADE_STATS;
@@ -323,6 +349,7 @@ async function fetchUserTradeStats(uid: string): Promise<UserTradeStats> {
 
 export function computePlatformStats(users: AdminUserSummary[]): AdminPlatformStats {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const weekStartDateKey = weekAgoDateKey();
 
   let totalTrades = 0;
   let usersWithTrades = 0;
@@ -342,10 +369,7 @@ export function computePlatformStats(users: AdminUserSummary[]): AdminPlatformSt
       if (!Number.isNaN(lastLogin.getTime()) && lastLogin >= weekAgo) activeLast7Days++;
     }
 
-    if (user.lastTradeActivityAt) {
-      const lastActivity = new Date(user.lastTradeActivityAt);
-      if (!Number.isNaN(lastActivity.getTime()) && lastActivity >= weekAgo) journaledLast7Days++;
-    }
+    if (userJournaledRecently(user, weekAgo, weekStartDateKey)) journaledLast7Days++;
   }
 
   return {
@@ -386,6 +410,7 @@ async function enrichUsersWithActivity(users: AdminUserSummary[]): Promise<void>
       user.totalPnl = tradeStats.totalPnl;
       user.winRate = tradeStats.winRate;
       user.tradesSavedLast7Days = tradeStats.tradesSavedLast7Days;
+      user.tradesSessionLast7Days = tradeStats.tradesSessionLast7Days;
       user.coachShareEnabled = coachShareEnabled;
     }),
   );
@@ -502,14 +527,22 @@ export function buildActivityFeed(
     .slice(0, limit);
 }
 
-/** Count registered accounts — users collection, with usernames as fallback. */
+/** Count registered accounts — unique union of users + usernames registries. */
 export async function fetchSignedUpUserCount(): Promise<number> {
   if (!isFirebaseConfigured()) return 0;
 
-  const [users, usernames] = await Promise.all([
-    countCollection('users'),
-    countCollection('usernames'),
+  const db = getFirebaseDb();
+  const [userSnaps, usernameSnaps] = await Promise.all([
+    getDocs(collection(db, 'users')),
+    getDocs(collection(db, 'usernames')),
   ]);
 
-  return Math.max(users ?? 0, usernames ?? 0);
+  const uids = new Set<string>();
+  for (const docSnap of userSnaps.docs) uids.add(docSnap.id);
+  for (const docSnap of usernameSnaps.docs) {
+    const uid = (docSnap.data() as { uid?: string }).uid?.trim();
+    if (uid) uids.add(uid);
+  }
+
+  return uids.size;
 }

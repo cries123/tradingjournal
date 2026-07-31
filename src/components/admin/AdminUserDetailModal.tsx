@@ -121,6 +121,9 @@ export function AdminUserDetailModal({
                 {user.tradesSavedLast7Days > 0 && (
                   <span className="text-text-secondary"> · {user.tradesSavedLast7Days} saved in last 7 days</span>
                 )}
+                {user.tradesSessionLast7Days > 0 && user.tradesSavedLast7Days === 0 && (
+                  <span className="text-text-secondary"> · {user.tradesSessionLast7Days} session trades in last 7 days</span>
+                )}
               </dd>
             </div>
             {user.tradeCount > 0 && user.totalPnl != null && (
