@@ -4,6 +4,7 @@ import { TradeListItem } from './TradeListItem';
 import type { ParsedTradeInput, Trade, TradeSide } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { checkParseServer, loadApiKey, parseScreenshot, saveApiKey } from '../utils/parseScreenshot';
+import { useEscapeToClose } from '../hooks/useEscapeToClose';
 
 interface ScreenshotImportModalProps {
   onClose: () => void;
@@ -26,6 +27,7 @@ interface ReviewTrade extends ParsedTradeInput {
 }
 
 export function ScreenshotImportModal({ onClose, onSave, targetDate }: ScreenshotImportModalProps) {
+  useEscapeToClose(onClose);
   const { user } = useAuth();
   const [step, setStep] = useState<Step>('upload');
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);

@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import { useEscapeToClose } from '../hooks/useEscapeToClose';
 
 interface ConfirmDialogProps {
   title: string;
@@ -19,6 +20,7 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  useEscapeToClose(onCancel);
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-backdrop-in" onClick={onCancel}>
       <div

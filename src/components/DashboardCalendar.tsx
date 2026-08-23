@@ -79,10 +79,10 @@ export function DashboardCalendar({
       </div>
 
       <div key={`${year}-${month}`} className="grid grid-cols-7 gap-0.5 md:gap-2 animate-fade-up motion-safe:animate-fade-up">
-        {weeks.flatMap((week) =>
+        {weeks.flatMap((week, wi) =>
           week.days.map((day, di) => (
             <DashboardDayCell
-              key={`${day.date?.toISOString() ?? 'e'}-${di}`}
+              key={day.date?.toISOString() ?? `e-${wi}-${di}`}
               dayNumber={day.date?.getDate() ?? null}
               summary={day.summary}
               intensity={

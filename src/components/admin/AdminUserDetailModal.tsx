@@ -9,6 +9,7 @@ import {
   adminUpdateUserPassword,
 } from '../../services/adminUserManagement';
 import { formatCurrency } from '../../utils/format';
+import { useEscapeToClose } from '../../hooks/useEscapeToClose';
 
 interface AdminUserDetailModalProps {
   user: AdminUserSummary;
@@ -45,6 +46,7 @@ export function AdminUserDetailModal({
   onUserUpdated,
   onUserDeleted,
 }: AdminUserDetailModalProps) {
+  useEscapeToClose(onClose);
   const [emailDraft, setEmailDraft] = useState(user.email);
   const [passwordDraft, setPasswordDraft] = useState('');
   const [busy, setBusy] = useState<string | null>(null);

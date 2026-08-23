@@ -10,6 +10,7 @@ import {
   previewBrokerCsv,
   type CsvImportPreview,
 } from '../utils/parseCsvRouter';
+import { useEscapeToClose } from '../hooks/useEscapeToClose';
 
 interface CsvImportModalProps {
   onClose: () => void;
@@ -28,6 +29,7 @@ function formatTargetDate(date: string): string {
 }
 
 export function CsvImportModal({ onClose, onSave, targetDate }: CsvImportModalProps) {
+  useEscapeToClose(onClose);
   const { settings } = useSettings();
   const [step, setStep] = useState<Step>('upload');
   const [fileName, setFileName] = useState('');

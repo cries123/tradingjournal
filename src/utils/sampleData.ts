@@ -52,16 +52,21 @@ const SAMPLE_DAYS: SampleDay[] = [
 /** Realistic example month, clearly marked with sample- ids so it can be cleared and never synced. */
 export function buildSampleTrades(accountId: string, now = new Date()): Trade[] {
   const trades: Trade[] = [];
+  const usedDates = new Set<string>();
   let id = 1;
 
   for (const day of SAMPLE_DAYS) {
     const d = new Date(now);
     d.setDate(d.getDate() - day.daysAgo);
-    // Keep sample sessions on weekdays so the calendar looks like real trading.
-    while (d.getDay() === 0 || d.getDay() === 6) {
+    // Keep sample sessions on weekdays so the calendar looks like real trading,
+    // and never double up on a date another sample day already claimed —
+    // keep walking back until we land on a free weekday.
+    let date = toDateKey(d);
+    while (d.getDay() === 0 || d.getDay() === 6 || usedDates.has(date)) {
       d.setDate(d.getDate() - 1);
+      date = toDateKey(d);
     }
-    const date = toDateKey(d);
+    usedDates.add(date);
 
     for (const t of day.trades) {
       trades.push({

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Camera, Menu, Plus } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
 import { AuthPanel } from './AuthPanel';
+import { useEscapeToClose } from '../hooks/useEscapeToClose';
 
 interface MobileNavProps {
   onOpenMenu: () => void;
@@ -85,6 +86,7 @@ interface MobileDrawerProps {
 }
 
 export function MobileDrawer({ open, onClose, children }: MobileDrawerProps) {
+  useEscapeToClose(onClose);
   if (!open) return null;
 
   return (

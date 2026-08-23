@@ -10,7 +10,7 @@ interface PrivacyPolicyPageProps {
 
 export function PrivacyPolicyPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: PrivacyPolicyPageProps) {
   return (
-    <LegalPageLayout title="Privacy Policy" onHome={onHome} onLaunch={onLaunch} onPrivacy={onPrivacy} onTerms={onTerms} onBrokers={onBrokers}>
+    <LegalPageLayout title="Privacy Policy" lastUpdated="June 28, 2026" onHome={onHome} onLaunch={onLaunch} onPrivacy={onPrivacy} onTerms={onTerms} onBrokers={onBrokers}>
       <section>
         <h2>Overview</h2>
         <p>

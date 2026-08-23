@@ -75,10 +75,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const firebaseEnabled = isFirebaseConfigured();
 
   useEffect(() => {
-    if (!firebaseEnabled) {
-      setLoading(false);
-      return;
-    }
+    // `loading` already initializes to `isFirebaseConfigured()`, so it's already
+    // false here when Firebase isn't configured — nothing to set.
+    if (!firebaseEnabled) return;
 
     const auth = getFirebaseAuth();
     return onAuthStateChanged(auth, (nextUser) => {

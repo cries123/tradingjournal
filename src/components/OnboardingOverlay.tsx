@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { BarChart3, Calendar, Upload, X } from 'lucide-react';
+import { useEscapeToClose } from '../hooks/useEscapeToClose';
 
 const STORAGE_KEY = 'trend-chasers-onboarding-done';
 
@@ -42,6 +43,8 @@ export function OnboardingOverlay({ onDone }: OnboardingOverlayProps) {
     markOnboardingDone();
     onDone();
   };
+
+  useEscapeToClose(finish);
 
   return (
     <div className="fixed inset-0 z-[90] flex items-end md:items-center justify-center bg-black/70 backdrop-blur-sm p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">

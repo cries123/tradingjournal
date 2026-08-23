@@ -3,6 +3,7 @@ import { Copy, Download, Share2, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { useEscapeToClose } from '../hooks/useEscapeToClose';
 import type { TradingStats } from '../utils/stats';
 import { formatCurrency } from '../utils/format';
 import {
@@ -41,6 +42,7 @@ interface ShareCardModalProps {
 }
 
 export function ShareCardModal({ period, stats, dateKey = '', year, month = 0, onClose }: ShareCardModalProps) {
+  useEscapeToClose(onClose);
   const { settings } = useSettings();
   const { user, username: profileUsername } = useAuth();
   const [copied, setCopied] = useState(false);

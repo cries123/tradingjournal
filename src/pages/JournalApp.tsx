@@ -334,6 +334,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
 
       {showTradeModal && (
         <TradeModal
+          key={editingTrade?.id ?? 'new'}
           trade={editingTrade ?? undefined}
           defaultDate={tradeModalDate}
           onClose={closeTradeModal}

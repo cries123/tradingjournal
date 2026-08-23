@@ -8,6 +8,7 @@ import { useSettings } from '../context/SettingsContext';
 import { fetchDayNote, saveDayNote } from '../services/dayNotes';
 import { formatCurrency } from '../utils/format';
 import { computeStats } from '../utils/stats';
+import { useEscapeToClose } from '../hooks/useEscapeToClose';
 
 interface DayDetailDrawerProps {
   date: string;
@@ -30,6 +31,7 @@ export function DayDetailDrawer({
   onImportCsv,
   onImportScreenshot,
 }: DayDetailDrawerProps) {
+  useEscapeToClose(onClose);
   const { settings } = useSettings();
   const { user, firebaseEnabled } = useAuth();
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -237,7 +239,7 @@ export function DayDetailDrawer({
           )}
         </div>
 
-        <div className="p-5 border-t border-border/60 shrink-0 space-y-2">
+        <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] border-t border-border/60 shrink-0 space-y-2">
           <p className="text-xs text-text-secondary font-medium uppercase tracking-wide">Import trades</p>
           <div className="grid grid-cols-2 gap-2">
             <button

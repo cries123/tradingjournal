@@ -80,7 +80,7 @@ export function BrokerGuidePage({
       </section>
 
       <div className="pt-4 not-prose">
-        <button type="button" onClick={onLaunch} className="btn-primary">
+        <button type="button" onClick={onLaunch} className="btn-primary text-sm px-6 py-3">
           Start journaling free
         </button>
       </div>

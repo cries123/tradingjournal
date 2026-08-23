@@ -10,7 +10,7 @@ interface TermsOfServicePageProps {
 
 export function TermsOfServicePage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: TermsOfServicePageProps) {
   return (
-    <LegalPageLayout title="Terms of Service" onHome={onHome} onLaunch={onLaunch} onPrivacy={onPrivacy} onTerms={onTerms} onBrokers={onBrokers}>
+    <LegalPageLayout title="Terms of Service" lastUpdated="June 26, 2026" onHome={onHome} onLaunch={onLaunch} onPrivacy={onPrivacy} onTerms={onTerms} onBrokers={onBrokers}>
       <section>
         <h2>Agreement</h2>
         <p>

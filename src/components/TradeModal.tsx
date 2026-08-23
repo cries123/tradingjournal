@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import type { Trade, TradeGrade, TradeSide, AssetClass } from '../types';
 import { compressImage } from '../utils/compressImage';
 import { buildTradingViewReplayUrl } from '../utils/tradingView';
+import { useEscapeToClose } from '../hooks/useEscapeToClose';
 
 interface TradeModalProps {
   trade?: Trade;
@@ -17,6 +18,7 @@ const GRADES: TradeGrade[] = ['A', 'B', 'C', 'D', 'F'];
 const ASSET_CLASSES: AssetClass[] = ['stock', 'option', 'future', 'forex', 'crypto'];
 
 export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: TradeModalProps) {
+  useEscapeToClose(onClose);
   const isEdit = Boolean(trade);
   const { settings } = useSettings();
   const today = new Date().toISOString().slice(0, 10);
@@ -44,30 +46,10 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
   const [imageUrls, setImageUrls] = useState<string[]>(trade?.imageUrls ?? []);
   const [chartUrl, setChartUrl] = useState(trade?.chartUrl ?? '');
 
-  useEffect(() => {
-    if (!trade) return;
-    setDate(trade.date);
-    setSymbol(trade.symbol);
-    setPnl(String(trade.pnl));
-    setSetup(trade.setup ?? '');
-    setSide(trade.side ?? 'long');
-    setNotes(trade.notes ?? '');
-    setExtraTags((trade.tags ?? []).join(', '));
-    setStrategyId(trade.strategyId ?? '');
-    setFees(trade.fees != null ? String(trade.fees) : '');
-    setGrossPnl(trade.grossPnl != null ? String(trade.grossPnl) : '');
-    setEntryTime(trade.entryTime ?? '');
-    setExitTime(trade.exitTime ?? '');
-    setMae(trade.mae != null ? String(trade.mae) : '');
-    setMfe(trade.mfe != null ? String(trade.mfe) : '');
-    setRMultiple(trade.rMultiple != null ? String(trade.rMultiple) : '');
-    setGrade(trade.grade ?? '');
-    setChecklistScore(trade.checklistScore != null ? String(trade.checklistScore) : '');
-    setAssetClass(trade.assetClass ?? '');
-    setIvRank(trade.ivRank != null ? String(trade.ivRank) : '');
-    setImageUrls(trade.imageUrls ?? []);
-    setChartUrl(trade.chartUrl ?? '');
-  }, [trade]);
+  // Field state is seeded straight from `trade` above. The parent remounts this
+  // component (via `key={trade?.id ?? 'new'}`) whenever it switches which trade
+  // is being edited, so the initializers above are all that's needed — no effect
+  // resyncing state from props on every render.
 
   const parseOptNum = (v: string) => {
     if (!v.trim()) return undefined;
