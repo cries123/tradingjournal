@@ -94,7 +94,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
       <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} />
 
       {/* Hero */}
-      <section className="relative z-10 max-w-[1400px] mx-auto px-4 md:px-6 pt-12 md:pt-20 pb-16 md:pb-20">
+      <section className="relative z-10 max-w-[1680px] mx-auto px-4 md:px-6 pt-12 md:pt-20 pb-16 md:pb-20">
         <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
           <FadeIn>
           <div>
@@ -143,7 +143,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
 
       {/* Security callout */}
       <section id="security" className="relative z-10 border-y border-border/50 bg-emerald-500/5 py-10 md:py-12">
-        <FadeIn className="max-w-[1400px] mx-auto px-4 md:px-6">
+        <FadeIn className="max-w-[1680px] mx-auto px-4 md:px-6">
           <div className="glass-card rounded-2xl p-6 md:p-8 flex flex-col md:flex-row gap-6 md:gap-10 items-start md:items-center">
             <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
               <Lock size={22} className="text-emerald-400" />
@@ -163,7 +163,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
 
       {/* Broker Sync */}
       <section className="relative z-10 py-16 md:py-24">
-        <div className="max-w-[1400px] mx-auto px-4 md:px-6">
+        <div className="max-w-[1680px] mx-auto px-4 md:px-6">
           <div className="grid lg:grid-cols-2 gap-10 items-center">
             <FadeIn>
             <div>
@@ -218,7 +218,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
 
       {/* Brokers teaser */}
       <section id="brokers" className="relative z-10 border-t border-border/50 bg-bg-secondary/30 py-16 md:py-24">
-        <div className="max-w-[1400px] mx-auto px-4 md:px-6">
+        <div className="max-w-[1680px] mx-auto px-4 md:px-6">
           <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
             <FadeIn>
               <div>
@@ -281,7 +281,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
 
       {/* Features */}
       <section id="features" className="relative z-10 py-16 md:py-24">
-        <div className="max-w-[1400px] mx-auto px-4 md:px-6">
+        <div className="max-w-[1680px] mx-auto px-4 md:px-6">
           <FadeIn className="text-center max-w-2xl mx-auto mb-12 md:mb-16">
             <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Features</p>
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Everything you need to review your edge</h2>
@@ -312,7 +312,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
 
       {/* Workflow */}
       <section className="relative z-10 border-t border-border/50 bg-bg-secondary/20 py-16 md:py-24">
-        <div className="max-w-[1400px] mx-auto px-4 md:px-6">
+        <div className="max-w-[1680px] mx-auto px-4 md:px-6">
           <FadeIn className="text-center max-w-2xl mx-auto mb-12">
             <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">Workflow</p>
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Three steps to clarity</h2>
@@ -333,7 +333,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
 
       {/* Guides */}
       <section id="guides" className="relative z-10 border-t border-border/50 bg-bg-secondary/20 py-16 md:py-24">
-        <div className="max-w-[1400px] mx-auto px-4 md:px-6">
+        <div className="max-w-[1680px] mx-auto px-4 md:px-6">
           <FadeIn className="text-center max-w-2xl mx-auto mb-10">
             <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">Guides</p>
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Free trading journal resources</h2>

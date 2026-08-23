@@ -1,53 +1,25 @@
-BUILD FAILURE FIX — FULL PROJECT SNAPSHOT
-=============================================
+BIGGER LOGO + WIDER LANDING PAGE (ROUND 2)
+==============================================
 
-WHAT WENT WRONG
-Your Netlify build failed with:
-  "Cannot find module '../components/landing/AnnouncementBar'"
+2 files, apply both together. This builds on the full-snapshot fix from
+last time — apply this AFTER that one (or just apply these 2 files now if
+you've already gotten the full snapshot in and pushed successfully).
 
-This means LandingPage.tsx (which I've updated many times) imports a file
-called AnnouncementBar.tsx that got added to your repo folder structure a
-while back, in one of the earlier zips — but it looks like that specific
-new file (it lives in a subfolder, src/components/landing/) never actually
-got dragged into GitHub Desktop along with everything else. Every zip since
-then assumed it was already there, so the mismatch didn't show up until
-now.
+WHAT CHANGED
+- src/components/landing/LandingFooter.tsx — nav bar logo roughly doubled
+  in size (was h-10/h-12, now h-16/h-20), and the nav bar itself got a bit
+  taller (80px → 96px) to fit it comfortably. Much more presence now.
+- src/pages/LandingPage.tsx — content width bumped again, from 1400px to
+  1680px, so it fills a lot more of a wide monitor. Based on your
+  screenshot your screen is around 1868px wide, so this leaves a
+  reasonable ~94px margin on each side instead of the bigger gap before.
 
-This is exactly the kind of thing that's easy to miss with file-by-file
-zips over many turns — a new file in a subfolder is easy to skip when
-you're focused on the files you were told changed. So instead of another
-small diff, this zip is a COMPLETE, verified snapshot of every file your
-project currently needs — all 175 tracked files, exactly as they should
-be. No guessing about what you might be missing.
+HOW TO APPLY
+1. GitHub Desktop, branch fix/calendar-keys-and-lint.
+2. Drag the src/ folder from this zip into your repo root, overwriting the
+   2 matching files.
+3. Should show as 2 changed files. Commit and push.
 
-HOW TO APPLY (do this once, carefully, and it resets you to a known-good
-state)
-1. Open your tradingjournal folder on your computer (the one GitHub
-   Desktop points at).
-2. Do NOT delete the ".git" folder inside it — that's your repo history,
-   leave it alone.
-3. Delete everything else inside that folder (all the visible files and
-   folders except .git) — or just extract this zip's contents directly on
-   top, overwriting everything, since every file this zip contains matches
-   a file that should already exist in your repo.
-4. Extract/copy every file and folder from this zip into that same
-   tradingjournal folder, so its contents replace what's there.
-5. Open GitHub Desktop. It'll show you the full list of changes (likely
-   just a handful of real changes, plus the missing AnnouncementBar.tsx
-   file showing up as new). Review it looks reasonable, then commit
-   everything with one commit and push.
-6. That should be enough to fix the Netlify build. If Netlify auto-deploys
-   on push, watch for the next build to go green.
-
-VERIFIED BEFORE SENDING
-I ran your exact Netlify build command locally (tsc -b && vite build) —
-both steps complete with zero errors. (The third step, the prerender
-script, needs to download a browser that my sandbox can't reach — that's
-a sandbox limitation, not a problem with your code; Netlify's own build
-environment already has what it needs for that step, since your builds
-got that far before.)
-
-Going forward, once this gets you back to a clean baseline, future fixes
-from me will go back to being small targeted diffs — this full-snapshot
-delivery is specifically to recover from the missing file, not the new
-normal.
+Verified: TypeScript compiles clean, lint is clean, and I screenshotted
+the page at your actual screen width (1868px) plus a normal 1280px width
+and mobile — logo and spacing look right at all three.

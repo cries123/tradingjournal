@@ -31,7 +31,7 @@ export function LandingFooter({
 
   return (
     <footer className="relative z-10 mt-auto border-t border-border/50 bg-bg-secondary/40 shrink-0">
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-10 md:py-14">
+      <div className="max-w-[1680px] mx-auto px-4 md:px-6 py-10 md:py-14">
         <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-8 mb-10">
           <div className="sm:col-span-2 lg:col-span-1">
             {onHome ? (
@@ -202,7 +202,7 @@ interface LandingNavProps {
 
 function NavBrand({ onHome }: { onHome?: () => void }) {
   const logo = (
-    <img src="/nav-logo.png" alt="Trend Chasers" className="h-10 sm:h-12 w-auto object-contain" />
+    <img src="/nav-logo.png" alt="Trend Chasers" className="h-16 sm:h-20 w-auto object-contain" />
   );
   const shellClass =
     'inline-flex items-center justify-start shrink-0 w-fit max-w-none p-0 m-0 border-0 bg-transparent text-left hover:opacity-90 transition-opacity focus-ring rounded';
@@ -232,7 +232,7 @@ function NavBrand({ onHome }: { onHome?: () => void }) {
 export function LandingNav({ onLaunch, onHome, onBrokers, onGuides, showBrokersLink = true }: LandingNavProps) {
   return (
     <header className="relative z-10 border-b border-border/50 backdrop-blur-md bg-bg-primary/70 sticky top-0">
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 h-20 flex items-center justify-between gap-6">
+      <div className="max-w-[1680px] mx-auto px-4 md:px-8 h-24 flex items-center justify-between gap-6">
         <NavBrand onHome={onHome} />
         <nav className="flex items-center gap-6 sm:gap-8 shrink-0" aria-label="Main">
           <div className="hidden sm:flex items-center gap-6">
