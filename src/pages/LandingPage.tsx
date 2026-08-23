@@ -248,7 +248,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
             </FadeIn>
             <FadeIn delay={100}>
               <div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                <div className="grid grid-cols-1 gap-3 mb-6">
                   {brokers.supported.map((b) => (
                     <div
                       key={b.name}
