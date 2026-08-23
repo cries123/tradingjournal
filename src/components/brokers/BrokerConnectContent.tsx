@@ -17,6 +17,9 @@ interface BrokerCardCopy {
   key: SupportedBroker;
   name: string;
   brokerId: 'schwab' | 'robinhood';
+  /** Lowercase substring to match against SnapTrade's institution_name for this broker's accounts.
+   *  Keep in sync with the needle used server-side in snaptradeClient.ts's resolveBrokerSlug. */
+  matchNeedle: string;
   access: string;
   steps: string[];
   note: string;
@@ -27,6 +30,7 @@ const BROKER_COPY: BrokerCardCopy[] = [
     key: 'SCHWAB',
     name: 'Charles Schwab & thinkorswim',
     brokerId: 'schwab',
+    matchNeedle: 'schwab',
     access: 'Read & sync',
     steps: [
       'Click Connect — a secure SnapTrade window opens in a new tab.',
@@ -40,6 +44,7 @@ const BROKER_COPY: BrokerCardCopy[] = [
     key: 'ROBINHOOD',
     name: 'Robinhood',
     brokerId: 'robinhood',
+    matchNeedle: 'robinhood',
     access: 'Read-only',
     steps: [
       'Click Connect — a secure SnapTrade window opens in a new tab.',
@@ -54,9 +59,11 @@ const BROKER_COPY: BrokerCardCopy[] = [
 interface BrokerConnectContentProps {
   onBack: () => void;
   onImportTrades: (trades: Trade[]) => void;
+  /** Already-saved trades, used to skip re-importing anything a previous sync already pulled in. */
+  existingTrades: Trade[];
 }
 
-export function BrokerConnectContent({ onBack, onImportTrades }: BrokerConnectContentProps) {
+export function BrokerConnectContent({ onBack, onImportTrades, existingTrades }: BrokerConnectContentProps) {
   const { user, loading, firebaseEnabled } = useAuth();
   const [available, setAvailable] = useState<boolean | null>(null);
   const [status, setStatus] = useState<{ registered: boolean; accounts: BrokerAccountSummary[] } | null>(null);
@@ -109,17 +116,33 @@ export function BrokerConnectContent({ onBack, onImportTrades }: BrokerConnectCo
     setSyncMessage(null);
     setSyncingAccountId(account.id);
     try {
-      const { trades } = await syncBrokerAccount(account.id);
-      if (trades.length === 0) {
-        setSyncMessage(`No new trade activity found for ${account.name ?? account.institutionName}.`);
+      const { trades, truncated } = await syncBrokerAccount(account.id);
+      const known = new Set(existingTrades.map((t) => t.sourceId).filter(Boolean));
+      const freshTrades = trades.filter((t) => !t.sourceId || !known.has(t.sourceId));
+      const label = account.name ?? account.institutionName;
+
+      if (freshTrades.length === 0) {
+        setSyncMessage(
+          trades.length === 0
+            ? `No trade activity found for ${label}.`
+            : `You're up to date — all ${trades.length} trade${trades.length === 1 ? '' : 's'} from ${label} ${trades.length === 1 ? 'was' : 'were'} already imported.`,
+        );
         return;
       }
-      const withIds: Trade[] = trades.map((t, i) => ({
+
+      const withIds: Trade[] = freshTrades.map((t, i) => ({
         ...t,
         id: `snaptrade_${account.id}_${Date.now()}_${i}`,
       }));
       onImportTrades(withIds);
-      setSyncMessage(`Imported ${trades.length} trade${trades.length === 1 ? '' : 's'} from ${account.name ?? account.institutionName}.`);
+      const skipped = trades.length - freshTrades.length;
+      setSyncMessage(
+        `Imported ${freshTrades.length} trade${freshTrades.length === 1 ? '' : 's'} from ${label}` +
+          (skipped > 0 ? ` (${skipped} already up to date).` : '.') +
+          (truncated
+            ? ' This account has more activity than one sync can pull in — the oldest history was left out.'
+            : ''),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sync failed');
     } finally {
@@ -137,8 +160,8 @@ export function BrokerConnectContent({ onBack, onImportTrades }: BrokerConnectCo
     }
   };
 
-  const accountsForInstitution = (name: string) =>
-    (status?.accounts ?? []).filter((a) => a.institutionName?.toLowerCase().includes(name.toLowerCase()));
+  const accountsForInstitution = (needle: string) =>
+    (status?.accounts ?? []).filter((a) => a.institutionName?.toLowerCase().includes(needle));
 
   return (
     <div className="pb-6">
@@ -194,7 +217,7 @@ export function BrokerConnectContent({ onBack, onImportTrades }: BrokerConnectCo
 
         <div className="space-y-5">
           {BROKER_COPY.map((broker) => {
-            const accounts = accountsForInstitution(broker.name.split(' ')[0]);
+            const accounts = accountsForInstitution(broker.matchNeedle);
             const isConnected = accounts.length > 0;
 
             return (
