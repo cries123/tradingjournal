@@ -127,6 +127,9 @@ function buildTrade(open: RawActivity, close: RawActivity, qty: number, pnl: num
     tradePrice: open.price,
     notes: `Synced from ${open.accountName ?? 'connected broker'} · closed ${close.tradeDate.slice(0, 10)} @ ${close.price} (opened @ ${open.price})`,
     accountType: open.accountName,
+    // Stable across re-syncs (SnapTrade's own activity ids for the open/close fills), so importing
+    // the same round-trip twice — e.g. clicking Sync trades again — is a no-op instead of a duplicate.
+    sourceId: `snaptrade:${open.id}:${close.id}`,
   };
 }
 

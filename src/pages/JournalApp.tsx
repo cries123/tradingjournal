@@ -198,7 +198,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 onRequestBroker={() => setAppView('request-broker')}
               />
             ) : appView === 'connect-broker' ? (
-              <BrokerConnectContent onBack={() => setAppView('dashboard')} onImportTrades={addTrades} />
+              <BrokerConnectContent onBack={() => setAppView('dashboard')} onImportTrades={addTrades} existingTrades={trades} />
             ) : appView === 'report-bug' ? (
               <ReportBugContent onBack={() => setAppView('dashboard')} />
             ) : appView === 'request-broker' ? (

@@ -15,6 +15,10 @@ export interface Trade {
   side?: TradeSide;
   notes?: string;
   accountId?: string;
+  /** Stable dedup key for trades imported from an external source (e.g. a broker sync), so
+   *  re-syncing the same round-trip trade doesn't create a duplicate entry. Not set for
+   *  manually-entered trades. */
+  sourceId?: string;
   contract?: string;
   assetType?: AssetType;
   optionType?: OptionType;

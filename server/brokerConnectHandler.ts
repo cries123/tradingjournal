@@ -113,20 +113,49 @@ async function handleSync(uid: string, accountId?: string, startDate?: string, e
   }
 
   const snaptrade = getSnaptrade();
-  const defaultStart = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const res = await snaptrade.accountInformation.getAccountActivities({
-    userId: creds.userId,
-    userSecret: creds.userSecret,
-    accountId,
-    startDate: startDate || defaultStart,
-    endDate: endDate || new Date().toISOString().slice(0, 10),
-    limit: 1000,
-  });
+  const PAGE_SIZE = 1000;
+  // Safety backstop only — not a real limit for anyone's trade history. Prevents a runaway loop if
+  // SnapTrade's pagination metadata is ever malformed.
+  const MAX_PAGES = 25;
 
-  const activities = (res.data.data ?? []) as SnapTradeActivityLike[];
+  const activities: SnapTradeActivityLike[] = [];
+  let total: number | undefined;
+  let truncated = false;
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const res = await snaptrade.accountInformation.getAccountActivities({
+      userId: creds.userId,
+      userSecret: creds.userSecret,
+      accountId,
+      // Leaving startDate/endDate unset pulls SnapTrade's full known history for the account (its own
+      // default) instead of an arbitrary recent window — syncing exists to backfill the calendar with
+      // everything, not just what happened lately.
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+      offset: page * PAGE_SIZE,
+      limit: PAGE_SIZE,
+    });
+
+    const batch = (res.data.data ?? []) as SnapTradeActivityLike[];
+    activities.push(...batch);
+    total = res.data.pagination?.total ?? total;
+
+    if (batch.length < PAGE_SIZE) break; // last page reached
+    if (page === MAX_PAGES - 1) truncated = true;
+  }
+
+  if (truncated) {
+    console.warn(
+      `[broker-connect] sync for account ${accountId} hit the ${MAX_PAGES * PAGE_SIZE}-activity safety cap; some older history may be missing from this sync.`,
+    );
+  }
+
   const trades = mapSnapTradeActivitiesToTrades(activities);
 
-  return { statusCode: 200, body: { trades, activityCount: activities.length } };
+  return {
+    statusCode: 200,
+    body: { trades, activityCount: activities.length, totalActivityCount: total ?? activities.length, truncated },
+  };
 }
 
 async function handleDisconnect(uid: string, authorizationId?: string): Promise<BrokerConnectResult> {

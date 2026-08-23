@@ -65,12 +65,16 @@ export async function fetchBrokerStatus(): Promise<BrokerStatus> {
   return brokerApiPost({ action: 'status' });
 }
 
-/** Pulls recent activity for one connected account and maps it into ready-to-save trades. */
+/**
+ * Pulls activity for one connected account and maps it into ready-to-save trades. With no
+ * startDate/endDate, pulls the account's full known history (not just a recent window), paginating
+ * through everything SnapTrade has on file.
+ */
 export async function syncBrokerAccount(
   accountId: string,
   startDate?: string,
   endDate?: string,
-): Promise<{ trades: ParsedTradeInput[]; activityCount: number }> {
+): Promise<{ trades: ParsedTradeInput[]; activityCount: number; totalActivityCount: number; truncated: boolean }> {
   return brokerApiPost({ action: 'sync', accountId, startDate, endDate });
 }
 
