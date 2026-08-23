@@ -10,7 +10,7 @@ interface TermsOfServicePageProps {
 
 export function TermsOfServicePage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: TermsOfServicePageProps) {
   return (
-    <LegalPageLayout title="Terms of Service" lastUpdated="June 26, 2026" onHome={onHome} onLaunch={onLaunch} onPrivacy={onPrivacy} onTerms={onTerms} onBrokers={onBrokers}>
+    <LegalPageLayout title="Terms of Service" lastUpdated="August 23, 2026" onHome={onHome} onLaunch={onLaunch} onPrivacy={onPrivacy} onTerms={onTerms} onBrokers={onBrokers}>
       <section>
         <h2>Agreement</h2>
         <p>
@@ -29,18 +29,22 @@ export function TermsOfServicePage({ onHome, onLaunch, onPrivacy, onTerms, onBro
       </section>
 
       <section>
-        <h2>No brokerage connection</h2>
+        <h2>Broker connections</h2>
         <p>
-          You are solely responsible for importing accurate trade data. We do not connect to your broker,
-          execute trades, or verify the accuracy of imported information. All imports are initiated by you.
+          Connecting a brokerage account is optional. If you choose to connect Schwab or Robinhood, the
+          connection is brokered by SnapTrade, a third-party service, and is read-only: it can retrieve your
+          trade activity but cannot place trades, withdraw funds, or otherwise act on your account. You are
+          responsible for reviewing synced trade data for accuracy — we do not guarantee that synced data
+          exactly matches your brokerage&apos;s records, and you should verify against your broker&apos;s own
+          statements. You can disconnect a broker at any time from within the app.
         </p>
       </section>
 
       <section>
-        <h2>AI screenshot parsing</h2>
+        <h2>Manual entry</h2>
         <p>
-          AI import is provided as a convenience and may contain errors. Always review parsed trades before
-          saving. We are not liable for mistakes in AI-extracted data, including incorrect P/L signs or symbols.
+          For trades you enter yourself, you are solely responsible for accuracy. We do not verify manually
+          entered or synced trade data against any external source.
         </p>
       </section>
 
@@ -72,8 +76,9 @@ export function TermsOfServicePage({ onHome, onLaunch, onPrivacy, onTerms, onBro
       <section>
         <h2>Broker support</h2>
         <p>
-          Import formats for Thinkorswim, Schwab, and Robinhood are supported today; additional brokers may
-          be added over time. Custom broker support may be configured upon request at our discretion.
+          Automatic sync is supported today for Schwab (including thinkorswim accounts) and Robinhood;
+          additional brokers may be added over time. Manual entry works for any broker. Custom broker
+          support may be configured upon request at our discretion.
         </p>
       </section>
 

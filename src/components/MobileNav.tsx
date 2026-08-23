@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Camera, Menu, Plus } from 'lucide-react';
+import { Link2, Menu, Plus } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
 import { AuthPanel } from './AuthPanel';
 import { useEscapeToClose } from '../hooks/useEscapeToClose';
@@ -7,7 +7,7 @@ import { useEscapeToClose } from '../hooks/useEscapeToClose';
 interface MobileNavProps {
   onOpenMenu: () => void;
   onAddTrade: () => void;
-  onImportScreenshot: () => void;
+  onConnectBroker: () => void;
 }
 
 export function MobileHeader({
@@ -40,7 +40,7 @@ export function MobileHeader({
   );
 }
 
-export function MobileBottomNav({ onOpenMenu, onAddTrade, onImportScreenshot }: MobileNavProps) {
+export function MobileBottomNav({ onOpenMenu, onAddTrade, onConnectBroker }: MobileNavProps) {
   return (
     <nav className="shrink-0 z-40 border-t border-border/60 bg-bg-secondary/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
       <div className="grid grid-cols-4 h-14">
@@ -54,11 +54,11 @@ export function MobileBottomNav({ onOpenMenu, onAddTrade, onImportScreenshot }: 
         </button>
         <button
           type="button"
-          onClick={onImportScreenshot}
+          onClick={onConnectBroker}
           className="flex flex-col items-center justify-center gap-0.5 text-cyan-400 focus-ring"
         >
-          <Camera size={18} />
-          <span className="text-[9px]">Screenshot</span>
+          <Link2 size={18} />
+          <span className="text-[9px]">Broker</span>
         </button>
         <button
           type="button"

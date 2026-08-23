@@ -15,7 +15,8 @@
     "firebase-admin": "^13.10.0",
     "lucide-react": "^1.21.0",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react-dom": "^19.2.6",
+    "snaptrade-typescript-sdk": "^12.1.10"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

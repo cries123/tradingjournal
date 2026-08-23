@@ -1,12 +1,11 @@
 import {
-  Bot,
+  BarChart3,
   Calendar,
   Check,
   Cloud,
-  FileSpreadsheet,
+  Link2,
   Lock,
   Pencil,
-  BarChart3,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
@@ -34,16 +33,10 @@ const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
       'See your month at a glance — green days for profit, red for loss. Click any day to import trades or drill into that session.',
   },
   {
-    icon: Bot,
-    title: 'AI Screenshot Parsing',
+    icon: Link2,
+    title: 'Broker Sync',
     description:
-      'Upload brokerage screenshots and let AI extract P/L, symbols, and contract details. Review before saving — no typing required.',
-  },
-  {
-    icon: FileSpreadsheet,
-    title: 'CSV Statement Import',
-    description:
-      'Drop in your account statement export. Round-trip trades are matched automatically so you can review and import in seconds.',
+      'Connect Schwab or Robinhood and let round-trip trades sync in automatically — read-only, disconnect anytime.',
   },
   {
     icon: Pencil,
@@ -68,7 +61,7 @@ const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
 const FAQ = LANDING_FAQ.map((item) => ({ q: item.question, a: item.answer }));
 
 const STEPS = [
-  { n: '01', title: 'Upload or log', body: 'Screenshot, CSV, or manual entry — get your trades into the journal in seconds.' },
+  { n: '01', title: 'Connect or log', body: 'Sync Schwab or Robinhood automatically, or enter trades manually — get your data into the journal in seconds.' },
   { n: '02', title: 'Review on calendar', body: 'Daily P&L colors show winning and losing sessions at a glance.' },
   { n: '03', title: 'Analyze your edge', body: 'See which setups pay and which bleed — streaks, expectancy, and your best and worst days.' },
 ];
@@ -86,16 +79,16 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs font-medium mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              AI-powered imports · No broker login ever
+              Broker sync or manual entry — your choice
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-[3.25rem] font-bold leading-[1.1] tracking-tight">
               <span className="text-gradient">Trend Chasers</span>
-              {' — '}the trading journal that never asks for your{' '}
-              <span className="text-gradient">broker login</span>
+              {' — '}the trading journal built for{' '}
+              <span className="text-gradient">how you actually trade</span>
             </h1>
             <p className="mt-5 text-base md:text-lg text-text-secondary leading-relaxed max-w-xl">
-              Track daily P&L on a visual calendar, import trades with AI or CSV, and review your performance —
-              without connecting to your brokerage account. Ever.
+              Track daily P&L on a visual calendar. Connect Schwab or Robinhood for automatic sync, or log
+              trades manually — nothing is forced, and you can switch anytime.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <button type="button" onClick={onLaunch} className="btn-primary text-base px-7 py-3.5">
@@ -109,7 +102,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
               No signup needed to try it — your journal stays in your browser until you choose to sync.
             </p>
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-text-secondary">
-              {['No brokerage login required', 'Free — no credit card', 'AI screenshot parsing'].map((item) => (
+              {['Broker sync or manual entry', 'Free — no credit card', 'Read-only broker connections'].map((item) => (
                 <span key={item} className="flex items-center gap-2">
                   <Check size={14} className="text-emerald-400" />
                   {item}
@@ -135,37 +128,38 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
               <Lock size={22} className="text-emerald-400" />
             </div>
             <div className="flex-1">
-              <h2 className="text-xl md:text-2xl font-bold mb-2">Your broker stays separate</h2>
+              <h2 className="text-xl md:text-2xl font-bold mb-2">Connecting is optional, and never held by us</h2>
               <p className="text-text-secondary leading-relaxed">
-                We will <strong className="text-text-primary">never</strong> ask you to sign in with your brokerage.
-                No API keys, no OAuth, no account linking. You control what goes into your journal — upload a CSV,
-                snap a screenshot, or type trades yourself. Your brokerage login and your journal are completely independent.
+                Broker sync is entirely opt-in — plenty of traders just log trades manually and never connect
+                anything. If you do connect Schwab or Robinhood, your credentials go to your broker or to
+                SnapTrade&apos;s secure connection portal, never to Trend Chasers&apos; servers. Connections are
+                read-only by default, and you can disconnect at any time from the app.
               </p>
             </div>
           </div>
         </FadeIn>
       </section>
 
-      {/* AI Import */}
+      {/* Broker Sync */}
       <section className="relative z-10 py-16 md:py-24">
         <div className="max-w-6xl mx-auto px-4 md:px-6">
           <div className="grid lg:grid-cols-2 gap-10 items-center">
             <FadeIn>
             <div>
-              <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">AI Import</p>
+              <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">Broker Sync</p>
               <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-                Upload a screenshot. AI does the rest.
+                Connect once. Trades sync automatically.
               </h2>
               <p className="text-text-secondary leading-relaxed mb-6">
-                Take a screenshot from your brokerage app — positions screen, P/L summary, or trade history.
-                Our AI reads the image and extracts trades so you can review and import with one click.
-                Works great for quick end-of-day logging when exporting CSV feels like overkill.
+                Link Schwab or Robinhood through SnapTrade, a broker-data connection provider, and your
+                round-trip trades sync straight to your calendar. It&apos;s entirely optional — manual entry
+                works just as well if you&apos;d rather keep everything separate.
               </p>
               <ul className="space-y-3 text-sm text-text-secondary">
                 {[
-                  'Multi-screenshot upload — batch an entire session',
-                  'Review & edit before saving — flip P/L signs, fix symbols',
-                  'Extracts options details when visible (strike, Greeks, contract)',
+                  'Read-only by default — nothing can place trades on your behalf',
+                  'Your login goes to your broker or SnapTrade, never to Trend Chasers',
+                  'Disconnect anytime from Settings — sync stops immediately',
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-2">
                     <span className="text-emerald-400 mt-0.5">→</span>
@@ -174,18 +168,18 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
                 ))}
               </ul>
               <button type="button" onClick={onLaunch} className="btn-primary text-sm px-6 py-2.5 mt-6">
-                Try AI import free
+                Connect a broker
               </button>
             </div>
             </FadeIn>
             <FadeIn delay={100}>
             <div className="glass-card rounded-2xl p-6 md:p-8 glow-border">
-              <p className="text-xs uppercase tracking-widest text-text-secondary mb-4">How AI import works</p>
+              <p className="text-xs uppercase tracking-widest text-text-secondary mb-4">How broker sync works</p>
               <ol className="space-y-4">
                 {[
-                  { step: '1', text: 'Screenshot your positions or P/L from any supported broker app' },
-                  { step: '2', text: 'AI parses symbol, P/L Day, contract info, and date' },
-                  { step: '3', text: 'You select which trades to keep and import to your calendar' },
+                  { step: '1', text: 'Pick Schwab or Robinhood and approve a read-only connection on their site' },
+                  { step: '2', text: 'Trend Chasers pulls your recent activity and matches opens to closes' },
+                  { step: '3', text: 'Review the synced trades on your calendar — edit tags and notes anytime' },
                 ].map((s) => (
                   <li key={s.step} className="flex gap-4">
                     <span className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0">
@@ -207,7 +201,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
           <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Brokers</p>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">Thinkorswim · Schwab · Robinhood</h2>
           <p className="text-text-secondary max-w-xl mx-auto mb-6">
-            AI screenshot parsing and CSV imports — no brokerage login required. More brokers coming soon.
+            Connect Schwab or Robinhood for automatic sync, or log trades manually. More brokers coming soon.
           </p>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 mb-8 text-sm">
             {[
@@ -285,7 +279,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
             <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">Guides</p>
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Free trading journal resources</h2>
             <p className="mt-3 text-text-secondary text-sm md:text-base">
-              Learn how to track performance, use a P&L calendar, and journal without connecting your brokerage.
+              Learn how to track performance, use a P&L calendar, and get the most out of broker sync.
             </p>
           </FadeIn>
           <div className="grid md:grid-cols-3 gap-4">
@@ -351,8 +345,8 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
           </div>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-8">Ready to track your edge?</h2>
           <p className="mt-4 text-text-secondary text-base md:text-lg">
-            Open your journal, import this month&apos;s trades, and see your performance on the calendar.
-            No broker login. No credit card. Just your data, your way.
+            Open your journal, connect a broker or log this month&apos;s trades yourself, and see your
+            performance on the calendar. No credit card. Just your data, your way.
           </p>
           <button type="button" onClick={onLaunch} className="btn-primary text-base px-8 py-3.5 mt-8">
             Open Trend Chasers

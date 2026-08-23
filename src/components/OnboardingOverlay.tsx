@@ -1,14 +1,14 @@
 import { useState } from 'react';
-import { BarChart3, Calendar, Upload, X } from 'lucide-react';
+import { BarChart3, Calendar, Link2, X } from 'lucide-react';
 import { useEscapeToClose } from '../hooks/useEscapeToClose';
 
 const STORAGE_KEY = 'trend-chasers-onboarding-done';
 
 const STEPS = [
   {
-    icon: Upload,
-    title: 'Import your trades',
-    body: 'Drop a broker CSV, upload a screenshot, or log trades manually — no broker login required.',
+    icon: Link2,
+    title: 'Get your trades in',
+    body: 'Connect Schwab or Robinhood to sync trades automatically, or log sessions manually — your call.',
   },
   {
     icon: Calendar,

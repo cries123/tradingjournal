@@ -1,6 +1,7 @@
 # Trading Journal
 
-A dark-themed trading journal with a calendar dashboard — green days for profit, red for loss. Import trades from Schwab CSV exports or Thinkorswim screenshots.
+A dark-themed trading journal with a calendar dashboard — green days for profit, red for loss. Connect
+Schwab or Robinhood for automatic trade sync, or log trades manually.
 
 ## Run locally on your computer
 
@@ -40,23 +41,32 @@ npm start
 
 Open **http://localhost:5173** — this serves the built app locally.
 
-### 4. Optional — AI screenshot import
+### 4. Optional — broker sync (Schwab & Robinhood)
 
-Create a `.env` file in the project root:
+Broker sync requires both Firebase (below) and a SnapTrade account, since the connection has to be tied
+to a signed-in user and SnapTrade brokers the actual link to Schwab/Robinhood.
+
+1. Sign up at [SnapTrade](https://dashboard.snaptrade.com) and grab your `clientId` and `consumerKey`
+2. Add them to `.env`:
 
 ```bash
 cp .env.example .env
 ```
 
-Add your OpenAI API key:
-
 ```
-OPENAI_API_KEY=sk-your-key-here
+SNAPTRADE_CLIENT_ID=your-client-id
+SNAPTRADE_CONSUMER_KEY=your-consumer-key
 ```
 
-Restart the dev server after changing `.env`. You can also paste the key in the import dialog when no server key is configured (stored in your browser only).
+3. Broker connect also needs `FIREBASE_SERVICE_ACCOUNT_JSON` (a Firebase service account key, server-side
+   only) so the Netlify function can store each user's SnapTrade connection securely — see the Firebase
+   Console → Project settings → Service accounts → Generate new private key, then paste the JSON as one
+   line into `.env`.
 
-### 5. Firebase cloud sync (optional)
+Without these, the app still runs fine — the Connect broker screen just shows a "not set up yet" message,
+and manual entry works exactly the same either way.
+
+### 5. Firebase cloud sync (optional, required for broker sync)
 
 1. Create a project at [Firebase Console](https://console.firebase.google.com/)
 2. Add a **Web app** and copy the config values into `.env` (see `.env.example`)
@@ -64,7 +74,9 @@ Restart the dev server after changing `.env`. You can also paste the key in the 
 4. Create a **Firestore Database** (production mode)
 5. Deploy rules from `firestore.rules` in the Firebase console (Rules tab)
 6. Add **trendchasers.net** (and your Netlify subdomain) under **Authentication → Settings → Authorized domains**
-7. Restart `npm run dev` — a login popup appears on first visit
+7. Generate a service account key (Project settings → Service accounts) if you also want broker sync,
+   and set it as `FIREBASE_SERVICE_ACCOUNT_JSON`
+8. Restart `npm run dev` — a login popup appears on first visit
 
 Your trades sync to `users/{your-uid}/trades` in Firestore. Local browser trades migrate automatically on first sign-in.
 
@@ -78,21 +90,24 @@ Your trades sync to `users/{your-uid}/trades` in Firestore. Local browser trades
 
 | Variable | Required | Notes |
 |----------|----------|-------|
-| `OPENAI_API_KEY` | For screenshot AI | Server-side only — never exposed to the browser |
+| `SNAPTRADE_CLIENT_ID` | For broker sync | From your SnapTrade dashboard |
+| `SNAPTRADE_CONSUMER_KEY` | For broker sync | Server-side only — never exposed to the browser |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | For broker sync | Service account key JSON, server-side only |
 | `VITE_FIREBASE_API_KEY` | For cloud sync | Firebase web config |
 | `VITE_FIREBASE_AUTH_DOMAIN` | For cloud sync | |
 | `VITE_FIREBASE_PROJECT_ID` | For cloud sync | |
 | `VITE_FIREBASE_STORAGE_BUCKET` | For cloud sync | |
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | For cloud sync | |
 | `VITE_FIREBASE_APP_ID` | For cloud sync | |
-| `SITE_URL` | Production domain | `https://trendchasers.net` — used for share links |
+| `SITE_URL` | Production domain | `https://trendchasers.net` — used for share links and broker-connect redirects |
 
-4. Deploy. Screenshot import calls `/api/parse-screenshot`, which runs as a Netlify Function using your `OPENAI_API_KEY`.
+4. Deploy. Broker sync calls `/api/broker-connect`, which runs as a Netlify Function using your SnapTrade
+   and Firebase credentials.
 
 ### Custom domain (trendchasers.net)
 
 1. In Netlify → **Domain management**, add `trendchasers.net` and follow DNS instructions
-2. Set `SITE_URL=https://trendchasers.net` in environment variables (optional, for share link fallbacks)
+2. Set `SITE_URL=https://trendchasers.net` in environment variables (also used for broker-connect redirects)
 3. Redeploy after changing env vars
 
 ---
@@ -101,29 +116,24 @@ Your trades sync to `users/{your-uid}/trades` in Firestore. Local browser trades
 
 - **Dashboard** — Calendar, Net P&L, win rate, profit factor, weekday & daily charts (fits in one screen, no scrolling)
 - **Login popup** — Email/password or Google sign-in; create an account stored in Firebase
-- **Import CSV** — Schwab/Thinkorswim account statement (`Account Trade History`)
-- **Import Screenshot** — AI reads Thinkorswim P/L Day from phone screenshots
-- **Log trades manually** — Symbol, P/L, setup tags
+- **Connect broker** — Read-only Schwab or Robinhood sync via SnapTrade; round-trip trades matched automatically
+- **Log trades manually** — Symbol, P/L, setup tags, always available with no connection required
 - **Persistent storage** — Browser cache + **Firebase Firestore** when signed in
 
-## Import your Schwab trades
+## Connect a broker
 
-1. In Thinkorswim/Schwab: **History → Export account statement** (CSV)
-2. In the app: **Import CSV** → upload the file
-3. Review matched round-trip trades → **Import**
-
-## Import from screenshots
-
-1. Click **Import Screenshot**
-2. Upload Thinkorswim position screenshots
-3. Parse with AI → review → add to journal
+1. In the app: **Connect broker** in the sidebar
+2. Choose Charles Schwab (covers thinkorswim accounts too) or Robinhood
+3. Approve a read-only connection in the SnapTrade window that opens
+4. Back in the app, click **Refresh** then **Sync trades** on the account you connected
 
 ## Data & privacy
 
 - Without Firebase: trades saved in your browser only
 - With Firebase: trades sync to your Firestore under your account
-- CSV import runs in your browser — your statement never leaves your machine
-- Screenshot AI sends images to OpenAI only when you use that feature
+- Broker sync is opt-in and read-only — your brokerage credentials go to your broker or SnapTrade's secure
+  portal, never to this app's servers
+- Disconnect a broker anytime from Connect broker — that revokes SnapTrade's access immediately
 
 ## Tech stack
 
@@ -131,4 +141,4 @@ Your trades sync to `users/{your-uid}/trades` in Firestore. Local browser trades
 - Vite
 - Tailwind CSS
 - Firebase Auth + Firestore
-- Netlify Functions (OpenAI screenshot parsing)
+- Netlify Functions (SnapTrade broker sync)

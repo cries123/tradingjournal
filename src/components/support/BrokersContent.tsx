@@ -53,8 +53,8 @@ export function BrokersContent({ onBack, backLabel = 'Back to dashboard', onRequ
           Supported brokers & import methods
         </h1>
         <p className="text-text-secondary text-base leading-relaxed max-w-2xl mb-10">
-          Trend Chasers never connects to your brokerage. You import data yourself — via AI screenshot
-          parsing or CSV upload.
+          Connect Schwab or Robinhood for automatic, read-only trade sync — or skip connecting entirely
+          and log trades yourself. Either way, you&apos;re in control.
         </p>
 
         <div className="space-y-4 mb-10">

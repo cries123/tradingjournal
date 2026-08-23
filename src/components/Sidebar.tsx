@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 import {
   Building2,
-  Camera,
-  FileSpreadsheet,
   HelpCircle,
   LayoutDashboard,
+  Link2,
   MessageSquarePlus,
   Settings,
   Share2,
@@ -19,6 +18,7 @@ export type SidebarAppView =
   | 'dashboard'
   | 'settings'
   | 'brokers'
+  | 'connect-broker'
   | 'report-bug'
   | 'request-broker';
 
@@ -26,8 +26,7 @@ interface SidebarProps {
   appView: SidebarAppView;
   onDashboard: () => void;
   onAddTrade: () => void;
-  onImportScreenshot: () => void;
-  onImportCsv: () => void;
+  onConnectBroker: () => void;
   onClearAll: () => void;
   onSettings: () => void;
   onBrokers: () => void;
@@ -51,8 +50,7 @@ export function Sidebar({
   appView,
   onDashboard,
   onAddTrade,
-  onImportScreenshot,
-  onImportCsv,
+  onConnectBroker,
   onClearAll,
   onSettings,
   onBrokers,
@@ -118,6 +116,14 @@ export function Sidebar({
           >
             <LayoutDashboard size={16} className={appView === 'dashboard' ? 'text-emerald-400' : undefined} />
             Overview
+          </button>
+          <button
+            type="button"
+            onClick={wrap(onConnectBroker)}
+            className={navItemClass(appView === 'connect-broker')}
+          >
+            <Link2 size={16} className={appView === 'connect-broker' ? 'text-emerald-400' : undefined} />
+            Connect broker
           </button>
           <button
             type="button"
@@ -220,25 +226,6 @@ export function Sidebar({
         <button type="button" onClick={wrap(onAddTrade)} className="w-full py-2.5 btn-primary text-sm font-semibold">
           + Log Trade
         </button>
-
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={wrap(onImportCsv)}
-            className="flex items-center justify-center gap-1.5 py-2 text-xs font-medium rounded-lg border border-border/60 text-text-secondary hover:text-text-primary hover:border-border transition-colors focus-ring"
-          >
-            <FileSpreadsheet size={14} />
-            CSV
-          </button>
-          <button
-            type="button"
-            onClick={wrap(onImportScreenshot)}
-            className="flex items-center justify-center gap-1.5 py-2 text-xs font-medium rounded-lg border border-border/60 text-text-secondary hover:text-text-primary hover:border-border transition-colors focus-ring"
-          >
-            <Camera size={14} />
-            Screenshot
-          </button>
-        </div>
 
         <button
           type="button"

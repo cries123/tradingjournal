@@ -2,16 +2,16 @@ import { doc, getDoc } from 'firebase/firestore';
 import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
 
 export interface AdminHealthStatus {
-  screenshotAi: { ok: boolean; hasApiKey?: boolean; error?: string };
+  brokerSync: { ok: boolean; configured?: boolean; error?: string };
   benchmark: { ok: boolean; asOf?: string; error?: string };
   firebase: { ok: boolean; error?: string };
 }
 
 export async function fetchAdminHealth(): Promise<AdminHealthStatus> {
-  const [screenshotResult, benchmarkResult, firebaseResult] = await Promise.allSettled([
-    fetch('/api/health').then(async (res) => {
+  const [brokerResult, benchmarkResult, firebaseResult] = await Promise.allSettled([
+    fetch('/api/broker-status').then(async (res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json() as Promise<{ ok?: boolean; hasApiKey?: boolean }>;
+      return res.json() as Promise<{ ok?: boolean; configured?: boolean }>;
     }),
     fetch('/api/benchmark?symbol=SPY').then(async (res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -24,13 +24,13 @@ export async function fetchAdminHealth(): Promise<AdminHealthStatus> {
   ]);
 
   return {
-    screenshotAi:
-      screenshotResult.status === 'fulfilled'
+    brokerSync:
+      brokerResult.status === 'fulfilled'
         ? {
-            ok: screenshotResult.value.ok === true,
-            hasApiKey: screenshotResult.value.hasApiKey,
+            ok: brokerResult.value.ok === true,
+            configured: brokerResult.value.configured,
           }
-        : { ok: false, error: String(screenshotResult.reason) },
+        : { ok: false, error: String(brokerResult.reason) },
     benchmark:
       benchmarkResult.status === 'fulfilled'
         ? { ok: true, asOf: benchmarkResult.value.asOf }

@@ -51,7 +51,7 @@ export function LandingFooter({
               </a>
             )}
             <p className="mt-3 text-sm text-text-secondary leading-relaxed max-w-xs">
-              Free trading journal for active traders. Track performance on a P&L calendar — no brokerage login.
+              Free trading journal for active traders. Track performance on a P&L calendar — broker sync or manual entry.
             </p>
           </div>
 

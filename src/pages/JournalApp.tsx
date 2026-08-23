@@ -9,11 +9,10 @@ import { hasCompletedOnboarding, OnboardingOverlay } from '../components/Onboard
 import { SettingsPage } from '../components/SettingsPage';
 import { ShareCardModal } from '../components/ShareCardModal';
 import { Sidebar, type SidebarAppView } from '../components/Sidebar';
+import { BrokerConnectContent } from '../components/brokers/BrokerConnectContent';
 import { BrokersContent } from '../components/support/BrokersContent';
 import { ReportBugContent } from '../components/support/ReportBugContent';
 import { RequestBrokerContent } from '../components/support/RequestBrokerContent';
-import { CsvImportModal } from '../components/CsvImportModal';
-import { ScreenshotImportModal } from '../components/ScreenshotImportModal';
 import { TradeModal } from '../components/TradeModal';
 import { UsernameSetupModal } from '../components/UsernameSetupModal';
 import { useAuth } from '../context/AuthContext';
@@ -60,11 +59,8 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   const [month, setMonth] = useState(now.getMonth());
   const [appView, setAppView] = useState<AppView>('dashboard');
   const [showTradeModal, setShowTradeModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [showCsvModal, setShowCsvModal] = useState(false);
   const [tradeModalDate, setTradeModalDate] = useState<string | undefined>();
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
-  const [importTargetDate, setImportTargetDate] = useState<string | undefined>();
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [clearConfirmStage, setClearConfirmStage] = useState<0 | 1 | 2>(0);
@@ -122,24 +118,6 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
     setShowTradeModal(true);
   };
 
-  const openImportCsv = (date?: string) => {
-    setImportTargetDate(date);
-    setShowCsvModal(true);
-    if (date) setSelectedDay(null);
-  };
-
-  const openImportScreenshot = (date?: string) => {
-    setImportTargetDate(date);
-    setShowImportModal(true);
-    if (date) setSelectedDay(null);
-  };
-
-  const closeImportModals = () => {
-    setShowCsvModal(false);
-    setShowImportModal(false);
-    setImportTargetDate(undefined);
-  };
-
   const closeTradeModal = () => {
     setShowTradeModal(false);
     setTradeModalDate(undefined);
@@ -155,8 +133,10 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
       closeMobileMenu();
     },
     onAddTrade: () => openAddTrade(),
-    onImportScreenshot: () => openImportScreenshot(),
-    onImportCsv: () => openImportCsv(),
+    onConnectBroker: () => {
+      setAppView('connect-broker');
+      closeMobileMenu();
+    },
     onClearAll: () => setClearConfirmStage(1),
     onSettings: () => {
       setAppView('settings');
@@ -217,6 +197,8 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 onBack={() => setAppView('dashboard')}
                 onRequestBroker={() => setAppView('request-broker')}
               />
+            ) : appView === 'connect-broker' ? (
+              <BrokerConnectContent onBack={() => setAppView('dashboard')} onImportTrades={addTrades} />
             ) : appView === 'report-bug' ? (
               <ReportBugContent onBack={() => setAppView('dashboard')} />
             ) : appView === 'request-broker' ? (
@@ -241,8 +223,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 onNextYear={() => setYear((y) => y + 1)}
                 onSelectMonth={setMonth}
                 onAddTrade={() => openAddTrade()}
-                onImportCsv={() => openImportCsv()}
-                onImportScreenshot={() => openImportScreenshot()}
+                onConnectBroker={() => setAppView('connect-broker')}
                 sampleActive={sampleActive}
                 onLoadSample={loadSampleData}
                 onClearSample={clearSampleData}
@@ -255,7 +236,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
           <MobileBottomNav
             onOpenMenu={() => setMobileMenuOpen(true)}
             onAddTrade={() => openAddTrade()}
-            onImportScreenshot={() => openImportScreenshot()}
+            onConnectBroker={() => setAppView('connect-broker')}
           />
         )}
       </div>
@@ -310,28 +291,6 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
         />
       )}
 
-      {showCsvModal && (
-        <CsvImportModal
-          targetDate={importTargetDate}
-          onClose={closeImportModals}
-          onSave={(t) => {
-            addTrades(t);
-            closeImportModals();
-          }}
-        />
-      )}
-
-      {showImportModal && (
-        <ScreenshotImportModal
-          targetDate={importTargetDate}
-          onClose={closeImportModals}
-          onSave={(t) => {
-            addTrades(t);
-            closeImportModals();
-          }}
-        />
-      )}
-
       {showTradeModal && (
         <TradeModal
           key={editingTrade?.id ?? 'new'}
@@ -354,8 +313,6 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
             openAddTrade(selectedDay);
             setSelectedDay(null);
           }}
-          onImportCsv={() => openImportCsv(selectedDay)}
-          onImportScreenshot={() => openImportScreenshot(selectedDay)}
         />
       )}
     </div>

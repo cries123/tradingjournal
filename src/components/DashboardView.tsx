@@ -44,8 +44,7 @@ interface DashboardViewProps {
   onNextYear: () => void;
   onSelectMonth: (month: number) => void;
   onAddTrade: () => void;
-  onImportCsv: () => void;
-  onImportScreenshot: () => void;
+  onConnectBroker: () => void;
   sampleActive?: boolean;
   onLoadSample?: () => void;
   onClearSample?: () => void;
@@ -68,8 +67,7 @@ export function DashboardView({
   onNextYear,
   onSelectMonth,
   onAddTrade,
-  onImportCsv,
-  onImportScreenshot,
+  onConnectBroker,
   sampleActive = false,
   onLoadSample,
   onClearSample,
@@ -134,8 +132,7 @@ export function DashboardView({
       {!hasAnyTrades && (
         <EmptyDashboard
           onAddTrade={onAddTrade}
-          onImportCsv={onImportCsv}
-          onImportScreenshot={onImportScreenshot}
+          onConnectBroker={onConnectBroker}
           onLoadSample={onLoadSample}
         />
       )}

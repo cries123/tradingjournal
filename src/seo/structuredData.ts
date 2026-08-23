@@ -11,7 +11,7 @@ const ORGANIZATION = {
   url: SITE_ORIGIN,
   logo: `${SITE_ORIGIN}/logo-mark.svg`,
   description:
-    'Free trading journal with a visual P&L calendar, performance analytics, and brokerage imports without broker login.',
+    'Free trading journal with a visual P&L calendar, performance analytics, and automatic Schwab & Robinhood sync.',
 };
 
 const WEBSITE = {
@@ -21,7 +21,7 @@ const WEBSITE = {
   alternateName: ['Trend Chasers Trading Journal', 'Trend Chasers Journal'],
   url: SITE_ORIGIN,
   description:
-    'Free trading journal to track and improve your performance. Visual P&L calendar and import from your brokerage — no broker login.',
+    'Free trading journal to track and improve your performance. Visual P&L calendar with automatic broker sync or manual entry.',
   publisher: { '@id': `${SITE_ORIGIN}/#organization` },
 };
 
@@ -38,7 +38,7 @@ const SOFTWARE_APP = {
     priceCurrency: 'USD',
   },
   description:
-    'Free trading journal with P&L calendar, AI screenshot import, CSV uploads, and performance analytics.',
+    'Free trading journal with P&L calendar, automatic Schwab & Robinhood sync, manual entry, and performance analytics.',
 };
 
 const NAV_LINKS = [

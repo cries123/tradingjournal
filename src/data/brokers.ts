@@ -1,18 +1,18 @@
 export const SUPPORTED_BROKERS = [
   {
     name: 'Thinkorswim',
-    detail: 'Screenshot AI + CSV',
-    methods: ['AI screenshot parsing from mobile/desktop', 'Schwab account statement CSV (TOS export)'],
+    detail: 'Automatic sync via Schwab',
+    methods: ['Syncs through the Charles Schwab connection', 'Round-trip trade matching', 'Manual entry always available'],
   },
   {
     name: 'Schwab',
-    detail: 'Account statement CSV',
-    methods: ['Account Trade History CSV export', 'Round-trip trade matching'],
+    detail: 'Automatic sync',
+    methods: ['Read-only connection via SnapTrade', 'Round-trip trade matching', 'Manual entry always available'],
   },
   {
     name: 'Robinhood',
-    detail: 'Screenshot AI parsing',
-    methods: ['AI screenshot parsing from the mobile app', 'Position & P/L screen capture'],
+    detail: 'Automatic sync',
+    methods: ['Read-only connection via SnapTrade', 'Round-trip trade matching', 'Manual entry always available'],
   },
 ] as const;
 

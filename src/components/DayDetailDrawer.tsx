@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Camera, FileText, Pencil, Plus, Share2, X } from 'lucide-react';
+import { Pencil, Plus, Share2, X } from 'lucide-react';
 import { TradeListItem } from './TradeListItem';
 import { ShareCardModal } from './ShareCardModal';
 import type { Trade } from '../types';
@@ -17,8 +17,6 @@ interface DayDetailDrawerProps {
   onDelete: (id: string) => void;
   onEdit: (trade: Trade) => void;
   onAddTrade: () => void;
-  onImportCsv: () => void;
-  onImportScreenshot: () => void;
 }
 
 export function DayDetailDrawer({
@@ -28,8 +26,6 @@ export function DayDetailDrawer({
   onDelete,
   onEdit,
   onAddTrade,
-  onImportCsv,
-  onImportScreenshot,
 }: DayDetailDrawerProps) {
   useEscapeToClose(onClose);
   const { settings } = useSettings();
@@ -239,33 +235,14 @@ export function DayDetailDrawer({
           )}
         </div>
 
-        <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] border-t border-border/60 shrink-0 space-y-2">
-          <p className="text-xs text-text-secondary font-medium uppercase tracking-wide">Import trades</p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={onImportCsv}
-              className="flex items-center justify-center gap-2 py-2.5 px-3 border border-border rounded-lg text-sm hover:border-accent/50 hover:bg-accent/5 transition-colors focus-ring"
-            >
-              <FileText size={16} />
-              Import CSV
-            </button>
-            <button
-              type="button"
-              onClick={onImportScreenshot}
-              className="flex items-center justify-center gap-2 py-2.5 px-3 border border-border rounded-lg text-sm hover:border-accent/50 hover:bg-accent/5 transition-colors focus-ring"
-            >
-              <Camera size={16} />
-              Screenshot
-            </button>
-          </div>
+        <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] border-t border-border/60 shrink-0">
           <button
             type="button"
             onClick={onAddTrade}
-            className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-border rounded-lg text-text-secondary hover:text-text-primary hover:border-accent/50 transition-colors text-sm focus-ring"
+            className="w-full flex items-center justify-center gap-2 py-2.5 btn-primary text-sm"
           >
             <Plus size={16} />
-            Log trade manually
+            Log trade
           </button>
         </div>
       </aside>

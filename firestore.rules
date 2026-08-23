@@ -97,6 +97,13 @@ service cloud.firestore {
       allow delete: if adminCanDeleteUser(userId);
     }
 
+    // Broker-connect secrets (SnapTrade userSecret). Written only by the admin SDK from
+    // netlify/functions/broker-connect.ts, which bypasses these rules entirely — this block just
+    // makes explicit that the client SDK can never read or write it, even by accident.
+    match /users/{userId}/private/{docId} {
+      allow read, write: if false;
+    }
+
     match /coachShares/{shareToken} {
       allow read: if true;
       allow list: if isAdmin();

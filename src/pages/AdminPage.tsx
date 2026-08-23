@@ -642,13 +642,13 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                 </p>
                 <div className="grid sm:grid-cols-3 gap-4 text-sm">
                   <div className="flex items-center gap-2">
-                    <HealthDot ok={ready.health.screenshotAi.ok} />
-                    <span>Screenshot AI</span>
+                    <HealthDot ok={ready.health.brokerSync.ok && Boolean(ready.health.brokerSync.configured)} />
+                    <span>Broker sync</span>
                     <span className="text-text-secondary text-xs ml-auto">
-                      {ready.health.screenshotAi.ok
-                        ? ready.health.screenshotAi.hasApiKey
+                      {ready.health.brokerSync.ok
+                        ? ready.health.brokerSync.configured
                           ? 'Ready'
-                          : 'No API key'
+                          : 'No API keys'
                         : 'Down'}
                     </span>
                   </div>

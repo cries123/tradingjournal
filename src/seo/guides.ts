@@ -11,44 +11,50 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
     slug: 'free-trading-journal',
     title: 'Free Trading Journal for Active Traders',
     description:
-      'Why a free trading journal helps you track performance, review mistakes, and improve consistency — without spreadsheets or broker logins.',
+      'Why a free trading journal helps you track performance, review mistakes, and improve consistency — with automatic broker sync or manual entry.',
     path: '/guides/free-trading-journal',
     sections: [
       {
         heading: 'What makes a good free trading journal?',
         paragraphs: [
           'A trading journal should show your results clearly — not bury them in rows. Trend Chasers is built around a visual P&L calendar so green and red days stand out immediately.',
-          'You get net P&L, win rate, profit factor, and average profit per trade without exporting to another tool. Import trades from your brokerage via screenshot or CSV, or log them manually.',
+          'You get net P&L, win rate, profit factor, and average profit per trade without exporting to another tool. Connect Schwab or Robinhood to sync trades automatically, or log them manually.',
         ],
       },
       {
         heading: 'Why traders switch from spreadsheets',
         paragraphs: [
           'Spreadsheets work until you skip a week, mis-tag a setup, or lose track of which account a trade belongs to. A dedicated journal keeps daily P&L, tags, and notes tied to each session.',
-          'Trend Chasers is free to start. Optional sign-in syncs your journal across devices — your brokerage login is never required.',
+          'Trend Chasers is free to start. Optional sign-in syncs your journal across devices, and broker sync keeps it current without any manual work.',
         ],
       },
     ],
   },
   {
-    slug: 'trading-journal-without-broker-login',
-    title: 'Trading Journal Without Broker Login',
+    slug: 'how-broker-sync-works',
+    title: 'How Broker Sync Works',
     description:
-      'Track trades safely without connecting your brokerage. Import CSV or screenshots manually — your login stays separate from your journal.',
-    path: '/guides/trading-journal-without-broker-login',
+      'Connect Schwab or Robinhood and let trades sync automatically — how the connection works, what data it reads, and how to disconnect.',
+    path: '/guides/how-broker-sync-works',
     sections: [
       {
-        heading: 'Your brokerage and your journal should stay separate',
+        heading: 'What broker sync actually does',
         paragraphs: [
-          'Many tools ask for API keys or OAuth access to your brokerage. Trend Chasers never does. You control what enters the journal: a CSV export, a screenshot from your app, or manual entry.',
-          'That means no third party holds your brokerage credentials, and you can journal even if your broker does not offer API access.',
+          'Trend Chasers uses SnapTrade, a broker-data connection provider, to read your trade activity. You authorize the connection on your broker\'s own site or SnapTrade\'s secure portal — your credentials are never sent to or stored by Trend Chasers.',
+          'Connections are read-only by default: Trend Chasers can pull your positions and trade history, but nothing can place trades on your behalf.',
         ],
       },
       {
-        heading: 'How to import without connecting',
+        heading: 'Connecting is optional',
         paragraphs: [
-          'Upload a screenshot of your positions or P/L screen — AI extracts symbols and daily P/L for review before saving.',
-          'Drop in a CSV statement export and match round-trip trades in seconds. Everything stays under your Trend Chasers account, not your broker.',
+          'You do not need to connect anything to use the journal. Manual entry works exactly as it always has, and you can mix the two — sync one account, log another by hand.',
+          'If you\'d rather not link a broker at all, every feature outside of automatic sync (the calendar, analytics, tags, notes) works the same either way.',
+        ],
+      },
+      {
+        heading: 'Disconnecting',
+        paragraphs: [
+          'Open Connect broker from the sidebar and click Disconnect on any linked account. That revokes SnapTrade\'s access immediately — Trend Chasers keeps the trades you already synced, but nothing new comes in until you reconnect.',
         ],
       },
     ],
@@ -64,7 +70,7 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
         heading: 'Why a P&L calendar beats a flat trade list',
         paragraphs: [
           'Lists hide patterns. A calendar shows whether you are green on Tuesdays, bleeding on FOMO days, or improving week over week.',
-          'Trend Chasers colors each day by net P&L. Click a day to import that session or drill into individual trades.',
+          'Trend Chasers colors each day by net P&L. Click a day to log a trade for that session or drill into individual trades.',
         ],
       },
       {

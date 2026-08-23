@@ -127,7 +127,7 @@ export function AuthModal() {
               {mode === 'login'
                 ? 'Sign in to sync your journal to the cloud and access it from any device.'
                 : mode === 'signup'
-                  ? 'Start journaling with cloud backup. No brokerage login — ever.'
+                  ? 'Start journaling with cloud backup. Connect a broker later, or keep it manual.'
                   : 'Enter your email and we\'ll send a link to reset your password.'}
             </p>
           </div>

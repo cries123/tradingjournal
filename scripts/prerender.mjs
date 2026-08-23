@@ -23,7 +23,7 @@ const ROUTES = [
   '/brokers/robinhood',
   '/guides',
   '/guides/free-trading-journal',
-  '/guides/trading-journal-without-broker-login',
+  '/guides/how-broker-sync-works',
   '/guides/pnl-calendar-trading-journal',
   '/privacy',
   '/terms',

@@ -13,45 +13,45 @@ export const BROKER_GUIDES: BrokerGuide[] = [
   {
     slug: 'thinkorswim',
     brokerName: 'Thinkorswim',
-    title: 'Thinkorswim Trading Journal — Import Trades Without Linking Your Account',
+    title: 'Thinkorswim Trading Journal — Automatic Sync or Manual Entry',
     description:
-      'Journal Thinkorswim trades with a P&L calendar. Import via CSV export or AI screenshot parsing — no account linking, no API keys, no broker login.',
+      'Journal Thinkorswim trades with a P&L calendar. Connect your Schwab account for automatic sync, or log trades manually.',
     path: '/brokers/thinkorswim',
     intro:
-      'Track your Thinkorswim trades on a visual P&L calendar without ever connecting your Schwab login. Export a CSV or snap a screenshot — your credentials stay with your broker.',
+      'Track your Thinkorswim trades on a visual P&L calendar. Thinkorswim accounts are Schwab accounts, so connecting Schwab through Trend Chasers syncs your Thinkorswim activity too — or log sessions manually if you\'d rather not connect anything.',
     sections: [
       {
-        heading: 'Import Thinkorswim trades from a CSV export',
+        heading: 'Sync Thinkorswim trades automatically',
         paragraphs: [
-          'In Thinkorswim desktop, open the Monitor tab and go to Account Statement. Set your date range, right-click the Account Trade History section, and export to file. That CSV contains every execution with time, side, quantity, and price.',
-          'Drop the file into Trend Chasers and round-trip trades are matched automatically — opens paired with closes, P&L computed per trade. Review the parsed list, deselect anything you do not want, and import to your calendar.',
+          'From Connect broker in the sidebar, choose Charles Schwab and approve a read-only connection through SnapTrade, a broker-data connection provider. Because thinkorswim runs on Schwab\'s infrastructure, this covers both.',
+          'Round-trip trades are matched automatically — opens paired with closes, P&L computed per trade — and land on your calendar ready to review, tag, and annotate.',
         ],
       },
       {
-        heading: 'Or screenshot your positions — AI does the parsing',
+        heading: 'Or log sessions manually',
         paragraphs: [
-          'For quick end-of-day logging, screenshot the P/L or positions screen in the Thinkorswim mobile app. The AI import reads symbols, daily P/L, and options details like strikes and expirations when visible.',
-          'You always review before saving: flip P/L signs, fix symbols, or drop rows. Nothing enters your journal without your approval.',
+          'Prefer not to connect anything? Log trade lets you enter symbol, P&L, side, and setup tags in seconds. Many traders log end-of-day from memory or a quick glance at their P/L screen.',
+          'You can mix both: sync one account automatically and log a paper account or a second broker by hand.',
         ],
       },
       {
         heading: 'Why traders journal Thinkorswim trades separately',
         paragraphs: [
-          'Thinkorswim shows account performance, but it is not a journal. A dedicated journal adds setup tags, notes, screenshots of your charts, win-rate analytics, and a calendar view that makes green and red streaks obvious.',
-          'Because Trend Chasers never asks for your Schwab login, you can journal a live account, a paper account, or both — completely separated from your brokerage access.',
+          'Thinkorswim shows account performance, but it is not a journal. A dedicated journal adds setup tags, notes, chart screenshots, win-rate analytics, and a calendar view that makes green and red streaks obvious.',
+          'Broker sync is read-only and optional — your Schwab login goes to Schwab or SnapTrade\'s secure portal, never to Trend Chasers, and you can disconnect at any time.',
         ],
       },
     ],
     faq: [
       {
-        question: 'Do I need to link my Schwab or Thinkorswim account?',
+        question: 'Do I need to connect my Schwab or Thinkorswim account?',
         answer:
-          'No. Trend Chasers never connects to your brokerage. You import trades yourself via CSV export or screenshot — your login stays with your broker.',
+          'No. Connecting is optional — Connect broker in the sidebar syncs trades automatically if you want it, but manual entry works just as well if you\'d rather not link anything.',
       },
       {
-        question: 'Does the CSV import handle options trades?',
+        question: 'Does broker sync handle options trades?',
         answer:
-          'Yes. The Thinkorswim Account Trade History export includes options executions, and round-trip matching pairs opens with closes including multi-leg fills.',
+          'Yes. Options fills sync with strike, expiration, and contract details when the brokerage provides them, and round-trip matching pairs opens with closes.',
       },
       {
         question: 'Is this free for Thinkorswim traders?',
@@ -63,45 +63,44 @@ export const BROKER_GUIDES: BrokerGuide[] = [
   {
     slug: 'charles-schwab',
     brokerName: 'Charles Schwab',
-    title: 'Charles Schwab Trading Journal — CSV Import, No Broker Login',
+    title: 'Charles Schwab Trading Journal — Automatic Sync or Manual Entry',
     description:
-      'Journal Charles Schwab trades on a P&L calendar. Import account statement CSVs or screenshots — no OAuth, no API keys, no credentials shared.',
+      'Journal Charles Schwab trades on a P&L calendar. Connect for automatic sync via a secure, read-only connection, or log trades manually.',
     path: '/brokers/charles-schwab',
     intro:
-      'Turn your Schwab account statements into a visual trading journal. Import the CSV you already export for your records — your Schwab login never leaves your broker.',
+      'Turn your Schwab account activity into a visual trading journal. Connect once for automatic sync, or keep full manual control — both are free.',
     sections: [
       {
-        heading: 'Import your Schwab account statement CSV',
+        heading: 'Connect Schwab for automatic sync',
         paragraphs: [
-          'From Schwab.com, open Accounts → History, choose your date range, and export transactions as CSV. Trend Chasers parses the statement, matches round-trip trades, and computes P&L per position.',
-          'The importer is optimized for Schwab statement exports: it skips non-trade rows like dividends and transfers, and pairs buys with sells automatically for review before anything is saved.',
+          'Open Connect broker from the sidebar, choose Charles Schwab, and approve a connection through SnapTrade — a broker-data connection provider that handles the secure link on Schwab\'s own site. Trend Chasers never sees your Schwab password.',
+          'Once connected, Trend Chasers reads your recent activity, matches round-trip trades, and computes P&L per position automatically. Sync again anytime to pull in new activity.',
         ],
       },
       {
-        heading: 'Screenshot import for quick daily logging',
+        heading: 'Read-only, and easy to undo',
         paragraphs: [
-          'Do not want to export a file every day? Screenshot your positions or realized P/L screen in the Schwab mobile app. AI extracts symbols and P/L for one-tap review and import.',
-          'This works well for end-of-day journaling: log the session in under a minute, add setup tags and notes while the trades are fresh.',
+          'The connection is read-only by default — it can pull your trade history, but nothing can place trades on your behalf. Disconnect from Connect broker at any time to revoke access immediately.',
+          'If you\'d rather not connect at all, Log trade covers manual entry with the same tags, notes, and analytics.',
         ],
       },
       {
-        heading: 'Your Schwab credentials stay with Schwab',
+        heading: 'Keep accounts separate',
         paragraphs: [
-          'Many journaling tools ask you to link your brokerage with OAuth or hand over API keys. Trend Chasers never does — there is nothing to link, revoke, or worry about.',
-          'You control exactly what enters the journal, which also means you can keep separate journals per account using the multi-journal feature.',
+          'Track multiple Schwab accounts, or a live account alongside a paper account, using the multi-journal feature — each keeps its own trades, stats, and calendar.',
         ],
       },
     ],
     faq: [
       {
-        question: 'Which Schwab export does the CSV import expect?',
+        question: 'How does Schwab sync actually work?',
         answer:
-          'The transactions/history CSV export from Schwab.com. Thinkorswim Account Statement exports are also supported — see the Thinkorswim guide.',
+          'Trend Chasers uses SnapTrade to connect to Schwab. You authorize the connection on Schwab\'s or SnapTrade\'s site; your credentials are never sent to or stored by Trend Chasers.',
       },
       {
-        question: 'Will Trend Chasers ever ask for my Schwab password?',
+        question: 'Will Trend Chasers ever ask for my Schwab password directly?',
         answer:
-          'Never. There is no account linking of any kind. You export data from Schwab yourself and import it manually.',
+          'No. Authorization happens on Schwab\'s or SnapTrade\'s own site. Trend Chasers only receives read access to your trade data after you approve it.',
       },
       {
         question: 'Can I track multiple Schwab accounts?',
@@ -113,25 +112,25 @@ export const BROKER_GUIDES: BrokerGuide[] = [
   {
     slug: 'robinhood',
     brokerName: 'Robinhood',
-    title: 'Robinhood Trading Journal — Screenshot & CSV Import, No Login Linking',
+    title: 'Robinhood Trading Journal — Automatic Sync or Manual Entry',
     description:
-      'Journal Robinhood trades on a visual P&L calendar. Import your activity report CSV or screenshots — no account linking required.',
+      'Journal Robinhood trades on a visual P&L calendar. Connect for read-only automatic sync, or log trades manually.',
     path: '/brokers/robinhood',
     intro:
-      'Robinhood shows you today’s P/L and little else. Journal your trades on a calendar, tag your setups, and see your real win rate — without linking your Robinhood account.',
+      'Robinhood shows you today\'s P/L and little else. Journal your trades on a calendar, tag your setups, and see your real win rate — connect for automatic sync or log sessions yourself.',
     sections: [
       {
-        heading: 'Import from your Robinhood activity report',
+        heading: 'Connect Robinhood for automatic sync',
         paragraphs: [
-          'In the Robinhood app, go to Account → Statements & History → Reports and generate an activity report CSV. It lists every fill with date, instrument, quantity, and amount.',
-          'Trend Chasers reads the report, matches buys to sells into round-trip trades, and computes per-trade P&L. Review the parsed trades and import the ones you want on your calendar.',
+          'Robinhood doesn\'t offer a public trading API, so Trend Chasers connects through SnapTrade, a broker-data connection provider that brokers a secure, read-only link to your account. Open Connect broker in the sidebar to get started.',
+          'Once connected, your trade history syncs in and round-trip trades are matched automatically — buys paired with sells, P&L computed per trade.',
         ],
       },
       {
-        heading: 'Screenshot your P/L for instant logging',
+        heading: 'Read-only, disconnect anytime',
         paragraphs: [
-          'Screenshot your positions or closed P/L screen and let AI extract the numbers — symbols, daily P/L, and options contract details when visible.',
-          'Everything lands in a review screen first. Fix a sign, correct a ticker, deselect a row — then import. Ideal for logging a session in seconds from your phone.',
+          'The connection can only read your activity — it cannot place trades. Your Robinhood login goes to Robinhood or SnapTrade\'s secure portal, never to Trend Chasers, and you can disconnect from Connect broker at any time.',
+          'If you\'d rather not connect, Log trade covers manual entry in a few seconds per session.',
         ],
       },
       {
@@ -144,19 +143,19 @@ export const BROKER_GUIDES: BrokerGuide[] = [
     ],
     faq: [
       {
+        question: 'Does Robinhood have an official trading API?',
+        answer:
+          'Not a public one for stocks and options. Trend Chasers connects through SnapTrade, which brokers a secure, read-only link to your account so you don\'t have to export or screenshot anything.',
+      },
+      {
+        question: 'Is the Robinhood connection safe?',
+        answer:
+          'It\'s read-only and your credentials are never sent to Trend Chasers — they go to Robinhood or SnapTrade\'s secure connection portal. Disconnect anytime to revoke access.',
+      },
+      {
         question: 'Do I have to connect my Robinhood account?',
         answer:
-          'No. Trend Chasers never asks for your Robinhood login. Import happens through CSV reports or screenshots that you control.',
-      },
-      {
-        question: 'Does it work with Robinhood options trades?',
-        answer:
-          'Yes. Both the activity report import and AI screenshot parsing handle options, including strikes and expirations when visible.',
-      },
-      {
-        question: 'Is Trend Chasers really free?',
-        answer:
-          'Yes — the journal, calendar, imports, and analytics are free. Optional sign-in syncs your journal across devices.',
+          'No. Manual entry is always available if you\'d rather keep your journal and your brokerage completely separate.',
       },
     ],
   },
