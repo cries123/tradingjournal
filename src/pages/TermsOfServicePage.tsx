@@ -93,7 +93,11 @@ export function TermsOfServicePage({ onHome, onLaunch, onPrivacy, onTerms, onBro
       <section>
         <h2>Contact</h2>
         <p>
-          Questions about these terms? Contact us via the links in the footer.
+          Questions about these terms? Email{' '}
+          <a href="mailto:support@trendchasers.net" className="text-emerald-400 hover:underline">
+            support@trendchasers.net
+          </a>
+          .
         </p>
       </section>
     </LegalPageLayout>

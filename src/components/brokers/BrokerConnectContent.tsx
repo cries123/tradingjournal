@@ -16,7 +16,7 @@ import type { Trade } from '../../types';
 interface BrokerCardCopy {
   key: SupportedBroker;
   name: string;
-  brokerId: 'schwab' | 'robinhood';
+  brokerId: 'schwab' | 'robinhood' | 'webull';
   /** Lowercase substring to match against SnapTrade's institution_name for this broker's accounts.
    *  Keep in sync with the needle used server-side in snaptradeClient.ts's resolveBrokerSlug. */
   matchNeedle: string;
@@ -53,6 +53,20 @@ const BROKER_COPY: BrokerCardCopy[] = [
       'Click Refresh, pick your account, and Sync trades to pull in your history.',
     ],
     note: 'Robinhood connections are read-only — this can pull your trade history, but can’t place trades.',
+  },
+  {
+    key: 'WEBULL',
+    name: 'Webull',
+    brokerId: 'webull',
+    matchNeedle: 'webull',
+    access: 'Read-only',
+    steps: [
+      'Click Connect — a secure SnapTrade window opens in a new tab.',
+      'Choose Webull and sign in there. SnapTrade brokers the connection — your credentials go to SnapTrade’s secure portal, never to our servers.',
+      'Approve read access, then close that tab and come back here.',
+      'Click Refresh, pick your account, and Sync trades to pull in your history.',
+    ],
+    note: 'Webull’s own login step currently asks for your Webull Trade PIN — that’s Webull’s own authentication method, not a Trend Chasers requirement, and this connection still only requests read access.',
   },
 ];
 

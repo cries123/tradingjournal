@@ -27,18 +27,20 @@ export function getSnaptrade() {
 
 /** Known SnapTrade brokerage slugs we support connecting to. Looked up dynamically at connect time
  * (see resolveBrokerSlug) so this is only the fallback if the reference-data lookup fails. */
-export const BROKER_SLUG_FALLBACK: Record<'SCHWAB' | 'ROBINHOOD', string> = {
+export const BROKER_SLUG_FALLBACK: Record<'SCHWAB' | 'ROBINHOOD' | 'WEBULL', string> = {
   SCHWAB: 'SCHWAB',
   ROBINHOOD: 'ROBINHOOD',
+  WEBULL: 'WEBULL',
 };
 
 let brokerageCache: { id?: string; slug?: string; name?: string; display_name?: string }[] | null = null;
 let brokerageCacheAt = 0;
 const BROKERAGE_CACHE_TTL_MS = 60 * 60 * 1000;
 
-/** Resolves a broker key ('SCHWAB' | 'ROBINHOOD') to the real SnapTrade brokerage slug by matching
- * on display name, rather than hardcoding a guessed slug that could drift from SnapTrade's catalog. */
-export async function resolveBrokerSlug(broker: 'SCHWAB' | 'ROBINHOOD'): Promise<string> {
+/** Resolves a broker key ('SCHWAB' | 'ROBINHOOD' | 'WEBULL') to the real SnapTrade brokerage slug by
+ * matching on display name, rather than hardcoding a guessed slug that could drift from SnapTrade's
+ * catalog. */
+export async function resolveBrokerSlug(broker: 'SCHWAB' | 'ROBINHOOD' | 'WEBULL'): Promise<string> {
   const snaptrade = getSnaptrade();
   const now = Date.now();
 
@@ -46,6 +48,16 @@ export async function resolveBrokerSlug(broker: 'SCHWAB' | 'ROBINHOOD'): Promise
     const res = await snaptrade.referenceData.listAllBrokerages();
     brokerageCache = res.data;
     brokerageCacheAt = now;
+  }
+
+  if (broker === 'WEBULL') {
+    // SnapTrade lists "Webull US" and "Webull Canada" as two distinct integrations — match "webull"
+    // but explicitly exclude "canada" so we never accidentally connect the wrong country's brokerage.
+    const match = brokerageCache?.find((b) => {
+      const name = `${b.name ?? ''} ${b.display_name ?? ''}`.toLowerCase();
+      return name.includes('webull') && !name.includes('canada');
+    });
+    return match?.slug || BROKER_SLUG_FALLBACK.WEBULL;
   }
 
   const needle = broker === 'SCHWAB' ? 'schwab' : 'robinhood';

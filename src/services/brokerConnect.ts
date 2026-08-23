@@ -1,7 +1,7 @@
 import type { ParsedTradeInput } from '../types';
 import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebase';
 
-export type SupportedBroker = 'SCHWAB' | 'ROBINHOOD';
+export type SupportedBroker = 'SCHWAB' | 'ROBINHOOD' | 'WEBULL';
 
 export interface BrokerAccountSummary {
   id: string;

@@ -31,6 +31,11 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://trendchasers.net/guides/broker-sync-now-live</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://trendchasers.net/guides/free-trading-journal</loc>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>

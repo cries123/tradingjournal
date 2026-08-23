@@ -23,7 +23,7 @@ export function GuidesIndexPage({
   return (
     <ContentPageLayout
       title="Trading journal guides"
-      subtitle="Practical guides on free journaling, P&L calendars, and tracking performance without connecting your brokerage."
+      subtitle="Practical guides on free journaling, P&L calendars, and getting the most out of broker sync."
       onHome={onHome}
       onLaunch={onLaunch}
       onPrivacy={onPrivacy}

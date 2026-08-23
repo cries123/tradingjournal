@@ -14,6 +14,7 @@ import { formatMonthYear } from '../utils/format';
 import { computeJournalingStreak } from '../utils/insights';
 import { useSettings } from '../context/SettingsContext';
 import { AccountSwitcher } from './AccountSwitcher';
+import { BrokerSyncAnnouncement } from './BrokerSyncAnnouncement';
 import { WeeklyRecapCard } from './WeeklyRecapCard';
 import { DailyPnlChart } from './DailyPnlChart';
 import { DashboardCalendar } from './DashboardCalendar';
@@ -91,6 +92,8 @@ export function DashboardView({
 
   return (
     <div className="flex flex-col gap-2 md:gap-3 pb-2">
+      <BrokerSyncAnnouncement onConnectBroker={onConnectBroker} />
+
       <AccountSwitcher />
 
       <div className="flex flex-wrap items-center gap-2 shrink-0">

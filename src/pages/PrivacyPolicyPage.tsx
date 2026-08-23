@@ -74,8 +74,11 @@ export function PrivacyPolicyPage({ onHome, onLaunch, onPrivacy, onTerms, onBrok
         <h2>Your rights</h2>
         <p>
           You can delete trades from the app, clear all data, or delete your Firebase account through
-          Firebase/Google account settings. For questions or deletion requests, contact us via the links
-          in the footer.
+          Firebase/Google account settings. For questions or deletion requests, email{' '}
+          <a href="mailto:support@trendchasers.net" className="text-emerald-400 hover:underline">
+            support@trendchasers.net
+          </a>
+          .
         </p>
       </section>
 
@@ -90,7 +93,11 @@ export function PrivacyPolicyPage({ onHome, onLaunch, onPrivacy, onTerms, onBrok
       <section>
         <h2>Contact</h2>
         <p>
-          Questions about privacy? Reach out via GitHub Issues or Report a bug in the site footer.
+          Questions about privacy, or a deletion request? Email{' '}
+          <a href="mailto:support@trendchasers.net" className="text-emerald-400 hover:underline">
+            support@trendchasers.net
+          </a>
+          , or use Report a bug in the site footer.
         </p>
       </section>
     </LegalPageLayout>

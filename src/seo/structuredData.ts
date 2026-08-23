@@ -12,6 +12,11 @@ const ORGANIZATION = {
   logo: `${SITE_ORIGIN}/logo-mark.svg`,
   description:
     'Free trading journal with a visual P&L calendar, performance analytics, and automatic Schwab & Robinhood sync.',
+  contactPoint: {
+    '@type': 'ContactPoint',
+    email: 'support@trendchasers.net',
+    contactType: 'customer support',
+  },
 };
 
 const WEBSITE = {

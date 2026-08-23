@@ -22,6 +22,7 @@ const ROUTES = [
   '/brokers/charles-schwab',
   '/brokers/robinhood',
   '/guides',
+  '/guides/broker-sync-now-live',
   '/guides/free-trading-journal',
   '/guides/how-broker-sync-works',
   '/guides/pnl-calendar-trading-journal',

@@ -14,11 +14,15 @@ export const SUPPORTED_BROKERS = [
     detail: 'Automatic sync',
     methods: ['Read-only connection via SnapTrade', 'Round-trip trade matching', 'Manual entry always available'],
   },
+  {
+    name: 'Webull',
+    detail: 'Automatic sync',
+    methods: ['Read-only connection via SnapTrade', 'Round-trip trade matching', 'Manual entry always available'],
+  },
 ] as const;
 
 export const COMING_SOON_BROKERS = [
   'Interactive Brokers',
-  'Webull',
   'Tastytrade',
   'E*TRADE',
   'Fidelity',

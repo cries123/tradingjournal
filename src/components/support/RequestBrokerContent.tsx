@@ -82,7 +82,11 @@ export function RequestBrokerContent({ onBack, backLabel = 'Back to dashboard' }
 
         {!firebaseEnabled ? (
           <div className="panel-card p-6 text-sm text-text-secondary">
-            Broker support requests require the app to be connected to our backend. Please use{' '}
+            Broker support requests require the app to be connected to our backend. Please email{' '}
+            <a href="mailto:support@trendchasers.net" className="text-emerald-400 hover:underline">
+              support@trendchasers.net
+            </a>{' '}
+            or use{' '}
             <a href="https://github.com/cries123/tradingjournal/issues/new" className="text-emerald-400 hover:underline">
               GitHub Issues
             </a>{' '}

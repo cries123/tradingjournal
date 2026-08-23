@@ -4,7 +4,7 @@ import { getSnaptrade, resolveBrokerSlug, SNAPTRADE_CONFIGURED } from './snaptra
 import { getAdminFirestore } from './firebaseAdmin';
 import { mapSnapTradeActivitiesToTrades, type SnapTradeActivityLike } from './mapSnapTradeActivities';
 
-export type SupportedBroker = 'SCHWAB' | 'ROBINHOOD';
+export type SupportedBroker = 'SCHWAB' | 'ROBINHOOD' | 'WEBULL';
 
 export type BrokerConnectAction = 'connect' | 'status' | 'sync' | 'disconnect';
 
@@ -54,8 +54,8 @@ async function getCredsIfRegistered(uid: string): Promise<SnaptradeCreds | null>
 }
 
 async function handleConnect(uid: string, broker?: SupportedBroker): Promise<BrokerConnectResult> {
-  if (broker !== 'SCHWAB' && broker !== 'ROBINHOOD') {
-    throw new BrokerRequestError('Unsupported broker. Use SCHWAB or ROBINHOOD.', 400);
+  if (broker !== 'SCHWAB' && broker !== 'ROBINHOOD' && broker !== 'WEBULL') {
+    throw new BrokerRequestError('Unsupported broker. Use SCHWAB, ROBINHOOD, or WEBULL.', 400);
   }
 
   const creds = await getOrRegisterCreds(uid);

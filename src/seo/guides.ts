@@ -8,6 +8,42 @@ export interface GuideArticle {
 
 export const GUIDE_ARTICLES: GuideArticle[] = [
   {
+    slug: 'broker-sync-now-live',
+    title: 'Broker Sync Is Live',
+    description:
+      'Automatic trade sync for Schwab and Robinhood is now live — read-only, so Trend Chasers never sees your balance or places trades on your behalf.',
+    path: '/guides/broker-sync-now-live',
+    sections: [
+      {
+        heading: "What's new",
+        paragraphs: [
+          'You can now connect Charles Schwab (thinkorswim accounts included) or Robinhood and have your round-trip trades sync straight into your calendar — no more copying numbers over by hand.',
+          'The connection is brokered by SnapTrade, a dedicated broker-data provider built for exactly this. Your login goes to your broker\'s own site or SnapTrade\'s secure portal — never to Trend Chasers.',
+        ],
+      },
+      {
+        heading: 'Read-only, on purpose',
+        paragraphs: [
+          'Broker sync only reads your trade history. Trend Chasers cannot see your account balance, buying power, or holdings beyond what\'s needed to reconstruct closed trades — and it cannot place, modify, or cancel a single trade on your behalf.',
+          'Think of it as a one-way mirror: your trade history flows in for the journal, and nothing ever flows back out to your brokerage account.',
+        ],
+      },
+      {
+        heading: 'How to turn it on',
+        paragraphs: [
+          'Open Connect broker from the sidebar, choose Schwab or Robinhood, and approve the read-only connection on your broker\'s own site. Come back, click Refresh, then Sync trades on your account — your history fills in automatically.',
+          'Nothing changes if you\'d rather not connect anything. Manual entry works exactly as it always has, and the two mix freely — sync one account, log another by hand.',
+        ],
+      },
+      {
+        heading: 'Disconnect anytime',
+        paragraphs: [
+          'Go to Connect broker and click Disconnect on any linked account. That revokes access immediately — the trades you already synced stay in your journal, but nothing new comes in until you reconnect.',
+        ],
+      },
+    ],
+  },
+  {
     slug: 'free-trading-journal',
     title: 'Free Trading Journal for Active Traders',
     description:
