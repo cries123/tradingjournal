@@ -1,4 +1,5 @@
 import type { AdminUserSummary } from './admin';
+import type { AdminUserNote } from './adminUserNotes';
 import type { BrokerSupportRequest } from './brokerSupportRequests';
 import type { BugReport } from './bugReports';
 
@@ -20,7 +21,7 @@ function downloadCsv(filename: string, rows: string[][]): void {
   URL.revokeObjectURL(url);
 }
 
-export function exportUsersCsv(users: AdminUserSummary[]): void {
+export function exportUsersCsv(users: AdminUserSummary[], notes?: Map<string, AdminUserNote>): void {
   downloadCsv('trend-chasers-users.csv', [
     [
       'username',
@@ -36,31 +37,39 @@ export function exportUsersCsv(users: AdminUserSummary[]): void {
       'first_session',
       'latest_session',
       'coach_share',
+      'flagged',
+      'admin_note',
     ],
-    ...users.map((u) => [
-      u.username ?? '',
-      u.email,
-      u.uid,
-      u.createdAt ? new Date(u.createdAt).toISOString() : '',
-      u.lastLoginAt ? new Date(u.lastLoginAt).toISOString() : '',
-      String(u.tradeCount),
-      String(u.tradesSavedLast7Days),
-      u.totalPnl != null ? u.totalPnl.toFixed(2) : '',
-      u.winRate != null ? u.winRate.toFixed(1) : '',
-      u.lastTradeActivityAt ? new Date(u.lastTradeActivityAt).toISOString() : '',
-      u.firstTradeDate ?? '',
-      u.lastTradeDate ?? '',
-      u.coachShareEnabled ? 'yes' : 'no',
-    ]),
+    ...users.map((u) => {
+      const note = notes?.get(u.uid);
+      return [
+        u.username ?? '',
+        u.email,
+        u.uid,
+        u.createdAt ? new Date(u.createdAt).toISOString() : '',
+        u.lastLoginAt ? new Date(u.lastLoginAt).toISOString() : '',
+        String(u.tradeCount),
+        String(u.tradesSavedLast7Days),
+        u.totalPnl != null ? u.totalPnl.toFixed(2) : '',
+        u.winRate != null ? u.winRate.toFixed(1) : '',
+        u.lastTradeActivityAt ? new Date(u.lastTradeActivityAt).toISOString() : '',
+        u.firstTradeDate ?? '',
+        u.lastTradeDate ?? '',
+        u.coachShareEnabled ? 'yes' : 'no',
+        note?.flagged ? 'yes' : 'no',
+        note?.note ?? '',
+      ];
+    }),
   ]);
 }
 
 export function exportBugReportsCsv(reports: BugReport[]): void {
   downloadCsv('trend-chasers-bug-reports.csv', [
-    ['created_at', 'status', 'email', 'username', 'description', 'steps', 'admin_note', 'page_url'],
+    ['created_at', 'status', 'priority', 'email', 'username', 'description', 'steps', 'admin_note', 'page_url'],
     ...reports.map((r) => [
       r.createdAt,
       r.status,
+      r.priority ?? 'medium',
       r.email,
       r.username ?? '',
       r.description,
@@ -76,6 +85,7 @@ export function exportBrokerRequestsCsv(requests: BrokerSupportRequest[]): void 
     [
       'created_at',
       'status',
+      'priority',
       'broker',
       'email',
       'username',
@@ -86,6 +96,7 @@ export function exportBrokerRequestsCsv(requests: BrokerSupportRequest[]): void 
     ...requests.map((r) => [
       r.createdAt,
       r.status,
+      r.priority ?? 'medium',
       r.brokerName,
       r.email,
       r.username ?? '',

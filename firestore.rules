@@ -174,5 +174,25 @@ service cloud.firestore {
       allow create: if adminCanDeleteUser(userId);
       allow update, delete: if false;
     }
+
+    // Internal admin-only notes/flags about a user account — deliberately separate from
+    // /users/{userId}, which the user themselves can read and write.
+    match /adminUserNotes/{userId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Immutable trail of admin actions (status/priority/note changes, account edits, deletes).
+    // Only ever appended to, never edited or removed, so it stays trustworthy as a record.
+    match /adminAuditLog/{entryId} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // Point-in-time system health snapshots, recorded each admin page load, to show a trend
+    // instead of only the current live check.
+    match /adminHealthHistory/{entryId} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
+    }
   }
 }

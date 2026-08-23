@@ -1,10 +1,17 @@
-import { doc, getDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, limit as fbLimit, orderBy, query } from 'firebase/firestore';
 import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
 
 export interface AdminHealthStatus {
   brokerSync: { ok: boolean; configured?: boolean; error?: string };
   benchmark: { ok: boolean; asOf?: string; error?: string };
   firebase: { ok: boolean; error?: string };
+}
+
+export interface AdminHealthSnapshot {
+  at: string;
+  brokerSyncOk: boolean;
+  benchmarkOk: boolean;
+  firebaseOk: boolean;
 }
 
 export async function fetchAdminHealth(): Promise<AdminHealthStatus> {
@@ -40,4 +47,32 @@ export async function fetchAdminHealth(): Promise<AdminHealthStatus> {
         ? { ok: true }
         : { ok: false, error: String(firebaseResult.reason) },
   };
+}
+
+/** Best-effort: records one point-in-time health snapshot so the panel can show a trend over time. */
+export async function recordAdminHealthSnapshot(status: AdminHealthStatus): Promise<void> {
+  if (!isFirebaseConfigured()) return;
+  try {
+    await addDoc(collection(getFirebaseDb(), 'adminHealthHistory'), {
+      at: new Date().toISOString(),
+      brokerSyncOk: status.brokerSync.ok,
+      benchmarkOk: status.benchmark.ok,
+      firebaseOk: status.firebase.ok,
+    });
+  } catch {
+    // Non-critical — the live status already rendered from the check itself.
+  }
+}
+
+export async function fetchAdminHealthHistory(max = 30): Promise<AdminHealthSnapshot[]> {
+  if (!isFirebaseConfigured()) return [];
+  try {
+    const q = query(collection(getFirebaseDb(), 'adminHealthHistory'), orderBy('at', 'desc'), fbLimit(max));
+    const snap = await getDocs(q);
+    return snap.docs
+      .map((d) => d.data() as AdminHealthSnapshot)
+      .reverse(); // oldest → newest, so the timeline reads left to right
+  } catch {
+    return [];
+  }
 }

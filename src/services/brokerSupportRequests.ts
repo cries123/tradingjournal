@@ -8,8 +8,10 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
+import type { AdminPriority } from './adminShared';
 
 export type BrokerSupportStatus = 'open' | 'resolved' | 'closed';
+export type { AdminPriority } from './adminShared';
 
 export interface BrokerSupportRequest {
   id: string;
@@ -24,6 +26,7 @@ export interface BrokerSupportRequest {
   userAgent: string;
   pageUrl: string;
   adminNote?: string;
+  priority?: AdminPriority;
 }
 
 export interface SubmitBrokerSupportInput {
@@ -85,4 +88,12 @@ export async function updateBrokerSupportAdminNote(
   await updateDoc(doc(getFirebaseDb(), 'brokerSupportRequests', requestId), {
     adminNote: adminNote.trim(),
   });
+}
+
+export async function updateBrokerSupportPriority(
+  requestId: string,
+  priority: AdminPriority,
+): Promise<void> {
+  if (!isFirebaseConfigured()) return;
+  await updateDoc(doc(getFirebaseDb(), 'brokerSupportRequests', requestId), { priority });
 }

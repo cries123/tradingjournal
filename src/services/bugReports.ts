@@ -8,8 +8,10 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
+import type { AdminPriority } from './adminShared';
 
 export type BugReportStatus = 'open' | 'resolved' | 'closed';
+export type { AdminPriority } from './adminShared';
 
 export interface BugReport {
   id: string;
@@ -23,6 +25,7 @@ export interface BugReport {
   userAgent: string;
   pageUrl: string;
   adminNote?: string;
+  priority?: AdminPriority;
 }
 
 export interface SubmitBugReportInput {
@@ -77,4 +80,12 @@ export async function updateBugReportStatus(
 export async function updateBugReportAdminNote(reportId: string, adminNote: string): Promise<void> {
   if (!isFirebaseConfigured()) return;
   await updateDoc(doc(getFirebaseDb(), 'bugReports', reportId), { adminNote: adminNote.trim() });
+}
+
+export async function updateBugReportPriority(
+  reportId: string,
+  priority: AdminPriority,
+): Promise<void> {
+  if (!isFirebaseConfigured()) return;
+  await updateDoc(doc(getFirebaseDb(), 'bugReports', reportId), { priority });
 }

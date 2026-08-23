@@ -6,7 +6,10 @@ import {
   Building2,
   Download,
   Eye,
+  Flag,
+  History,
   Lock,
+  ScrollText,
   Search,
   ShieldCheck,
   Users,
@@ -28,10 +31,20 @@ import {
 } from '../services/admin';
 import { formatCurrency } from '../utils/format';
 import { exportBrokerRequestsCsv, exportBugReportsCsv, exportUsersCsv } from '../services/adminExport';
-import { fetchAdminHealth, type AdminHealthStatus } from '../services/adminHealth';
+import {
+  fetchAdminHealth,
+  fetchAdminHealthHistory,
+  recordAdminHealthSnapshot,
+  type AdminHealthSnapshot,
+  type AdminHealthStatus,
+} from '../services/adminHealth';
+import { fetchAllAdminUserNotes, saveAdminUserNote, type AdminUserNote } from '../services/adminUserNotes';
+import { fetchRecentAuditLog, logAdminAction, type AdminAuditEntry } from '../services/adminAuditLog';
+import type { AdminPriority } from '../services/adminShared';
 import {
   fetchBrokerSupportRequests,
   updateBrokerSupportAdminNote,
+  updateBrokerSupportPriority,
   updateBrokerSupportStatus,
   type BrokerSupportRequest,
   type BrokerSupportStatus,
@@ -39,6 +52,7 @@ import {
 import {
   fetchBugReports,
   updateBugReportAdminNote,
+  updateBugReportPriority,
   updateBugReportStatus,
   type BugReport,
   type BugReportStatus,
@@ -116,6 +130,9 @@ type AdminState =
       visitorStatsError: string | null;
       serverStats: AdminServerStats | null;
       serverStatsError: string | null;
+      userNotes: Map<string, AdminUserNote>;
+      auditLog: AdminAuditEntry[];
+      healthHistory: AdminHealthSnapshot[];
     };
 
 const STATUS_LABELS: Record<RequestStatus, string> = {
@@ -133,6 +150,75 @@ function statusBadgeClass(status: RequestStatus): string {
     case 'closed':
       return 'bg-zinc-500/15 text-zinc-400';
   }
+}
+
+const PRIORITY_LABELS: Record<AdminPriority, string> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+};
+
+const PRIORITY_RANK: Record<AdminPriority, number> = { high: 0, medium: 1, low: 2 };
+
+function priorityBadgeClass(priority: AdminPriority): string {
+  switch (priority) {
+    case 'high':
+      return 'bg-red-500/15 text-red-400';
+    case 'medium':
+      return 'bg-amber-500/15 text-amber-400';
+    case 'low':
+      return 'bg-zinc-500/15 text-zinc-400';
+  }
+}
+
+function PrioritySelect({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: AdminPriority;
+  disabled: boolean;
+  onChange: (priority: AdminPriority) => void;
+}) {
+  return (
+    <select
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value as AdminPriority)}
+      className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 border-0 cursor-pointer ${priorityBadgeClass(value)}`}
+      aria-label="Set priority"
+    >
+      <option value="low">Low priority</option>
+      <option value="medium">Medium priority</option>
+      <option value="high">High priority</option>
+    </select>
+  );
+}
+
+/** Small left-to-right strip of recent up/down checks, oldest to newest, with a rolling uptime %. */
+function HealthTimeline({ label, values }: { label: string; values: boolean[] }) {
+  if (values.length === 0) return null;
+  const upCount = values.filter(Boolean).length;
+  const uptimePct = (upCount / values.length) * 100;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-xs text-text-secondary">{label}</span>
+        <span className="text-[10px] text-text-secondary">
+          {uptimePct.toFixed(0)}% of last {values.length}
+        </span>
+      </div>
+      <div className="flex gap-0.5" role="img" aria-label={`${label}: ${uptimePct.toFixed(0)}% healthy`}>
+        {values.map((ok, i) => (
+          <span
+            key={i}
+            className={`h-4 flex-1 rounded-[2px] ${ok ? 'bg-emerald-400/70' : 'bg-red-400/80'}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function formatDate(iso: string | null): string {
@@ -248,6 +334,37 @@ function ActivityFeedItem({ item }: { item: AdminActivityItem }) {
   );
 }
 
+const AUDIT_ACTION_LABELS: Record<AdminAuditEntry['action'], string> = {
+  'user.email-changed': 'Changed email for',
+  'user.password-changed': 'Set a new password for',
+  'user.password-reset-sent': 'Sent password reset to',
+  'user.deleted': 'Deleted user',
+  'user.note-saved': 'Updated internal note for',
+  'user.flagged': 'Flagged',
+  'user.unflagged': 'Unflagged',
+  'bug.status-changed': 'Updated status on bug report',
+  'bug.priority-changed': 'Changed priority on bug report',
+  'bug.note-saved': 'Added a note to bug report',
+  'broker-request.status-changed': 'Updated status on broker request',
+  'broker-request.priority-changed': 'Changed priority on broker request',
+  'broker-request.note-saved': 'Added a note to broker request',
+};
+
+function AuditLogItem({ entry }: { entry: AdminAuditEntry }) {
+  const time = new Date(entry.at).toLocaleString();
+  return (
+    <li className="text-xs border-l-2 border-border/50 pl-3">
+      <p className="text-text-primary">
+        {AUDIT_ACTION_LABELS[entry.action]}{' '}
+        <span className="font-medium">{entry.targetLabel || entry.targetId.slice(0, 8)}</span>
+      </p>
+      <p className="text-text-secondary mt-0.5">
+        {entry.detail} · {time}
+      </p>
+    </li>
+  );
+}
+
 function StatusFilterBar({
   value,
   onChange,
@@ -327,12 +444,15 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
     }
 
     try {
-      const [reportsResult, brokerResult, usersResult, healthResult] =
+      const [reportsResult, brokerResult, usersResult, healthResult, notesResult, auditResult, healthHistoryResult] =
         await Promise.allSettled([
           fetchBugReports(),
           fetchBrokerSupportRequests(),
           fetchSignedUpUsers(),
           fetchAdminHealth(),
+          fetchAllAdminUserNotes(),
+          fetchRecentAuditLog(),
+          fetchAdminHealthHistory(),
         ]);
 
       const users =
@@ -355,6 +475,9 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
         fetchAdminServerStats(),
       ]);
 
+      const health = healthResult.status === 'fulfilled' ? healthResult.value : null;
+      if (health) void recordAdminHealthSnapshot(health);
+
       setState({
         phase: 'ready',
         isNewClaim: access.isNewClaim,
@@ -362,11 +485,14 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
         brokerRequests: brokerResult.status === 'fulfilled' ? brokerResult.value : [],
         userCount,
         users,
-        health: healthResult.status === 'fulfilled' ? healthResult.value : null,
+        health,
         visitorStats: visitorResult.stats,
         visitorStatsError: visitorResult.error,
         serverStats: serverResult.stats,
         serverStatsError: serverResult.error,
+        userNotes: notesResult.status === 'fulfilled' ? notesResult.value : new Map(),
+        auditLog: auditResult.status === 'fulfilled' ? auditResult.value : [],
+        healthHistory: healthHistoryResult.status === 'fulfilled' ? healthHistoryResult.value : [],
       });
     } catch {
       setState({
@@ -389,6 +515,9 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
         visitorStatsError: null,
         serverStats: null,
         serverStatsError: null,
+        userNotes: new Map(),
+        auditLog: [],
+        healthHistory: [],
       });
     }
   }, [firebaseEnabled, loading, user, username]);
@@ -397,7 +526,9 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
     void loadAdmin();
   }, [loadAdmin]);
 
-  const handleBugStatusChange = async (reportId: string, status: BugReportStatus) => {
+  const adminIdentity = { adminUid: user?.uid ?? '', adminEmail: user?.email ?? '' };
+
+  const handleBugStatusChange = async (reportId: string, status: BugReportStatus, label: string) => {
     setUpdatingKey(`bug:${reportId}`);
     try {
       await updateBugReportStatus(reportId, status);
@@ -408,12 +539,44 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
           reports: prev.reports.map((r) => (r.id === reportId ? { ...r, status } : r)),
         };
       });
+      void logAdminAction({
+        ...adminIdentity,
+        action: 'bug.status-changed',
+        targetType: 'bug-report',
+        targetId: reportId,
+        targetLabel: label,
+        detail: `Status → ${STATUS_LABELS[status]}`,
+      });
     } finally {
       setUpdatingKey(null);
     }
   };
 
-  const handleBrokerStatusChange = async (requestId: string, status: BrokerSupportStatus) => {
+  const handleBugPriorityChange = async (reportId: string, priority: AdminPriority, label: string) => {
+    setUpdatingKey(`bug-priority:${reportId}`);
+    try {
+      await updateBugReportPriority(reportId, priority);
+      setState((prev) => {
+        if (prev.phase !== 'ready') return prev;
+        return {
+          ...prev,
+          reports: prev.reports.map((r) => (r.id === reportId ? { ...r, priority } : r)),
+        };
+      });
+      void logAdminAction({
+        ...adminIdentity,
+        action: 'bug.priority-changed',
+        targetType: 'bug-report',
+        targetId: reportId,
+        targetLabel: label,
+        detail: `Priority → ${PRIORITY_LABELS[priority]}`,
+      });
+    } finally {
+      setUpdatingKey(null);
+    }
+  };
+
+  const handleBrokerStatusChange = async (requestId: string, status: BrokerSupportStatus, label: string) => {
     setUpdatingKey(`broker:${requestId}`);
     try {
       await updateBrokerSupportStatus(requestId, status);
@@ -426,12 +589,46 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
           ),
         };
       });
+      void logAdminAction({
+        ...adminIdentity,
+        action: 'broker-request.status-changed',
+        targetType: 'broker-request',
+        targetId: requestId,
+        targetLabel: label,
+        detail: `Status → ${STATUS_LABELS[status]}`,
+      });
     } finally {
       setUpdatingKey(null);
     }
   };
 
-  const handleBugNoteSave = async (reportId: string, adminNote: string) => {
+  const handleBrokerPriorityChange = async (requestId: string, priority: AdminPriority, label: string) => {
+    setUpdatingKey(`broker-priority:${requestId}`);
+    try {
+      await updateBrokerSupportPriority(requestId, priority);
+      setState((prev) => {
+        if (prev.phase !== 'ready') return prev;
+        return {
+          ...prev,
+          brokerRequests: prev.brokerRequests.map((r) =>
+            r.id === requestId ? { ...r, priority } : r,
+          ),
+        };
+      });
+      void logAdminAction({
+        ...adminIdentity,
+        action: 'broker-request.priority-changed',
+        targetType: 'broker-request',
+        targetId: requestId,
+        targetLabel: label,
+        detail: `Priority → ${PRIORITY_LABELS[priority]}`,
+      });
+    } finally {
+      setUpdatingKey(null);
+    }
+  };
+
+  const handleBugNoteSave = async (reportId: string, adminNote: string, label: string) => {
     setUpdatingKey(`bug-note:${reportId}`);
     try {
       await updateBugReportAdminNote(reportId, adminNote);
@@ -442,12 +639,20 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
           reports: prev.reports.map((r) => (r.id === reportId ? { ...r, adminNote } : r)),
         };
       });
+      void logAdminAction({
+        ...adminIdentity,
+        action: 'bug.note-saved',
+        targetType: 'bug-report',
+        targetId: reportId,
+        targetLabel: label,
+        detail: 'Admin note updated',
+      });
     } finally {
       setUpdatingKey(null);
     }
   };
 
-  const handleBrokerNoteSave = async (requestId: string, adminNote: string) => {
+  const handleBrokerNoteSave = async (requestId: string, adminNote: string, label: string) => {
     setUpdatingKey(`broker-note:${requestId}`);
     try {
       await updateBrokerSupportAdminNote(requestId, adminNote);
@@ -460,9 +665,47 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
           ),
         };
       });
+      void logAdminAction({
+        ...adminIdentity,
+        action: 'broker-request.note-saved',
+        targetType: 'broker-request',
+        targetId: requestId,
+        targetLabel: label,
+        detail: 'Admin note updated',
+      });
     } finally {
       setUpdatingKey(null);
     }
+  };
+
+  const handleUserNoteSave = async (uid: string, patch: { note?: string; flagged?: boolean }, label: string) => {
+    const saved = await saveAdminUserNote(uid, patch, user?.email ?? '');
+    setState((prev) => {
+      if (prev.phase !== 'ready') return prev;
+      const nextNotes = new Map(prev.userNotes);
+      nextNotes.set(uid, saved);
+      return { ...prev, userNotes: nextNotes };
+    });
+    if (patch.flagged !== undefined) {
+      void logAdminAction({
+        ...adminIdentity,
+        action: patch.flagged ? 'user.flagged' : 'user.unflagged',
+        targetType: 'user',
+        targetId: uid,
+        targetLabel: label,
+        detail: patch.flagged ? 'Flagged for review' : 'Flag cleared',
+      });
+    } else {
+      void logAdminAction({
+        ...adminIdentity,
+        action: 'user.note-saved',
+        targetType: 'user',
+        targetId: uid,
+        targetLabel: label,
+        detail: 'Admin note updated',
+      });
+    }
+    return saved;
   };
 
   const ready = state.phase === 'ready' ? state : null;
@@ -503,18 +746,22 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
 
   const filteredBugs = useMemo(() => {
     if (!ready) return [];
-    const sorted = [...ready.reports].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
+    const sorted = [...ready.reports].sort((a, b) => {
+      const priorityDiff = PRIORITY_RANK[a.priority ?? 'medium'] - PRIORITY_RANK[b.priority ?? 'medium'];
+      if (priorityDiff !== 0) return priorityDiff;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
     if (bugFilter === 'all') return sorted;
     return sorted.filter((r) => r.status === bugFilter);
   }, [ready, bugFilter]);
 
   const filteredBrokers = useMemo(() => {
     if (!ready) return [];
-    const sorted = [...ready.brokerRequests].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
+    const sorted = [...ready.brokerRequests].sort((a, b) => {
+      const priorityDiff = PRIORITY_RANK[a.priority ?? 'medium'] - PRIORITY_RANK[b.priority ?? 'medium'];
+      if (priorityDiff !== 0) return priorityDiff;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
     if (brokerFilter === 'all') return sorted;
     return sorted.filter((r) => r.status === brokerFilter);
   }, [ready, brokerFilter]);
@@ -637,9 +884,12 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
 
             {ready.health && (
               <div className="glass-card rounded-xl p-4 md:p-5 mb-6">
-                <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-3">
-                  System health
-                </p>
+                <div className="flex items-center gap-1.5 mb-3">
+                  <History size={13} className="text-text-secondary" />
+                  <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                    System health
+                  </p>
+                </div>
                 <div className="grid sm:grid-cols-3 gap-4 text-sm">
                   <div className="flex items-center gap-2">
                     <HealthDot ok={ready.health.brokerSync.ok && Boolean(ready.health.brokerSync.configured)} />
@@ -671,6 +921,23 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                     </span>
                   </div>
                 </div>
+
+                {ready.healthHistory.length > 1 && (
+                  <div className="mt-5 pt-4 border-t border-border/50 grid sm:grid-cols-3 gap-4">
+                    <HealthTimeline
+                      label="Broker sync"
+                      values={ready.healthHistory.map((h) => h.brokerSyncOk)}
+                    />
+                    <HealthTimeline
+                      label="SPY benchmark"
+                      values={ready.healthHistory.map((h) => h.benchmarkOk)}
+                    />
+                    <HealthTimeline
+                      label="Firebase"
+                      values={ready.healthHistory.map((h) => h.firebaseOk)}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -932,6 +1199,12 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                                   Coach share
                                 </span>
                               )}
+                              {ready.userNotes.get(entry.uid)?.flagged && (
+                                <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 text-[9px] font-medium uppercase tracking-wide">
+                                  <Flag size={9} />
+                                  Flagged
+                                </span>
+                              )}
                             </p>
                             <p className="text-text-secondary mt-0.5 truncate">
                               {entry.email || 'Email not stored'}
@@ -998,7 +1271,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => exportUsersCsv(ready.users)}
+                    onClick={() => exportUsersCsv(ready.users, ready.userNotes)}
                     className="btn-secondary text-xs px-3 py-2"
                   >
                     Users CSV
@@ -1021,6 +1294,25 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
               </div>
             </div>
 
+            <div className="glass-card rounded-xl p-5 md:p-6 mb-8">
+              <div className="flex items-center gap-2 mb-4">
+                <ScrollText size={16} className="text-emerald-400" />
+                <h2 className="text-sm font-semibold">Recent admin activity</h2>
+              </div>
+              {ready.auditLog.length === 0 ? (
+                <p className="text-xs text-text-secondary">
+                  No admin actions recorded yet — this fills in as you triage reports, update
+                  priorities, and manage accounts.
+                </p>
+              ) : (
+                <ul className="space-y-2.5 max-h-[280px] overflow-y-auto pr-1">
+                  {ready.auditLog.map((entry) => (
+                    <AuditLogItem key={entry.id} entry={entry} />
+                  ))}
+                </ul>
+              )}
+            </div>
+
             <h2 className="text-lg font-semibold mb-2">Broker support requests</h2>
             <StatusFilterBar value={brokerFilter} onChange={setBrokerFilter} counts={brokerFilterCounts} />
 
@@ -1036,11 +1328,20 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                   <article key={request.id} className="glass-card rounded-xl p-5 md:p-6">
                     <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
                       <div>
-                        <span
-                          className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${statusBadgeClass(request.status)}`}
-                        >
-                          {STATUS_LABELS[request.status]}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${statusBadgeClass(request.status)}`}
+                          >
+                            {STATUS_LABELS[request.status]}
+                          </span>
+                          <PrioritySelect
+                            value={request.priority ?? 'medium'}
+                            disabled={updatingKey === `broker-priority:${request.id}`}
+                            onChange={(priority) =>
+                              void handleBrokerPriorityChange(request.id, priority, request.brokerName)
+                            }
+                          />
+                        </div>
                         <p className="text-sm font-semibold mt-2">{request.brokerName}</p>
                         <p className="text-xs text-text-secondary mt-1">
                           {new Date(request.createdAt).toLocaleString()}
@@ -1053,7 +1354,11 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                         value={request.status}
                         disabled={updatingKey === `broker:${request.id}`}
                         onChange={(e) =>
-                          void handleBrokerStatusChange(request.id, e.target.value as BrokerSupportStatus)
+                          void handleBrokerStatusChange(
+                            request.id,
+                            e.target.value as BrokerSupportStatus,
+                            request.brokerName,
+                          )
                         }
                         className="input-field text-sm py-1.5 px-2 min-w-[120px]"
                         aria-label="Update broker request status"
@@ -1078,7 +1383,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                     <AdminNoteField
                       value={request.adminNote ?? ''}
                       disabled={updatingKey === `broker-note:${request.id}`}
-                      onSave={(note) => handleBrokerNoteSave(request.id, note)}
+                      onSave={(note) => handleBrokerNoteSave(request.id, note, request.brokerName)}
                       label="Broker request admin note"
                     />
                   </article>
@@ -1099,11 +1404,20 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                   <article key={report.id} className="glass-card rounded-xl p-5 md:p-6">
                     <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
                       <div>
-                        <span
-                          className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${statusBadgeClass(report.status)}`}
-                        >
-                          {STATUS_LABELS[report.status]}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${statusBadgeClass(report.status)}`}
+                          >
+                            {STATUS_LABELS[report.status]}
+                          </span>
+                          <PrioritySelect
+                            value={report.priority ?? 'medium'}
+                            disabled={updatingKey === `bug-priority:${report.id}`}
+                            onChange={(priority) =>
+                              void handleBugPriorityChange(report.id, priority, report.description.slice(0, 40))
+                            }
+                          />
+                        </div>
                         <p className="text-xs text-text-secondary mt-2">
                           {new Date(report.createdAt).toLocaleString()}
                           {' · '}
@@ -1115,7 +1429,11 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                         value={report.status}
                         disabled={updatingKey === `bug:${report.id}`}
                         onChange={(e) =>
-                          void handleBugStatusChange(report.id, e.target.value as BugReportStatus)
+                          void handleBugStatusChange(
+                            report.id,
+                            e.target.value as BugReportStatus,
+                            report.description.slice(0, 40),
+                          )
                         }
                         className="input-field text-sm py-1.5 px-2 min-w-[120px]"
                         aria-label="Update report status"
@@ -1149,7 +1467,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                     <AdminNoteField
                       value={report.adminNote ?? ''}
                       disabled={updatingKey === `bug-note:${report.id}`}
-                      onSave={(note) => handleBugNoteSave(report.id, note)}
+                      onSave={(note) => handleBugNoteSave(report.id, note, report.description.slice(0, 40))}
                       label="Bug report admin note"
                     />
                   </article>
@@ -1164,6 +1482,16 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
         <AdminUserDetailModal
           user={selectedUser}
           adminUid={user.uid}
+          adminEmail={user.email ?? ''}
+          note={
+            ready?.userNotes.get(selectedUser.uid) ?? {
+              note: '',
+              flagged: false,
+              updatedAt: null,
+              updatedBy: null,
+            }
+          }
+          onNoteSave={(patch) => handleUserNoteSave(selectedUser.uid, patch, selectedUser.username ?? selectedUser.email)}
           onClose={() => setSelectedUser(null)}
           onUserUpdated={(uid, patch) => {
             setState((prev) => {

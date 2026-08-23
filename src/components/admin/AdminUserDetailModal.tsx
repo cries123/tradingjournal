@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { KeyRound, Mail, Trash2, User, X } from 'lucide-react';
+import { Flag, KeyRound, Mail, Trash2, User, X } from 'lucide-react';
 import { ConfirmDialog } from '../ConfirmDialog';
 import type { AdminUserSummary } from '../../services/admin';
+import { logAdminAction } from '../../services/adminAuditLog';
+import type { AdminUserNote } from '../../services/adminUserNotes';
 import {
   adminDeleteUser,
   adminSendPasswordResetEmail,
@@ -14,6 +16,9 @@ import { useEscapeToClose } from '../../hooks/useEscapeToClose';
 interface AdminUserDetailModalProps {
   user: AdminUserSummary;
   adminUid: string;
+  adminEmail: string;
+  note: AdminUserNote;
+  onNoteSave: (patch: { note?: string; flagged?: boolean }) => Promise<AdminUserNote>;
   onClose: () => void;
   onUserUpdated: (uid: string, patch: Partial<AdminUserSummary>) => void;
   onUserDeleted: (uid: string) => void;
@@ -42,6 +47,9 @@ function formatDate(iso: string | null): string {
 export function AdminUserDetailModal({
   user,
   adminUid,
+  adminEmail,
+  note,
+  onNoteSave,
   onClose,
   onUserUpdated,
   onUserDeleted,
@@ -53,8 +61,42 @@ export function AdminUserDetailModal({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [noteDraft, setNoteDraft] = useState(note.note);
+  const [noteSaving, setNoteSaving] = useState(false);
+  const [flagged, setFlagged] = useState(note.flagged);
 
   const isSelf = user.uid === adminUid;
+  const targetLabel = user.username ? `@${user.username}` : user.email || user.uid;
+
+  const logSelf = (
+    action: Parameters<typeof logAdminAction>[0]['action'],
+    detail: string,
+  ) =>
+    void logAdminAction({
+      adminUid,
+      adminEmail,
+      action,
+      targetType: 'user',
+      targetId: user.uid,
+      targetLabel,
+      detail,
+    });
+
+  const saveNote = async () => {
+    if (noteDraft.trim() === note.note.trim()) return;
+    setNoteSaving(true);
+    try {
+      await onNoteSave({ note: noteDraft });
+    } finally {
+      setNoteSaving(false);
+    }
+  };
+
+  const toggleFlag = async () => {
+    const next = !flagged;
+    setFlagged(next);
+    await onNoteSave({ flagged: next });
+  };
 
   const run = async (key: string, fn: () => Promise<void>) => {
     setBusy(key);
@@ -173,6 +215,7 @@ export function AdminUserDetailModal({
                 void run('reset', async () => {
                   await adminSendPasswordResetEmail(user.email);
                   setMessage(`Password reset email sent to ${user.email}`);
+                  logSelf('user.password-reset-sent', `Sent to ${user.email}`);
                 })
               }
               className="w-full flex items-center justify-center gap-2 btn-secondary py-2.5 text-sm disabled:opacity-50"
@@ -196,9 +239,11 @@ export function AdminUserDetailModal({
                   disabled={busy !== null || !emailDraft.trim()}
                   onClick={() =>
                     void run('email', async () => {
+                      const nextEmail = emailDraft.trim().toLowerCase();
                       const result = await adminUpdateUserEmail(user.uid, emailDraft);
-                      onUserUpdated(user.uid, { email: emailDraft.trim().toLowerCase() });
+                      onUserUpdated(user.uid, { email: nextEmail });
                       setMessage(result.message);
+                      logSelf('user.email-changed', `${user.email || '(none)'} → ${nextEmail}`);
                     })
                   }
                   className="btn-secondary px-3 py-2 text-xs shrink-0 disabled:opacity-50"
@@ -227,6 +272,7 @@ export function AdminUserDetailModal({
                       const result = await adminUpdateUserPassword(user.uid, passwordDraft);
                       setPasswordDraft('');
                       setMessage(result.message);
+                      logSelf('user.password-changed', 'Password manually set by admin');
                     })
                   }
                   className="btn-secondary px-3 py-2 text-xs shrink-0 disabled:opacity-50"
@@ -252,6 +298,42 @@ export function AdminUserDetailModal({
             {message && <p className="text-xs text-emerald-300">{message}</p>}
             {error && <p className="text-xs text-red-400">{error}</p>}
           </div>
+
+          <div className="border-t border-border/50 pt-5 mt-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                Internal notes (admin only)
+              </p>
+              <button
+                type="button"
+                onClick={() => void toggleFlag()}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                  flagged
+                    ? 'bg-red-500/15 text-red-400'
+                    : 'bg-bg-tertiary/60 text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                <Flag size={12} />
+                {flagged ? 'Flagged' : 'Flag for review'}
+              </button>
+            </div>
+            <textarea
+              value={noteDraft}
+              onChange={(e) => setNoteDraft(e.target.value)}
+              onBlur={() => void saveNote()}
+              rows={3}
+              placeholder="Only visible to admins — context on this account, past issues, follow-ups…"
+              className="input-field text-sm w-full resize-y min-h-[70px]"
+              aria-label="Internal admin note"
+            />
+            <p className="text-[10px] text-text-secondary">
+              {noteSaving
+                ? 'Saving…'
+                : note.updatedAt
+                  ? `Last updated ${new Date(note.updatedAt).toLocaleString()}${note.updatedBy ? ` by ${note.updatedBy}` : ''}`
+                  : 'Never noted'}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -265,6 +347,7 @@ export function AdminUserDetailModal({
           onConfirm={() => {
             void run('delete', async () => {
               await adminDeleteUser(user.uid);
+              logSelf('user.deleted', user.email || user.uid);
               onUserDeleted(user.uid);
               setConfirmDelete(false);
               onClose();
