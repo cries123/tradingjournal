@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   BarChart3,
   Calendar,
@@ -9,11 +10,15 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
+import { AnnouncementBar } from '../components/landing/AnnouncementBar';
 import { DashboardPreview } from '../components/landing/DashboardPreview';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import { FadeIn } from '../components/motion/FadeIn';
+import { brokerIdFromName, BrokerLogo } from '../components/brokers/BrokerLogo';
+import { COMING_SOON_BROKERS, SUPPORTED_BROKERS } from '../data/brokers';
 import { LANDING_FAQ } from '../seo/faq';
 import { GUIDE_ARTICLES } from '../seo/guides';
+import { fetchBrokersConfig, type BrokerConfig } from '../services/brokersConfig';
 
 interface LandingPageProps {
   onLaunch: () => void;
@@ -67,13 +72,29 @@ const STEPS = [
 ];
 
 export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, onGuides, onGuide }: LandingPageProps) {
+  const [brokers, setBrokers] = useState<{ supported: BrokerConfig[]; comingSoon: string[] }>({
+    supported: SUPPORTED_BROKERS.map((b) => ({ ...b, methods: [...b.methods] })),
+    comingSoon: [...COMING_SOON_BROKERS],
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchBrokersConfig().then((config) => {
+      if (!cancelled) setBrokers(config);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
       <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
+      <AnnouncementBar onGuide={onGuide} />
       <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} />
 
       {/* Hero */}
-      <section className="relative z-10 max-w-6xl mx-auto px-4 md:px-6 pt-12 md:pt-20 pb-16 md:pb-20">
+      <section className="relative z-10 max-w-[1400px] mx-auto px-4 md:px-6 pt-12 md:pt-20 pb-16 md:pb-20">
         <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
           <FadeIn>
           <div>
@@ -122,7 +143,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
 
       {/* Security callout */}
       <section id="security" className="relative z-10 border-y border-border/50 bg-emerald-500/5 py-10 md:py-12">
-        <FadeIn className="max-w-6xl mx-auto px-4 md:px-6">
+        <FadeIn className="max-w-[1400px] mx-auto px-4 md:px-6">
           <div className="glass-card rounded-2xl p-6 md:p-8 flex flex-col md:flex-row gap-6 md:gap-10 items-start md:items-center">
             <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
               <Lock size={22} className="text-emerald-400" />
@@ -142,7 +163,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
 
       {/* Broker Sync */}
       <section className="relative z-10 py-16 md:py-24">
-        <div className="max-w-6xl mx-auto px-4 md:px-6">
+        <div className="max-w-[1400px] mx-auto px-4 md:px-6">
           <div className="grid lg:grid-cols-2 gap-10 items-center">
             <FadeIn>
             <div>
@@ -197,32 +218,70 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
 
       {/* Brokers teaser */}
       <section id="brokers" className="relative z-10 border-t border-border/50 bg-bg-secondary/30 py-16 md:py-24">
-        <FadeIn className="max-w-6xl mx-auto px-4 md:px-6 text-center">
-          <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Brokers</p>
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">Thinkorswim · Schwab · Robinhood</h2>
-          <p className="text-text-secondary max-w-xl mx-auto mb-6">
-            Connect Schwab or Robinhood for automatic sync, or log trades manually. More brokers coming soon.
-          </p>
-          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 mb-8 text-sm">
-            {[
-              { name: 'Thinkorswim journal guide', path: '/brokers/thinkorswim' },
-              { name: 'Schwab journal guide', path: '/brokers/charles-schwab' },
-              { name: 'Robinhood journal guide', path: '/brokers/robinhood' },
-            ].map((link) => (
-              <a key={link.path} href={link.path} className="text-emerald-400 hover:underline">
-                {link.name} →
-              </a>
-            ))}
+        <div className="max-w-[1400px] mx-auto px-4 md:px-6">
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+            <FadeIn>
+              <div>
+                <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Brokers</p>
+                <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+                  Connect your broker, sync in seconds
+                </h2>
+                <p className="text-text-secondary leading-relaxed mb-6 max-w-md">
+                  Schwab and Robinhood sync automatically today, with thinkorswim covered through your Schwab
+                  connection. More brokers are on the way — manual entry works for any broker in the meantime.
+                </p>
+                <div className="flex flex-wrap gap-x-6 gap-y-2 mb-8 text-sm">
+                  {[
+                    { name: 'Thinkorswim journal guide', path: '/brokers/thinkorswim' },
+                    { name: 'Schwab journal guide', path: '/brokers/charles-schwab' },
+                    { name: 'Robinhood journal guide', path: '/brokers/robinhood' },
+                  ].map((link) => (
+                    <a key={link.path} href={link.path} className="text-emerald-400 hover:underline">
+                      {link.name} →
+                    </a>
+                  ))}
+                </div>
+                <button type="button" onClick={onBrokers} className="btn-secondary px-8 py-3">
+                  View all supported brokers →
+                </button>
+              </div>
+            </FadeIn>
+            <FadeIn delay={100}>
+              <div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                  {brokers.supported.map((b) => (
+                    <div
+                      key={b.name}
+                      className="rounded-xl border border-border/60 bg-bg-primary/60 p-4 flex items-center hover:border-emerald-500/40 transition-colors"
+                    >
+                      <BrokerLogo broker={brokerIdFromName(b.name)} />
+                    </div>
+                  ))}
+                </div>
+                {brokers.comingSoon.length > 0 && (
+                  <>
+                    <p className="text-xs uppercase tracking-widest text-text-secondary mb-3">Coming soon</p>
+                    <div className="flex flex-wrap gap-2">
+                      {brokers.comingSoon.map((name) => (
+                        <span
+                          key={name}
+                          className="px-3 py-1.5 rounded-full text-xs border border-border/60 text-text-secondary bg-bg-primary/50"
+                        >
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </FadeIn>
           </div>
-          <button type="button" onClick={onBrokers} className="btn-secondary px-8 py-3">
-            View all supported brokers →
-          </button>
-        </FadeIn>
+        </div>
       </section>
 
       {/* Features */}
       <section id="features" className="relative z-10 py-16 md:py-24">
-        <div className="max-w-6xl mx-auto px-4 md:px-6">
+        <div className="max-w-[1400px] mx-auto px-4 md:px-6">
           <FadeIn className="text-center max-w-2xl mx-auto mb-12 md:mb-16">
             <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Features</p>
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Everything you need to review your edge</h2>
@@ -253,7 +312,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
 
       {/* Workflow */}
       <section className="relative z-10 border-t border-border/50 bg-bg-secondary/20 py-16 md:py-24">
-        <div className="max-w-6xl mx-auto px-4 md:px-6">
+        <div className="max-w-[1400px] mx-auto px-4 md:px-6">
           <FadeIn className="text-center max-w-2xl mx-auto mb-12">
             <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">Workflow</p>
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Three steps to clarity</h2>
@@ -274,7 +333,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
 
       {/* Guides */}
       <section id="guides" className="relative z-10 border-t border-border/50 bg-bg-secondary/20 py-16 md:py-24">
-        <div className="max-w-6xl mx-auto px-4 md:px-6">
+        <div className="max-w-[1400px] mx-auto px-4 md:px-6">
           <FadeIn className="text-center max-w-2xl mx-auto mb-10">
             <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">Guides</p>
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Free trading journal resources</h2>
@@ -282,7 +341,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
               Learn how to track performance, use a P&L calendar, and get the most out of broker sync.
             </p>
           </FadeIn>
-          <div className="grid md:grid-cols-3 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {GUIDE_ARTICLES.map((guide, i) => (
               <FadeIn key={guide.slug} delay={i * 60}>
                 <a

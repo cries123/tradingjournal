@@ -1,48 +1,35 @@
-Complete broker-sync fix — 6 files, all at once
-==================================================
+NEW NAV LOGO + WIDER LANDING PAGE
+====================================
 
-WHY THIS ONE IS DIFFERENT
-----------------------------
-Your Netlify build just failed with 5 TypeScript errors, all pointing to
-the same root cause: you applied the "Schwab match fix" file, but not
-the earlier "sync full history + dedupe" delivery it was actually built
-on top of. That earlier delivery never got applied, so the newer file
-references things (a `sourceId` field, a `truncated` flag) that didn't
-exist yet in your repo.
+3 files, apply all together.
 
-To stop this from happening again, this zip has ALL SIX files that
-belong together as one unit. Don't apply these one at a time — replace
-all six now, in one go, then commit and push once.
+1) Nav bar now uses your new logo
+   - public/nav-logo.png — the new logo file you sent (icon + "TREND
+     CHASERS" + tagline, all baked into one image). Confirmed genuinely
+     transparent.
+   - src/components/landing/LandingFooter.tsx — the nav bar's brand mark
+     now renders this image directly instead of the hand-built text I had
+     before. Heads up: the wordmark text in your file is a translucent
+     near-white, which is why it looked faint on the white chat preview —
+     it's actually designed to sit on a dark background, and it reads
+     great against our dark nav (I checked with a screenshot).
 
-FILES IN THIS ZIP
---------------------
-server/brokerConnectHandler.ts
-server/mapSnapTradeActivities.ts
-src/components/brokers/BrokerConnectContent.tsx
-src/pages/JournalApp.tsx
-src/services/brokerConnect.ts
-src/types.ts
+2) Fixed the wasted space on wide screens
+   - src/pages/LandingPage.tsx — the landing page's content width went
+     from 1152px to 1400px, so it fills a lot more of a wide monitor
+     instead of leaving big empty margins. I left the FAQ and final CTA
+     sections narrower on purpose — wide paragraph text is harder to read,
+     so those stay comfortable regardless of screen size.
+   - Same width bump applied to the nav bar and footer (in
+     LandingFooter.tsx) so they stay visually aligned with the page above
+     and below them.
 
-HOW TO APPLY (GitHub Desktop)
----------------------------------
-1. Drag ALL of these files (keeping their folder structure — "server",
-   "src/components/brokers", "src/pages", "src/services") into your
-   local repo folder, overwriting the existing files each time.
-2. In GitHub Desktop, go to the Changes tab. You should see exactly 6
-   files listed (not more, not fewer). If you see other unexpected
-   files changed, stop and let me know before committing.
-3. Write a commit message, click Commit, then click the Push button
-   (it will say "Push origin" with a number next to it once you've
-   committed — that number should NOT be 0).
-4. Go to Netlify's Deploys tab and watch the new build. It should say
-   "Published" this time, since these 6 files are internally consistent.
+HOW TO APPLY
+1. GitHub Desktop, branch fix/calendar-keys-and-lint.
+2. Drag the public/ and src/ folders from this zip into your repo root,
+   overwriting matching files, adding the new logo image.
+3. Should show as 1 new file + 2 changed files. Commit and push.
 
-AFTER IT DEPLOYS
--------------------
-Go back to Connect broker in the app, click Refresh connections, and
-your Schwab account should finally show up with a Sync trades button.
-Click that to pull in your trade history and fill in the calendar.
-
-If the build fails again, copy the FULL error text from Netlify's
-deploy log (like you did last time) and send it over — that log is the
-fastest way for me to diagnose exactly what's missing.
+Verified: TypeScript compiles clean, lint is clean, and I screenshotted the
+page at both a normal 1280px width and a wide 1889px width to confirm
+nothing wraps oddly and the extra space is actually being used now.
