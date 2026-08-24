@@ -21,9 +21,9 @@ export function YearHeatmap({ trades, year, onPrevYear, onNextYear, onSelectMont
 
   return (
     <div className="panel-card p-2 md:p-4 shrink-0">
-      <div className="flex items-center justify-between mb-3 md:mb-4 gap-2">
+      <div className="flex items-center justify-between mb-1.5 md:mb-3 gap-2">
         <div>
-          <p className="text-[10px] uppercase tracking-widest text-emerald-400/80 font-medium mb-0.5">Year view</p>
+          <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">Year view</p>
           <h2 className="text-xs md:text-lg font-semibold">{year}</h2>
         </div>
         <div className="flex items-center gap-2">

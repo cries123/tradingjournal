@@ -20,7 +20,6 @@ import { DailyPnlChart } from './DailyPnlChart';
 import { DashboardCalendar } from './DashboardCalendar';
 import { EmptyDashboard } from './EmptyDashboard';
 import { FiltersBar } from './FiltersBar';
-import { PerformanceChart } from './PerformanceChart';
 import { ShareCardModal } from './ShareCardModal';
 import { StatsCards } from './StatsCards';
 import { WeekdayChart } from './WeekdayChart';
@@ -171,7 +170,7 @@ export function DashboardView({
 
       {hasAnyTrades && <WeeklyRecapCard trades={trades} />}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1.7fr_1fr] gap-2 md:gap-3 items-start">
+      <div className="md:max-w-[820px] md:mx-auto">
         {mode === 'month' ? (
           <DashboardCalendar
             year={year}
@@ -194,7 +193,6 @@ export function DashboardView({
             }}
           />
         )}
-        <PerformanceChart trades={trades} />
       </div>
 
       {(hasAnyTrades || hasFilters) && (
@@ -203,9 +201,9 @@ export function DashboardView({
 
       {hasAnyTrades && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
-          <div className="panel-card p-2.5 md:p-4 flex flex-col min-h-[140px]">
+          <div className="panel-card p-3 md:p-4 flex flex-col min-h-[140px]">
             <div className="mb-1.5 md:mb-3 shrink-0">
-              <p className="text-[10px] uppercase tracking-widest text-emerald-400/80 font-medium mb-0.5">
+              <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
                 Rhythm
               </p>
               <h3 className="text-[10px] md:text-sm font-semibold text-text-primary">
@@ -216,10 +214,10 @@ export function DashboardView({
               <WeekdayChart data={weekdayPnl} />
             </div>
           </div>
-          <div className="panel-card p-2.5 md:p-4 flex flex-col min-h-[160px]">
+          <div className="panel-card p-3 md:p-4 flex flex-col min-h-[160px]">
             <div className="flex items-start justify-between mb-1.5 md:mb-3 shrink-0 gap-2">
               <div>
-                <p className="text-[10px] uppercase tracking-widest text-emerald-400/80 font-medium mb-0.5">
+                <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
                   Sessions
                 </p>
                 <h3 className="text-[10px] md:text-sm font-semibold whitespace-nowrap text-text-primary">Gross Daily P&L</h3>

@@ -33,18 +33,22 @@ export function WeekdayChart({ data }: WeekdayChartProps) {
         return (
           <div key={point.label} className="flex items-center gap-1.5">
             <span className="text-[10px] text-text-secondary w-7 shrink-0">{point.label}</span>
-            <div className="flex-1 h-3.5 bg-bg-primary rounded overflow-hidden relative">
+            <div className="flex-1 h-3 bg-bg-primary rounded-full overflow-hidden relative">
               {point.pnl !== 0 && (
                 <div
-                  className={`h-full rounded chart-bar-h ${isProfit ? 'bar-profit-h' : 'bar-loss-h'}`}
+                  className={`h-full rounded-full chart-bar-h ${isProfit ? 'bar-profit-h' : 'bar-loss-h'}`}
                   style={{
-                    width: animate ? `${Math.max(widthPct, 2)}%` : '0%',
+                    width: animate ? `${Math.max(widthPct, 3)}%` : '0%',
                     transitionDelay: `${i * 50}ms`,
                   }}
                 />
               )}
             </div>
-            <span className={`text-[10px] font-medium w-16 text-right shrink-0 ${point.pnl >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}>
+            <span
+              className={`text-[10px] font-medium w-16 text-right shrink-0 tabular-nums ${
+                point.pnl >= 0 ? 'text-profit-bright' : 'text-loss-bright'
+              }`}
+            >
               {point.pnl !== 0 ? formatCurrency(point.pnl) : '—'}
             </span>
           </div>

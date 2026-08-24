@@ -24,11 +24,11 @@ export function WeeklyRecapCard({ trades }: { trades: Trade[] }) {
     <div className="panel-card p-3 md:p-4 shrink-0">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 shrink-0">
+          <div className="p-1.5 rounded-lg bg-accent/10 text-accent shrink-0">
             <CalendarCheck size={15} />
           </div>
           <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-widest text-emerald-400/80 font-medium">
+            <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium">
               Your week
             </p>
             <p className="text-sm md:text-base font-semibold flex items-baseline gap-1.5 min-w-0">

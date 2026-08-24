@@ -1,48 +1,76 @@
-BUILD FIX: MISSING getPerformanceData EXPORT
-==================================================
+JOURNAL POLISH PASS: COLOR, FILTERS, CHARTS, SPACING
+==========================================================
 
-5 files, replaces the versions currently in your repo.
+8 files modified. Covers the 4 areas you picked.
 
-WHAT BROKE
-Your Netlify build failed with:
-  "Module '../utils/stats' has no exported member 'getPerformanceData'"
+1. COLOR DISCIPLINE
+Every card's little uppercase label — CALENDAR, YEAR VIEW, YOUR WEEK,
+RHYTHM, SESSIONS, TRADING INSIGHTS — was the same green as your P&L
+numbers, win-rate pills, and buttons. Everything on the page was
+competing for the same color, so nothing stood out. Those section
+labels now use the app's sky-blue accent instead (the same blue
+already used for "today" on the calendar), so green is reserved for
+what it actually means — profit — and the section labels read as
+structure, not data. Bonus: this also fixed a small existing bug —
+those labels were hardcoded to green even for people using the Cyan
+or Violet theme in Settings, so they wouldn't match. They're theme-
+aware now.
+I left the Month/Year toggle, buttons, and the broker-sync banner
+alone — those are legitimately your brand color (used for actions and
+promotion), not the "everything is green" problem you were describing.
 
-That function lives in src/utils/stats.ts and was part of the original
-dashboard-redesign delivery (the one that added the PnL performance
-chart next to the calendar) — but your repo has the newer
-PerformanceChart.tsx (the line-graph version) without the matching
-stats.ts changes underneath it. Somewhere along the way that one file
-didn't make it in, which is an easy thing to miss when dragging folders
-across a few separate zips. The extra "implicitly has an 'any' type"
-errors in the same build log are just a side effect of that one missing
-export — TypeScript gives up inferring types once the import it depends
-on doesn't exist, they're not separate bugs.
+2. FILTERS & CONTROLS
+The Symbol/Setup/Tag/Side dropdowns were plain unstyled browser
+selects sitting next to a bunch of polished cards. They're now pill-
+shaped controls with a proper chevron icon, and they highlight in
+blue with the chevron to match whenever a filter is actually active —
+so you can tell at a glance that a filter's applied, not just what it
+says.
 
-THE FIX
-This zip has the complete, current, working set of every file this
-feature touches, all pulled from the same consistent state and
-verified to build together:
-- src/utils/stats.ts (the missing piece — adds getPerformanceData)
-- src/components/PerformanceChart.tsx (the line chart you already have)
-- src/components/DashboardView.tsx (calendar + chart side-by-side layout)
-- src/components/DashboardDayCell.tsx (the day-cell height tweak)
-- src/components/EmptyDashboard.tsx (the "Connect your broker" copy fix)
+3. WEEKDAY & SESSIONS CHARTS
+The "Performance by Weekday" bars now have fully rounded pill ends
+instead of a slight corner-radius, matching the rounder, softer style
+of the newer parts of the app. The "Gross Daily P&L" bars got the
+same rounded-cap treatment, and their value labels switched to a
+compact format ($643 instead of $643.20) so they stop truncating or
+crowding each other on narrower screens — this was actually visibly
+broken on mobile before (numbers were getting cut off mid-digit).
 
-Overwriting all 5 together removes any doubt about what's actually in
-your repo right now — safer than guessing which single file is missing.
+4. SPACING & CARD RHYTHM
+The Rhythm and Sessions cards had slightly tighter padding (10px)
+than every other card around them (12px) — bumped to match, so the
+whole page now uses one consistent padding scale instead of two.
+
+FILES
+- src/components/DashboardView.tsx
+- src/components/DashboardCalendar.tsx
+- src/components/YearHeatmap.tsx
+- src/components/WeeklyRecapCard.tsx
+- src/components/FiltersBar.tsx
+- src/components/WeekdayChart.tsx
+- src/components/DailyPnlChart.tsx
+- src/components/analytics/TradingInsightsSection.tsx
 
 HOW TO APPLY
 1. GitHub Desktop, branch fix/calendar-keys-and-lint.
 2. Drag the src/ folder from this zip into your repo root, overwriting
-   these 5 files.
-3. Should show as up to 5 changed files (however many actually differ
-   from what you have — could be just stats.ts if everything else was
-   already correct). Commit and push.
+   these 8 files.
+3. Should show as 8 changed files. Commit and push.
 
 VERIFIED
+- Rendered the full journal with ~450 days of generated sample trades
+  at desktop width, in both Month and Year view, and checked the
+  filter row's active/inactive states directly.
 - npx tsc -b --force: 0 errors
-- npm run lint: 0 errors, 19 warnings (same baseline as every prior
-  delivery, no new ones)
-- This is the exact set of files currently sitting in my working copy,
-  which is what every screenshot I've sent you of the dashboard/chart
-  was rendered from — so it's known-good.
+- npm run lint: 0 errors, 18 warnings — same as your last delivery,
+  no new ones.
+- git status shows exactly these 8 files changed (plus whatever's
+  still pending from the broker-logo and chart-removal zips I sent
+  separately, if you haven't applied those yet — this one's
+  independent of both).
+
+WHAT I DIDN'T TOUCH
+This pass was scoped to the four areas you picked. There's more I
+could look at if you want to keep going — the sidebar/nav chrome, the
+trade-entry modal, empty states elsewhere in the app — just say what
+to look at next.

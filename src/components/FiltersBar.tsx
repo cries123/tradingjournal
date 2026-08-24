@@ -1,3 +1,4 @@
+import { ChevronDown, X } from 'lucide-react';
 import type { Filters } from '../types';
 
 interface FiltersBarProps {
@@ -11,7 +12,7 @@ export function FiltersBar({ filters, symbols, setups, onChange }: FiltersBarPro
   const hasFilter = Boolean(filters.symbol || filters.setup || filters.side || filters.tag);
 
   return (
-    <div className="flex flex-wrap gap-2 shrink-0">
+    <div className="flex flex-wrap items-center gap-1.5 shrink-0">
       <FilterSelect
         label="Symbol"
         value={filters.symbol}
@@ -40,8 +41,9 @@ export function FiltersBar({ filters, symbols, setups, onChange }: FiltersBarPro
         <button
           type="button"
           onClick={() => onChange({ symbol: '', setup: '', side: '', tag: '' })}
-          className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary border border-border rounded-md transition-colors"
+          className="inline-flex items-center gap-1 pl-2.5 pr-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary rounded-full border border-border/50 hover:border-border transition-colors focus-ring"
         >
+          <X size={12} />
           Clear filters
         </button>
       )}
@@ -60,19 +62,35 @@ function FilterSelect({
   options: string[];
   onChange: (value: string) => void;
 }) {
+  const active = value !== '';
+
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="px-3 py-1.5 text-xs bg-bg-secondary border border-border rounded-md text-text-primary focus:outline-none focus:border-accent cursor-pointer"
-      aria-label={`Filter by ${label}`}
-    >
-      <option value="">{label}</option>
-      {options.map((opt) => (
-        <option key={opt} value={opt}>
-          {opt}
-        </option>
-      ))}
-    </select>
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`appearance-none pl-3 pr-7 py-1.5 rounded-full border text-xs font-medium cursor-pointer transition-colors focus-ring ${
+          active
+            ? 'bg-accent/10 border-accent/40 text-accent'
+            : 'bg-bg-tertiary/60 border-border/50 text-text-secondary hover:text-text-primary hover:border-border'
+        }`}
+        aria-label={`Filter by ${label}`}
+      >
+        <option value="">{label}</option>
+        {options.map((opt) => (
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
+        ))}
+      </select>
+      <ChevronDown
+        size={12}
+        strokeWidth={2.5}
+        aria-hidden
+        className={`pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 ${
+          active ? 'text-accent' : 'text-text-secondary'
+        }`}
+      />
+    </div>
   );
 }

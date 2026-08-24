@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { DailyPnlPoint } from '../utils/stats';
-import { formatCurrency } from '../utils/format';
+import { formatCurrencyCompact } from '../utils/format';
 
 interface DailyPnlChartProps {
   data: DailyPnlPoint[];
@@ -31,19 +31,23 @@ export function DailyPnlChart({ data }: DailyPnlChartProps) {
         const isProfit = point.pnl >= 0;
         return (
           <div key={point.date} className="flex-1 flex flex-col items-center gap-0.5 min-w-0 h-full">
-            <span className={`text-[9px] font-medium truncate w-full text-center ${isProfit ? 'text-profit-bright' : 'text-loss-bright'}`}>
-              {formatCurrency(point.pnl)}
+            <span
+              className={`text-[9px] font-medium truncate w-full text-center tabular-nums ${
+                isProfit ? 'text-profit-bright' : 'text-loss-bright'
+              }`}
+            >
+              {formatCurrencyCompact(point.pnl)}
             </span>
             <div className="w-full flex-1 flex items-end justify-center min-h-0">
               <div
-                className={`w-full max-w-[28px] rounded-t-md chart-bar ${isProfit ? 'bar-profit' : 'bar-loss'}`}
+                className={`w-full max-w-[28px] rounded-t-full chart-bar ${isProfit ? 'bar-profit' : 'bar-loss'}`}
                 style={{
                   height: animate ? `${Math.max(heightPct, 4)}%` : '0%',
                   transitionDelay: `${i * 60}ms`,
                 }}
               />
             </div>
-            <span className="text-[9px] text-text-secondary">{point.label}</span>
+            <span className="text-[9px] text-text-secondary tabular-nums">{point.label}</span>
           </div>
         );
       })}

@@ -73,7 +73,7 @@ export function TradingInsightsSection({ trades }: TradingInsightsSectionProps) 
   return (
     <section className="panel-card p-3 md:p-4 space-y-3">
       <div>
-        <p className="text-[10px] uppercase tracking-widest text-emerald-400/80 font-medium">
+        <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium">
           Trading insights
         </p>
         <h3 className="text-sm md:text-base font-semibold">What's working, what's not</h3>
