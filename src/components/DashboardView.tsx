@@ -170,30 +170,28 @@ export function DashboardView({
 
       {hasAnyTrades && <WeeklyRecapCard trades={trades} />}
 
-      <div className="md:max-w-[820px] md:mx-auto">
-        {mode === 'month' ? (
-          <DashboardCalendar
-            year={year}
-            month={month}
-            trades={trades}
-            onDayClick={onDayClick}
-            onPrevMonth={onPrevMonth}
-            onNextMonth={onNextMonth}
-            onMonthChange={onMonthChange}
-          />
-        ) : (
-          <YearHeatmap
-            trades={trades}
-            year={year}
-            onPrevYear={onPrevYear}
-            onNextYear={onNextYear}
-            onSelectMonth={(m) => {
-              onSelectMonth(m);
-              setMode('month');
-            }}
-          />
-        )}
-      </div>
+      {mode === 'month' ? (
+        <DashboardCalendar
+          year={year}
+          month={month}
+          trades={trades}
+          onDayClick={onDayClick}
+          onPrevMonth={onPrevMonth}
+          onNextMonth={onNextMonth}
+          onMonthChange={onMonthChange}
+        />
+      ) : (
+        <YearHeatmap
+          trades={trades}
+          year={year}
+          onPrevYear={onPrevYear}
+          onNextYear={onNextYear}
+          onSelectMonth={(m) => {
+            onSelectMonth(m);
+            setMode('month');
+          }}
+        />
+      )}
 
       {(hasAnyTrades || hasFilters) && (
         <FiltersBar filters={filters} symbols={filterSymbols} setups={filterSetups} onChange={onFiltersChange} />

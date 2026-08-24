@@ -4,6 +4,7 @@ import { aggregateTradesByDay, buildCalendarWeeks, getMonthTotalPnl } from '../u
 import { formatCurrency, formatMonthYear } from '../utils/format';
 import { useSettings } from '../context/SettingsContext';
 import { DashboardDayCell } from './DashboardDayCell';
+import { DashboardWeekTotalCell } from './DashboardWeekTotalCell';
 import { MonthPicker } from './MonthPicker';
 
 interface DashboardCalendarProps {
@@ -16,8 +17,11 @@ interface DashboardCalendarProps {
   onMonthChange: (year: number, month: number) => void;
 }
 
-const WEEKDAYS_SHORT = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WEEKDAYS_SHORT = ['S', 'M', 'T', 'W', 'T', 'F'];
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+/** Trading days shown per week (Sun–Fri) — Saturday's column is replaced with a week-total
+ *  summary cell instead, since it's almost never a trading day. */
+const TRADING_DAYS_PER_WEEK = 6;
 
 export function DashboardCalendar({
   year,
@@ -36,7 +40,7 @@ export function DashboardCalendar({
   const maxDayAbs = useMemo(() => {
     let max = 0;
     for (const week of weeks) {
-      for (const day of week.days) {
+      for (const day of week.days.slice(0, TRADING_DAYS_PER_WEEK)) {
         if (day.summary && day.summary.tradeCount > 0) {
           max = Math.max(max, Math.abs(day.summary.totalPnl));
         }
@@ -76,11 +80,15 @@ export function DashboardCalendar({
             <span className="hidden md:inline">{day}</span>
           </div>
         ))}
+        <div className="text-[8px] md:text-[11px] text-accent/80 text-center py-0.5 md:py-1 font-medium uppercase tracking-wide">
+          <span className="md:hidden">Tot</span>
+          <span className="hidden md:inline">Week total</span>
+        </div>
       </div>
 
       <div key={`${year}-${month}`} className="grid grid-cols-7 gap-0.5 md:gap-2 animate-fade-up motion-safe:animate-fade-up">
-        {weeks.flatMap((week, wi) =>
-          week.days.map((day, di) => (
+        {weeks.flatMap((week, wi) => [
+          ...week.days.slice(0, TRADING_DAYS_PER_WEEK).map((day, di) => (
             <DashboardDayCell
               key={day.date?.toISOString() ?? `e-${wi}-${di}`}
               dayNumber={day.date?.getDate() ?? null}
@@ -98,7 +106,8 @@ export function DashboardCalendar({
               }
             />
           )),
-        )}
+          <DashboardWeekTotalCell key={`week-total-${wi}`} summary={week.summary} />,
+        ])}
       </div>
     </div>
   );

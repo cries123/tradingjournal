@@ -1,36 +1,54 @@
-BUILD FIX: OLD PerformanceChart.tsx STILL IN YOUR REPO
-=============================================================
+CALENDAR: FULL WIDTH + WEEK TOTAL COLUMN
+================================================
 
-1 file, overwrites what's currently in your repo.
+3 files (2 modified, 1 new).
 
-WHAT BROKE
-Same error shape as last time — your build failed because
-src/components/PerformanceChart.tsx still imports getPerformanceData
-from src/utils/stats.ts, but that function was removed on purpose when
-we took the performance chart out of the dashboard. The last zip I
-sent asked you to delete that file by hand in GitHub Desktop (drag-
-and-drop only adds/overwrites files, it can't delete them), and that
-step didn't happen — easy to miss, it's not like the other steps.
+WHAT CHANGED
 
-THE FIX — NO DELETING REQUIRED THIS TIME
-Instead of asking you to delete the file again, this zip just replaces
-its contents with an empty placeholder. Nothing in the app imports
-this file anymore, so an empty file in that spot is completely inert —
-it does nothing, shows up nowhere, and can't break the build no matter
-what. You can leave it there forever, or delete it whenever you're
-next cleaning up — either way from here on out it's a normal
-drag-and-drop overwrite like every other file, no special steps.
+1. Calendar now spans the full width
+   It was capped to a centered ~820px box, which is exactly what made
+   it look like it was floating in a sea of empty space next to your
+   full-width stat cards. That cap is gone — the calendar (and the
+   Year view) now stretches edge-to-edge from the sidebar to the right
+   side of the window, same as every other card on the page. Since the
+   day cells scale with the available width, they're noticeably
+   bigger now too.
+
+2. Saturday's column is now a "Week total"
+   Each week row is Sun–Fri plus one more column on the right showing
+   that week's total P&L and trade count, instead of a mostly-empty
+   Saturday cell (fine detail: the total still includes any actual
+   Saturday trades in the sum, in the rare case you have any — it's
+   just not broken out into its own cell anymore). It's styled
+   distinctly from the day cells — blue "WEEK TOTAL" label, tinted
+   green/red border by that week's result — so it reads as a summary
+   column, not just another day.
+
+FILES
+- src/components/DashboardView.tsx — removed the width cap
+- src/components/DashboardCalendar.tsx — 6-day week (Sun–Fri) +
+  week-total column, both in the header row and the grid
+- src/components/DashboardWeekTotalCell.tsx (new) — the week-total
+  cell component, matching the day cells' sizing so the grid still
+  lines up
 
 HOW TO APPLY
 1. GitHub Desktop, branch fix/calendar-keys-and-lint.
-2. Drag the src/ folder from this zip into your repo root, overwriting
-   src/components/PerformanceChart.tsx.
-3. Should show as 1 changed file. Commit and push.
+2. Drag the src/ folder from this zip into your repo root.
+   DashboardWeekTotalCell.tsx will show up as a new file; the other 2
+   overwrite what's there.
+3. Should show as 3 changed files (1 added, 2 modified). Commit and
+   push.
 
 VERIFIED
-- Dropped this exact file into a full copy of the project and ran:
-  npx tsc -b --force → 0 errors
-  npm run lint → 0 errors, 18 warnings (same baseline as your last
-  successful delivery, nothing new)
-- This is the specific failure mode from your last build log, fixed
-  at the source rather than relying on a manual step.
+- Rendered the dashboard with ~450 days of sample trades at a wide
+  desktop width (with a sidebar alongside it, like your screenshot)
+  and confirmed the calendar now runs the full width with noticeably
+  bigger cells, and the week-total numbers add up correctly against
+  the individual days shown.
+- Checked mobile width too — still fits cleanly, the week-total column
+  just shows "TOT" and a compact number ($1.9k) instead of the full
+  label, same pattern as the rest of the app on small screens.
+- npx tsc -b --force: 0 errors
+- npm run lint: 0 errors, 18 warnings — same baseline as your last
+  successful build, nothing new.
