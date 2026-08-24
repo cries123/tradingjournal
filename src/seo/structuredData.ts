@@ -11,7 +11,7 @@ const ORGANIZATION = {
   url: SITE_ORIGIN,
   logo: `${SITE_ORIGIN}/logo-mark.svg`,
   description:
-    'Free trading journal with a visual P&L calendar, performance analytics, and automatic Schwab & Robinhood sync.',
+    'Free trading journal with a visual P&L calendar, performance analytics, and automatic sync with 20 brokers.',
   contactPoint: {
     '@type': 'ContactPoint',
     email: 'support@trendchasers.net',
@@ -43,7 +43,7 @@ const SOFTWARE_APP = {
     priceCurrency: 'USD',
   },
   description:
-    'Free trading journal with P&L calendar, automatic Schwab & Robinhood sync, manual entry, and performance analytics.',
+    'Free trading journal with P&L calendar, automatic sync with 20 brokers, manual entry, and performance analytics.',
 };
 
 const NAV_LINKS = [

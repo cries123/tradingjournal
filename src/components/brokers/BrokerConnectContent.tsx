@@ -11,26 +11,28 @@ import {
   type BrokerAccountSummary,
   type SupportedBroker,
 } from '../../services/brokerConnect';
+import { BROKER_REGISTRY, matchesBrokerEntry, type BrokerRegistryEntry } from '../../data/brokerRegistry';
 import type { Trade } from '../../types';
 
 interface BrokerCardCopy {
   key: SupportedBroker;
   name: string;
-  brokerId: 'schwab' | 'robinhood' | 'webull';
-  /** Lowercase substring to match against SnapTrade's institution_name for this broker's accounts.
-   *  Keep in sync with the needle used server-side in snaptradeClient.ts's resolveBrokerSlug. */
-  matchNeedle: string;
+  /** Short form for the "Connect X" button — falls back to the full name when not set. */
+  shortName?: string;
+  brokerId: string;
+  entry: BrokerRegistryEntry;
   access: string;
   steps: string[];
   note: string;
 }
 
-const BROKER_COPY: BrokerCardCopy[] = [
-  {
-    key: 'SCHWAB',
+/** Hand-tuned copy for the first three brokers (shipped before this list became registry-driven —
+ *  see src/data/brokerRegistry.ts). Every other broker gets the templated copy below, which is
+ *  accurate but generic; swap in bespoke copy here as it's worth writing for a given broker. */
+const CUSTOM_COPY: Partial<Record<string, { name: string; shortName?: string; access: string; steps: string[]; note: string }>> = {
+  SCHWAB: {
     name: 'Charles Schwab & thinkorswim',
-    brokerId: 'schwab',
-    matchNeedle: 'schwab',
+    shortName: 'Schwab',
     access: 'Read & sync',
     steps: [
       'Click Connect — a secure SnapTrade window opens in a new tab.',
@@ -40,11 +42,8 @@ const BROKER_COPY: BrokerCardCopy[] = [
     ],
     note: 'thinkorswim accounts are Schwab accounts under the hood, so this same connection covers both.',
   },
-  {
-    key: 'ROBINHOOD',
+  ROBINHOOD: {
     name: 'Robinhood',
-    brokerId: 'robinhood',
-    matchNeedle: 'robinhood',
     access: 'Read-only',
     steps: [
       'Click Connect — a secure SnapTrade window opens in a new tab.',
@@ -54,11 +53,8 @@ const BROKER_COPY: BrokerCardCopy[] = [
     ],
     note: 'Robinhood connections are read-only — this can pull your trade history, but can’t place trades.',
   },
-  {
-    key: 'WEBULL',
+  WEBULL: {
     name: 'Webull',
-    brokerId: 'webull',
-    matchNeedle: 'webull',
     access: 'Read-only',
     steps: [
       'Click Connect — a secure SnapTrade window opens in a new tab.',
@@ -68,7 +64,30 @@ const BROKER_COPY: BrokerCardCopy[] = [
     ],
     note: 'Webull’s own login step currently asks for your Webull Trade PIN — that’s Webull’s own authentication method, not a Trend Chasers requirement, and this connection still only requests read access.',
   },
-];
+};
+
+function defaultSteps(name: string): string[] {
+  return [
+    'Click Connect — a secure SnapTrade window opens in a new tab.',
+    `Choose ${name} and sign in there. SnapTrade brokers the connection — your credentials go to SnapTrade’s secure portal (or ${name}’s own site), never to Trend Chasers.`,
+    'Approve read access, then close that tab and come back here.',
+    'Click Refresh, pick your account, and Sync trades to pull in your history.',
+  ];
+}
+
+const BROKER_COPY: BrokerCardCopy[] = BROKER_REGISTRY.map((entry) => {
+  const custom = CUSTOM_COPY[entry.key];
+  return {
+    key: entry.key,
+    entry,
+    name: custom?.name ?? entry.name,
+    shortName: custom?.shortName,
+    brokerId: entry.brokerId,
+    access: custom?.access ?? entry.access,
+    steps: custom?.steps ?? defaultSteps(entry.name),
+    note: custom?.note ?? `This is a read-only connection — it can pull your ${entry.name} trade history, but can’t place trades.`,
+  };
+});
 
 interface BrokerConnectContentProps {
   onBack: () => void;
@@ -174,8 +193,8 @@ export function BrokerConnectContent({ onBack, onImportTrades, existingTrades }:
     }
   };
 
-  const accountsForInstitution = (needle: string) =>
-    (status?.accounts ?? []).filter((a) => a.institutionName?.toLowerCase().includes(needle));
+  const accountsForInstitution = (entry: BrokerRegistryEntry) =>
+    (status?.accounts ?? []).filter((a) => matchesBrokerEntry(a.institutionName, entry));
 
   return (
     <div className="pb-6">
@@ -194,10 +213,10 @@ export function BrokerConnectContent({ onBack, onImportTrades, existingTrades }:
           Sync trades automatically
         </h1>
         <p className="text-text-secondary text-base leading-relaxed max-w-2xl mb-8">
-          Connect Schwab or Robinhood through SnapTrade, a broker-data connection provider, to pull your
-          trade history in automatically. Your broker credentials go directly to your broker or to
-          SnapTrade&apos;s secure portal — never to Trend Chasers. You can disconnect anytime. Prefer not
-          to connect? You can still log trades manually.
+          Connect any of the brokers below through SnapTrade, a broker-data connection provider, to
+          pull your trade history in automatically. Your broker credentials go directly to your
+          broker or to SnapTrade&apos;s secure portal — never to Trend Chasers. You can disconnect
+          anytime. Prefer not to connect? You can still log trades manually.
         </p>
 
         {!firebaseEnabled ? (
@@ -231,7 +250,7 @@ export function BrokerConnectContent({ onBack, onImportTrades, existingTrades }:
 
         <div className="space-y-5">
           {BROKER_COPY.map((broker) => {
-            const accounts = accountsForInstitution(broker.matchNeedle);
+            const accounts = accountsForInstitution(broker.entry);
             const isConnected = accounts.length > 0;
 
             return (
@@ -292,7 +311,7 @@ export function BrokerConnectContent({ onBack, onImportTrades, existingTrades }:
                     ) : (
                       <Link2 size={15} />
                     )}
-                    Connect {broker.name.split(' ')[0]}
+                    Connect {broker.shortName ?? broker.name}
                   </button>
                 )}
 

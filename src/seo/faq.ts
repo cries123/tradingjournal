@@ -1,13 +1,18 @@
+import { BROKER_REGISTRY, THINKORSWIM_DISPLAY } from '../data/brokerRegistry';
+
 export interface FaqItem {
   question: string;
   answer: string;
 }
 
+const SUPPORTED_BROKER_COUNT = BROKER_REGISTRY.length + 1; // +1 for thinkorswim (rides on Schwab)
+const SUPPORTED_BROKER_NAMES = [THINKORSWIM_DISPLAY.name, ...BROKER_REGISTRY.map((b) => b.name)];
+
 export const LANDING_FAQ: FaqItem[] = [
   {
     question: 'Do I have to connect my broker?',
     answer:
-      'No. Connecting Schwab or Robinhood for automatic sync is entirely optional — you can log every trade manually and never connect anything.',
+      'No. Connecting a broker for automatic sync is entirely optional — you can log every trade manually and never connect anything.',
   },
   {
     question: 'How does broker sync work?',
@@ -17,7 +22,7 @@ export const LANDING_FAQ: FaqItem[] = [
   {
     question: 'Which brokers are supported today?',
     answer:
-      'Schwab (including thinkorswim accounts) and Robinhood support automatic sync. Manual entry works for any broker. Use Request broker support in the footer to ask for another connection.',
+      `${SUPPORTED_BROKER_COUNT} brokers support automatic sync, including ${SUPPORTED_BROKER_NAMES.slice(0, 6).join(', ')}, and more — see the full list on the Brokers page. Manual entry works for any broker. Use Request broker support in the footer to ask for another connection.`,
   },
   {
     question: 'I use a different broker. Can you add support?',

@@ -3,14 +3,15 @@ import { assertCallerUid, BrokerRequestError } from './snaptradeAuth';
 import { getSnaptrade, resolveBrokerSlug, SNAPTRADE_CONFIGURED } from './snaptradeClient';
 import { getAdminFirestore } from './firebaseAdmin';
 import { mapSnapTradeActivitiesToTrades, type SnapTradeActivityLike } from './mapSnapTradeActivities';
+import { BROKER_REGISTRY, isBrokerRegistryKey } from '../src/data/brokerRegistry';
 
-export type SupportedBroker = 'SCHWAB' | 'ROBINHOOD' | 'WEBULL';
+export type SupportedBroker = string;
 
 export type BrokerConnectAction = 'connect' | 'status' | 'sync' | 'disconnect';
 
 export interface BrokerConnectRequestBody {
   action: BrokerConnectAction;
-  broker?: SupportedBroker;
+  broker?: string;
   accountId?: string;
   authorizationId?: string;
   startDate?: string;
@@ -53,9 +54,10 @@ async function getCredsIfRegistered(uid: string): Promise<SnaptradeCreds | null>
   return existing?.userSecret ? existing : null;
 }
 
-async function handleConnect(uid: string, broker?: SupportedBroker): Promise<BrokerConnectResult> {
-  if (broker !== 'SCHWAB' && broker !== 'ROBINHOOD' && broker !== 'WEBULL') {
-    throw new BrokerRequestError('Unsupported broker. Use SCHWAB, ROBINHOOD, or WEBULL.', 400);
+async function handleConnect(uid: string, broker?: string): Promise<BrokerConnectResult> {
+  if (!isBrokerRegistryKey(broker)) {
+    const keys = BROKER_REGISTRY.map((b) => b.key).join(', ');
+    throw new BrokerRequestError(`Unsupported broker. Use one of: ${keys}.`, 400);
   }
 
   const creds = await getOrRegisterCreds(uid);

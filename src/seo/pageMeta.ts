@@ -16,13 +16,13 @@ const PAGE_SEO: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>, Pa
   landing: {
     title: 'Trend Chasers — Trading Journal & P&L Calendar',
     description:
-      'Free trading journal to track and improve your performance. Visual P&L calendar, automatic Schwab & Robinhood sync, or log trades manually.',
+      'Free trading journal to track and improve your performance. Visual P&L calendar, automatic sync with 20 brokers including Schwab and Robinhood, or log trades manually.',
     path: '/',
   },
   brokers: {
     title: 'Supported Brokers — Trend Chasers Trading Journal',
     description:
-      'Connect Schwab or Robinhood for automatic trade sync, or log trades manually. See how Trend Chasers fits your workflow.',
+      'Connect any of 20 brokers, including Schwab, Fidelity, and Robinhood, for automatic trade sync — or log trades manually. See how Trend Chasers fits your workflow.',
     path: '/brokers',
   },
   guides: {

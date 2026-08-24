@@ -1,4 +1,5 @@
 import { Snaptrade, SnaptradeAuth } from 'snaptrade-typescript-sdk';
+import { brokerRegistryEntry, matchesBrokerEntry } from '../src/data/brokerRegistry';
 
 export const SNAPTRADE_CONFIGURED = Boolean(
   process.env.SNAPTRADE_CLIENT_ID?.trim() && process.env.SNAPTRADE_CONSUMER_KEY?.trim(),
@@ -25,22 +26,20 @@ export function getSnaptrade() {
   return client;
 }
 
-/** Known SnapTrade brokerage slugs we support connecting to. Looked up dynamically at connect time
- * (see resolveBrokerSlug) so this is only the fallback if the reference-data lookup fails. */
-export const BROKER_SLUG_FALLBACK: Record<'SCHWAB' | 'ROBINHOOD' | 'WEBULL', string> = {
-  SCHWAB: 'SCHWAB',
-  ROBINHOOD: 'ROBINHOOD',
-  WEBULL: 'WEBULL',
-};
-
 let brokerageCache: { id?: string; slug?: string; name?: string; display_name?: string }[] | null = null;
 let brokerageCacheAt = 0;
 const BROKERAGE_CACHE_TTL_MS = 60 * 60 * 1000;
 
-/** Resolves a broker key ('SCHWAB' | 'ROBINHOOD' | 'WEBULL') to the real SnapTrade brokerage slug by
- * matching on display name, rather than hardcoding a guessed slug that could drift from SnapTrade's
- * catalog. */
-export async function resolveBrokerSlug(broker: 'SCHWAB' | 'ROBINHOOD' | 'WEBULL'): Promise<string> {
+/** Resolves a broker registry key (see src/data/brokerRegistry.ts) to the real SnapTrade
+ * brokerage slug by matching on display name, rather than hardcoding a guessed slug that could
+ * drift from SnapTrade's catalog. Falls back to the registry key itself if the lookup can't find
+ * a match (SnapTrade's catalog changes independently of this app). */
+export async function resolveBrokerSlug(broker: string): Promise<string> {
+  const entry = brokerRegistryEntry(broker);
+  if (!entry) {
+    throw new Error(`Unknown broker key: ${broker}`);
+  }
+
   const snaptrade = getSnaptrade();
   const now = Date.now();
 
@@ -50,21 +49,6 @@ export async function resolveBrokerSlug(broker: 'SCHWAB' | 'ROBINHOOD' | 'WEBULL
     brokerageCacheAt = now;
   }
 
-  if (broker === 'WEBULL') {
-    // SnapTrade lists "Webull US" and "Webull Canada" as two distinct integrations — match "webull"
-    // but explicitly exclude "canada" so we never accidentally connect the wrong country's brokerage.
-    const match = brokerageCache?.find((b) => {
-      const name = `${b.name ?? ''} ${b.display_name ?? ''}`.toLowerCase();
-      return name.includes('webull') && !name.includes('canada');
-    });
-    return match?.slug || BROKER_SLUG_FALLBACK.WEBULL;
-  }
-
-  const needle = broker === 'SCHWAB' ? 'schwab' : 'robinhood';
-  const match = brokerageCache?.find((b) => {
-    const name = `${b.name ?? ''} ${b.display_name ?? ''}`.toLowerCase();
-    return name.includes(needle);
-  });
-
-  return match?.slug || BROKER_SLUG_FALLBACK[broker];
+  const match = brokerageCache?.find((b) => matchesBrokerEntry(`${b.name ?? ''} ${b.display_name ?? ''}`, entry));
+  return match?.slug || entry.key;
 }

@@ -37,11 +37,11 @@ export function BrokerSyncAnnouncement({ onConnectBroker }: BrokerSyncAnnounceme
         <Link2 size={16} />
       </div>
       <div className="flex-1 min-w-[220px]">
-        <p className="text-sm font-semibold text-text-primary">New: broker sync is live</p>
+        <p className="text-sm font-semibold text-text-primary">New: broker sync now covers 20 brokers</p>
         <p className="text-xs text-text-secondary leading-relaxed mt-0.5 max-w-2xl">
-          Connect Schwab or Robinhood and your round-trip trades sync in automatically. It&apos;s
-          read-only — Trend Chasers can&apos;t see your balance or place trades on your behalf, and you
-          can disconnect anytime.
+          Connect your broker — Schwab, Fidelity, Robinhood, Interactive Brokers, Webull, and 15 more
+          — and your round-trip trades sync in automatically. It&apos;s read-only — Trend Chasers
+          can&apos;t see your balance or place trades on your behalf, and you can disconnect anytime.
         </p>
         <button
           type="button"
