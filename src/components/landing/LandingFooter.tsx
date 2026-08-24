@@ -203,7 +203,7 @@ interface LandingNavProps {
 
 function NavBrand({ onHome }: { onHome?: () => void }) {
   const logo = (
-    <img src="/nav-logo.png" alt="Trend Chasers" className="h-16 sm:h-28 w-auto object-contain" />
+    <img src="/nav-logo.png" alt="Trend Chasers" className="h-14 sm:h-24 w-auto object-contain" />
   );
   const shellClass =
     'inline-flex items-center justify-start shrink-0 w-fit max-w-none p-0 m-0 border-0 bg-transparent text-left hover:opacity-90 transition-opacity focus-ring rounded';
