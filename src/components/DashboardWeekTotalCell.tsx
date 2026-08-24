@@ -7,7 +7,7 @@ interface DashboardWeekTotalCellProps {
 }
 
 const cellShell =
-  'rounded-sm md:rounded-lg text-left flex flex-col overflow-hidden aspect-square border';
+  'rounded-sm md:rounded-lg text-left flex flex-col overflow-hidden aspect-square md:aspect-auto md:h-[108px] border';
 
 export function DashboardWeekTotalCell({ summary }: DashboardWeekTotalCellProps) {
   const { settings } = useSettings();

@@ -1,54 +1,43 @@
-CALENDAR: FULL WIDTH + WEEK TOTAL COLUMN
-================================================
+FIX: WIDE, NOT TALL
+=========================
 
-3 files (2 modified, 1 new).
+2 files. Overwrites what's in your repo (DashboardWeekTotalCell.tsx
+is new if you haven't applied the last zip yet — either way this one
+supersedes it).
 
 WHAT CHANGED
+Last time I made the calendar go full width by removing its max-width
+cap. The day cells were set to always be perfect squares, so once the
+box got wider, each cell also got taller to match — which is why the
+whole calendar (and the page below it) ballooned in height and you
+ended up scrolling twice as far to see everything.
 
-1. Calendar now spans the full width
-   It was capped to a centered ~820px box, which is exactly what made
-   it look like it was floating in a sea of empty space next to your
-   full-width stat cards. That cap is gone — the calendar (and the
-   Year view) now stretches edge-to-edge from the sidebar to the right
-   side of the window, same as every other card on the page. Since the
-   day cells scale with the available width, they're noticeably
-   bigger now too.
-
-2. Saturday's column is now a "Week total"
-   Each week row is Sun–Fri plus one more column on the right showing
-   that week's total P&L and trade count, instead of a mostly-empty
-   Saturday cell (fine detail: the total still includes any actual
-   Saturday trades in the sum, in the rare case you have any — it's
-   just not broken out into its own cell anymore). It's styled
-   distinctly from the day cells — blue "WEEK TOTAL" label, tinted
-   green/red border by that week's result — so it reads as a summary
-   column, not just another day.
+Fixed it properly this time: on desktop, the cells now use a fixed
+height instead of always matching their width, so they get wider
+without getting taller. The calendar still spans the full width like
+you wanted, but the whole block is noticeably shorter now — closer to
+your original page length, just with each cell wider and roomier.
+Phone-sized screens are untouched — cells stay square there since the
+grid is naturally narrow and that still looks right.
 
 FILES
-- src/components/DashboardView.tsx — removed the width cap
-- src/components/DashboardCalendar.tsx — 6-day week (Sun–Fri) +
-  week-total column, both in the header row and the grid
-- src/components/DashboardWeekTotalCell.tsx (new) — the week-total
-  cell component, matching the day cells' sizing so the grid still
-  lines up
+- src/components/DashboardDayCell.tsx — fixed height on desktop
+  instead of aspect-square
+- src/components/DashboardWeekTotalCell.tsx — same fixed height, so
+  it still lines up with the day cells next to it
 
 HOW TO APPLY
 1. GitHub Desktop, branch fix/calendar-keys-and-lint.
-2. Drag the src/ folder from this zip into your repo root.
-   DashboardWeekTotalCell.tsx will show up as a new file; the other 2
-   overwrite what's there.
-3. Should show as 3 changed files (1 added, 2 modified). Commit and
-   push.
+2. Drag the src/ folder from this zip into your repo root, overwriting
+   these 2 files.
+3. Should show as 2 changed files. Commit and push.
 
 VERIFIED
-- Rendered the dashboard with ~450 days of sample trades at a wide
-  desktop width (with a sidebar alongside it, like your screenshot)
-  and confirmed the calendar now runs the full width with noticeably
-  bigger cells, and the week-total numbers add up correctly against
-  the individual days shown.
-- Checked mobile width too — still fits cleanly, the week-total column
-  just shows "TOT" and a compact number ($1.9k) instead of the full
-  label, same pattern as the rest of the app on small screens.
+- Rendered the full dashboard at a wide desktop width with ~450 days
+  of sample trades and measured the page height before/after: it
+  dropped from about 2890px to about 2250px — roughly a 20% shorter
+  page — while the calendar itself still runs the full width.
+- Checked mobile width too — cells are still square there, unchanged
+  from before.
 - npx tsc -b --force: 0 errors
-- npm run lint: 0 errors, 18 warnings — same baseline as your last
-  successful build, nothing new.
+- npm run lint: 0 errors, 18 warnings — same baseline, nothing new.
