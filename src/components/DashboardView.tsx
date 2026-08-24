@@ -20,6 +20,7 @@ import { DailyPnlChart } from './DailyPnlChart';
 import { DashboardCalendar } from './DashboardCalendar';
 import { EmptyDashboard } from './EmptyDashboard';
 import { FiltersBar } from './FiltersBar';
+import { PerformanceChart } from './PerformanceChart';
 import { ShareCardModal } from './ShareCardModal';
 import { StatsCards } from './StatsCards';
 import { WeekdayChart } from './WeekdayChart';
@@ -170,28 +171,31 @@ export function DashboardView({
 
       {hasAnyTrades && <WeeklyRecapCard trades={trades} />}
 
-      {mode === 'month' ? (
-        <DashboardCalendar
-          year={year}
-          month={month}
-          trades={trades}
-          onDayClick={onDayClick}
-          onPrevMonth={onPrevMonth}
-          onNextMonth={onNextMonth}
-          onMonthChange={onMonthChange}
-        />
-      ) : (
-        <YearHeatmap
-          trades={trades}
-          year={year}
-          onPrevYear={onPrevYear}
-          onNextYear={onNextYear}
-          onSelectMonth={(m) => {
-            onSelectMonth(m);
-            setMode('month');
-          }}
-        />
-      )}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.7fr_1fr] gap-2 md:gap-3 items-start">
+        {mode === 'month' ? (
+          <DashboardCalendar
+            year={year}
+            month={month}
+            trades={trades}
+            onDayClick={onDayClick}
+            onPrevMonth={onPrevMonth}
+            onNextMonth={onNextMonth}
+            onMonthChange={onMonthChange}
+          />
+        ) : (
+          <YearHeatmap
+            trades={trades}
+            year={year}
+            onPrevYear={onPrevYear}
+            onNextYear={onNextYear}
+            onSelectMonth={(m) => {
+              onSelectMonth(m);
+              setMode('month');
+            }}
+          />
+        )}
+        <PerformanceChart trades={trades} />
+      </div>
 
       {(hasAnyTrades || hasFilters) && (
         <FiltersBar filters={filters} symbols={filterSymbols} setups={filterSetups} onChange={onFiltersChange} />

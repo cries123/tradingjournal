@@ -1,64 +1,48 @@
-REAL BROKER LOGOS FOR THE 16 NEW BROKERS
-==========================================
+BUILD FIX: MISSING getPerformanceData EXPORT
+==================================================
 
-18 files (16 new logo images, 2 modified code files).
+5 files, replaces the versions currently in your repo.
 
-WHAT CHANGED
-The 16 brokers added earlier (Fidelity, E*TRADE, Interactive Brokers,
-Vanguard, tastytrade, TradeStation, Tradier, Public, Alpaca, Moomoo,
-Chase, Citi, Edward Jones, Coinbase, TIAA, PNC Wealth Management) were
-showing a generic building-icon badge since I didn't have official logo
-files yet. You sent those over, so all 20 brokers now show their real
-logo in the connect flow, the Brokers page, and anywhere else a broker
-badge shows up.
+WHAT BROKE
+Your Netlify build failed with:
+  "Module '../utils/stats' has no exported member 'getPerformanceData'"
 
-WHAT I DID TO EACH IMAGE
-Same treatment as the existing badges (Schwab, Robinhood, Webull,
-thinkorswim): cropped tight to the actual logo content, background
-removed and made transparent where the source had a plain white
-background baked in, sized consistently, and saved as PNGs.
+That function lives in src/utils/stats.ts and was part of the original
+dashboard-redesign delivery (the one that added the PnL performance
+chart next to the calendar) — but your repo has the newer
+PerformanceChart.tsx (the line-graph version) without the matching
+stats.ts changes underneath it. Somewhere along the way that one file
+didn't make it in, which is an easy thing to miss when dragging folders
+across a few separate zips. The extra "implicitly has an 'any' type"
+errors in the same build log are just a side effect of that one missing
+export — TypeScript gives up inferring types once the import it depends
+on doesn't exist, they're not separate bugs.
 
-A few brokers' source files combined an icon mark with the company
-wordmark (Moomoo, Vanguard, TIAA, PNC) — for those I kept just the
-icon/symbol and dropped the wordmark, same call I made earlier for
-thinkorswim and Robinhood, since the badge box is small and square and
-the broker's name is already shown as text right next to it. A few
-others (Interactive Brokers, TradeStation, Coinbase) have their brand
-color/background baked into the icon itself (e.g. IB's red mark on
-black, Coinbase's blue square) — those were left as their real icon
-looks, not stripped to transparent, since the background is part of
-the mark.
+THE FIX
+This zip has the complete, current, working set of every file this
+feature touches, all pulled from the same consistent state and
+verified to build together:
+- src/utils/stats.ts (the missing piece — adds getPerformanceData)
+- src/components/PerformanceChart.tsx (the line chart you already have)
+- src/components/DashboardView.tsx (calendar + chart side-by-side layout)
+- src/components/DashboardDayCell.tsx (the day-cell height tweak)
+- src/components/EmptyDashboard.tsx (the "Connect your broker" copy fix)
 
-Edward Jones and Citi don't have a separate icon apart from their
-wordmark, so those show the full wordmark, cropped tight — same as how
-"Charles Schwab" already renders in its badge.
-
-FILES
-- public/broker-logos/*.png — 16 new logo files
-- src/components/brokers/BrokerLogo.tsx — registered each new file
-- src/data/brokerRegistry.ts — flipped hasLogo: false → true for
-  these 16, for documentation/consistency (doesn't change behavior,
-  BrokerLogo.tsx's own LOGOS record is what actually renders it)
+Overwriting all 5 together removes any doubt about what's actually in
+your repo right now — safer than guessing which single file is missing.
 
 HOW TO APPLY
 1. GitHub Desktop, branch fix/calendar-keys-and-lint.
-2. Drag the src/ and public/ folders from this zip into your repo
-   root. public/broker-logos/ will show 16 new files; the 2 .tsx/.ts
-   files overwrite existing ones.
-3. Should show as 18 changed files (16 added, 2 modified). Commit and
-   push.
+2. Drag the src/ folder from this zip into your repo root, overwriting
+   these 5 files.
+3. Should show as up to 5 changed files (however many actually differ
+   from what you have — could be just stats.ts if everything else was
+   already correct). Commit and push.
 
 VERIFIED
-- Rendered all 20 broker badges together in a grid and screenshotted
-  it — every one now shows a real, legible logo in the same fixed-size
-  box, nothing stretched, cropped off, or showing the placeholder icon
-  anymore.
 - npx tsc -b --force: 0 errors
-- npm run lint: 0 errors, same 19 warnings as the last delivery — no
-  new ones.
-- git status shows exactly these 18 files changed, nothing else.
-
-ONE NOTE
-Trend Chasers isn't affiliated with or endorsed by any of these
-brokers — the badges are just there to show which ones you can
-connect, same disclaimer that already applies to the first 4.
+- npm run lint: 0 errors, 19 warnings (same baseline as every prior
+  delivery, no new ones)
+- This is the exact set of files currently sitting in my working copy,
+  which is what every screenshot I've sent you of the dashboard/chart
+  was rendered from — so it's known-good.
