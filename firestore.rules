@@ -194,5 +194,14 @@ service cloud.firestore {
       allow read, create: if isAdmin();
       allow update, delete: if false;
     }
+
+    // Help Center articles — authored only by the site admin. The public Help Center page
+    // queries with a published == true filter, so this "resource.data.published == true"
+    // clause is what actually restricts that query's results; isAdmin() lets the admin panel
+    // see drafts too.
+    match /helpArticles/{articleId} {
+      allow read: if resource.data.published == true || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
   }
 }

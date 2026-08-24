@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
+import type { ExtraNavRoute } from '../hooks/useRoute';
 
 interface ContentPageLayoutProps {
   title: string;
@@ -11,6 +12,7 @@ interface ContentPageLayoutProps {
   onTerms: () => void;
   onBrokers?: () => void;
   onGuides?: () => void;
+  onNavigate?: (route: ExtraNavRoute) => void;
 }
 
 export function ContentPageLayout({
@@ -23,6 +25,7 @@ export function ContentPageLayout({
   onTerms,
   onBrokers,
   onGuides,
+  onNavigate,
 }: ContentPageLayoutProps) {
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
@@ -32,6 +35,7 @@ export function ContentPageLayout({
         onHome={onHome}
         onBrokers={onBrokers}
         onGuides={onGuides}
+        onNavigate={onNavigate}
       />
       <main className="relative z-10 flex-1 max-w-3xl mx-auto px-4 md:px-6 py-12 md:py-16 w-full">
         <a

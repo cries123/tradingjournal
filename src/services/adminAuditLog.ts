@@ -14,7 +14,12 @@ export type AdminAuditAction =
   | 'bug.note-saved'
   | 'broker-request.status-changed'
   | 'broker-request.priority-changed'
-  | 'broker-request.note-saved';
+  | 'broker-request.note-saved'
+  | 'help-article.created'
+  | 'help-article.updated'
+  | 'help-article.published'
+  | 'help-article.unpublished'
+  | 'help-article.deleted';
 
 export interface AdminAuditEntry {
   id: string;
@@ -22,7 +27,7 @@ export interface AdminAuditEntry {
   adminUid: string;
   adminEmail: string;
   action: AdminAuditAction;
-  targetType: 'user' | 'bug-report' | 'broker-request';
+  targetType: 'user' | 'bug-report' | 'broker-request' | 'help-article';
   targetId: string;
   targetLabel: string;
   detail: string;

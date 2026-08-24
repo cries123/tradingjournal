@@ -1,5 +1,6 @@
 import { ContentPageLayout } from './ContentPageLayout';
 import { BROKER_GUIDES, getBrokerGuideBySlug } from '../seo/brokerGuides';
+import type { ExtraNavRoute } from '../hooks/useRoute';
 
 interface BrokerGuidePageProps {
   slug: string;
@@ -9,6 +10,7 @@ interface BrokerGuidePageProps {
   onTerms: () => void;
   onBrokers?: () => void;
   onGuides?: () => void;
+  onNavigate?: (route: ExtraNavRoute) => void;
 }
 
 export function BrokerGuidePage({
@@ -19,6 +21,7 @@ export function BrokerGuidePage({
   onTerms,
   onBrokers,
   onGuides,
+  onNavigate,
 }: BrokerGuidePageProps) {
   const guide = getBrokerGuideBySlug(slug);
 
@@ -32,6 +35,7 @@ export function BrokerGuidePage({
         onTerms={onTerms}
         onBrokers={onBrokers}
         onGuides={onGuides}
+        onNavigate={onNavigate}
       >
         <p>This broker guide does not exist. Browse supported brokers instead.</p>
         {onBrokers && (
@@ -55,6 +59,7 @@ export function BrokerGuidePage({
       onTerms={onTerms}
       onBrokers={onBrokers}
       onGuides={onGuides}
+      onNavigate={onNavigate}
     >
       {guide.sections.map((section) => (
         <section key={section.heading}>

@@ -1,4 +1,5 @@
 import { LegalPageLayout } from './LegalPageLayout';
+import type { ExtraNavRoute } from '../hooks/useRoute';
 
 interface TermsOfServicePageProps {
   onHome: () => void;
@@ -6,11 +7,13 @@ interface TermsOfServicePageProps {
   onPrivacy: () => void;
   onTerms: () => void;
   onBrokers?: () => void;
+  onGuides?: () => void;
+  onNavigate?: (route: ExtraNavRoute) => void;
 }
 
-export function TermsOfServicePage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: TermsOfServicePageProps) {
+export function TermsOfServicePage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onGuides, onNavigate }: TermsOfServicePageProps) {
   return (
-    <LegalPageLayout title="Terms of Service" lastUpdated="August 23, 2026" onHome={onHome} onLaunch={onLaunch} onPrivacy={onPrivacy} onTerms={onTerms} onBrokers={onBrokers}>
+    <LegalPageLayout title="Terms of Service" lastUpdated="August 23, 2026" onHome={onHome} onLaunch={onLaunch} onPrivacy={onPrivacy} onTerms={onTerms} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate}>
       <section>
         <h2>Agreement</h2>
         <p>

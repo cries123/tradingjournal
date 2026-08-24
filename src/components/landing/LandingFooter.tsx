@@ -1,6 +1,11 @@
+import { useState } from 'react';
+import { Menu, X } from 'lucide-react';
 import { BrandLogo } from '../BrandLogo';
+import { ProductsDropdown } from './ProductsDropdown';
+import { MobileNavPanel } from './MobileNavPanel';
 import { BROKER_GUIDES } from '../../seo/brokerGuides';
 import { GUIDE_ARTICLES } from '../../seo/guides';
+import type { ExtraNavRoute } from '../../hooks/useRoute';
 
 interface LandingFooterProps {
   onPrivacy: () => void;
@@ -174,11 +179,6 @@ export function LandingFooter({
                   Request broker support
                 </a>
               </li>
-              <li>
-                <a href="/admin" className="hover:text-emerald-400 transition-colors opacity-60">
-                  Admin
-                </a>
-              </li>
             </ul>
           </div>
         </div>
@@ -197,12 +197,13 @@ interface LandingNavProps {
   onHome?: () => void;
   onBrokers?: () => void;
   onGuides?: () => void;
+  onNavigate?: (route: ExtraNavRoute) => void;
   showBrokersLink?: boolean;
 }
 
 function NavBrand({ onHome }: { onHome?: () => void }) {
   const logo = (
-    <img src="/nav-logo.png" alt="Trend Chasers" className="h-16 sm:h-20 w-auto object-contain" />
+    <img src="/nav-logo.png" alt="Trend Chasers" className="h-16 sm:h-28 w-auto object-contain" />
   );
   const shellClass =
     'inline-flex items-center justify-start shrink-0 w-fit max-w-none p-0 m-0 border-0 bg-transparent text-left hover:opacity-90 transition-opacity focus-ring rounded';
@@ -229,52 +230,94 @@ function NavBrand({ onHome }: { onHome?: () => void }) {
   );
 }
 
-export function LandingNav({ onLaunch, onHome, onBrokers, onGuides, showBrokersLink = true }: LandingNavProps) {
+export function LandingNav({
+  onLaunch,
+  onHome,
+  onBrokers,
+  onGuides,
+  onNavigate,
+  showBrokersLink = true,
+}: LandingNavProps) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   return (
-    <header className="relative z-10 border-b border-border/50 backdrop-blur-md bg-bg-primary/70 sticky top-0">
-      <div className="max-w-[1680px] mx-auto px-4 md:px-8 h-24 flex items-center justify-between gap-6">
+    <header className="relative z-30 border-b border-border/50 backdrop-blur-md bg-bg-primary/70 sticky top-0">
+      <div className="max-w-[1680px] mx-auto px-4 md:px-8 h-24 sm:h-32 flex items-center gap-3 sm:gap-6 md:gap-10">
         <NavBrand onHome={onHome} />
-        <nav className="flex items-center gap-6 sm:gap-8 shrink-0" aria-label="Main">
-          <div className="hidden sm:flex items-center gap-6">
-            {showBrokersLink && (
-              <a
-                href="/brokers"
-                onClick={(e) => {
-                  if (onBrokers) {
-                    e.preventDefault();
-                    onBrokers();
-                  }
-                }}
-                className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
-              >
-                Brokers
-              </a>
-            )}
+        <nav className="hidden sm:flex items-center gap-6 sm:gap-8" aria-label="Main">
+          <ProductsDropdown onLaunch={onLaunch} onNavigate={onNavigate} />
+          <a
+            href="/guides"
+            onClick={(e) => {
+              if (onGuides) {
+                e.preventDefault();
+                onGuides();
+              }
+            }}
+            className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+          >
+            Tutorials
+          </a>
+          {showBrokersLink && (
             <a
-              href="/guides"
+              href="/brokers"
               onClick={(e) => {
-                if (onGuides) {
+                if (onBrokers) {
                   e.preventDefault();
-                  onGuides();
+                  onBrokers();
                 }
               }}
               className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
             >
-              Guides
+              Brokers
             </a>
-          </div>
+          )}
+          <a
+            href="/help-center"
+            onClick={(e) => {
+              if (onNavigate) {
+                e.preventDefault();
+                onNavigate('help-center');
+              }
+            }}
+            className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+          >
+            Help Center
+          </a>
+        </nav>
+        <div className="ml-auto flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setMobileOpen((v) => !v)}
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-nav-panel"
+            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+            className="sm:hidden p-1.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60 transition-colors"
+          >
+            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
           <a
             href="/app"
             onClick={(e) => {
               e.preventDefault();
               onLaunch();
             }}
-            className="btn-primary text-sm px-5 py-2.5"
+            className="btn-primary text-sm px-4 sm:px-5 py-2.5 shrink-0"
           >
-            Open Journal
+            Sign up
           </a>
-        </nav>
+        </div>
       </div>
+
+      <MobileNavPanel
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        onLaunch={onLaunch}
+        onGuides={onGuides}
+        onBrokers={onBrokers}
+        onNavigate={onNavigate}
+        showBrokersLink={showBrokersLink}
+      />
     </header>
   );
 }

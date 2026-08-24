@@ -1,5 +1,6 @@
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import { BrokersContent } from '../components/support/BrokersContent';
+import type { ExtraNavRoute } from '../hooks/useRoute';
 
 interface BrokersPageProps {
   onHome: () => void;
@@ -8,6 +9,8 @@ interface BrokersPageProps {
   onTerms: () => void;
   onBrokers: () => void;
   onRequestBroker?: () => void;
+  onGuides?: () => void;
+  onNavigate?: (route: ExtraNavRoute) => void;
 }
 
 export function BrokersPage({
@@ -17,11 +20,20 @@ export function BrokersPage({
   onTerms,
   onBrokers,
   onRequestBroker,
+  onGuides,
+  onNavigate,
 }: BrokersPageProps) {
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
       <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
-      <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} showBrokersLink={false} />
+      <LandingNav
+        onLaunch={onLaunch}
+        onHome={onHome}
+        onBrokers={onBrokers}
+        onGuides={onGuides}
+        onNavigate={onNavigate}
+        showBrokersLink={false}
+      />
 
       <main className="relative z-10 flex-1">
         <BrokersContent
@@ -36,7 +48,7 @@ export function BrokersPage({
         </div>
       </main>
 
-      <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} onHome={onHome} onBrokers={onBrokers} />
+      <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} />
     </div>
   );
 }

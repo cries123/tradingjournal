@@ -19,6 +19,7 @@ import { COMING_SOON_BROKERS, SUPPORTED_BROKERS } from '../data/brokers';
 import { LANDING_FAQ } from '../seo/faq';
 import { GUIDE_ARTICLES } from '../seo/guides';
 import { fetchBrokersConfig, type BrokerConfig } from '../services/brokersConfig';
+import type { ExtraNavRoute } from '../hooks/useRoute';
 
 interface LandingPageProps {
   onLaunch: () => void;
@@ -28,6 +29,7 @@ interface LandingPageProps {
   onBrokers: () => void;
   onGuides?: () => void;
   onGuide?: (slug: string) => void;
+  onNavigate?: (route: ExtraNavRoute) => void;
 }
 
 const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
@@ -71,7 +73,7 @@ const STEPS = [
   { n: '03', title: 'Analyze your edge', body: 'See which setups pay and which bleed — streaks, expectancy, and your best and worst days.' },
 ];
 
-export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, onGuides, onGuide }: LandingPageProps) {
+export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, onGuides, onGuide, onNavigate }: LandingPageProps) {
   const [brokers, setBrokers] = useState<{ supported: BrokerConfig[]; comingSoon: string[] }>({
     supported: SUPPORTED_BROKERS.map((b) => ({ ...b, methods: [...b.methods] })),
     comingSoon: [...COMING_SOON_BROKERS],
@@ -91,7 +93,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
       <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
       <AnnouncementBar onGuide={onGuide} />
-      <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} />
+      <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate} />
 
       {/* Hero */}
       <section className="relative z-10 max-w-[1680px] mx-auto px-4 md:px-6 pt-12 md:pt-20 pb-16 md:pb-20">

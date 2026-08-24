@@ -1,5 +1,6 @@
 import { ContentPageLayout } from './ContentPageLayout';
 import { getGuideBySlug } from '../seo/guides';
+import type { ExtraNavRoute } from '../hooks/useRoute';
 
 interface GuidePageProps {
   slug: string;
@@ -9,6 +10,7 @@ interface GuidePageProps {
   onTerms: () => void;
   onBrokers?: () => void;
   onGuides?: () => void;
+  onNavigate?: (route: ExtraNavRoute) => void;
 }
 
 export function GuidePage({
@@ -19,6 +21,7 @@ export function GuidePage({
   onTerms,
   onBrokers,
   onGuides,
+  onNavigate,
 }: GuidePageProps) {
   const guide = getGuideBySlug(slug);
 
@@ -32,6 +35,7 @@ export function GuidePage({
         onTerms={onTerms}
         onBrokers={onBrokers}
         onGuides={onGuides}
+        onNavigate={onNavigate}
       >
         <p>This guide does not exist. Return to the guides index to browse available articles.</p>
         {onGuides && (
@@ -53,6 +57,7 @@ export function GuidePage({
       onTerms={onTerms}
       onBrokers={onBrokers}
       onGuides={onGuides}
+      onNavigate={onNavigate}
     >
       {guide.sections.map((section) => (
         <section key={section.heading}>

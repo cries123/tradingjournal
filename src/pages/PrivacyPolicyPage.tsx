@@ -1,4 +1,5 @@
 import { LegalPageLayout } from './LegalPageLayout';
+import type { ExtraNavRoute } from '../hooks/useRoute';
 
 interface PrivacyPolicyPageProps {
   onHome: () => void;
@@ -6,11 +7,13 @@ interface PrivacyPolicyPageProps {
   onPrivacy: () => void;
   onTerms: () => void;
   onBrokers?: () => void;
+  onGuides?: () => void;
+  onNavigate?: (route: ExtraNavRoute) => void;
 }
 
-export function PrivacyPolicyPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: PrivacyPolicyPageProps) {
+export function PrivacyPolicyPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onGuides, onNavigate }: PrivacyPolicyPageProps) {
   return (
-    <LegalPageLayout title="Privacy Policy" lastUpdated="August 23, 2026" onHome={onHome} onLaunch={onLaunch} onPrivacy={onPrivacy} onTerms={onTerms} onBrokers={onBrokers}>
+    <LegalPageLayout title="Privacy Policy" lastUpdated="August 23, 2026" onHome={onHome} onLaunch={onLaunch} onPrivacy={onPrivacy} onTerms={onTerms} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate}>
       <section>
         <h2>Overview</h2>
         <p>

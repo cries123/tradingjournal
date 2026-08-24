@@ -1,51 +1,17 @@
-ADMIN PANEL UPGRADE
-====================
+EVERYTHING SINCE 4:38PM
+=========================
 
-10 files, apply all of them together (this is a linked set — some of
-these files import from the new ones, so a partial apply will break
-the build).
-
-WHAT'S NEW
-
-1. Priority on bug reports & broker requests
-   Each one now has a Low/Medium/High priority pill next to its status
-   badge — click it to change it. Within whatever status filter you have
-   selected, the list sorts High priority first automatically.
-
-2. Internal admin notes + a flag, per user account
-   Open any user in the Users list and there's a new "Internal notes
-   (admin only)" section at the bottom — a free-text note plus a
-   "Flag for review" toggle. This is stored completely separately from
-   that user's own profile document, so it's never visible to them,
-   only to you. Flagged accounts show a small red "Flagged" badge
-   in the user list.
-
-3. Recent admin activity (audit log)
-   A new card logs every admin action automatically — status changes,
-   priority changes, note saves, email/password changes, password
-   reset emails sent, account deletions, flags. It's append-only
-   (nothing can edit or delete an entry, including you, by design) so
-   it stays a trustworthy record if you ever need to check "did I
-   already handle this" or "when did I do that."
-
-4. System health history
-   The System health card now also shows a small timeline strip under
-   each of the three checks (Broker sync / SPY benchmark / Firebase) —
-   a row of green/red bars for the last ~30 times you loaded the admin
-   page, plus a rolling uptime %. It fills in over time as you visit
-   the panel; the first visit after this update will only show one bar.
-
-5. CSV exports now include the new data
-   Bug report and broker request exports have a priority column;
-   the users export has flagged + admin_note columns.
-
-6. Removed the public "Admin" link from the landing page footer
-   (from your last request — still included in this same set).
+firestore.rules + 29 code files, apply all of them together (this is
+a linked set — many of these files import from the new ones, so a
+partial apply will break the build). This is one combined zip of
+everything from the four separate deliveries since then, so you don't
+have to track down and re-merge earlier zips — this replaces all of
+them.
 
 IMPORTANT — TWO SEPARATE DEPLOY STEPS THIS TIME
-This update touches firestore.rules for the first time in one of these
-deliveries, which is NOT part of your normal Netlify deploy. You need
-to do both of the following, in either order:
+This set touches firestore.rules (new Help Center articles
+collection), which is NOT part of your normal Netlify deploy. You
+need to do both of the following, in either order:
 
   A) The usual app deploy — commit + push these files like normal,
      Netlify builds and deploys the site.
@@ -55,33 +21,60 @@ to do both of the following, in either order:
 
          firebase deploy --only firestore:rules
 
-     If you don't have the Firebase CLI yet: `npm install -g firebase-tools`,
-     then `firebase login`, then run the command above from inside your
-     tradingjournal folder (it uses the firebase project already
-     configured in this repo).
-
-If you skip step B, the app will build and deploy fine, but the three
-new features (notes/flags, audit log, health history) will silently
-fail every read/write with a Firestore "permission denied" error,
-because the security rules that allow YOUR admin account to use them
+If you skip step B, the app builds and deploys fine, but the Help
+Center will silently fail to load or save articles with a
+"permission denied" error, because the security rules that allow it
 won't exist yet on the live database.
+
+WHAT'S IN HERE, IN ORDER
+
+1. Broker badges — all four broker badges (thinkorswim, Schwab,
+   Robinhood, Webull) are now the same fixed size, with each logo
+   zoomed to fill it. Schwab and Webull's source images were cropped
+   to remove baked-in empty space around the logo.
+
+2. New nav logo — swapped in your new 3D compass/arrow render,
+   sized up, then cropped a touch tighter.
+
+3. Header nav redesign — nav links moved next to the logo, CTA
+   renamed to "Sign up", a Products dropdown (Journal, Market
+   Simulator, AI Assistant, Pricing, What's New), Tutorials, Brokers,
+   and Help Center as top-level items. Market Simulator, AI
+   Assistant, and Pricing go to a "coming soon" page. What's New is a
+   real changelog page (src/data/whatsNew.ts) with the broker sync
+   launch as its first entry.
+
+4. Mobile hamburger menu — below the sm breakpoint, a hamburger
+   button opens all those nav items in a dropdown panel, since they'd
+   previously only been reachable on wider screens.
+
+5. Real Help Center — /help-center is now a proper knowledge base
+   with 7 fixed categories (General, Brokers, Dashboard, Journal,
+   Settings, Privacy, Support), search, and expandable articles.
+   Articles are written entirely from a new "Help Center articles"
+   card in the admin panel — only your admin account can create,
+   edit, publish/unpublish, or delete them.
+
+6. Mobile header + search bar fixes — the logo/hamburger/Sign up
+   row was overflowing off the right edge on phones; now sits with
+   even padding on both sides. The Help Center search box's
+   placeholder text was running into the magnifying glass icon
+   (same latent bug also existed in the admin Users search box,
+   fixed both).
 
 HOW TO APPLY
 1. GitHub Desktop, branch fix/calendar-keys-and-lint.
-2. Drag the firestore.rules file and the src/ folder from this zip
-   into your repo root, overwriting the 7 matching files. The 3 new
-   files (src/services/adminAuditLog.ts, adminShared.ts,
-   adminUserNotes.ts) will show up as new files, not overwrites.
-3. Should show as 10 changed files (7 modified, 3 added). Commit and
-   push.
+2. Drag the firestore.rules file and the public/ and src/ folders
+   from this zip into your repo root, overwriting the matching files.
+   8 files (ProductsDropdown.tsx, MobileNavPanel.tsx,
+   AdminHelpArticleModal.tsx, HelpCenterPage.tsx, ComingSoonPage.tsx,
+   WhatsNewPage.tsx, whatsNew.ts, adminHelpArticles.ts) will show up
+   as new files, not overwrites.
+3. Should show as 30 changed files (22 modified, 8 added). Commit
+   and push.
 4. Run the firestore rules deploy command above (step B).
 
 VERIFIED
 - npx tsc -b --force: 0 errors
 - npm run lint: 0 errors, same 18 pre-existing warnings as before
-  this change (no new ones introduced)
-I wasn't able to get you screenshots of the live admin panel this
-round — Firebase isn't configured in this sandbox, so I can't sign in
-and exercise it with real data — but everything above is verified by
-type-checking and linting cleanly, and I hand-reviewed every file for
-correctness before packaging.
+  all of this work — no new ones introduced across any of it

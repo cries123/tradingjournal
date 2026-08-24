@@ -12,7 +12,15 @@ export type AppRoute =
   | 'request-broker'
   | 'admin'
   | 'guides'
-  | 'guide';
+  | 'guide'
+  | 'market-simulator'
+  | 'ai-assistant'
+  | 'pricing'
+  | 'help-center'
+  | 'whats-new';
+
+/** The nav destinations that only exist as "coming soon" or changelog pages, reached from the Products dropdown / Help Center link. */
+export type ExtraNavRoute = 'market-simulator' | 'ai-assistant' | 'pricing' | 'help-center' | 'whats-new';
 
 const ROUTE_PATHS: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>, string> = {
   landing: '/',
@@ -24,6 +32,11 @@ const ROUTE_PATHS: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>,
   'request-broker': '/request-broker',
   admin: '/admin',
   guides: '/guides',
+  'market-simulator': '/market-simulator',
+  'ai-assistant': '/ai-assistant',
+  pricing: '/pricing',
+  'help-center': '/help-center',
+  'whats-new': '/whats-new',
 };
 
 interface RouteState {
@@ -56,6 +69,11 @@ function readRoute(): RouteState {
   if (path.startsWith('/report-bug')) return { route: 'report-bug' };
   if (path.startsWith('/request-broker')) return { route: 'request-broker' };
   if (path.startsWith('/admin')) return { route: 'admin' };
+  if (path.startsWith('/market-simulator')) return { route: 'market-simulator' };
+  if (path.startsWith('/ai-assistant')) return { route: 'ai-assistant' };
+  if (path.startsWith('/pricing')) return { route: 'pricing' };
+  if (path.startsWith('/help-center')) return { route: 'help-center' };
+  if (path.startsWith('/whats-new')) return { route: 'whats-new' };
   return { route: 'landing' };
 }
 

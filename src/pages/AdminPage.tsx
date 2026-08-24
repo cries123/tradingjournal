@@ -8,7 +8,9 @@ import {
   Eye,
   Flag,
   History,
+  LifeBuoy,
   Lock,
+  Plus,
   ScrollText,
   Search,
   ShieldCheck,
@@ -16,8 +18,10 @@ import {
 } from 'lucide-react';
 import { AuthModal } from '../components/AuthModal';
 import { AdminUserDetailModal } from '../components/admin/AdminUserDetailModal';
+import { AdminHelpArticleModal } from '../components/admin/AdminHelpArticleModal';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import { useAuth } from '../context/AuthContext';
+import type { ExtraNavRoute } from '../hooks/useRoute';
 import {
   buildActivityFeed,
   claimOrVerifyAdmin,
@@ -40,6 +44,11 @@ import {
 } from '../services/adminHealth';
 import { fetchAllAdminUserNotes, saveAdminUserNote, type AdminUserNote } from '../services/adminUserNotes';
 import { fetchRecentAuditLog, logAdminAction, type AdminAuditEntry } from '../services/adminAuditLog';
+import {
+  fetchAllHelpArticles,
+  helpCategoryLabel,
+  type HelpArticle,
+} from '../services/adminHelpArticles';
 import type { AdminPriority } from '../services/adminShared';
 import {
   fetchBrokerSupportRequests,
@@ -66,6 +75,8 @@ interface AdminPageProps {
   onPrivacy: () => void;
   onTerms: () => void;
   onBrokers?: () => void;
+  onGuides?: () => void;
+  onNavigate?: (route: ExtraNavRoute) => void;
 }
 
 type RequestStatus = BugReportStatus | BrokerSupportStatus;
@@ -348,6 +359,11 @@ const AUDIT_ACTION_LABELS: Record<AdminAuditEntry['action'], string> = {
   'broker-request.status-changed': 'Updated status on broker request',
   'broker-request.priority-changed': 'Changed priority on broker request',
   'broker-request.note-saved': 'Added a note to broker request',
+  'help-article.created': 'Created help article',
+  'help-article.updated': 'Edited help article',
+  'help-article.published': 'Published help article',
+  'help-article.unpublished': 'Unpublished help article',
+  'help-article.deleted': 'Deleted help article',
 };
 
 function AuditLogItem({ entry }: { entry: AdminAuditEntry }) {
@@ -402,7 +418,7 @@ function StatusFilterBar({
   );
 }
 
-export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: AdminPageProps) {
+export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onGuides, onNavigate }: AdminPageProps) {
   const { user, username, loading, firebaseEnabled, logout } = useAuth();
   const [state, setState] = useState<AdminState>({ phase: 'loading' });
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
@@ -411,6 +427,8 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
   const [selectedUser, setSelectedUser] = useState<AdminUserSummary | null>(null);
   const [userSearch, setUserSearch] = useState('');
   const [userSort, setUserSort] = useState<UserSortKey>('activity');
+  const [helpArticles, setHelpArticles] = useState<HelpArticle[]>([]);
+  const [articleModal, setArticleModal] = useState<'new' | HelpArticle | null>(null);
 
   const loadAdmin = useCallback(async () => {
     if (!firebaseEnabled) {
@@ -525,6 +543,17 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
   useEffect(() => {
     void loadAdmin();
   }, [loadAdmin]);
+
+  useEffect(() => {
+    if (state.phase !== 'ready') return;
+    let cancelled = false;
+    void fetchAllHelpArticles().then((list) => {
+      if (!cancelled) setHelpArticles(list);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [state.phase]);
 
   const adminIdentity = { adminUid: user?.uid ?? '', adminEmail: user?.email ?? '' };
 
@@ -802,7 +831,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
       <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
-      <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} />
+      <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate} />
 
       {state.phase === 'auth-required' && firebaseEnabled && !loading && !user && <AuthModal />}
 
@@ -1159,6 +1188,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                       onChange={(e) => setUserSearch(e.target.value)}
                       placeholder="Search username, email, UID…"
                       className="input-field text-xs py-1.5 pl-8 pr-3 w-52"
+                      style={{ paddingLeft: '2rem' }}
                       aria-label="Search users"
                     />
                   </div>
@@ -1308,6 +1338,59 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
                 <ul className="space-y-2.5 max-h-[280px] overflow-y-auto pr-1">
                   {ready.auditLog.map((entry) => (
                     <AuditLogItem key={entry.id} entry={entry} />
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="glass-card rounded-xl p-5 md:p-6 mb-8">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <LifeBuoy size={16} className="text-emerald-400" />
+                  <h2 className="text-sm font-semibold">Help Center articles</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setArticleModal('new')}
+                  className="btn-secondary text-xs px-3 py-2 inline-flex items-center gap-1.5"
+                >
+                  <Plus size={14} />
+                  New article
+                </button>
+              </div>
+
+              {helpArticles.length === 0 ? (
+                <p className="text-xs text-text-secondary">
+                  No articles yet — the public Help Center stays empty until you add one.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {helpArticles.map((article) => (
+                    <li
+                      key={article.id}
+                      className="flex items-center gap-3 rounded-lg border border-border/40 px-3 py-2.5"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-text-primary truncate">{article.title}</p>
+                          {!article.published && (
+                            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 bg-zinc-500/15 text-zinc-400">
+                              Draft
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-text-secondary mt-0.5">
+                          {helpCategoryLabel(article.category)} · Updated {formatDateTime(article.updatedAt)}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setArticleModal(article)}
+                        className="btn-secondary text-xs px-3 py-1.5 shrink-0"
+                      >
+                        Edit
+                      </button>
+                    </li>
                   ))}
                 </ul>
               )}
@@ -1517,7 +1600,25 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers }: A
         />
       )}
 
-      <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} onHome={onHome} onBrokers={onBrokers} />
+      {articleModal !== null && user && (
+        <AdminHelpArticleModal
+          article={articleModal === 'new' ? null : articleModal}
+          adminUid={user.uid}
+          adminEmail={user.email ?? ''}
+          onClose={() => setArticleModal(null)}
+          onSaved={(saved) => {
+            setHelpArticles((prev) => {
+              const exists = prev.some((a) => a.id === saved.id);
+              return exists ? prev.map((a) => (a.id === saved.id ? saved : a)) : [saved, ...prev];
+            });
+          }}
+          onDeleted={(id) => {
+            setHelpArticles((prev) => prev.filter((a) => a.id !== id));
+          }}
+        />
+      )}
+
+      <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} />
     </div>
   );
 }

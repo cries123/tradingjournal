@@ -1,5 +1,6 @@
 import { ContentPageLayout } from './ContentPageLayout';
 import { GUIDE_ARTICLES } from '../seo/guides';
+import type { ExtraNavRoute } from '../hooks/useRoute';
 
 interface GuidesIndexPageProps {
   onHome: () => void;
@@ -9,6 +10,7 @@ interface GuidesIndexPageProps {
   onBrokers?: () => void;
   onGuides?: () => void;
   onGuide: (slug: string) => void;
+  onNavigate?: (route: ExtraNavRoute) => void;
 }
 
 export function GuidesIndexPage({
@@ -19,6 +21,7 @@ export function GuidesIndexPage({
   onBrokers,
   onGuides,
   onGuide,
+  onNavigate,
 }: GuidesIndexPageProps) {
   return (
     <ContentPageLayout
@@ -30,6 +33,7 @@ export function GuidesIndexPage({
       onTerms={onTerms}
       onBrokers={onBrokers}
       onGuides={onGuides}
+      onNavigate={onNavigate}
     >
       <ul className="space-y-4 not-prose">
         {GUIDE_ARTICLES.map((guide) => (

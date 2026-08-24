@@ -66,6 +66,34 @@ const PAGE_SEO: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>, Pa
     path: '/admin',
     noindex: true,
   },
+  'whats-new': {
+    title: "What's New — Trend Chasers",
+    description: 'Product updates and changes to Trend Chasers, newest first.',
+    path: '/whats-new',
+  },
+  'market-simulator': {
+    title: 'Market Simulator (Coming Soon) — Trend Chasers',
+    description: 'Practice trading strategies risk-free. Coming soon to Trend Chasers.',
+    path: '/market-simulator',
+    noindex: true,
+  },
+  'ai-assistant': {
+    title: 'AI Assistant (Coming Soon) — Trend Chasers',
+    description: 'An AI assistant for your trading habits. Coming soon to Trend Chasers.',
+    path: '/ai-assistant',
+    noindex: true,
+  },
+  pricing: {
+    title: 'Pricing (Coming Soon) — Trend Chasers',
+    description: 'Trend Chasers pricing details. Coming soon.',
+    path: '/pricing',
+    noindex: true,
+  },
+  'help-center': {
+    title: 'Help Center — Trend Chasers',
+    description: 'Answers and how-tos for Trend Chasers, organized by area — brokers, dashboard, journal, settings, privacy, and support.',
+    path: '/help-center',
+  },
 };
 
 const COACH_SEO: PageSeo = {
@@ -138,4 +166,5 @@ export const PRERENDER_ROUTES = [
   '/terms',
   '/request-broker',
   '/report-bug',
+  '/whats-new',
 ] as const;
