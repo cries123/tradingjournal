@@ -1,43 +1,35 @@
-FIX: WIDE, NOT TALL
-=========================
+TRANSPARENT LOGO BACKGROUND ON THE SIGN-UP PANEL
+==============================================
 
-2 files. Overwrites what's in your repo (DashboardWeekTotalCell.tsx
-is new if you haven't applied the last zip yet — either way this one
-supersedes it).
+1 file, overwrites what's in your repo.
 
 WHAT CHANGED
-Last time I made the calendar go full width by removing its max-width
-cap. The day cells were set to always be perfect squares, so once the
-box got wider, each cell also got taller to match — which is why the
-whole calendar (and the page below it) ballooned in height and you
-ended up scrolling twice as far to see everything.
+logo.svg (the bigger stacked mark + "TREND CHASERS" + tagline version
+shown on the left panel of the sign-in/sign-up screen) had its own
+solid dark rectangle (#13171c) baked in as a background. That rectangle
+sat on top of the panel's green/cyan gradient background, so it showed
+up as a visible dark box around the logo instead of blending in.
 
-Fixed it properly this time: on desktop, the cells now use a fixed
-height instead of always matching their width, so they get wider
-without getting taller. The calendar still spans the full width like
-you wanted, but the whole block is noticeably shorter now — closer to
-your original page length, just with each cell wider and roomier.
-Phone-sized screens are untouched — cells stay square there since the
-grid is naturally narrow and that still looks right.
+Removed that background rectangle. The logo (mark + text) is now
+transparent behind, so it sits directly on the panel's gradient like
+the rest of the panel content does.
+
+Nothing else changed — same mark, same text, same layout, just no more
+boxed-in background.
 
 FILES
-- src/components/DashboardDayCell.tsx — fixed height on desktop
-  instead of aspect-square
-- src/components/DashboardWeekTotalCell.tsx — same fixed height, so
-  it still lines up with the day cells next to it
+- public/logo.svg
 
 HOW TO APPLY
 1. GitHub Desktop, branch fix/calendar-keys-and-lint.
-2. Drag the src/ folder from this zip into your repo root, overwriting
-   these 2 files.
-3. Should show as 2 changed files. Commit and push.
+2. Drag the public/ folder from this zip into your repo root,
+   overwriting this 1 file.
+3. Should show as 1 changed file. Commit and push.
 
 VERIFIED
-- Rendered the full dashboard at a wide desktop width with ~450 days
-  of sample trades and measured the page height before/after: it
-  dropped from about 2890px to about 2250px — roughly a 20% shorter
-  page — while the calendar itself still runs the full width.
-- Checked mobile width too — cells are still square there, unchanged
-  from before.
+- Rendered the sign-up panel with the updated file and screenshotted
+  it — the dark box is gone, the logo blends into the gradient panel
+  the same way the icon-only mark already did.
 - npx tsc -b --force: 0 errors
-- npm run lint: 0 errors, 18 warnings — same baseline, nothing new.
+- npm run lint: 0 errors, 18 warnings — same baseline, nothing new
+  (asset-only change, no component code touched).
