@@ -21,6 +21,22 @@ const LOGOS: Record<string, { src: string; name: string }> = {
   schwab: { src: '/broker-logos/schwab.png', name: 'Charles Schwab' },
   robinhood: { src: '/broker-logos/robinhood.png', name: 'Robinhood' },
   webull: { src: '/broker-logos/webull.png', name: 'Webull' },
+  fidelity: { src: '/broker-logos/fidelity.png', name: 'Fidelity' },
+  etrade: { src: '/broker-logos/etrade.png', name: 'E*TRADE' },
+  'interactive-brokers': { src: '/broker-logos/interactive-brokers.png', name: 'Interactive Brokers' },
+  vanguard: { src: '/broker-logos/vanguard.png', name: 'Vanguard' },
+  tastytrade: { src: '/broker-logos/tastytrade.png', name: 'tastytrade' },
+  tradestation: { src: '/broker-logos/tradestation.png', name: 'TradeStation' },
+  tradier: { src: '/broker-logos/tradier.png', name: 'Tradier' },
+  public: { src: '/broker-logos/public.png', name: 'Public' },
+  alpaca: { src: '/broker-logos/alpaca.png', name: 'Alpaca' },
+  moomoo: { src: '/broker-logos/moomoo.png', name: 'Moomoo' },
+  chase: { src: '/broker-logos/chase.png', name: 'Chase' },
+  citi: { src: '/broker-logos/citi.png', name: 'Citi' },
+  'edward-jones': { src: '/broker-logos/edward-jones.png', name: 'Edward Jones' },
+  coinbase: { src: '/broker-logos/coinbase.png', name: 'Coinbase' },
+  tiaa: { src: '/broker-logos/tiaa.png', name: 'TIAA' },
+  pnc: { src: '/broker-logos/pnc.png', name: 'PNC Wealth Management' },
 };
 
 function resolveBroker(input: string): { brokerId: string; name: string } | null {
