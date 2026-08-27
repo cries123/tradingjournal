@@ -1,51 +1,31 @@
-import { useMemo, useState } from 'react';
-import { ArrowLeft, EyeOff, Shield, Target, TrendingUp, Trophy } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowLeft, EyeOff, Shield, Target, TrendingUp, Trophy, Users } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
+import {
+  MIN_TRADES_FOR_RATE_CATEGORIES,
+  subscribeLeaderboard,
+  type LeaderboardCategory,
+  type LeaderboardEntry,
+  type LeaderboardPeriod,
+} from '../services/leaderboard';
 import { formatCurrency } from '../utils/format';
 
 interface LeaderboardContentProps {
   onBack: () => void;
 }
 
-type Category = 'profit' | 'consistency' | 'risk';
-
-interface LeaderboardEntry {
-  id: string;
-  displayName: string;
-  isAnonymous: boolean;
-  isYou?: boolean;
-  netPnl: number;
-  winRate: number;
-  avgRR: number;
-  tradeCount: number;
-}
-
-// PLACEHOLDER DATA — this whole file renders mock entries so the design can be reviewed before
-// the real cross-account aggregation pipeline is built. A live version needs a server-side job
-// (not the client) that reads each opted-in user's own synced trades and writes an aggregated,
-// non-PII entry to a shared, client-read-only collection — never computed or trusted from the
-// client, for the same reason a synced trade's own numbers can't be trusted if it's client-editable.
-const MOCK_ENTRIES: LeaderboardEntry[] = [
-  { id: '1', displayName: 'alexrivera_fx', isAnonymous: false, netPnl: 18420, winRate: 71.2, avgRR: 2.8, tradeCount: 96 },
-  { id: '2', displayName: 'Anonymous Trader', isAnonymous: true, netPnl: 15200, winRate: 58.4, avgRR: 3.4, tradeCount: 142 },
-  { id: '3', displayName: 'quinnochoa', isAnonymous: false, netPnl: 12980, winRate: 64.9, avgRR: 2.1, tradeCount: 77 },
-  { id: '4', displayName: 'jayhealey', isAnonymous: false, isYou: true, netPnl: 9540, winRate: 55.3, avgRR: 1.9, tradeCount: 61 },
-  { id: '5', displayName: 'delta_daytrader', isAnonymous: false, netPnl: 8100, winRate: 62.0, avgRR: 1.6, tradeCount: 130 },
-  { id: '6', displayName: 'Anonymous Trader', isAnonymous: true, netPnl: 7300, winRate: 49.8, avgRR: 2.6, tradeCount: 54 },
-  { id: '7', displayName: 'priya.trades', isAnonymous: false, netPnl: 6200, winRate: 68.1, avgRR: 1.3, tradeCount: 40 },
-  { id: '8', displayName: 'northstar_options', isAnonymous: false, netPnl: 5100, winRate: 44.2, avgRR: 3.1, tradeCount: 88 },
-  { id: '9', displayName: 'cole_martinez', isAnonymous: false, netPnl: 4300, winRate: 60.5, avgRR: 1.1, tradeCount: 33 },
-  { id: '10', displayName: 'Anonymous Trader', isAnonymous: true, netPnl: 3600, winRate: 52.7, avgRR: 1.8, tradeCount: 45 },
-  { id: '11', displayName: 'teejaytrades', isAnonymous: false, netPnl: 2100, winRate: 47.3, avgRR: 1.4, tradeCount: 29 },
-  { id: '12', displayName: 'bearmarketbrian', isAnonymous: false, netPnl: -800, winRate: 38.9, avgRR: 0.9, tradeCount: 22 },
+const CATEGORIES: Array<{ key: LeaderboardCategory; label: string; icon: typeof TrendingUp; sublabel: string }> = [
+  { key: 'profit', label: 'Most Profitable', icon: TrendingUp, sublabel: 'Ranked by net P&L' },
+  { key: 'consistency', label: 'Most Consistent', icon: Target, sublabel: `Ranked by win rate · ${MIN_TRADES_FOR_RATE_CATEGORIES}+ trades in range` },
+  { key: 'risk', label: 'Best Risk Management', icon: Shield, sublabel: `Ranked by avg win/loss ratio · ${MIN_TRADES_FOR_RATE_CATEGORIES}+ trades in range` },
 ];
 
-const MIN_TRADES_FOR_RATE_CATEGORIES = 20;
-
-const CATEGORIES: Array<{ key: Category; label: string; icon: typeof TrendingUp; sublabel: string }> = [
-  { key: 'profit', label: 'Most Profitable', icon: TrendingUp, sublabel: 'Ranked by net P&L' },
-  { key: 'consistency', label: 'Most Consistent', icon: Target, sublabel: `Ranked by win rate · ${MIN_TRADES_FOR_RATE_CATEGORIES}+ trades` },
-  { key: 'risk', label: 'Best Risk Management', icon: Shield, sublabel: `Ranked by avg win/loss ratio · ${MIN_TRADES_FOR_RATE_CATEGORIES}+ trades` },
+const PERIODS: Array<{ key: LeaderboardPeriod; label: string }> = [
+  { key: 'day', label: 'Day' },
+  { key: 'week', label: 'Week' },
+  { key: 'month', label: 'Month' },
+  { key: 'allTime', label: 'All time' },
 ];
 
 function rankBadgeClass(rank: number): string {
@@ -64,31 +44,47 @@ function initials(name: string): string {
 
 export function LeaderboardContent({ onBack }: LeaderboardContentProps) {
   const { settings } = useSettings();
-  const [category, setCategory] = useState<Category>('profit');
+  const { user, firebaseEnabled } = useAuth();
+  const [category, setCategory] = useState<LeaderboardCategory>('profit');
+  const [period, setPeriod] = useState<LeaderboardPeriod>('allTime');
+  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
-  const entries = useMemo(() => {
-    const eligible = MOCK_ENTRIES.filter(
-      (e) => category === 'profit' || e.tradeCount >= MIN_TRADES_FOR_RATE_CATEGORIES,
+  useEffect(() => {
+    if (!firebaseEnabled) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setLoadError(false);
+    const unsubscribe = subscribeLeaderboard(
+      period,
+      category,
+      (next) => {
+        setEntries(next);
+        setLoading(false);
+      },
+      () => {
+        setLoadError(true);
+        setLoading(false);
+      },
     );
-    const sorted = [...eligible].sort((a, b) => {
-      if (category === 'profit') return b.netPnl - a.netPnl;
-      if (category === 'consistency') return b.winRate - a.winRate;
-      return b.avgRR - a.avgRR;
-    });
-    return sorted;
-  }, [category]);
+    return unsubscribe;
+  }, [period, category, firebaseEnabled]);
 
   const activeCategory = CATEGORIES.find((c) => c.key === category)!;
 
   const primaryStat = (e: LeaderboardEntry): { value: string; positive: boolean } => {
-    if (category === 'profit') return { value: formatCurrency(e.netPnl, settings.currency), positive: e.netPnl >= 0 };
-    if (category === 'consistency') return { value: `${e.winRate.toFixed(1)}%`, positive: true };
-    return { value: `${e.avgRR.toFixed(2)}R`, positive: true };
+    const s = e.stats[period];
+    if (category === 'profit') return { value: formatCurrency(s.netPnl, settings.currency), positive: s.netPnl >= 0 };
+    if (category === 'consistency') return { value: `${s.winRate.toFixed(1)}%`, positive: true };
+    return { value: s.avgRR >= 99 ? '∞' : `${s.avgRR.toFixed(2)}R`, positive: true };
   };
 
   return (
     <div className="pb-6">
-      <div className="max-w-2xl mx-auto p-4 md:p-6 space-y-6">
+      <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
         <button
           type="button"
           onClick={onBack}
@@ -98,17 +94,36 @@ export function LeaderboardContent({ onBack }: LeaderboardContentProps) {
           Back to dashboard
         </button>
 
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="w-8 h-8 rounded-lg bg-accent/10 text-accent flex items-center justify-center shrink-0">
-              <Trophy size={16} />
-            </span>
-            <h1 className="text-2xl font-bold">Leaderboard</h1>
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <span className="w-8 h-8 rounded-lg bg-accent/10 text-accent flex items-center justify-center shrink-0">
+                <Trophy size={16} />
+              </span>
+              <h1 className="text-2xl font-bold">Leaderboard</h1>
+            </div>
+            <p className="text-sm text-text-secondary mt-2 leading-relaxed max-w-xl">
+              Only broker-synced trades ever count here — manual entries are excluded, and account
+              values are verified against the broker, not self-reported.
+            </p>
           </div>
-          <p className="text-sm text-text-secondary mt-2 leading-relaxed">
-            Only broker-synced trades ever count here — manual entries are excluded, and account
-            values are verified against the broker, not self-reported.
-          </p>
+
+          <div className="flex gap-1 rounded-full border border-border/60 bg-bg-tertiary/40 p-1 shrink-0">
+            {PERIODS.map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => setPeriod(p.key)}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors focus-ring ${
+                  period === p.key
+                    ? 'bg-accent/15 text-accent'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {!settings.leaderboardOptIn && (
@@ -118,7 +133,7 @@ export function LeaderboardContent({ onBack }: LeaderboardContentProps) {
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="grid sm:grid-cols-3 gap-2">
           {CATEGORIES.map((c) => {
             const Icon = c.icon;
             const active = c.key === category;
@@ -127,7 +142,7 @@ export function LeaderboardContent({ onBack }: LeaderboardContentProps) {
                 key={c.key}
                 type="button"
                 onClick={() => setCategory(c.key)}
-                className={`flex-1 flex items-center gap-2 rounded-full px-3.5 py-2 text-xs font-semibold border transition-colors focus-ring ${
+                className={`flex items-center gap-2 rounded-full px-3.5 py-2.5 text-xs font-semibold border transition-colors focus-ring justify-center ${
                   active
                     ? 'bg-accent/10 border-accent/40 text-accent'
                     : 'bg-bg-tertiary/60 border-border/50 text-text-secondary hover:text-text-primary hover:border-border'
@@ -141,65 +156,102 @@ export function LeaderboardContent({ onBack }: LeaderboardContentProps) {
         </div>
         <p className="text-[11px] text-text-secondary -mt-4">{activeCategory.sublabel}</p>
 
-        <div className="panel-card divide-y divide-border/50 overflow-hidden">
-          {entries.map((entry, i) => {
-            const rank = i + 1;
-            const stat = primaryStat(entry);
-            return (
-              <div
-                key={entry.id}
-                className={`flex items-center gap-3 p-3.5 ${
-                  entry.isYou ? 'bg-accent/[0.06] ring-1 ring-inset ring-accent/30' : ''
-                }`}
-              >
-                <span
-                  className={`w-7 h-7 rounded-full border flex items-center justify-center text-[11px] font-bold shrink-0 ${rankBadgeClass(rank)}`}
-                >
-                  {rank}
-                </span>
-
-                <span
-                  className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                    entry.isAnonymous
-                      ? 'bg-bg-tertiary text-text-secondary/60'
-                      : 'bg-gradient-to-br from-accent/30 to-profit-bright/20 text-text-primary'
-                  }`}
-                >
-                  {entry.isAnonymous ? <EyeOff size={14} /> : initials(entry.displayName)}
-                </span>
-
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate flex items-center gap-1.5">
-                    {entry.isAnonymous ? (
-                      <span className="text-text-secondary italic">Anonymous Trader</span>
-                    ) : (
-                      <span className="truncate">@{entry.displayName}</span>
-                    )}
-                    {entry.isYou && (
-                      <span className="text-[10px] font-semibold text-accent bg-accent/10 rounded-full px-1.5 py-0.5 shrink-0">
-                        You
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-[11px] text-text-secondary">{entry.tradeCount} synced trades</p>
+        {!firebaseEnabled ? (
+          <div className="panel-card p-8 text-center">
+            <Users size={22} className="mx-auto text-text-secondary mb-3" />
+            <p className="text-sm font-medium">Sign in to see the leaderboard</p>
+            <p className="text-xs text-text-secondary mt-1.5 max-w-sm mx-auto leading-relaxed">
+              Rankings are shared across everyone who&apos;s opted in — cloud sync needs to be set up
+              for this deployment to load them.
+            </p>
+          </div>
+        ) : loading ? (
+          <div className="panel-card divide-y divide-border/50 overflow-hidden">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex items-center gap-3 p-3.5 animate-pulse">
+                <span className="w-7 h-7 rounded-full bg-bg-tertiary shrink-0" />
+                <span className="w-9 h-9 rounded-full bg-bg-tertiary shrink-0" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="h-3 w-28 rounded bg-bg-tertiary" />
+                  <div className="h-2.5 w-20 rounded bg-bg-tertiary" />
                 </div>
-
-                <span
-                  className={`text-sm font-bold tabular-nums shrink-0 ${
-                    stat.positive ? 'text-profit-bright' : 'text-loss-bright'
+                <div className="h-4 w-16 rounded bg-bg-tertiary shrink-0" />
+              </div>
+            ))}
+          </div>
+        ) : loadError ? (
+          <div className="panel-card p-8 text-center">
+            <p className="text-sm text-loss-bright font-medium">Couldn&apos;t load the leaderboard</p>
+            <p className="text-xs text-text-secondary mt-1.5">Check your connection and try again.</p>
+          </div>
+        ) : entries.length === 0 ? (
+          <div className="panel-card p-8 text-center">
+            <Trophy size={22} className="mx-auto text-text-secondary mb-3" />
+            <p className="text-sm font-medium">Nobody&apos;s on this one yet</p>
+            <p className="text-xs text-text-secondary mt-1.5 max-w-sm mx-auto leading-relaxed">
+              {settings.leaderboardOptIn
+                ? `You're opted in, but nothing qualifies for ${activeCategory.label.toLowerCase()} over this period yet — sync some trades and check back.`
+                : 'Turn on "Show me on the public leaderboard" in Settings to be the first.'}
+            </p>
+          </div>
+        ) : (
+          <div className="panel-card divide-y divide-border/50 overflow-hidden">
+            {entries.map((entry, i) => {
+              const rank = i + 1;
+              const stat = primaryStat(entry);
+              const isYou = entry.uid === user?.uid;
+              const displayName = entry.isAnonymous ? entry.anonLabel : entry.username;
+              return (
+                <div
+                  key={entry.uid}
+                  className={`flex items-center gap-3 p-3.5 ${
+                    isYou ? 'bg-accent/[0.06] ring-1 ring-inset ring-accent/30' : ''
                   }`}
                 >
-                  {stat.value}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+                  <span
+                    className={`w-7 h-7 rounded-full border flex items-center justify-center text-[11px] font-bold shrink-0 ${rankBadgeClass(rank)}`}
+                  >
+                    {rank}
+                  </span>
 
-        <p className="text-[11px] text-text-secondary/70 text-center leading-relaxed">
-          Rankings shown are placeholder data for design review — live rankings will only ever
-          reflect real, broker-verified trades from users who&apos;ve opted in.
-        </p>
+                  <span
+                    className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                      entry.isAnonymous
+                        ? 'bg-bg-tertiary text-text-secondary/60'
+                        : 'bg-gradient-to-br from-accent/30 to-profit-bright/20 text-text-primary'
+                    }`}
+                  >
+                    {entry.isAnonymous ? <EyeOff size={14} /> : initials(displayName)}
+                  </span>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate flex items-center gap-1.5">
+                      {entry.isAnonymous ? (
+                        <span className="text-text-secondary italic">{displayName}</span>
+                      ) : (
+                        <span className="truncate">@{displayName}</span>
+                      )}
+                      {isYou && (
+                        <span className="text-[10px] font-semibold text-accent bg-accent/10 rounded-full px-1.5 py-0.5 shrink-0">
+                          You
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-[11px] text-text-secondary">{entry.stats[period].tradeCount} synced trades</p>
+                  </div>
+
+                  <span
+                    className={`text-sm font-bold tabular-nums shrink-0 ${
+                      stat.positive ? 'text-profit-bright' : 'text-loss-bright'
+                    }`}
+                  >
+                    {stat.value}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

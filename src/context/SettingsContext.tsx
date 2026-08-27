@@ -24,8 +24,10 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 // profit/accent hex plus their R,G,B triplets (kept in sync so CSS can alpha-blend via
 // rgba(var(--color-*-rgb), alpha) — see index.css). Every button, banner, focus ring, chart bar,
 // and nav highlight across the app reads these two var pairs, so switching accent here recolors
-// the whole authenticated app (landing page, logo, and the exported share-card image are the only
-// surfaces that intentionally stay fixed).
+// the whole authenticated app — including the share card's nebula glow, badge and username (see
+// utils/shareCard.ts's resolveShareCardAccent). Only the landing page and the "TREND CHASERS"
+// wordmark itself (everywhere it appears, share card included) intentionally stay fixed brand
+// emerald, same as the logo.
 const ACCENT_VARS: Record<ThemeAccent, { profit: string; profitRgb: string; accent: string; accentRgb: string }> = {
   emerald: { profit: '#34d399', profitRgb: '52, 211, 153', accent: '#38bdf8', accentRgb: '56, 189, 248' },
   cyan: { profit: '#22d3ee', profitRgb: '34, 211, 238', accent: '#2dd4bf', accentRgb: '45, 212, 191' },

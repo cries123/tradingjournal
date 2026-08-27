@@ -21,6 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useIsDesktop } from '../hooks/useMediaQuery';
 import { useJournalReminder } from '../hooks/useJournalReminder';
+import { useLeaderboardSync } from '../hooks/useLeaderboardSync';
 import { useTrades } from '../hooks/useTrades';
 import type { Trade } from '../types';
 import { computeStats, getMonthTrades } from '../utils/stats';
@@ -80,6 +81,9 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   const monthStats = useMemo(() => computeStats(monthTrades), [monthTrades]);
 
   useJournalReminder(settings.remindersEnabled, settings.reminderTime, allTrades);
+  // Every journal's trades, not just the active one — a trader's leaderboard standing is about
+  // them, not whichever journal happens to be selected right now.
+  useLeaderboardSync(everyTrade);
 
   const filterSetups = useMemo(
     () => [...new Set([...settings.setupTags, ...setups])].sort(),

@@ -1,0 +1,28 @@
+rules_version = '2';
+
+// Firebase Storage security rules for the share-card custom background feature
+// (src/services/shareCardBackgrounds.ts). Paste this into Firebase Console → Storage → Rules
+// (there's no firebase.json/storage config in this repo yet, so this file isn't auto-deployed —
+// it's a reference to copy in by hand, same as firestore.rules already is).
+//
+// Layout: shareCardBackgrounds/{uid}/{timestamp}.jpg — one folder per user. Only that user's own
+// signed-in client may write or delete inside their own folder; anyone can read, since a share
+// card background is only ever used as a public-facing image (a card someone is about to share
+// publicly), never sensitive data.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /shareCardBackgrounds/{userId}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Everything else stays closed by default.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -35,6 +35,13 @@ export interface UserSettings {
   /** Show a random placeholder name instead of the real username. Only meaningful when
    *  leaderboardOptIn is true. */
   leaderboardAnonymous: boolean;
+  /** Download URLs of custom share-card background images the user has uploaded (Firebase
+   *  Storage), most-recent last. Capped at MAX_SHARE_CARD_BACKGROUNDS — see
+   *  services/shareCardBackgrounds.ts — so re-uploading is never required to pick one again. */
+  shareCardBackgrounds: string[];
+  /** Which background the share card currently uses: a URL from shareCardBackgrounds above, or
+   *  null for the default Milky Way starfield. */
+  shareCardBackgroundId: string | null;
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -52,4 +59,6 @@ export const DEFAULT_SETTINGS: UserSettings = {
   coachShareEnabled: false,
   leaderboardOptIn: false,
   leaderboardAnonymous: false,
+  shareCardBackgrounds: [],
+  shareCardBackgroundId: null,
 };
