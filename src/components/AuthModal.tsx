@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { BrandLogo } from './BrandLogo';
+import { Starfield } from './Starfield';
 import { UsernameField } from './UsernameField';
 import { useAuth } from '../context/AuthContext';
 import { UsernameTakenError } from '../services/username';
@@ -108,11 +109,12 @@ export function AuthModal() {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-bg-primary/95 backdrop-blur-md p-4 md:p-8 overflow-y-auto animate-backdrop-in motion-safe:animate-backdrop-in">
+      <Starfield />
       <div className="landing-grid pointer-events-none fixed inset-0 opacity-50" aria-hidden />
 
       <div className="relative w-full max-w-4xl grid md:grid-cols-5 rounded-2xl overflow-hidden glow-border shadow-2xl shadow-black/50 my-auto animate-scale-in motion-safe:animate-scale-in">
         {/* Brand panel */}
-        <div className="md:col-span-2 bg-gradient-to-br from-emerald-500/15 via-bg-secondary to-cyan-500/10 border-b md:border-b-0 md:border-r border-border/50 p-6 md:p-10 flex flex-col justify-between">
+        <div className="md:col-span-2 bg-gradient-to-br from-profit-bright/15 via-bg-secondary to-accent/10 border-b md:border-b-0 md:border-r border-border/50 p-6 md:p-10 flex flex-col justify-between">
           <div>
             <div className="md:hidden">
               <BrandLogo size="md" variant="compact" />
@@ -135,7 +137,7 @@ export function AuthModal() {
           <ul className="mt-8 space-y-3 hidden md:block">
             {BENEFITS.map((b) => (
               <li key={b} className="flex items-center gap-2.5 text-sm text-text-secondary">
-                <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs shrink-0">
+                <span className="w-5 h-5 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs shrink-0">
                   ✓
                 </span>
                 {b}
@@ -153,7 +155,7 @@ export function AuthModal() {
               onClick={() => { setMode('login'); setError(null); setResetSent(false); }}
               className={`flex-1 py-2.5 text-sm font-medium rounded-md transition-all ${
                 mode === 'login'
-                  ? 'bg-emerald-500/20 text-emerald-300 shadow-sm'
+                  ? 'bg-accent/20 text-accent shadow-sm'
                   : 'text-text-secondary hover:text-text-primary'
               }`}
             >
@@ -164,7 +166,7 @@ export function AuthModal() {
               onClick={() => { setMode('signup'); setError(null); setResetSent(false); }}
               className={`flex-1 py-2.5 text-sm font-medium rounded-md transition-all ${
                 mode === 'signup'
-                  ? 'bg-emerald-500/20 text-emerald-300 shadow-sm'
+                  ? 'bg-accent/20 text-accent shadow-sm'
                   : 'text-text-secondary hover:text-text-primary'
               }`}
             >
@@ -180,7 +182,7 @@ export function AuthModal() {
                 <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input-field py-3" placeholder="you@example.com" />
               </label>
               {resetSent ? (
-                <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-4 py-3 text-sm text-emerald-300">
+                <div className="rounded-lg bg-profit-bright/10 border border-profit-bright/30 px-4 py-3 text-sm text-profit-bright">
                   Reset link sent! Check your inbox.
                 </div>
               ) : null}
@@ -233,7 +235,7 @@ export function AuthModal() {
                 <button
                   type="button"
                   onClick={() => { setMode('reset'); setError(null); setResetSent(false); }}
-                  className="text-xs text-emerald-400 hover:underline"
+                  className="text-xs text-accent hover:underline"
                 >
                   Forgot password?
                 </button>

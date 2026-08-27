@@ -25,6 +25,16 @@ export interface UserSettings {
   reminderTime: string;
   coachShareEnabled: boolean;
   coachShareToken?: string;
+  /** Last-used date range (YYYY-MM-DD) for the trade-history share link, remembered so the
+   *  share panel and "Update link" both reuse it without asking again. */
+  coachShareRangeStart?: string;
+  coachShareRangeEnd?: string;
+  /** Opt-in — off by default. Even when on, only broker-synced trades ever count toward a
+   *  leaderboard ranking; manual entries are excluded regardless of this setting. */
+  leaderboardOptIn: boolean;
+  /** Show a random placeholder name instead of the real username. Only meaningful when
+   *  leaderboardOptIn is true. */
+  leaderboardAnonymous: boolean;
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -40,4 +50,6 @@ export const DEFAULT_SETTINGS: UserSettings = {
   remindersEnabled: false,
   reminderTime: '16:00',
   coachShareEnabled: false,
+  leaderboardOptIn: false,
+  leaderboardAnonymous: false,
 };

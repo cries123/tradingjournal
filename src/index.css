@@ -20,6 +20,16 @@
   --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+/* R,G,B triplets mirroring --color-profit-bright / --color-accent, kept outside the @theme block
+   so Tailwind doesn't try to turn them into utilities — they exist only so alpha-blended CSS below
+   (box-shadows, focus rings, gradients) can do rgba(var(--color-profit-bright-rgb), 0.25) and still
+   pick up whichever theme accent is active. SettingsContext keeps both in sync when the user
+   changes Theme accent; these are the emerald defaults for first paint before that runs. */
+:root {
+  --color-profit-bright-rgb: 52, 211, 153;
+  --color-accent-rgb: 56, 189, 248;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -98,7 +108,19 @@ body {
   mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black, transparent);
 }
 
+/* App-facing gradient text — reads the active theme accent (profit-bright -> accent), so it
+   recolors when the user switches Theme accent in Settings. Used inside the authenticated app
+   and auth/username modals. */
 .text-gradient {
+  background: linear-gradient(135deg, var(--color-profit-bright) 0%, var(--color-accent) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Fixed brand gradient — landing page only. Intentionally NOT theme-reactive: the public marketing
+   page keeps one fixed look regardless of what a signed-in user later picks in Settings. */
+.text-gradient-brand {
   background: linear-gradient(135deg, #34d399 0%, #38bdf8 100%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -117,16 +139,28 @@ body {
   transform: translateY(-2px);
 }
 
+/* App-facing glow border — theme-reactive, see .text-gradient above for why. */
 .glow-border {
+  border: 1px solid rgba(var(--color-profit-bright-rgb), 0.2);
+  box-shadow: 0 0 0 1px rgba(var(--color-accent-rgb), 0.05), 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+
+/* Fixed brand glow border — landing page only, not theme-reactive. */
+.glow-border-brand {
   border: 1px solid rgba(52, 211, 153, 0.2);
   box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.05), 0 20px 50px rgba(0, 0, 0, 0.45);
 }
 
 .dashboard-bg {
-  background:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(52, 211, 153, 0.08), transparent),
-    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(56, 189, 248, 0.05), transparent),
-    var(--color-bg-primary);
+  position: relative;
+  background: var(--color-bg-primary);
+}
+
+.starfield-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
 }
 
 @keyframes slide-in {
@@ -223,7 +257,7 @@ body {
 }
 
 .stat-card:hover {
-  border-color: rgba(52, 211, 153, 0.28);
+  border-color: rgba(var(--color-profit-bright-rgb), 0.28);
   transform: translateY(-1px);
 }
 
@@ -231,11 +265,11 @@ body {
 .hero-card {
   position: relative;
   background: linear-gradient(150deg, rgba(15, 20, 31, 0.98), rgba(13, 17, 26, 0.9));
-  border: 1px solid rgba(52, 211, 153, 0.18);
+  border: 1px solid rgba(var(--color-profit-bright-rgb), 0.18);
   border-radius: 1rem;
   overflow: hidden;
   box-shadow:
-    0 0 0 1px rgba(56, 189, 248, 0.04),
+    0 0 0 1px rgba(var(--color-accent-rgb), 0.04),
     0 16px 48px rgba(0, 0, 0, 0.4);
 }
 
@@ -244,8 +278,8 @@ body {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 60% 90% at 8% 0%, rgba(52, 211, 153, 0.12), transparent 60%),
-    radial-gradient(ellipse 40% 80% at 100% 100%, rgba(56, 189, 248, 0.08), transparent 60%);
+    radial-gradient(ellipse 60% 90% at 8% 0%, rgba(var(--color-profit-bright-rgb), 0.12), transparent 60%),
+    radial-gradient(ellipse 40% 80% at 100% 100%, rgba(var(--color-accent-rgb), 0.08), transparent 60%);
   pointer-events: none;
 }
 
@@ -256,15 +290,20 @@ body {
 .hero-card.hero-loss::before {
   background:
     radial-gradient(ellipse 60% 90% at 8% 0%, rgba(248, 113, 113, 0.1), transparent 60%),
-    radial-gradient(ellipse 40% 80% at 100% 100%, rgba(56, 189, 248, 0.06), transparent 60%);
+    radial-gradient(ellipse 40% 80% at 100% 100%, rgba(var(--color-accent-rgb), 0.06), transparent 60%);
 }
 
 .hero-value-profit {
-  background: linear-gradient(135deg, #6ee7b7 0%, #34d399 45%, #2dd4bf 100%);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-profit-bright) 65%, white) 0%,
+    var(--color-profit-bright) 45%,
+    var(--color-accent) 100%
+  );
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 0 24px rgba(52, 211, 153, 0.25));
+  filter: drop-shadow(0 0 24px rgba(var(--color-profit-bright-rgb), 0.25));
 }
 
 .hero-value-loss {
@@ -295,8 +334,8 @@ body {
 
 /* Gradient chart bars */
 .bar-profit {
-  background: linear-gradient(180deg, #34d399 0%, rgba(52, 211, 153, 0.35) 100%);
-  box-shadow: 0 0 12px rgba(52, 211, 153, 0.25);
+  background: linear-gradient(180deg, var(--color-profit-bright) 0%, rgba(var(--color-profit-bright-rgb), 0.35) 100%);
+  box-shadow: 0 0 12px rgba(var(--color-profit-bright-rgb), 0.25);
 }
 
 .bar-loss {
@@ -305,8 +344,8 @@ body {
 }
 
 .bar-profit-h {
-  background: linear-gradient(90deg, rgba(52, 211, 153, 0.4) 0%, #34d399 100%);
-  box-shadow: 0 0 10px rgba(52, 211, 153, 0.2);
+  background: linear-gradient(90deg, rgba(var(--color-profit-bright-rgb), 0.4) 0%, var(--color-profit-bright) 100%);
+  box-shadow: 0 0 10px rgba(var(--color-profit-bright-rgb), 0.2);
 }
 
 .bar-loss-h {
@@ -317,8 +356,8 @@ body {
 /* Calendar heat cells */
 .day-today {
   box-shadow:
-    inset 0 0 0 1.5px rgba(56, 189, 248, 0.55),
-    0 0 12px rgba(56, 189, 248, 0.15);
+    inset 0 0 0 1.5px rgba(var(--color-accent-rgb), 0.55),
+    0 0 12px rgba(var(--color-accent-rgb), 0.15);
 }
 
 .btn-primary {
@@ -327,16 +366,16 @@ body {
   justify-content: center;
   font-weight: 600;
   border-radius: 0.625rem;
-  color: #042f2e;
-  background: linear-gradient(135deg, #34d399, #2dd4bf);
-  box-shadow: 0 4px 20px rgba(52, 211, 153, 0.25);
+  color: #051014;
+  background: linear-gradient(135deg, var(--color-profit-bright), var(--color-accent));
+  box-shadow: 0 4px 20px rgba(var(--color-profit-bright-rgb), 0.25);
   transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease;
 }
 
 .btn-primary:hover {
   opacity: 0.95;
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(52, 211, 153, 0.35);
+  box-shadow: 0 6px 24px rgba(var(--color-profit-bright-rgb), 0.35);
 }
 
 .btn-primary:active {
@@ -356,7 +395,7 @@ body {
 }
 
 .btn-secondary:hover {
-  border-color: rgba(52, 211, 153, 0.4);
+  border-color: rgba(var(--color-profit-bright-rgb), 0.4);
   background: rgba(21, 27, 40, 0.9);
   transform: translateY(-1px);
 }
@@ -385,7 +424,7 @@ details.glass-card > p {
 
 .focus-ring:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--color-bg-primary), 0 0 0 4px rgba(56, 189, 248, 0.55);
+  box-shadow: 0 0 0 2px var(--color-bg-primary), 0 0 0 4px rgba(var(--color-accent-rgb), 0.55);
 }
 
 .skeleton-shimmer {
@@ -441,8 +480,8 @@ details.glass-card > p {
 
 .input-field:focus {
   outline: none;
-  border-color: rgba(52, 211, 153, 0.5);
-  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.1);
+  border-color: rgba(var(--color-profit-bright-rgb), 0.5);
+  box-shadow: 0 0 0 3px rgba(var(--color-profit-bright-rgb), 0.1);
 }
 
 .prose-legal section {

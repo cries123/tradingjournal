@@ -44,7 +44,7 @@ function EquitySparkline({ series }: { series: number[] }) {
       <polyline
         points={points}
         fill="none"
-        stroke={positive ? 'rgb(52 211 153)' : 'rgb(248 113 113)'}
+        stroke={positive ? 'var(--color-profit-bright)' : 'rgb(248 113 113)'}
         strokeWidth="1.5"
         strokeLinejoin="round"
         strokeLinecap="round"
@@ -94,19 +94,19 @@ export function TradingInsightsSection({ trades }: TradingInsightsSectionProps) 
         <div
           className={`flex items-center gap-2.5 rounded-lg border p-2.5 ${
             streak > 0
-              ? 'border-emerald-500/30 bg-emerald-500/5'
+              ? 'border-accent/30 bg-accent/5'
               : 'border-red-500/30 bg-red-500/5'
           }`}
         >
           {streak > 0 ? (
-            <Flame size={16} className="text-emerald-400 shrink-0" />
+            <Flame size={16} className="text-accent shrink-0" />
           ) : (
             <Snowflake size={16} className="text-red-400 shrink-0" />
           )}
           <p className="text-xs">
             {streak > 0 ? (
               <>
-                <span className="font-semibold text-emerald-300">
+                <span className="font-semibold text-accent">
                   {streak} green day{streak === 1 ? '' : 's'} running
                 </span>
                 <span className="text-text-secondary"> · best run {insights.streaks.bestGreen}</span>
@@ -273,7 +273,7 @@ function BreakdownPanel({
     <div className="rounded-lg bg-bg-tertiary/50 border border-border/40 p-2.5">
       <p className="text-[9px] uppercase tracking-wide text-text-secondary mb-1.5 flex items-center gap-1">
         {tone === 'profit' ? (
-          <TrendingUp size={11} className="text-emerald-400" />
+          <TrendingUp size={11} className="text-accent" />
         ) : (
           <TrendingDown size={11} className="text-red-400" />
         )}{' '}

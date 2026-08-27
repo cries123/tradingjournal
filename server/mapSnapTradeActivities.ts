@@ -108,7 +108,40 @@ interface OpenLot {
   open: RawActivity;
 }
 
-function buildTrade(open: RawActivity, close: RawActivity, qty: number, pnl: number, side: TradeSide): ParsedTradeInput {
+/**
+ * Extracts a local "HH:MM" time-of-day from a SnapTrade activity's trade_date, converted to US
+ * Eastern time — the standard equities/options session clock the app's market-session heuristic
+ * already assumes (see marketSessionFromTime in src/utils/tradeHelpers.ts) and the same convention
+ * the manual trade-entry form uses. Returns undefined when the source only carries a bare date
+ * with no real time component: some brokerages report activities with no time-of-day granularity
+ * at all, which SnapTrade represents as an exact UTC midnight, so we don't show a fabricated 00:00.
+ */
+function extractEasternTime(isoOrDate: string): string | undefined {
+  if (!isoOrDate.includes('T')) return undefined;
+  const d = new Date(isoOrDate);
+  if (Number.isNaN(d.getTime())) return undefined;
+  if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) return undefined;
+
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(d);
+  const hh = parts.find((p) => p.type === 'hour')?.value ?? '00';
+  const mm = parts.find((p) => p.type === 'minute')?.value ?? '00';
+  return `${hh}:${mm}`;
+}
+
+function buildTrade(
+  open: RawActivity,
+  close: RawActivity,
+  qty: number,
+  pnl: number,
+  grossPnl: number,
+  fee: number,
+  side: TradeSide,
+): ParsedTradeInput {
   const contract = open.isOption
     ? `${open.underlyingSymbol} ${open.expiration ?? ''} ${open.strike ?? ''} ${(open.optionType ?? '').charAt(0)}`.trim()
     : open.underlyingSymbol;
@@ -124,8 +157,14 @@ function buildTrade(open: RawActivity, close: RawActivity, qty: number, pnl: num
     expiration: open.expiration,
     strike: open.strike,
     quantity: qty,
+    // Broker-verified execution data pulled from SnapTrade and stored as structured fields — shown
+    // as labeled rows in the trade detail view (TradeDetails.tsx) rather than crammed into notes.
     tradePrice: open.price,
-    notes: `Synced from ${open.accountName ?? 'connected broker'} · closed ${close.tradeDate.slice(0, 10)} @ ${close.price} (opened @ ${open.price})`,
+    exitPrice: close.price,
+    entryTime: extractEasternTime(open.tradeDate),
+    exitTime: extractEasternTime(close.tradeDate),
+    fees: Math.round(fee * 100) / 100,
+    grossPnl: Math.round(grossPnl * 100) / 100,
     accountType: open.accountName,
     // Stable across re-syncs (SnapTrade's own activity ids for the open/close fills), so importing
     // the same round-trip twice — e.g. clicking Sync trades again — is a no-op instead of a duplicate.
@@ -163,7 +202,7 @@ function matchOptions(activities: RawActivity[]): ParsedTradeInput[] {
       const pnl = grossPnl - feeShare;
       const side: TradeSide = lot.open.side === 'BUY' ? 'long' : 'short';
 
-      trades.push(buildTrade(lot.open, exec, matched, pnl, side));
+      trades.push(buildTrade(lot.open, exec, matched, pnl, grossPnl, feeShare, side));
 
       lot.qty -= matched;
       remaining -= matched;
@@ -197,7 +236,7 @@ function matchStocks(activities: RawActivity[]): ParsedTradeInput[] {
       const pnl = grossPnl - feeShare;
       const side: TradeSide = lotSign > 0 ? 'long' : 'short';
 
-      trades.push(buildTrade(lot.open, exec, matched, pnl, side));
+      trades.push(buildTrade(lot.open, exec, matched, pnl, grossPnl, feeShare, side));
 
       lot.qty -= lotSign * matched;
       remaining -= matched;

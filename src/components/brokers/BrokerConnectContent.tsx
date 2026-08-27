@@ -202,13 +202,13 @@ export function BrokerConnectContent({ onBack, onImportTrades, existingTrades }:
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-emerald-400 transition-colors mb-8 focus-ring rounded-lg px-1 py-1"
+          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors mb-8 focus-ring rounded-lg px-1 py-1"
         >
           <ArrowLeft size={16} />
           Back to dashboard
         </button>
 
-        <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Connect a broker</p>
+        <p className="text-xs uppercase tracking-widest text-accent font-medium mb-3">Connect a broker</p>
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
           Sync trades automatically
         </h1>
@@ -242,7 +242,7 @@ export function BrokerConnectContent({ onBack, onImportTrades, existingTrades }:
         )}
 
         {syncMessage && (
-          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-300 mb-6 flex items-center gap-2">
+          <div className="rounded-lg border border-accent/30 bg-accent/5 px-4 py-3 text-sm text-accent mb-6 flex items-center gap-2">
             <CheckCircle2 size={16} className="shrink-0" />
             {syncMessage}
           </div>
@@ -267,10 +267,10 @@ export function BrokerConnectContent({ onBack, onImportTrades, existingTrades }:
                     {accounts.map((a) => (
                       <div
                         key={a.id}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/5 px-3 py-2"
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-accent/25 bg-accent/5 px-3 py-2"
                       >
                         <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                          <CheckCircle2 size={14} className="text-accent shrink-0" />
                           <span className="font-medium">{a.name ?? a.institutionName}</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -278,7 +278,7 @@ export function BrokerConnectContent({ onBack, onImportTrades, existingTrades }:
                             type="button"
                             onClick={() => void handleSync(a)}
                             disabled={syncingAccountId === a.id}
-                            className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-border/60 hover:border-emerald-500/40 hover:text-emerald-300 transition-colors disabled:opacity-50 focus-ring"
+                            className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-border/60 hover:border-accent/40 hover:text-accent transition-colors disabled:opacity-50 focus-ring"
                           >
                             {syncingAccountId === a.id ? (
                               <Loader2 size={13} className="animate-spin" />

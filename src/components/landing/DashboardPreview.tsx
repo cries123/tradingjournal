@@ -15,7 +15,7 @@ export function DashboardPreview() {
   };
 
   return (
-    <div className="glass-card glow-border rounded-2xl p-4 md:p-5 shadow-2xl shadow-black/40">
+    <div className="glass-card glow-border-brand rounded-2xl p-4 md:p-5 shadow-2xl shadow-black/40">
       <div className="flex items-center justify-between mb-4">
         <div>
           <p className="text-xs text-text-secondary uppercase tracking-widest">Live preview</p>

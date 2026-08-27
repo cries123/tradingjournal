@@ -9,8 +9,8 @@ interface EmptyDashboardProps {
 export function EmptyDashboard({ onAddTrade, onConnectBroker, onLoadSample }: EmptyDashboardProps) {
   return (
     <div className="panel-card p-6 md:p-8 text-center shrink-0">
-      <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center mx-auto mb-4">
-        <Plus size={28} className="text-emerald-400" />
+      <div className="w-14 h-14 rounded-2xl bg-accent/10 border border-accent/25 flex items-center justify-center mx-auto mb-4">
+        <Plus size={28} className="text-accent" />
       </div>
       <h3 className="text-lg font-semibold mb-2">Start your journal</h3>
       <p className="text-sm text-text-secondary max-w-sm mx-auto mb-6 leading-relaxed">
@@ -31,7 +31,7 @@ export function EmptyDashboard({ onAddTrade, onConnectBroker, onLoadSample }: Em
         <button
           type="button"
           onClick={onLoadSample}
-          className="mt-4 inline-flex items-center gap-1.5 text-sm text-emerald-400 hover:text-emerald-300 hover:underline transition-colors focus-ring rounded px-1 py-0.5"
+          className="mt-4 inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent/80 hover:underline transition-colors focus-ring rounded px-1 py-0.5"
         >
           <Sparkles size={14} />
           Or explore with an example month

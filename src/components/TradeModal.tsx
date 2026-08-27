@@ -185,7 +185,7 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
           <button
             type="button"
             onClick={() => setShowAdvanced((v) => !v)}
-            className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 focus-ring rounded"
+            className="flex items-center gap-1 text-xs text-accent hover:text-accent/80 focus-ring rounded"
           >
             <ChevronDown size={14} className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
             Advanced details

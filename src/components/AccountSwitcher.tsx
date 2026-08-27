@@ -18,7 +18,7 @@ export function AccountSwitcher() {
   return (
     <div className="panel-card p-2 md:p-3 shrink-0">
       <div className="flex items-center gap-2 mb-2">
-        <BookOpen size={14} className="text-emerald-400 shrink-0" />
+        <BookOpen size={14} className="text-accent shrink-0" />
         <p className="text-[10px] md:text-xs uppercase tracking-widest text-text-secondary font-medium">
           Journal
         </p>
@@ -34,7 +34,7 @@ export function AccountSwitcher() {
               onClick={() => setActiveAccount(account.id)}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-all focus-ring ${
                 active
-                  ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/35 shadow-sm shadow-emerald-500/10'
+                  ? 'bg-accent/15 text-accent border border-accent/35 shadow-sm shadow-accent/10'
                   : 'bg-bg-tertiary/60 text-text-secondary border border-border/50 hover:text-text-primary hover:border-border'
               }`}
             >
@@ -80,7 +80,7 @@ export function AccountSwitcher() {
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium border border-dashed border-border/70 text-text-secondary hover:text-emerald-300 hover:border-emerald-500/40 transition-colors focus-ring"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium border border-dashed border-border/70 text-text-secondary hover:text-accent hover:border-accent/40 transition-colors focus-ring"
           >
             <Plus size={14} />
             New journal

@@ -4,11 +4,13 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { DashboardView } from '../components/DashboardView';
 import { DashboardSkeleton } from '../components/DashboardSkeleton';
 import { DayDetailDrawer } from '../components/DayDetailDrawer';
+import { LeaderboardContent } from '../components/LeaderboardContent';
 import { MobileBottomNav, MobileDrawer, MobileHeader } from '../components/MobileNav';
 import { hasCompletedOnboarding, OnboardingOverlay } from '../components/OnboardingOverlay';
 import { SettingsPage } from '../components/SettingsPage';
 import { ShareCardModal } from '../components/ShareCardModal';
 import { Sidebar, type SidebarAppView } from '../components/Sidebar';
+import { Starfield } from '../components/Starfield';
 import { BrokerConnectContent } from '../components/brokers/BrokerConnectContent';
 import { BrokersContent } from '../components/support/BrokersContent';
 import { ReportBugContent } from '../components/support/ReportBugContent';
@@ -154,6 +156,10 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
       setAppView('request-broker');
       closeMobileMenu();
     },
+    onLeaderboard: () => {
+      setAppView('leaderboard');
+      closeMobileMenu();
+    },
     onShareCard: () => {
       setAppView('dashboard');
       setShowShareCard(true);
@@ -169,9 +175,11 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
         isDesktop ? 'min-h-dvh' : 'h-full min-h-0 flex-1 flex flex-col overflow-hidden'
       }`}
     >
+      <Starfield />
       {isDesktop && <Sidebar variant="desktop" onHome={onHome} {...sidebarActions} />}
 
-      <div className={`flex-1 flex flex-col min-w-0 w-full ${isDesktop ? '' : 'min-h-0'}`}>
+      {/* relative: keeps this content painting above the fixed Starfield canvas behind it */}
+      <div className={`relative flex-1 flex flex-col min-w-0 w-full ${isDesktop ? '' : 'min-h-0'}`}>
         {!isDesktop && <MobileHeader onOpenMenu={() => setMobileMenuOpen(true)} onHome={onHome} />}
 
         <main
@@ -203,6 +211,8 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
               <ReportBugContent onBack={() => setAppView('dashboard')} />
             ) : appView === 'request-broker' ? (
               <RequestBrokerContent onBack={() => setAppView('dashboard')} />
+            ) : appView === 'leaderboard' ? (
+              <LeaderboardContent onBack={() => setAppView('dashboard')} />
             ) : isLoading ? (
               <DashboardSkeleton />
             ) : (

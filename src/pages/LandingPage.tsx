@@ -14,6 +14,7 @@ import { AnnouncementBar } from '../components/landing/AnnouncementBar';
 import { DashboardPreview } from '../components/landing/DashboardPreview';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import { FadeIn } from '../components/motion/FadeIn';
+import { Starfield } from '../components/Starfield';
 import { brokerIdFromName, BrokerLogo } from '../components/brokers/BrokerLogo';
 import { COMING_SOON_BROKERS, SUPPORTED_BROKERS } from '../data/brokers';
 import { LANDING_FAQ } from '../seo/faq';
@@ -91,6 +92,9 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
 
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
+      {/* reactive={false}: the landing page keeps its fixed emerald/blue brand look regardless of
+          which Theme accent a signed-in user has picked in Settings — same reasoning as the logo. */}
+      <Starfield reactive={false} />
       <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
       <AnnouncementBar onGuide={onGuide} />
       <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate} />
@@ -105,9 +109,9 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
               Broker sync or manual entry — your choice
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-[3.25rem] font-bold leading-[1.1] tracking-tight">
-              <span className="text-gradient">Trend Chasers</span>
+              <span className="text-gradient-brand">Trend Chasers</span>
               {' — '}the trading journal built for{' '}
-              <span className="text-gradient">how you actually trade</span>
+              <span className="text-gradient-brand">how you actually trade</span>
             </h1>
             <p className="mt-5 text-base md:text-lg text-text-secondary leading-relaxed max-w-xl">
               Track daily P&L on a visual calendar. Connect Schwab or Robinhood for automatic sync, or log
@@ -196,7 +200,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
             </div>
             </FadeIn>
             <FadeIn delay={100}>
-            <div className="glass-card rounded-2xl p-6 md:p-8 glow-border">
+            <div className="glass-card rounded-2xl p-6 md:p-8 glow-border-brand">
               <p className="text-xs uppercase tracking-widest text-text-secondary mb-4">How broker sync works</p>
               <ol className="space-y-4">
                 {[
@@ -323,7 +327,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
             {STEPS.map((step, i) => (
               <FadeIn key={step.n} delay={i * 80}>
               <div className="glass-card rounded-xl p-6 md:p-7 h-full">
-                <span className="text-4xl font-bold text-gradient opacity-80">{step.n}</span>
+                <span className="text-4xl font-bold text-gradient-brand opacity-80">{step.n}</span>
                 <h3 className="text-lg font-semibold mt-3 mb-2">{step.title}</h3>
                 <p className="text-sm text-text-secondary leading-relaxed">{step.body}</p>
               </div>

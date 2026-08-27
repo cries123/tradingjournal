@@ -167,7 +167,7 @@ export function CsvImportModal({ onClose, onSave, targetDate }: CsvImportModalPr
               <div>
                 <p className="text-sm text-text-secondary">
                   {selectedCount} of {trades.length} trades from <span className="text-text-primary">{fileName}</span>
-                  {detectedFormat && <span className="ml-1 text-emerald-400">({detectedFormat})</span>}
+                  {detectedFormat && <span className="ml-1 text-accent">({detectedFormat})</span>}
                 </p>
                 <p className={`text-sm font-semibold mt-0.5 ${totalPnl >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}>
                   Selected total: {formatCurrency(totalPnl, settings.currency)}

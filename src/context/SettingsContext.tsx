@@ -21,16 +21,23 @@ interface SettingsContextValue {
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
-const ACCENT_VARS: Record<ThemeAccent, { profit: string; accent: string }> = {
-  emerald: { profit: '#34d399', accent: '#38bdf8' },
-  cyan: { profit: '#22d3ee', accent: '#38bdf8' },
-  violet: { profit: '#a78bfa', accent: '#818cf8' },
+// profit/accent hex plus their R,G,B triplets (kept in sync so CSS can alpha-blend via
+// rgba(var(--color-*-rgb), alpha) — see index.css). Every button, banner, focus ring, chart bar,
+// and nav highlight across the app reads these two var pairs, so switching accent here recolors
+// the whole authenticated app (landing page, logo, and the exported share-card image are the only
+// surfaces that intentionally stay fixed).
+const ACCENT_VARS: Record<ThemeAccent, { profit: string; profitRgb: string; accent: string; accentRgb: string }> = {
+  emerald: { profit: '#34d399', profitRgb: '52, 211, 153', accent: '#38bdf8', accentRgb: '56, 189, 248' },
+  cyan: { profit: '#22d3ee', profitRgb: '34, 211, 238', accent: '#2dd4bf', accentRgb: '45, 212, 191' },
+  violet: { profit: '#a78bfa', profitRgb: '167, 139, 250', accent: '#818cf8', accentRgb: '129, 140, 248' },
 };
 
 function applyThemeAccent(accent: ThemeAccent) {
   const vars = ACCENT_VARS[accent];
   document.documentElement.style.setProperty('--color-profit-bright', vars.profit);
+  document.documentElement.style.setProperty('--color-profit-bright-rgb', vars.profitRgb);
   document.documentElement.style.setProperty('--color-accent', vars.accent);
+  document.documentElement.style.setProperty('--color-accent-rgb', vars.accentRgb);
 }
 
 export function SettingsProvider({ children }: { children: ReactNode }) {

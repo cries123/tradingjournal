@@ -1,7 +1,7 @@
 import type { User } from 'firebase/auth';
 import type { TradingStats } from './stats';
 
-import { SITE_DOMAIN } from '../config/site';
+import { SITE_DOMAIN, SITE_ORIGIN } from '../config/site';
 
 export type SharePeriod = 'day' | 'month' | 'year';
 export type ShareCardOrientation = 'landscape' | 'portrait';
@@ -16,42 +16,86 @@ export function resolveShareCardOrientation(isMobileViewport: boolean): ShareCar
   return isMobileViewport ? 'portrait' : 'landscape';
 }
 
-const SHARE_LOGO_MARK = `<g transform="translate(40 36) scale(0.105)">
-  <g transform="translate(0, -30)">
-    <path d="M 300 270 A 120 120 0 1 1 500 130" fill="none" stroke="#6cd59f" stroke-width="14" stroke-linecap="round"/>
-    <path d="M 280 230 A 120 120 0 0 0 350 310" fill="none" stroke="#6cd59f" stroke-width="14" stroke-linecap="round"/>
-    <polygon points="400,50 415,110 400,125 385,110" fill="#6cd59f"/>
-    <polygon points="250,200 310,215 325,200 310,185" fill="#6cd59f"/>
-    <polygon points="550,200 490,185 475,200 490,215" fill="#6cd59f"/>
-    <polygon points="400,350 385,290 400,275 415,290" fill="#6cd59f"/>
-    <polygon points="294,94 325,125 310,140 295,125" fill="#6cd59f"/>
-    <polygon points="506,94 475,125 490,140 505,125" fill="#6cd59f"/>
-    <polygon points="310,280 340,250 355,265 325,295" fill="#6cd59f"/>
-    <rect x="540" y="80" width="8" height="12" rx="4" fill="#ff5757"/>
-    <rect x="555" y="65" width="8" height="27" rx="4" fill="#ff5757"/>
-    <rect x="570" y="50" width="8" height="42" rx="4" fill="#ff5757"/>
-    <path d="M 250 320 L 330 240 L 370 280 L 520 130 L 520 160 L 370 310 L 330 270 L 250 350 Z" fill="#4ba779"/>
-    <path d="M 235 305 L 330 210 L 380 260 L 520 120 L 520 135 L 380 275 L 330 225 L 235 320 Z" fill="#6cd59f"/>
-    <polygon points="540,100 460,110 520,170" fill="#6cd59f"/>
-    <polygon points="530,115 470,125 515,170" fill="#4ba779"/>
-  </g>
-</g>`;
+// Standalone raster mark (public/share-mark.png) referenced by absolute URL rather than inlined —
+// this SVG gets rasterized through an <img>/<canvas> round-trip (see renderSharePngBlob below), so
+// keeping the mark as a same-origin image request avoids bloating the JS bundle with a base64 copy
+// on every page load just for a feature most visitors never use.
+const SHARE_LOGO_MARK = `<image href="${SITE_ORIGIN}/share-mark.png" x="38" y="36" width="46" height="44"/>`;
 
-const SHARE_LOGO_MARK_SMALL = `<g transform="translate(40 348) scale(0.055)">
-  <g transform="translate(0, -30)">
-    <path d="M 300 270 A 120 120 0 1 1 500 130" fill="none" stroke="#6cd59f" stroke-width="14" stroke-linecap="round"/>
-    <path d="M 280 230 A 120 120 0 0 0 350 310" fill="none" stroke="#6cd59f" stroke-width="14" stroke-linecap="round"/>
-    <polygon points="400,50 415,110 400,125 385,110" fill="#6cd59f"/>
-    <polygon points="250,200 310,215 325,200 310,185" fill="#6cd59f"/>
-    <polygon points="550,200 490,185 475,200 490,215" fill="#6cd59f"/>
-    <polygon points="400,350 385,290 400,275 415,290" fill="#6cd59f"/>
-    <rect x="540" y="80" width="8" height="12" rx="4" fill="#ff5757"/>
-    <rect x="555" y="65" width="8" height="27" rx="4" fill="#ff5757"/>
-    <rect x="570" y="50" width="8" height="42" rx="4" fill="#ff5757"/>
-    <path d="M 235 305 L 330 210 L 380 260 L 520 120 L 520 135 L 380 275 L 330 225 L 235 320 Z" fill="#6cd59f"/>
-    <polygon points="540,100 460,110 520,170" fill="#6cd59f"/>
-  </g>
-</g>`;
+const SHARE_LOGO_MARK_SMALL = `<image href="${SITE_ORIGIN}/share-mark.png" x="38" y="337" width="24" height="23"/>`;
+
+// Soft nebula glow behind the mark + a faint hand-placed constellation field, echoing the misty,
+// interconnected-node look of the brand's wider marketing art — kept subtle and masked to fade out
+// before the stat rows so it never competes with the actual numbers.
+const STARFIELD_DEFS = `<radialGradient id="glow1" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#34d399" stop-opacity="0.32"/>
+      <stop offset="100%" stop-color="#34d399" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="starFadeLandscape" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff"/>
+      <stop offset="52%" stop-color="#fff" stop-opacity="0.4"/>
+      <stop offset="78%" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="starFadePortrait" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff"/>
+      <stop offset="42%" stop-color="#fff" stop-opacity="0.4"/>
+      <stop offset="62%" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="starMaskLandscape"><rect width="600" height="400" fill="url(#starFadeLandscape)"/></mask>
+    <mask id="starMaskPortrait"><rect width="450" height="800" fill="url(#starFadePortrait)"/></mask>`;
+
+const STARFIELD_LINES_LANDSCAPE: Array<[number, number, number, number]> = [
+  [60, 20, 140, 15], [140, 15, 200, 45], [200, 45, 280, 18], [340, 50, 420, 22],
+  [420, 22, 480, 60], [480, 60, 540, 15], [30, 90, 110, 110], [110, 110, 170, 70],
+  [250, 100, 330, 90], [330, 90, 400, 110], [400, 110, 460, 95], [460, 95, 520, 120],
+  [70, 150, 150, 170], [150, 170, 230, 155],
+];
+
+const STARFIELD_DOTS_LANDSCAPE: Array<[number, number, number, number]> = [
+  [60, 20, 1.2, 0.5], [140, 15, 0.9, 0.35], [200, 45, 1.4, 0.45], [280, 18, 1, 0.3],
+  [340, 50, 1.1, 0.4], [420, 22, 1.3, 0.5], [480, 60, 0.9, 0.3], [540, 15, 1.2, 0.45],
+  [580, 80, 1, 0.35], [30, 90, 1, 0.3], [110, 110, 1.3, 0.4], [170, 70, 0.8, 0.25],
+  [250, 100, 1.1, 0.35], [330, 90, 0.9, 0.3], [400, 110, 1.2, 0.4], [460, 95, 1, 0.3],
+  [520, 120, 0.9, 0.25], [70, 150, 0.8, 0.2], [150, 170, 1, 0.25], [230, 155, 0.9, 0.2],
+  [310, 175, 0.8, 0.18], [390, 160, 1, 0.22], [460, 180, 0.8, 0.18], [520, 200, 0.7, 0.15],
+  [200, 210, 0.7, 0.15], [350, 220, 0.6, 0.12],
+];
+
+const STARFIELD_LINES_PORTRAIT: Array<[number, number, number, number]> = [
+  [40, 20, 100, 15], [100, 15, 160, 45], [230, 18, 300, 50], [300, 50, 370, 25],
+  [370, 25, 410, 70], [30, 90, 90, 110], [90, 110, 150, 75], [220, 100, 290, 90],
+  [290, 90, 350, 115], [350, 115, 410, 100], [60, 150, 130, 175], [130, 175, 200, 155],
+];
+
+const STARFIELD_DOTS_PORTRAIT: Array<[number, number, number, number]> = [
+  [40, 20, 1.2, 0.5], [100, 15, 0.9, 0.35], [160, 45, 1.3, 0.45], [230, 18, 1, 0.3],
+  [300, 50, 1.1, 0.4], [370, 25, 1.2, 0.45], [410, 70, 0.9, 0.3], [30, 90, 1, 0.3],
+  [90, 110, 1.2, 0.4], [150, 75, 0.8, 0.25], [220, 100, 1, 0.35], [290, 90, 0.9, 0.3],
+  [350, 115, 1.1, 0.35], [410, 100, 0.8, 0.25], [60, 150, 0.8, 0.2], [130, 175, 1, 0.25],
+  [200, 155, 0.8, 0.2], [270, 180, 0.8, 0.18], [340, 165, 0.9, 0.2], [400, 190, 0.7, 0.15],
+  [90, 230, 0.7, 0.15], [180, 250, 0.6, 0.12], [260, 240, 0.7, 0.15], [340, 260, 0.6, 0.1],
+  [400, 280, 0.6, 0.1],
+];
+
+function starfieldMarkup(
+  dots: Array<[number, number, number, number]>,
+  lines: Array<[number, number, number, number]>,
+): string {
+  const dotEls = dots
+    .map(([cx, cy, r, o]) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#a7f3d0" fill-opacity="${o}"/>`)
+    .join('');
+  const lineEls = lines
+    .map(([x1, y1, x2, y2]) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#34d399" stroke-width="0.6" stroke-opacity="0.2"/>`)
+    .join('');
+  return lineEls + dotEls;
+}
+
+const STARFIELD_LANDSCAPE = starfieldMarkup(STARFIELD_DOTS_LANDSCAPE, STARFIELD_LINES_LANDSCAPE);
+const STARFIELD_PORTRAIT = starfieldMarkup(STARFIELD_DOTS_PORTRAIT, STARFIELD_LINES_PORTRAIT);
 
 const PERIOD_BADGE: Record<SharePeriod, string> = {
   day: 'TRADING SESSION',
@@ -147,10 +191,6 @@ function buildShareSvgLandscape(data: ShareSvgInput): string {
       <stop offset="55%" stop-color="#0a0f18"/>
       <stop offset="100%" stop-color="#07090f"/>
     </linearGradient>
-    <linearGradient id="logo" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#34d399"/>
-      <stop offset="100%" stop-color="#22d3ee"/>
-    </linearGradient>
     <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0%" stop-color="#34d399" stop-opacity="0.35"/>
       <stop offset="100%" stop-color="#22d3ee" stop-opacity="0.15"/>
@@ -162,13 +202,13 @@ function buildShareSvgLandscape(data: ShareSvgInput): string {
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
-    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
-      <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(52,211,153,0.04)" stroke-width="1"/>
-    </pattern>
+    ${STARFIELD_DEFS}
   </defs>
 
   <rect width="600" height="400" rx="32" fill="url(#bg)"/>
-  <rect width="600" height="400" rx="32" fill="url(#grid)"/>
+  <circle cx="70" cy="55" r="130" fill="url(#glow1)"/>
+  <circle cx="540" cy="30" r="140" fill="url(#glow2)"/>
+  <g mask="url(#starMaskLandscape)">${STARFIELD_LANDSCAPE}</g>
   <rect x="1" y="1" width="598" height="398" rx="31" fill="none" stroke="url(#accent)" stroke-width="2"/>
   <rect x="24" y="24" width="552" height="72" rx="20" fill="rgba(15,20,31,0.65)" stroke="rgba(148,163,184,0.12)" stroke-width="1"/>
 
@@ -227,26 +267,16 @@ function buildShareSvgPortrait(data: ShareSvgInput): string {
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
-    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
-      <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(52,211,153,0.04)" stroke-width="1"/>
-    </pattern>
+    ${STARFIELD_DEFS}
   </defs>
 
   <rect width="450" height="800" rx="40" fill="url(#bg)"/>
-  <rect width="450" height="800" rx="40" fill="url(#grid)"/>
+  <circle cx="225" cy="55" r="150" fill="url(#glow1)"/>
+  <circle cx="380" cy="110" r="130" fill="url(#glow2)"/>
+  <g mask="url(#starMaskPortrait)">${STARFIELD_PORTRAIT}</g>
   <rect x="1" y="1" width="448" height="798" rx="39" fill="none" stroke="url(#accent)" stroke-width="2"/>
 
-  <g transform="translate(185 52) scale(0.09)">
-    <g transform="translate(0, -30)">
-      <path d="M 300 270 A 120 120 0 1 1 500 130" fill="none" stroke="#6cd59f" stroke-width="14" stroke-linecap="round"/>
-      <path d="M 280 230 A 120 120 0 0 0 350 310" fill="none" stroke="#6cd59f" stroke-width="14" stroke-linecap="round"/>
-      <polygon points="400,50 415,110 400,125 385,110" fill="#6cd59f"/>
-      <rect x="540" y="80" width="8" height="12" rx="4" fill="#ff5757"/>
-      <rect x="555" y="65" width="8" height="27" rx="4" fill="#ff5757"/>
-      <rect x="570" y="50" width="8" height="42" rx="4" fill="#ff5757"/>
-      <path d="M 235 305 L 330 210 L 380 260 L 520 120 L 520 135 L 380 275 L 330 225 L 235 320 Z" fill="#6cd59f"/>
-    </g>
-  </g>
+  <image href="${SITE_ORIGIN}/share-mark.png" x="196" y="24" width="58" height="56"/>
   <text x="225" y="118" fill="#6cd59f" font-family="Montserrat, system-ui, sans-serif" font-size="15" font-weight="900" letter-spacing="1.5" text-anchor="middle">TREND CHASERS</text>
   <text x="225" y="138" fill="#8e939d" font-family="system-ui, sans-serif" font-size="11" text-anchor="middle">Track · Analyze · Improve</text>
   <text x="225" y="168" fill="#6ee7b7" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="600" text-anchor="middle">@${username}</text>

@@ -53,7 +53,7 @@ export function YearHeatmap({ trades, year, onPrevYear, onNextYear, onSelectMont
               className={`rounded-xl p-3 md:p-4 text-left border transition-all focus-ring hover:scale-[1.02] ${
                 hasData
                   ? isProfit
-                    ? 'border-emerald-500/40'
+                    ? 'border-profit-bright/40'
                     : 'border-red-500/40'
                   : 'border-border/50 hover:border-border'
               }`}
@@ -61,7 +61,7 @@ export function YearHeatmap({ trades, year, onPrevYear, onNextYear, onSelectMont
                 hasData
                   ? {
                       backgroundColor: isProfit
-                        ? `rgba(52, 211, 153, ${intensity * 0.2})`
+                        ? `rgba(var(--color-profit-bright-rgb), ${intensity * 0.2})`
                         : `rgba(248, 113, 113, ${intensity * 0.2})`,
                     }
                   : undefined

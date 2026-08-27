@@ -28,7 +28,8 @@ export function TradeDetails({ trade, compact }: TradeDetailsProps) {
     rows.push({ label: 'Underlying', value: `$${trade.underlyingPrice}` });
   }
   if (isMeaningfulNumber(trade.mark)) rows.push({ label: 'Mark', value: `$${trade.mark}` });
-  if (isMeaningfulNumber(trade.tradePrice)) rows.push({ label: 'Trade Price', value: `$${trade.tradePrice}` });
+  if (isMeaningfulNumber(trade.tradePrice)) rows.push({ label: 'Entry Price', value: `$${trade.tradePrice}` });
+  if (isMeaningfulNumber(trade.exitPrice)) rows.push({ label: 'Exit Price', value: `$${trade.exitPrice}` });
   if (isMeaningfulNumber(trade.pnlOpen)) {
     rows.push({ label: 'P/L Open', value: formatCurrency(trade.pnlOpen) });
   }
@@ -40,8 +41,8 @@ export function TradeDetails({ trade, compact }: TradeDetailsProps) {
   if (trade.checklistScore != null) rows.push({ label: 'Checklist', value: `${trade.checklistScore}%` });
   if (isMeaningfulNumber(trade.fees)) rows.push({ label: 'Fees', value: formatCurrency(trade.fees) });
   if (isMeaningfulNumber(trade.grossPnl)) rows.push({ label: 'Gross P/L', value: formatCurrency(trade.grossPnl) });
-  if (isNonEmptyString(trade.entryTime)) rows.push({ label: 'Entry', value: trade.entryTime });
-  if (isNonEmptyString(trade.exitTime)) rows.push({ label: 'Exit', value: trade.exitTime });
+  if (isNonEmptyString(trade.entryTime)) rows.push({ label: 'Entry Time', value: trade.entryTime });
+  if (isNonEmptyString(trade.exitTime)) rows.push({ label: 'Exit Time', value: trade.exitTime });
   const session = marketSessionFromTime(trade.entryTime);
   if (session) rows.push({ label: 'Session', value: session });
   if (isMeaningfulNumber(trade.mae)) rows.push({ label: 'MAE', value: formatCurrency(trade.mae) });
@@ -90,7 +91,7 @@ export function TradeDetails({ trade, compact }: TradeDetailsProps) {
           href={trade.chartUrl || buildTradingViewReplayUrl(trade)}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex text-xs text-emerald-400 hover:text-emerald-300 mt-2"
+          className="inline-flex text-xs text-accent hover:text-accent/80 mt-2"
         >
           Open chart replay →
         </a>

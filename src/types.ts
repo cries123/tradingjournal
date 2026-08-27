@@ -26,7 +26,10 @@ export interface Trade {
   strike?: number;
   quantity?: number;
   mark?: number;
+  /** Entry (opening) execution price. */
   tradePrice?: number;
+  /** Exit (closing) execution price — set for round-trip trades where open and close are known separately. */
+  exitPrice?: number;
   pnlOpen?: number;
   netLiq?: number;
   underlyingPrice?: number;

@@ -23,7 +23,7 @@ export function SidebarJournalPicker({ onNavigate }: SidebarJournalPickerProps) 
   return (
     <div className="rounded-lg border border-border/50 bg-bg-tertiary/30 p-2.5">
       <div className="flex items-center gap-1.5 px-1 mb-2">
-        <BookOpen size={13} className="text-emerald-400 shrink-0" />
+        <BookOpen size={13} className="text-accent shrink-0" />
         <p className="text-[10px] font-semibold uppercase tracking-wider text-text-secondary">Journal</p>
       </div>
 
@@ -37,7 +37,7 @@ export function SidebarJournalPicker({ onNavigate }: SidebarJournalPickerProps) 
               onClick={() => setActiveAccount(account.id)}
               className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-left text-xs font-medium transition-colors focus-ring ${
                 active
-                  ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                  ? 'bg-accent/15 text-accent border border-accent/30'
                   : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/80 border border-transparent'
               }`}
             >
@@ -84,7 +84,7 @@ export function SidebarJournalPicker({ onNavigate }: SidebarJournalPickerProps) 
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="mt-2 w-full flex items-center justify-center gap-1 py-1.5 rounded-md text-[11px] font-medium border border-dashed border-border/60 text-text-secondary hover:text-emerald-300 hover:border-emerald-500/40 transition-colors focus-ring"
+          className="mt-2 w-full flex items-center justify-center gap-1 py-1.5 rounded-md text-[11px] font-medium border border-dashed border-border/60 text-text-secondary hover:text-accent hover:border-accent/40 transition-colors focus-ring"
         >
           <Plus size={12} />
           New journal

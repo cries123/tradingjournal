@@ -54,7 +54,7 @@ export function TradeListItem({
             )}
           </div>
           {pnl != null && (
-            <span className={`text-sm font-semibold shrink-0 ${pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            <span className={`text-sm font-semibold shrink-0 ${pnl >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}>
               {formatCurrency(pnl)}
             </span>
           )}

@@ -31,15 +31,17 @@ export function DashboardDayCell({
   const isLoss = hasTrades && summary.totalPnl < 0;
 
   const borderClass = isProfit
-    ? 'border-emerald-500/50 ring-1 ring-emerald-500/15 shadow-sm shadow-emerald-500/10'
+    ? 'border-profit-bright/50 ring-1 ring-profit-bright/15 shadow-sm shadow-profit-bright/10'
     : isLoss
       ? 'border-red-500/50 ring-1 ring-red-500/15 shadow-sm shadow-red-500/10'
       : 'border-border/40';
 
-  // Heat-map tint: bigger days glow harder.
+  // Heat-map tint: bigger days glow harder. Reads the live theme accent via the
+  // --color-profit-bright-rgb custom property (set in index.css / kept in sync by
+  // SettingsContext) so the heat-map recolors along with everything else.
   const alpha = hasTrades ? 0.06 + intensity * 0.22 : 0;
   const heatStyle = isProfit
-    ? { background: `linear-gradient(160deg, rgba(52, 211, 153, ${alpha}), rgba(52, 211, 153, ${alpha * 0.25}))` }
+    ? { background: `linear-gradient(160deg, rgba(var(--color-profit-bright-rgb), ${alpha}), rgba(var(--color-profit-bright-rgb), ${alpha * 0.25}))` }
     : isLoss
       ? { background: `linear-gradient(160deg, rgba(248, 113, 113, ${alpha}), rgba(248, 113, 113, ${alpha * 0.25}))` }
       : undefined;
@@ -55,7 +57,7 @@ export function DashboardDayCell({
     >
       <span
         className={`text-[9px] md:text-xs leading-none ${
-          isToday ? 'text-sky-300 font-semibold' : 'text-text-secondary'
+          isToday ? 'text-accent font-semibold' : 'text-text-secondary'
         }`}
       >
         {dayNumber}

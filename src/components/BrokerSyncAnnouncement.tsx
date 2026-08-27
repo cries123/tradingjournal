@@ -32,8 +32,8 @@ export function BrokerSyncAnnouncement({ onConnectBroker }: BrokerSyncAnnounceme
   };
 
   return (
-    <div className="relative flex flex-wrap items-start gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 pl-4 pr-9 py-3.5 shrink-0">
-      <div className="w-9 h-9 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0 text-emerald-400">
+    <div className="relative flex flex-wrap items-start gap-3 rounded-xl border border-accent/30 bg-accent/5 pl-4 pr-9 py-3.5 shrink-0">
+      <div className="w-9 h-9 rounded-lg bg-accent/15 border border-accent/30 flex items-center justify-center shrink-0 text-accent">
         <Link2 size={16} />
       </div>
       <div className="flex-1 min-w-[220px]">
@@ -46,7 +46,7 @@ export function BrokerSyncAnnouncement({ onConnectBroker }: BrokerSyncAnnounceme
         <button
           type="button"
           onClick={onConnectBroker}
-          className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-300 hover:text-emerald-200 transition-colors focus-ring rounded"
+          className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:text-accent/80 transition-colors focus-ring rounded"
         >
           <ShieldCheck size={13} />
           Connect a broker →

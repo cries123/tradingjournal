@@ -13,7 +13,7 @@ export function WeekSummaryCell({ totalPnl, tradeCount }: WeekSummaryCellProps) 
       {hasTrades ? (
         <>
           <span
-            className={`text-sm font-semibold ${totalPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}
+            className={`text-sm font-semibold ${totalPnl >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}
           >
             {formatCurrency(totalPnl)}
           </span>

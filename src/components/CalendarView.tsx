@@ -43,7 +43,7 @@ export function CalendarView({
           <h2 className="text-xl font-semibold">
             {formatMonthYear(year, month)}
             <span
-              className={`ml-3 text-lg ${monthTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}
+              className={`ml-3 text-lg ${monthTotal >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}
             >
               {formatCurrency(monthTotal)}
             </span>

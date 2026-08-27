@@ -111,7 +111,7 @@ export function DayDetailDrawer({
       >
         <div className="flex items-start justify-between gap-3 p-5 border-b border-border/60 shrink-0">
           <div>
-            <p className="text-xs uppercase tracking-widest text-emerald-400/80 font-medium mb-1">Day detail</p>
+            <p className="text-xs uppercase tracking-widest text-accent/80 font-medium mb-1">Day detail</p>
             <h3 className="text-lg font-semibold">{formattedDate}</h3>
             {dayTrades.length > 0 && (
               <p className={`text-sm font-medium mt-1 ${totalPnl >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}>
@@ -134,7 +134,7 @@ export function DayDetailDrawer({
             <button
               type="button"
               onClick={() => setShowShare(true)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium border border-emerald-500/30 text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/15 transition-colors focus-ring"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium border border-accent/30 text-accent bg-accent/10 hover:bg-accent/15 transition-colors focus-ring"
             >
               <Share2 size={16} />
               Share session
@@ -150,7 +150,7 @@ export function DayDetailDrawer({
               </p>
               <span className="text-[10px] text-text-secondary">
                 {noteStatus === 'saving' && 'Saving…'}
-                {noteStatus === 'saved' && <span className="text-emerald-400">Saved</span>}
+                {noteStatus === 'saved' && <span className="text-profit-bright">Saved</span>}
                 {noteStatus === 'error' && <span className="text-red-400">Could not save</span>}
               </span>
             </div>
@@ -180,7 +180,7 @@ export function DayDetailDrawer({
                     }}
                     className={`w-7 h-7 rounded-md text-xs font-semibold transition-colors focus-ring ${
                       discipline != null && n <= discipline
-                        ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/40'
+                        ? 'bg-accent/25 text-accent border border-accent/40'
                         : 'bg-bg-tertiary/60 text-text-secondary border border-border/40 hover:text-text-primary'
                     }`}
                   >
@@ -211,7 +211,7 @@ export function DayDetailDrawer({
                           e.stopPropagation();
                           onEdit(trade);
                         }}
-                        className="text-text-secondary hover:text-emerald-400 p-1 focus-ring rounded"
+                        className="text-text-secondary hover:text-accent p-1 focus-ring rounded"
                         aria-label="Edit trade"
                       >
                         <Pencil size={14} />

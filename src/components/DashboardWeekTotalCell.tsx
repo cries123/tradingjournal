@@ -28,7 +28,7 @@ export function DashboardWeekTotalCell({ summary }: DashboardWeekTotalCellProps)
   return (
     <div
       className={`${cellShell} p-0.5 md:p-2 bg-accent/[0.06] ${
-        isProfit ? 'border-emerald-500/30' : 'border-red-500/30'
+        isProfit ? 'border-profit-bright/30' : 'border-red-500/30'
       }`}
     >
       <span className="text-[7px] md:text-[10px] text-accent/80 uppercase tracking-wide leading-none font-medium">

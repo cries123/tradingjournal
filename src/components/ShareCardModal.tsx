@@ -158,7 +158,7 @@ export function ShareCardModal({ period, stats, dateKey = '', year, month = 0, o
             {isMobileViewport ? 'Save photo' : 'PNG'}
           </button>
         </div>
-        {saveHint && <p className="text-[11px] text-emerald-300 text-center mt-3">{saveHint}</p>}
+        {saveHint && <p className="text-[11px] text-profit-bright text-center mt-3">{saveHint}</p>}
       </div>
     </div>
   );

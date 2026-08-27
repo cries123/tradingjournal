@@ -8,6 +8,7 @@ import {
   Settings,
   Share2,
   ShieldCheck,
+  Trophy,
 } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
 import { SidebarJournalPicker } from './SidebarJournalPicker';
@@ -20,7 +21,8 @@ export type SidebarAppView =
   | 'brokers'
   | 'connect-broker'
   | 'report-bug'
-  | 'request-broker';
+  | 'request-broker'
+  | 'leaderboard';
 
 interface SidebarProps {
   appView: SidebarAppView;
@@ -32,6 +34,7 @@ interface SidebarProps {
   onBrokers: () => void;
   onReportBug: () => void;
   onRequestBroker: () => void;
+  onLeaderboard: () => void;
   onShareCard?: () => void;
   shareCardEnabled?: boolean;
   onAdmin?: () => void;
@@ -42,7 +45,7 @@ interface SidebarProps {
 
 function navItemClass(active: boolean): string {
   return active
-    ? 'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-medium focus-ring'
+    ? 'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-accent/10 text-accent border border-accent/20 font-medium focus-ring'
     : 'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60 transition-colors focus-ring';
 }
 
@@ -56,6 +59,7 @@ export function Sidebar({
   onBrokers,
   onReportBug,
   onRequestBroker,
+  onLeaderboard,
   onShareCard,
   shareCardEnabled = false,
   onAdmin,
@@ -114,7 +118,7 @@ export function Sidebar({
             onClick={wrap(onDashboard)}
             className={navItemClass(appView === 'dashboard')}
           >
-            <LayoutDashboard size={16} className={appView === 'dashboard' ? 'text-emerald-400' : undefined} />
+            <LayoutDashboard size={16} className={appView === 'dashboard' ? 'text-accent' : undefined} />
             Overview
           </button>
           <button
@@ -122,7 +126,7 @@ export function Sidebar({
             onClick={wrap(onConnectBroker)}
             className={navItemClass(appView === 'connect-broker')}
           >
-            <Link2 size={16} className={appView === 'connect-broker' ? 'text-emerald-400' : undefined} />
+            <Link2 size={16} className={appView === 'connect-broker' ? 'text-accent' : undefined} />
             Connect broker
           </button>
           <button
@@ -132,6 +136,14 @@ export function Sidebar({
           >
             <Settings size={16} />
             Settings
+          </button>
+          <button
+            type="button"
+            onClick={wrap(onLeaderboard)}
+            className={navItemClass(appView === 'leaderboard')}
+          >
+            <Trophy size={16} className={appView === 'leaderboard' ? 'text-accent' : undefined} />
+            Leaderboard
           </button>
           {onShareCard && (
             <button
@@ -196,10 +208,10 @@ export function Sidebar({
       <div className="p-3 border-t border-border/60 shrink-0 space-y-3">
         {firebaseEnabled && !loading && user && (
           <div className="flex items-center gap-2 px-1 min-w-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
             <div className="min-w-0 flex-1">
               {username ? (
-                <p className="text-[11px] text-emerald-300 font-medium truncate">@{username}</p>
+                <p className="text-[11px] text-accent font-medium truncate">@{username}</p>
               ) : null}
               <p className="text-[11px] text-text-secondary truncate">{user.email}</p>
             </div>

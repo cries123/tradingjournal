@@ -58,11 +58,11 @@ export function OnboardingOverlay({ onDone }: OnboardingOverlayProps) {
           <X size={18} />
         </button>
 
-        <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-4">
+        <p className="text-xs uppercase tracking-widest text-accent font-medium mb-4">
           Step {step + 1} of {STEPS.length}
         </p>
-        <div className="w-12 h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mb-4">
-          <Icon size={24} className="text-emerald-400" />
+        <div className="w-12 h-12 rounded-xl bg-accent/15 border border-accent/30 flex items-center justify-center mb-4">
+          <Icon size={24} className="text-accent" />
         </div>
         <h2 className="text-xl font-bold mb-2">{current.title}</h2>
         <p className="text-sm text-text-secondary leading-relaxed mb-6">{current.body}</p>
@@ -71,7 +71,7 @@ export function OnboardingOverlay({ onDone }: OnboardingOverlayProps) {
           {STEPS.map((_, i) => (
             <div
               key={i}
-              className={`h-1 flex-1 rounded-full ${i <= step ? 'bg-emerald-400' : 'bg-border'}`}
+              className={`h-1 flex-1 rounded-full ${i <= step ? 'bg-accent' : 'bg-border'}`}
             />
           ))}
         </div>

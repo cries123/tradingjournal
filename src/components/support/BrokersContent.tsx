@@ -42,13 +42,13 @@ export function BrokersContent({ onBack, backLabel = 'Back to dashboard', onRequ
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-emerald-400 transition-colors mb-8 focus-ring rounded-lg px-1 py-1"
+          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors mb-8 focus-ring rounded-lg px-1 py-1"
         >
           <ArrowLeft size={16} />
           {backLabel}
         </button>
 
-        <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Brokers</p>
+        <p className="text-xs uppercase tracking-widest text-accent font-medium mb-3">Brokers</p>
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
           Supported brokers & import methods
         </h1>
@@ -60,7 +60,7 @@ export function BrokersContent({ onBack, backLabel = 'Back to dashboard', onRequ
         <div className="space-y-4 mb-10">
           {supported.map((b) => (
             <article key={b.name} className="panel-card p-5 md:p-6">
-              <span className="inline-flex px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-semibold uppercase tracking-wide mb-3">
+              <span className="inline-flex px-2 py-0.5 rounded-full bg-accent/15 text-accent text-[10px] font-semibold uppercase tracking-wide mb-3">
                 Live now
               </span>
               <BrokerLogo broker={brokerIdFromName(b.name)} />
@@ -68,7 +68,7 @@ export function BrokersContent({ onBack, backLabel = 'Back to dashboard', onRequ
               <ul className="space-y-2">
                 {b.methods.map((m) => (
                   <li key={m} className="flex items-start gap-2 text-sm text-text-secondary">
-                    <Check size={14} className="text-emerald-400 mt-0.5 shrink-0" />
+                    <Check size={14} className="text-accent mt-0.5 shrink-0" />
                     {m}
                   </li>
                 ))}
@@ -76,7 +76,7 @@ export function BrokersContent({ onBack, backLabel = 'Back to dashboard', onRequ
               {brokerGuidePath(b.name) && (
                 <a
                   href={brokerGuidePath(b.name)!}
-                  className="inline-block mt-4 text-sm text-emerald-400 hover:underline"
+                  className="inline-block mt-4 text-sm text-accent hover:underline"
                 >
                   How to journal {b.name} trades →
                 </a>
@@ -102,7 +102,7 @@ export function BrokersContent({ onBack, backLabel = 'Back to dashboard', onRequ
           </div>
         </div>
 
-        <div className="panel-card p-6 md:p-8 border-dashed border-2 border-emerald-500/25 text-center">
+        <div className="panel-card p-6 md:p-8 border-dashed border-2 border-accent/25 text-center">
           <h2 className="text-xl font-semibold mb-2">Your broker not listed?</h2>
           <p className="text-sm text-text-secondary leading-relaxed mb-6 max-w-lg mx-auto">
             Tell us your broker plus how you export trades. We&apos;ll configure import support for your

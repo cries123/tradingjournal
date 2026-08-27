@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { BrandLogo } from './BrandLogo';
+import { Starfield } from './Starfield';
 import { UsernameField } from './UsernameField';
 import { useAuth } from '../context/AuthContext';
 import { UsernameTakenError } from '../services/username';
@@ -37,6 +38,7 @@ export function UsernameSetupModal() {
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-bg-primary/95 backdrop-blur-md p-4">
+      <Starfield />
       <div className="relative w-full max-w-lg rounded-2xl overflow-hidden glow-border shadow-2xl bg-bg-secondary p-7 md:p-10">
         <BrandLogo size="lg" variant="compact" />
         <h2 className="text-2xl font-bold mt-6 mb-2">Choose your username</h2>

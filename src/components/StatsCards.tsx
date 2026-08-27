@@ -105,7 +105,7 @@ export function StatsCards({
       {hasTrades && (
         <div className="relative mt-2.5 md:mt-3.5 h-1 rounded-full bg-bg-primary/80 overflow-hidden flex">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-400"
+            className="h-full rounded-full bg-gradient-to-r from-profit-bright to-accent"
             style={{ width: `${winPct}%` }}
           />
           <div
@@ -117,13 +117,13 @@ export function StatsCards({
 
       {goalPnl > 0 && (
         <div className="relative mt-3 flex items-center gap-2.5">
-          <Target size={13} className="text-sky-400 shrink-0" />
+          <Target size={13} className="text-accent shrink-0" />
           <div className="flex-1 h-1.5 rounded-full bg-bg-primary/80 overflow-hidden">
             <div
               className={`h-full rounded-full ${
                 stats.netPnl >= goalPnl
-                  ? 'bg-gradient-to-r from-emerald-400 to-teal-300'
-                  : 'bg-gradient-to-r from-sky-500 to-sky-300'
+                  ? 'bg-gradient-to-r from-profit-bright to-accent'
+                  : 'bg-gradient-to-r from-accent/60 to-accent'
               }`}
               style={{ width: `${Math.min(100, Math.max(0, (stats.netPnl / goalPnl) * 100))}%` }}
             />

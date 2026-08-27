@@ -47,7 +47,7 @@ export function UsernameField({ value, onChange, currentUid, disabled }: Usernam
   return (
     <label className="block">
       <span className="text-xs font-medium text-text-secondary mb-1.5 block uppercase tracking-wide">Username</span>
-      <div className="flex items-center gap-1.5 input-field py-3 px-3 focus-within:border-emerald-500/50 focus-within:shadow-[0_0_0_3px_rgba(52,211,153,0.1)]">
+      <div className="flex items-center gap-1.5 input-field py-3 px-3 focus-within:border-profit-bright/50 focus-within:shadow-[0_0_0_3px_rgba(var(--color-profit-bright-rgb),0.1)]">
         <span className="text-text-secondary text-base font-medium shrink-0 select-none" aria-hidden>
           @
         </span>
@@ -70,7 +70,7 @@ export function UsernameField({ value, onChange, currentUid, disabled }: Usernam
         <p className="text-[11px] text-text-secondary mt-1">Checking availability…</p>
       )}
       {showTaken && <p className="text-[11px] text-red-400 mt-1">That username is already taken.</p>}
-      {showAvailable && <p className="text-[11px] text-emerald-400 mt-1">Username is available.</p>}
+      {showAvailable && <p className="text-[11px] text-profit-bright mt-1">Username is available.</p>}
     </label>
   );
 }

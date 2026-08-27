@@ -102,7 +102,7 @@ export function DashboardView({
             type="button"
             onClick={() => setMode('month')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors focus-ring ${
-              mode === 'month' ? 'bg-emerald-500/15 text-emerald-300' : 'text-text-secondary hover:text-text-primary'
+              mode === 'month' ? 'bg-accent/15 text-accent' : 'text-text-secondary hover:text-text-primary'
             }`}
           >
             <Calendar size={14} />
@@ -112,7 +112,7 @@ export function DashboardView({
             type="button"
             onClick={() => setMode('year')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors focus-ring ${
-              mode === 'year' ? 'bg-emerald-500/15 text-emerald-300' : 'text-text-secondary hover:text-text-primary'
+              mode === 'year' ? 'bg-accent/15 text-accent' : 'text-text-secondary hover:text-text-primary'
             }`}
           >
             <Grid3X3 size={14} />
@@ -124,7 +124,7 @@ export function DashboardView({
           <button
             type="button"
             onClick={() => setShowShare(true)}
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border/60 text-text-secondary hover:text-text-primary hover:border-emerald-500/30 transition-colors focus-ring"
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border/60 text-text-secondary hover:text-text-primary hover:border-accent/30 transition-colors focus-ring"
           >
             <Share2 size={14} />
             {mode === 'month' ? 'Share month' : 'Share year'}

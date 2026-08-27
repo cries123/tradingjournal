@@ -63,14 +63,14 @@ export function RequestBrokerContent({ onBack, backLabel = 'Back to dashboard' }
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-emerald-400 transition-colors mb-8 focus-ring rounded-lg px-1 py-1"
+          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors mb-8 focus-ring rounded-lg px-1 py-1"
         >
           <ArrowLeft size={16} />
           {backLabel}
         </button>
 
         <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+          <div className="p-2 rounded-lg bg-accent/10 text-accent">
             <Building2 size={22} />
           </div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Request broker support</h1>
@@ -83,18 +83,18 @@ export function RequestBrokerContent({ onBack, backLabel = 'Back to dashboard' }
         {!firebaseEnabled ? (
           <div className="panel-card p-6 text-sm text-text-secondary">
             Broker support requests require the app to be connected to our backend. Please email{' '}
-            <a href="mailto:support@trendchasers.net" className="text-emerald-400 hover:underline">
+            <a href="mailto:support@trendchasers.net" className="text-accent hover:underline">
               support@trendchasers.net
             </a>{' '}
             or use{' '}
-            <a href="https://github.com/cries123/tradingjournal/issues/new" className="text-emerald-400 hover:underline">
+            <a href="https://github.com/cries123/tradingjournal/issues/new" className="text-accent hover:underline">
               GitHub Issues
             </a>{' '}
             instead.
           </div>
         ) : submitted ? (
           <div className="panel-card p-8 text-center">
-            <CheckCircle2 size={40} className="mx-auto text-emerald-400 mb-4" />
+            <CheckCircle2 size={40} className="mx-auto text-accent mb-4" />
             <h2 className="text-xl font-semibold mb-2">Thanks — we got your request</h2>
             <p className="text-text-secondary text-sm mb-6">
               We will review support for {brokerName.trim()} and reach out at {contactEmail.trim()} if we

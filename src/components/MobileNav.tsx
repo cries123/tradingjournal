@@ -55,7 +55,7 @@ export function MobileBottomNav({ onOpenMenu, onAddTrade, onConnectBroker }: Mob
         <button
           type="button"
           onClick={onConnectBroker}
-          className="flex flex-col items-center justify-center gap-0.5 text-cyan-400 focus-ring"
+          className="flex flex-col items-center justify-center gap-0.5 text-accent focus-ring"
         >
           <Link2 size={18} />
           <span className="text-[9px]">Broker</span>
@@ -65,7 +65,7 @@ export function MobileBottomNav({ onOpenMenu, onAddTrade, onConnectBroker }: Mob
           onClick={onAddTrade}
           className="flex flex-col items-center justify-center focus-ring"
         >
-          <span className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center text-bg-primary shadow-lg shadow-emerald-500/30">
+          <span className="w-9 h-9 rounded-full bg-gradient-to-br from-profit-bright to-accent flex items-center justify-center text-bg-primary shadow-lg shadow-profit-bright/30">
             <Plus size={22} strokeWidth={2.5} />
           </span>
         </button>
