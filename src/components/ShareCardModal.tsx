@@ -315,7 +315,7 @@ function ShareCardPreview({
   // `isolate` matters here, not just decoration: without it, `relative` alone doesn't create a
   // new stacking context, so the background layer's `-z-10` (below) escapes to the nearest
   // ancestor stacking context instead of staying local — which buried it behind the whole modal.
-  const shellClass = 'relative isolate overflow-hidden border-[3px] border-black shadow-lg shadow-black/40';
+  const shellClass = 'relative isolate overflow-hidden shadow-lg shadow-black/40';
   const usernameStyle = { color: accent.primary };
   const badgeStyle = {
     color: accent.primary,

@@ -8,6 +8,33 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
+// Matches the handful of ways browsers phrase "a lazy-loaded page chunk failed to fetch" —
+// Chrome/Edge, Firefox, and Safari all word it differently. This is a known class of transient
+// failure for code-split apps behind a CDN: a brief window right after a deploy where the
+// already-loaded index.html still points at a chunk hash the CDN has since evicted, or just a
+// one-off network blip on that one request. A plain reload almost always fixes it because the
+// retry hits the current deploy — so we do that reload automatically instead of making the user
+// find the button themselves.
+const CHUNK_LOAD_ERROR_PATTERN =
+  /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Loading chunk .* failed/i;
+
+const RELOAD_GUARD_KEY = 'tc-chunk-reload-at';
+const RELOAD_GUARD_WINDOW_MS = 15_000;
+
+/** True at most once per RELOAD_GUARD_WINDOW_MS — prevents a genuinely broken deploy (where
+ *  reloading never helps) from reload-looping the page forever. A second chunk error within the
+ *  window falls through to the normal fallback UI instead. */
+function shouldAutoReload(): boolean {
+  try {
+    const last = Number(sessionStorage.getItem(RELOAD_GUARD_KEY) || 0);
+    if (Date.now() - last < RELOAD_GUARD_WINDOW_MS) return false;
+    sessionStorage.setItem(RELOAD_GUARD_KEY, String(Date.now()));
+    return true;
+  } catch {
+    return true; // sessionStorage unavailable (e.g. some private-browsing modes) — still try once
+  }
+}
+
 /** Last-resort catch so a render crash shows a recovery screen instead of a blank page. */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { hasError: false };
@@ -18,6 +45,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('Unhandled render error:', error, info.componentStack);
+
+    if (CHUNK_LOAD_ERROR_PATTERN.test(error?.message ?? '') && shouldAutoReload()) {
+      window.location.reload();
+    }
   }
 
   render() {

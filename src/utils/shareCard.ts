@@ -1,7 +1,7 @@
 import type { User } from 'firebase/auth';
 import type { TradingStats } from './stats';
 
-import { SITE_DOMAIN, SITE_ORIGIN } from '../config/site';
+import { SITE_DOMAIN } from '../config/site';
 
 export type SharePeriod = 'day' | 'month' | 'year';
 export type ShareCardOrientation = 'landscape' | 'portrait';
@@ -16,13 +16,17 @@ export function resolveShareCardOrientation(isMobileViewport: boolean): ShareCar
   return isMobileViewport ? 'portrait' : 'landscape';
 }
 
-// Standalone raster mark (public/share-mark.png) referenced by absolute URL rather than inlined —
-// this SVG gets rasterized through an <img>/<canvas> round-trip (see renderSharePngBlob below), so
-// keeping the mark as a same-origin image request avoids bloating the JS bundle with a base64 copy
-// on every page load just for a feature most visitors never use.
-const SHARE_LOGO_MARK = `<image href="${SITE_ORIGIN}/share-mark.png" x="38" y="36" width="46" height="44"/>`;
+// Standalone raster mark (public/share-mark.png) referenced by a root-relative path rather than
+// inlined — this SVG gets rasterized through an <img>/<canvas> round-trip (see renderSharePngBlob
+// below), so keeping the mark as a same-origin image request avoids bloating the JS bundle with a
+// base64 copy on every page load just for a feature most visitors never use. This MUST stay
+// relative (not `${SITE_ORIGIN}/...`) — the export is generated wherever the app is actually
+// running (localhost, a preview deploy, the real domain), and an absolute production URL is only
+// same-origin on the real domain; everywhere else it 404s or gets treated as cross-origin and the
+// mark silently fails to load.
+const SHARE_LOGO_MARK = `<image href="/share-mark.png" x="38" y="36" width="46" height="44"/>`;
 
-const SHARE_LOGO_MARK_SMALL = `<image href="${SITE_ORIGIN}/share-mark.png" x="38" y="337" width="24" height="23"/>`;
+const SHARE_LOGO_MARK_SMALL = `<image href="/share-mark.png" x="38" y="337" width="24" height="23"/>`;
 
 /** The two accent colors that drive the card's nebula glow, badge and username — mirrors how
  *  Starfield.tsx reads --color-profit-bright / --color-accent so the share card matches whichever
@@ -55,7 +59,11 @@ export function hexToRgba(hex: string, alpha: number): string {
 }
 
 // Masks that fade the starfield out before the stat rows so it never competes with the actual
-// numbers, plus clip-paths used to round off a custom background image to the card's corners.
+// numbers, plus the card's rounded-corner clip-paths — used both to crop a custom background
+// image and, wrapped around each builder's whole <g>, to clip everything (glow, starfield, text)
+// to the same rounded silhouette so nothing bleeds into the corners. The PNG export leaves those
+// corners transparent rather than filling them (see renderSharePngBlob) — that's the only way to
+// get an actually-rounded downloaded image rather than a rounded shape painted on a solid square.
 const STARFIELD_DEFS = `<linearGradient id="starFadeLandscape" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#fff"/>
       <stop offset="58%" stop-color="#fff" stop-opacity="0.65"/>
@@ -154,13 +162,12 @@ const STARFIELD_PORTRAIT = starfieldMarkup(STARFIELD_DOTS_PORTRAIT, STARFIELD_LI
  */
 function backgroundLayer(orientation: ShareCardOrientation, backgroundImageHref?: string | null): string {
   const { width, height } = getShareCardDimensions(orientation);
-  const rx = orientation === 'portrait' ? 40 : 32;
 
   if (backgroundImageHref) {
     const clip = orientation === 'portrait' ? 'cardClipPortrait' : 'cardClipLandscape';
-    return `<rect width="${width}" height="${height}" rx="${rx}" fill="#07090f"/>
+    return `<rect width="${width}" height="${height}" fill="#07090f"/>
   <image href="${escapeXml(backgroundImageHref)}" x="0" y="0" width="${width}" height="${height}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clip})"/>
-  <rect width="${width}" height="${height}" rx="${rx}" fill="url(#scrim)"/>`;
+  <rect width="${width}" height="${height}" fill="url(#scrim)"/>`;
   }
 
   const mask = orientation === 'portrait' ? 'starMaskPortrait' : 'starMaskLandscape';
@@ -176,7 +183,7 @@ function backgroundLayer(orientation: ShareCardOrientation, backgroundImageHref?
           { cx: 540, cy: 35, r: 165 },
         ];
 
-  return `<rect width="${width}" height="${height}" rx="${rx}" fill="url(#bg)"/>
+  return `<rect width="${width}" height="${height}" fill="url(#bg)"/>
   <circle cx="${glow1.cx}" cy="${glow1.cy}" r="${glow1.r}" fill="url(#glow1)"/>
   <circle cx="${glow2.cx}" cy="${glow2.cy}" r="${glow2.r}" fill="url(#glow2)"/>
   <g mask="url(#${mask})">${starfield}</g>`;
@@ -341,9 +348,10 @@ function buildShareSvgLandscape(
     ${accentGlowDefs(accent)}
   </defs>
 
+  <g clip-path="url(#cardClipLandscape)">
   ${backgroundLayer('landscape', backgroundImageHref)}
-  <rect x="1.5" y="1.5" width="597" height="397" rx="30.5" fill="none" stroke="#000000" stroke-width="3"/>
-  <rect x="24" y="24" width="552" height="72" rx="20" fill="rgba(15,20,31,0.65)" stroke="rgba(148,163,184,0.12)" stroke-width="1"/>
+  <rect width="600" height="96" fill="rgba(15,20,31,0.65)"/>
+  <line x1="0" y1="96" x2="600" y2="96" stroke="rgba(148,163,184,0.12)" stroke-width="1"/>
 
   ${SHARE_LOGO_MARK}
   <text x="92" y="52" fill="#6cd59f" font-family="Montserrat, system-ui, sans-serif" font-size="14" font-weight="900" letter-spacing="1.5">TREND</text>
@@ -370,6 +378,7 @@ function buildShareSvgLandscape(
 
   ${SHARE_LOGO_MARK_SMALL}
   <text x="70" y="367" fill="#64748b" font-family="system-ui,-apple-system,sans-serif" font-size="13" font-weight="500">${SHARE_SITE_URL}</text>
+  </g>
 </svg>`;
 }
 
@@ -406,10 +415,10 @@ function buildShareSvgPortrait(
     ${accentGlowDefs(accent)}
   </defs>
 
+  <g clip-path="url(#cardClipPortrait)">
   ${backgroundLayer('portrait', backgroundImageHref)}
-  <rect x="1.5" y="1.5" width="447" height="797" rx="38.5" fill="none" stroke="#000000" stroke-width="3"/>
 
-  <image href="${SITE_ORIGIN}/share-mark.png" x="196" y="24" width="58" height="56"/>
+  <image href="/share-mark.png" x="196" y="24" width="58" height="56"/>
   <text x="225" y="118" fill="#6cd59f" font-family="Montserrat, system-ui, sans-serif" font-size="15" font-weight="900" letter-spacing="1.5" text-anchor="middle">TREND CHASERS</text>
   <text x="225" y="138" fill="#8e939d" font-family="system-ui, sans-serif" font-size="11" text-anchor="middle">Track · Analyze · Improve</text>
   <text x="225" y="168" fill="${accent.primary}" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="600" text-anchor="middle">@${username}</text>
@@ -434,6 +443,7 @@ function buildShareSvgPortrait(
 
   <line x1="40" y1="680" x2="410" y2="680" stroke="rgba(148,163,184,0.18)" stroke-width="1"/>
   <text x="225" y="720" fill="#64748b" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="500" text-anchor="middle">${SHARE_SITE_URL}</text>
+  </g>
 </svg>`;
 }
 
@@ -463,8 +473,11 @@ export async function renderSharePngBlob(
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
 
-    ctx.fillStyle = '#07090f';
-    ctx.fillRect(0, 0, width, height);
+    // No fallback fill here on purpose: the card itself is a rounded shape clipped inside the
+    // SVG (see the cardClipLandscape/cardClipPortrait <g> wrapper in buildShareSvgLandscape /
+    // Portrait), so the four corners outside that rounded silhouette are meant to stay fully
+    // transparent in the exported PNG — a solid fill would turn "rounded corners" back into a
+    // plain rectangle with rounded corners painted over a solid background.
     ctx.drawImage(img, 0, 0, width, height);
 
     return await new Promise<Blob | null>((resolve) => {
