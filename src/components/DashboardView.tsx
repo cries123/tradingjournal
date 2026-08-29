@@ -5,13 +5,21 @@ import {
   computeStats,
   getCumulativePnlSeries,
   getDailyPnlForMonth,
+  getEquityCurve,
   getMonthTrades,
   getWeekdayPnl,
   getWinRateSeries,
   getYearTrades,
 } from '../utils/stats';
-import { formatMonthYear } from '../utils/format';
-import { computeJournalingStreak } from '../utils/insights';
+import { formatCurrency, formatMonthYear } from '../utils/format';
+import { computeJournalingStreak, computeTradingInsights } from '../utils/insights';
+import {
+  computeExcursionInsights,
+  computeRMultipleInsights,
+  computeSessionPerformance,
+  sessionPhrase,
+} from '../utils/tradeQuality';
+import { computeTakeaway } from '../utils/takeaway';
 import { useSettings } from '../context/SettingsContext';
 import { AccountSwitcher } from './AccountSwitcher';
 import { BrokerSyncAnnouncement } from './BrokerSyncAnnouncement';
@@ -25,6 +33,10 @@ import { StatsCards } from './StatsCards';
 import { WeekdayChart } from './WeekdayChart';
 import { YearHeatmap } from './YearHeatmap';
 import { TradingInsightsSection } from './analytics/TradingInsightsSection';
+import { EquityCurve } from './analytics/EquityCurve';
+import { ExecutionPanel } from './analytics/ExecutionPanel';
+import { SessionChart } from './analytics/SessionChart';
+import { TakeawayBanner } from './analytics/TakeawayBanner';
 
 type DashboardMode = 'month' | 'year';
 
@@ -89,6 +101,39 @@ export function DashboardView({
   const hasFilters = Boolean(filters.symbol || filters.setup || filters.side || filters.tag);
   const analyticsTrades = mode === 'month' ? monthTrades : yearTrades;
   const streakDays = useMemo(() => computeJournalingStreak(trades), [trades]);
+
+  const equityPoints = useMemo(() => getEquityCurve(analyticsTrades), [analyticsTrades]);
+  const sessions = useMemo(() => computeSessionPerformance(analyticsTrades), [analyticsTrades]);
+  const excursion = useMemo(() => computeExcursionInsights(analyticsTrades), [analyticsTrades]);
+  const rMultiple = useMemo(() => computeRMultipleInsights(analyticsTrades), [analyticsTrades]);
+
+  // One plain-language read of the timing chart, so the panel answers "so what" rather than
+  // leaving the trader to compare bar lengths themselves.
+  const sessionSummary = useMemo(() => {
+    if (!sessions || sessions.length < 2) return null;
+    const sorted = [...sessions].sort((a, b) => b.pnl - a.pnl);
+    const best = sorted[0];
+    const worst = sorted[sorted.length - 1];
+    if (best.pnl <= 0) return null;
+
+    const money = (n: number) => formatCurrency(Math.abs(n), settings.currency);
+    if (worst.pnl < 0) {
+      return `Your best window is ${sessionPhrase(best.session)} (${money(best.pnl)} across ${best.trades} trades). ${
+        sessionPhrase(worst.session).charAt(0).toUpperCase() + sessionPhrase(worst.session).slice(1)
+      } gives back ${money(worst.pnl)}.`;
+    }
+    return `Your best window is ${sessionPhrase(best.session)} — ${money(best.pnl)} across ${best.trades} trades at a ${best.winRate.toFixed(0)}% win rate.`;
+  }, [sessions, settings.currency]);
+
+  const takeaway = useMemo(() => {
+    const insights = computeTradingInsights(analyticsTrades);
+    if (!insights) return null;
+    return computeTakeaway({
+      trades: analyticsTrades,
+      insights,
+      currencyFormat: (n) => formatCurrency(n, settings.currency),
+    });
+  }, [analyticsTrades, settings.currency]);
 
   return (
     <div className="flex flex-col gap-2 md:gap-3 pb-2">
@@ -165,7 +210,29 @@ export function DashboardView({
           periodLabel={mode === 'month' ? formatMonthYear(year, month) : String(year)}
           streakDays={streakDays}
           goalPnl={mode === 'month' ? settings.monthlyGoalPnl : 0}
+          showBenchmark={mode === 'month'}
         />
+      )}
+
+      {hasAnyTrades && <TakeawayBanner takeaway={takeaway} />}
+
+      {hasAnyTrades && equityPoints.length >= 2 && (
+        <div className="panel-card p-3 md:p-4">
+          <div className="flex items-start justify-between gap-2 mb-1 md:mb-2">
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
+                Equity
+              </p>
+              <h3 className="text-[10px] md:text-sm font-semibold text-text-primary">
+                Cumulative P&amp;L {mode === 'month' ? formatMonthYear(year, month) : year}
+              </h3>
+            </div>
+            <span className="text-[9px] md:text-[10px] text-text-secondary shrink-0 pt-0.5 hidden sm:block">
+              Shaded area = drawdown from your running high
+            </span>
+          </div>
+          <EquityCurve points={equityPoints} />
+        </div>
       )}
 
       {hasAnyTrades && <WeeklyRecapCard trades={trades} />}
@@ -216,7 +283,7 @@ export function DashboardView({
             <div className="flex items-start justify-between mb-1.5 md:mb-3 shrink-0 gap-2">
               <div>
                 <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
-                  Sessions
+                  Days
                 </p>
                 <h3 className="text-[10px] md:text-sm font-semibold whitespace-nowrap text-text-primary">Gross Daily P&L</h3>
               </div>
@@ -233,6 +300,32 @@ export function DashboardView({
               <DailyPnlChart data={dailyPnl} />
             </div>
           </div>
+        </div>
+      )}
+
+      {hasAnyTrades && (sessions || excursion || rMultiple) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
+          {sessions && (
+            <div className="panel-card p-3 md:p-4 flex flex-col min-h-[140px]">
+              <div className="mb-1.5 md:mb-3 shrink-0">
+                <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
+                  Timing
+                </p>
+                <h3 className="text-[10px] md:text-sm font-semibold text-text-primary">
+                  Performance by Time of Day
+                </h3>
+              </div>
+              <div className="flex-1 min-h-[80px]">
+                <SessionChart data={sessions} />
+              </div>
+              {sessionSummary && (
+                <p className="text-[10px] md:text-[11px] text-text-secondary mt-2 leading-snug shrink-0">
+                  {sessionSummary}
+                </p>
+              )}
+            </div>
+          )}
+          <ExecutionPanel excursion={excursion} rMultiple={rMultiple} />
         </div>
       )}
 

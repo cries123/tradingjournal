@@ -212,6 +212,27 @@ body {
   }
 }
 
+/* Bars that grow out from a centre baseline. Pure CSS so a chart can animate on data change
+   via a changing `key` alone, with no setState-in-effect to schedule it. */
+@keyframes grow-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.bar-grow {
+  animation: grow-x 0.45s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar-grow {
+    animation: none;
+  }
+}
+
 @keyframes shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }

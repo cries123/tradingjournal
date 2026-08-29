@@ -1,7 +1,10 @@
 import { Flame, Target } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
+import { useBenchmark } from '../hooks/useBenchmark';
 import type { TradingStats } from '../utils/stats';
 import { formatCurrency } from '../utils/format';
+import { breakevenWinRate } from '../utils/metricVerdict';
+import { BenchmarkChip } from './analytics/BenchmarkChip';
 import { Sparkline } from './Sparkline';
 
 interface StatsCardsProps {
@@ -13,6 +16,9 @@ interface StatsCardsProps {
   streakDays?: number;
   /** Monthly P&L goal — renders a progress bar when > 0. */
   goalPnl?: number;
+  /** Show the vs-SPY comparison. Only true for the month view — the endpoint reports
+   *  month-to-date, so pinning it next to a year total would be comparing different windows. */
+  showBenchmark?: boolean;
 }
 
 export function StatsCards({
@@ -22,12 +28,25 @@ export function StatsCards({
   periodLabel,
   streakDays = 0,
   goalPnl = 0,
+  showBenchmark = false,
 }: StatsCardsProps) {
   const { settings } = useSettings();
   const hasTrades = stats.totalTrades > 0;
   const isProfit = stats.netPnl >= 0;
   const winPct = hasTrades ? stats.winRate : 0;
   const fmt = (n: number) => formatCurrency(n, settings.currency);
+
+  // Comparing dollars to an index's percentage move is meaningless, so the benchmark only loads
+  // once the trader has told us what capital those dollars were made on.
+  const canCompare = showBenchmark && hasTrades && settings.accountSize > 0;
+  const benchmark = useBenchmark(canCompare);
+  const returnPct = canCompare ? (stats.netPnl / settings.accountSize) * 100 : 0;
+
+  // Win rate is only meaningful against the rate this trader's own win/loss sizes require.
+  // Needs both sides: with no losers avgRR degrades to a raw dollar figure, not a ratio, and
+  // feeding that in would produce a confidently wrong "you need 2% winners".
+  const hasBothSides = stats.winningTrades > 0 && stats.losingTrades > 0;
+  const breakeven = hasBothSides ? breakevenWinRate(stats.avgRR, 1) : null;
 
   return (
     <div className={`hero-card ${!isProfit && hasTrades ? 'hero-loss' : ''} shrink-0 p-3 md:p-5`}>
@@ -71,11 +90,32 @@ export function StatsCards({
                 <span className="chip-value text-amber-300">{streakDays}-day streak</span>
               </span>
             )}
-            <span className="stat-chip">
+            {canCompare && <BenchmarkChip returnPct={returnPct} quote={benchmark} />}
+            <span
+              className="stat-chip"
+              title={
+                breakeven !== null
+                  ? `At your average win/loss you need ${breakeven.toFixed(0)}% winners to break even`
+                  : undefined
+              }
+            >
               Win rate{' '}
-              <span className={`chip-value ${winPct >= 50 ? 'text-profit-bright' : 'text-loss-bright'}`}>
+              <span
+                className={`chip-value ${
+                  breakeven !== null
+                    ? winPct >= breakeven
+                      ? 'text-profit-bright'
+                      : 'text-loss-bright'
+                    : 'text-text-primary'
+                }`}
+              >
                 {winPct.toFixed(0)}%
               </span>
+              {breakeven !== null && (
+                <span className="text-[10px] text-text-secondary">
+                  need {breakeven.toFixed(0)}%
+                </span>
+              )}
               {winRateSeries.length >= 2 && (
                 <Sparkline values={winRateSeries} positive={winPct >= 50} width={36} height={12} />
               )}

@@ -4,6 +4,14 @@ import type { Trade } from '../../types';
 import { useSettings } from '../../context/SettingsContext';
 import { formatCurrency } from '../../utils/format';
 import { computeTradingInsights } from '../../utils/insights';
+import type { Verdict } from '../../utils/metricVerdict';
+import {
+  drawdownVerdict,
+  expectancyVerdict,
+  profitFactorVerdict,
+  winRateVerdict,
+  VERDICT_TEXT_CLASS,
+} from '../../utils/metricVerdict';
 import { checkRuleViolations } from '../../utils/tradingRules';
 
 interface TradingInsightsSectionProps {
@@ -13,45 +21,6 @@ interface TradingInsightsSectionProps {
 function formatDayLabel(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-function EquitySparkline({ series }: { series: number[] }) {
-  if (series.length < 2) return null;
-
-  const width = 100;
-  const height = 28;
-  const min = Math.min(0, ...series);
-  const max = Math.max(0, ...series);
-  const range = max - min || 1;
-
-  const points = series
-    .map((value, i) => {
-      const x = (i / (series.length - 1)) * width;
-      const y = height - ((value - min) / range) * height;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
-
-  const positive = series[series.length - 1] >= 0;
-
-  return (
-    <svg
-      viewBox={`0 0 ${width} ${height}`}
-      className="w-full h-8"
-      preserveAspectRatio="none"
-      aria-hidden
-    >
-      <polyline
-        points={points}
-        fill="none"
-        stroke={positive ? 'var(--color-profit-bright)' : 'rgb(248 113 113)'}
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
-  );
 }
 
 export function TradingInsightsSection({ trades }: TradingInsightsSectionProps) {
@@ -130,6 +99,7 @@ export function TradingInsightsSection({ trades }: TradingInsightsSectionProps) 
           label="Expectancy / trade"
           value={formatCurrency(insights.expectancyPerTrade, currency)}
           tone={insights.expectancyPerTrade >= 0 ? 'profit' : 'loss'}
+          verdict={expectancyVerdict(insights.expectancyPerTrade)}
         />
         <Metric
           label="Profit factor"
@@ -137,6 +107,7 @@ export function TradingInsightsSection({ trades }: TradingInsightsSectionProps) 
             insights.profitFactor === Infinity ? '∞' : insights.profitFactor.toFixed(2)
           }
           tone={insights.profitFactor >= 1 ? 'profit' : 'loss'}
+          verdict={profitFactorVerdict(insights.profitFactor)}
         />
         <Metric
           label="Avg win / avg loss"
@@ -176,8 +147,16 @@ export function TradingInsightsSection({ trades }: TradingInsightsSectionProps) 
           label="Max drawdown"
           value={formatCurrency(-insights.maxDrawdown, currency)}
           tone="loss"
+          verdict={drawdownVerdict(
+            insights.maxDrawdown,
+            insights.equitySeries[insights.equitySeries.length - 1] ?? 0,
+          )}
         />
-        <Metric label="Win rate" value={`${insights.winRate.toFixed(0)}%`} />
+        <Metric
+          label="Win rate"
+          value={`${insights.winRate.toFixed(0)}%`}
+          verdict={winRateVerdict(insights.winRate, insights.avgWin, insights.avgLoss)}
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -232,27 +211,23 @@ export function TradingInsightsSection({ trades }: TradingInsightsSectionProps) 
         </div>
       )}
 
-      <div className="rounded-lg bg-bg-tertiary/50 border border-border/40 p-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-          <p className="text-[9px] uppercase tracking-wide text-text-secondary">Momentum</p>
-          <p className="text-[10px] text-text-secondary">
-            Last 5 sessions:{' '}
-            <span
-              className={`font-semibold ${
-                insights.recentNet >= 0 ? 'text-profit-bright' : 'text-loss-bright'
-              }`}
-            >
-              {formatCurrency(insights.recentNet, currency)}
+      <div className="rounded-lg bg-bg-tertiary/50 border border-border/40 px-2.5 py-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[9px] uppercase tracking-wide text-text-secondary">Momentum</p>
+        <p className="text-[10px] text-text-secondary">
+          Last 5 sessions:{' '}
+          <span
+            className={`font-semibold ${
+              insights.recentNet >= 0 ? 'text-profit-bright' : 'text-loss-bright'
+            }`}
+          >
+            {formatCurrency(insights.recentNet, currency)}
+          </span>
+          {momentumDelta != null && (
+            <span className="ml-1.5">
+              {momentumDelta >= 0 ? '▲' : '▼'} vs prior 5
             </span>
-            {momentumDelta != null && (
-              <span className="ml-1.5">
-                {momentumDelta >= 0 ? '▲' : '▼'} vs prior 5
-              </span>
-            )}
-          </p>
-        </div>
-        <EquitySparkline series={insights.equitySeries} />
-        <p className="text-[9px] text-text-secondary mt-1">Cumulative net P&L by session</p>
+          )}
+        </p>
       </div>
     </section>
   );
@@ -306,10 +281,14 @@ function Metric({
   label,
   value,
   tone,
+  verdict,
 }: {
   label: string;
   value: string;
   tone?: 'profit' | 'loss';
+  /** Short read on whether this number is good. Omitted for metrics that can't be honestly
+   *  graded on their own — "best day" isn't good or bad, it's just a fact. */
+  verdict?: Verdict;
 }) {
   const valueClass =
     tone === 'profit' ? 'text-profit-bright' : tone === 'loss' ? 'text-loss-bright' : 'text-text-primary';
@@ -317,6 +296,11 @@ function Metric({
     <div className="rounded-lg bg-bg-tertiary/50 border border-border/40 px-2.5 py-2">
       <p className="text-[9px] uppercase tracking-wide text-text-secondary">{label}</p>
       <p className={`text-sm font-semibold mt-0.5 ${valueClass}`}>{value}</p>
+      {verdict && (
+        <p className={`text-[9px] mt-0.5 leading-snug ${VERDICT_TEXT_CLASS[verdict.tone]}`}>
+          {verdict.label}
+        </p>
+      )}
     </div>
   );
 }

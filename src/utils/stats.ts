@@ -178,3 +178,30 @@ export function getWinRateSeries(trades: Trade[], year: number, month: number): 
   }
   return series;
 }
+
+export interface EquityPoint {
+  date: string;
+  equity: number;
+}
+
+/**
+ * Cumulative net P&L per trading session, carrying the date with it.
+ *
+ * getCumulativePnlSeries above returns bare numbers, which is all a sparkline needs. The full
+ * equity curve also has to label its axis and its hover readout, so it needs the dates that
+ * produced each point rather than just their order.
+ */
+export function getEquityCurve(trades: Trade[]): EquityPoint[] {
+  const byDay = new Map<string, number>();
+  for (const trade of trades) {
+    byDay.set(trade.date, (byDay.get(trade.date) ?? 0) + trade.pnl);
+  }
+
+  let running = 0;
+  return [...byDay.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, pnl]) => {
+      running += pnl;
+      return { date, equity: running };
+    });
+}

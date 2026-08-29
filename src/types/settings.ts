@@ -20,6 +20,10 @@ export interface UserSettings {
   tradingRules: TradingRules;
   /** Monthly net P&L target — 0 disables the goal tracker. */
   monthlyGoalPnl: number;
+  /** Trading capital, used to express P&L as a percentage return so it can be compared against
+   *  a benchmark like SPY. 0 means "not set" — the comparison is hidden rather than guessed at,
+   *  since dollars and an index's percentage move aren't comparable without it. */
+  accountSize: number;
   remindersEnabled: boolean;
   /** Local HH:MM for end-of-day journal reminder */
   reminderTime: string;
@@ -54,6 +58,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   strategies: [],
   tradingRules: DEFAULT_TRADING_RULES,
   monthlyGoalPnl: 0,
+  accountSize: 0,
   remindersEnabled: false,
   reminderTime: '16:00',
   coachShareEnabled: false,

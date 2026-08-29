@@ -149,7 +149,7 @@ export function MobileNavPanel({
         <div className="my-3 border-t border-border/50" />
 
         <button type="button" onClick={launch} className="w-full btn-primary text-sm py-3">
-          Sign up
+          Sign up / Sign in
         </button>
       </nav>
     </div>

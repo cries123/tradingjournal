@@ -304,7 +304,10 @@ export function LandingNav({
             }}
             className="btn-primary text-sm px-4 sm:px-5 py-2.5 shrink-0"
           >
-            Sign up
+            {/* Shorter on narrow phones so it doesn't crowd the logo + menu button off the edge —
+                the auth modal it opens lets you switch between signing up and signing in either way. */}
+            <span className="sm:hidden">Sign in</span>
+            <span className="hidden sm:inline">Sign up / Sign in</span>
           </a>
         </div>
       </div>

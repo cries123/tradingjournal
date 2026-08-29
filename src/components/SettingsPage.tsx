@@ -434,6 +434,26 @@ export function SettingsPage({
               placeholder="2000"
             />
           </label>
+          <label className="block">
+            <span className="text-xs text-text-secondary mb-1 block">
+              Trading capital (unlocks % return vs SPY)
+            </span>
+            <input
+              type="number"
+              step="500"
+              min="0"
+              value={settings.accountSize || ''}
+              onChange={(e) =>
+                updateSettings({ accountSize: Math.max(0, Number(e.target.value) || 0) })
+              }
+              className="input-field"
+              placeholder="25000"
+            />
+            <span className="text-[11px] text-text-secondary mt-1 block">
+              Only used to turn your P&amp;L into a percentage so it can be compared to the market.
+              Leave blank to keep the dashboard in dollars.
+            </span>
+          </label>
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"

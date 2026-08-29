@@ -23,6 +23,12 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
  *  summary cell instead, since it's almost never a trading day. */
 const TRADING_DAYS_PER_WEEK = 6;
 
+/** True when one of this week's cells is today — that row stays full height even when empty,
+ *  since it's the one the trader is most likely to click into to log a session. */
+function weekHasToday(week: { days: { date: Date | null }[] }, today: Date): boolean {
+  return week.days.some((d) => d.date?.getDate() === today.getDate());
+}
+
 export function DashboardCalendar({
   year,
   month,
@@ -87,27 +93,36 @@ export function DashboardCalendar({
       </div>
 
       <div key={`${year}-${month}`} className="grid grid-cols-7 gap-0.5 md:gap-2 animate-fade-up motion-safe:animate-fade-up">
-        {weeks.flatMap((week, wi) => [
-          ...week.days.slice(0, TRADING_DAYS_PER_WEEK).map((day, di) => (
-            <DashboardDayCell
-              key={day.date?.toISOString() ?? `e-${wi}-${di}`}
-              dayNumber={day.date?.getDate() ?? null}
-              summary={day.summary}
-              intensity={
-                day.summary && day.summary.tradeCount > 0 && maxDayAbs > 0
-                  ? Math.abs(day.summary.totalPnl) / maxDayAbs
-                  : 0
-              }
-              isToday={isCurrentMonth && day.date?.getDate() === today.getDate()}
-              onClick={
-                day.date
-                  ? () => onDayClick(`${year}-${String(month + 1).padStart(2, '0')}-${String(day.date!.getDate()).padStart(2, '0')}`)
-                  : undefined
-              }
-            />
-          )),
-          <DashboardWeekTotalCell key={`week-total-${wi}`} summary={week.summary} />,
-        ])}
+        {weeks.flatMap((week, wi) => {
+          // Weeks with nothing in them collapse to a slim row. A month that begins on a Friday
+          // otherwise opens with two full-height rows of empty cells, which pushed the actual
+          // trading days below the fold for no information gain. The row stays visible (rather
+          // than being dropped) so the month's shape and the date alignment still read correctly.
+          const compact = week.summary.tradeCount === 0 && !(isCurrentMonth && weekHasToday(week, today));
+
+          return [
+            ...week.days.slice(0, TRADING_DAYS_PER_WEEK).map((day, di) => (
+              <DashboardDayCell
+                key={day.date?.toISOString() ?? `e-${wi}-${di}`}
+                dayNumber={day.date?.getDate() ?? null}
+                summary={day.summary}
+                compact={compact}
+                intensity={
+                  day.summary && day.summary.tradeCount > 0 && maxDayAbs > 0
+                    ? Math.abs(day.summary.totalPnl) / maxDayAbs
+                    : 0
+                }
+                isToday={isCurrentMonth && day.date?.getDate() === today.getDate()}
+                onClick={
+                  day.date
+                    ? () => onDayClick(`${year}-${String(month + 1).padStart(2, '0')}-${String(day.date!.getDate()).padStart(2, '0')}`)
+                    : undefined
+                }
+              />
+            )),
+            <DashboardWeekTotalCell key={`week-total-${wi}`} summary={week.summary} compact={compact} />,
+          ];
+        })}
       </div>
     </div>
   );

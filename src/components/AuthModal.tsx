@@ -31,9 +31,10 @@ function authErrorMessage(code: string): string {
 }
 
 const BENEFITS = [
-  'Sync trades across devices',
-  'Never connects to your broker',
-  'Your data stays in your account',
+  'Auto-sync trades from 20 brokers, read-only',
+  'See which setups pay and which ones bleed',
+  'Know if you exit winners too early',
+  'Your journal syncs across every device',
 ];
 
 export function AuthModal() {
@@ -129,7 +130,7 @@ export function AuthModal() {
               {mode === 'login'
                 ? 'Sign in to sync your journal to the cloud and access it from any device.'
                 : mode === 'signup'
-                  ? 'Start journaling with cloud backup. Connect a broker later, or keep it manual.'
+                  ? 'Free to start. Connect a broker for automatic syncing, or log trades by hand — switch anytime.'
                   : 'Enter your email and we\'ll send a link to reset your password.'}
             </p>
           </div>
