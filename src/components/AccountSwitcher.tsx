@@ -15,8 +15,13 @@ export function AccountSwitcher() {
     setAdding(false);
   };
 
+  // With a single journal and no add in progress there is nothing to switch between, so on
+  // phones this panel was ~150px of chrome asking the user to choose between one option. Desktop
+  // keeps it visible since the space is free there and it advertises that journals exist.
+  const hasChoice = settings.accounts.length > 1 || adding;
+
   return (
-    <div className="panel-card p-2 md:p-3 shrink-0">
+    <div className={`panel-card p-2 md:p-3 shrink-0 ${hasChoice ? '' : 'hidden md:block'}`}>
       <div className="flex items-center gap-2 mb-2">
         <BookOpen size={14} className="text-accent shrink-0" />
         <p className="text-[10px] md:text-xs uppercase tracking-widest text-text-secondary font-medium">

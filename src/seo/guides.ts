@@ -1,3 +1,4 @@
+import { BROKER_COUNT_PHRASE, BROKER_EXAMPLES } from '../data/brokerCopy';
 export interface GuideArticle {
   slug: string;
   title: string;
@@ -11,13 +12,13 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
     slug: 'broker-sync-now-live',
     title: 'Broker Sync Is Live',
     description:
-      'Automatic trade sync for Schwab and Robinhood is now live — read-only, so Trend Chasers never sees your balance or places trades on your behalf.',
+      `Automatic trade sync for ${BROKER_COUNT_PHRASE} is now live — read-only, so Trend Chasers never sees your balance or places trades on your behalf.`,
     path: '/guides/broker-sync-now-live',
     sections: [
       {
         heading: "What's new",
         paragraphs: [
-          'You can now connect Charles Schwab (thinkorswim accounts included) or Robinhood and have your round-trip trades sync straight into your calendar — no more copying numbers over by hand.',
+          `You can now connect any of ${BROKER_COUNT_PHRASE} — ${BROKER_EXAMPLES} and more, with thinkorswim accounts covered by the Schwab connection — and have your round-trip trades sync straight into your calendar, no more copying numbers over by hand.`,
           'The connection is brokered by SnapTrade, a dedicated broker-data provider built for exactly this. Your login goes to your broker\'s own site or SnapTrade\'s secure portal — never to Trend Chasers.',
         ],
       },
@@ -31,7 +32,7 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
       {
         heading: 'How to turn it on',
         paragraphs: [
-          'Open Connect broker from the sidebar, choose Schwab or Robinhood, and approve the read-only connection on your broker\'s own site. Come back, click Refresh, then Sync trades on your account — your history fills in automatically.',
+          `Open Connect broker from the sidebar, choose your broker from the ${BROKER_COUNT_PHRASE} supported, and approve the read-only connection on your broker's own site. Come back, click Refresh, then Sync trades on your account — your history fills in automatically.`,
           'Nothing changes if you\'d rather not connect anything. Manual entry works exactly as it always has, and the two mix freely — sync one account, log another by hand.',
         ],
       },
@@ -54,7 +55,7 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
         heading: 'What makes a good free trading journal?',
         paragraphs: [
           'A trading journal should show your results clearly — not bury them in rows. Trend Chasers is built around a visual P&L calendar so green and red days stand out immediately.',
-          'You get net P&L, win rate, profit factor, and average profit per trade without exporting to another tool. Connect Schwab or Robinhood to sync trades automatically, or log them manually.',
+          `You get net P&L, win rate, profit factor, and average profit per trade without exporting to another tool. Connect any of ${BROKER_COUNT_PHRASE} to sync trades automatically, or log them manually.`,
         ],
       },
       {
@@ -70,7 +71,7 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
     slug: 'how-broker-sync-works',
     title: 'How Broker Sync Works',
     description:
-      'Connect Schwab or Robinhood and let trades sync automatically — how the connection works, what data it reads, and how to disconnect.',
+      `Connect any of ${BROKER_COUNT_PHRASE} and let trades sync automatically — how the connection works, what data it reads, and how to disconnect.`,
     path: '/guides/how-broker-sync-works',
     sections: [
       {

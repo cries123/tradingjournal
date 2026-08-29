@@ -95,13 +95,12 @@ export function ProductsDropdown({ onLaunch, onNavigate }: ProductsDropdownProps
             onClick={() => go('ai-assistant')}
             className="w-full flex items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-bg-primary transition-colors"
           >
-            <Sparkles className="h-4 w-4 mt-0.5 text-text-secondary shrink-0" aria-hidden />
+            <Sparkles className="h-4 w-4 mt-0.5 text-emerald-400 shrink-0" aria-hidden />
             <span className="flex-1 min-w-0">
-              <span className="flex items-center gap-2">
-                <span className="block text-sm font-medium text-text-primary">AI Assistant</span>
-                <ComingSoonBadge />
+              <span className="block text-sm font-medium text-text-primary">AI Assistant</span>
+              <span className="block text-xs text-text-secondary">
+                Ask why a setup keeps losing
               </span>
-              <span className="block text-xs text-text-secondary">Get insights on your trading habits</span>
             </span>
           </button>
 

@@ -6,6 +6,7 @@ import { useVisitorTracking } from './hooks/useVisitorTracking';
 import { getPageSeo } from './seo/pageMeta';
 import { PageTransition } from './components/motion/FadeIn';
 import { LandingPage } from './pages/LandingPage';
+import { setPendingAppView } from './utils/pendingAppView';
 
 const AdminPage = lazy(() => import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })));
 const BrokerGuidePage = lazy(() => import('./pages/BrokerGuidePage').then((m) => ({ default: m.BrokerGuidePage })));
@@ -36,7 +37,8 @@ function RouteLoading() {
 }
 
 export default function App() {
-  const { route, coachToken, guideSlug, brokerSlug, navigate, navigateGuide } = useRoute();
+  const { route, coachToken, guideSlug, brokerSlug, navigate, navigateGuide, navigateBrokerGuide } =
+    useRoute();
   usePageMeta(getPageSeo(route, coachToken, guideSlug, brokerSlug));
   useStructuredData(route, guideSlug, brokerSlug);
   useVisitorTracking(route, guideSlug, brokerSlug);
@@ -49,6 +51,12 @@ export default function App() {
   const goRequestBroker = () => navigate('request-broker');
   const goAdmin = () => navigate('admin');
   const goGuides = () => navigate('guides');
+  const goReportBug = () => navigate('report-bug');
+  /** Opens the journal on the broker screen rather than the dashboard. */
+  const goConnectBroker = () => {
+    setPendingAppView('connect-broker');
+    navigate('app');
+  };
 
   const publicPageProps = {
     onHome: goHome,
@@ -59,17 +67,24 @@ export default function App() {
     onRequestBroker: goRequestBroker,
     onGuides: goGuides,
     onGuide: navigateGuide,
+    onBrokerGuide: navigateBrokerGuide,
+    onReportBug: goReportBug,
     onNavigate: navigate,
   };
 
-  const COMING_SOON_COPY: Record<'market-simulator' | 'ai-assistant' | 'pricing', { feature: string; description: string }> = {
+  const COMING_SOON_COPY: Record<
+    'market-simulator' | 'ai-assistant' | 'pricing',
+    { feature: string; description: string; eyebrow?: string }
+  > = {
     'market-simulator': {
       feature: 'Market Simulator',
       description: "We're building a risk-free way to practice trading strategies before you put real money on the line. Check back soon.",
     },
     'ai-assistant': {
-      feature: 'AI Assistant',
-      description: "An AI assistant that spots patterns in your trading history and helps you understand your own edge is on the way.",
+      feature: 'Trading Assistant',
+      eyebrow: 'Now live',
+      description:
+        "Open your journal and ask why a setup keeps losing, what happens when you trade the open, or whether you're cutting winners early. It reads the stats your journal already computed \u2014 so its numbers always match your dashboard \u2014 and it reviews what you actually did rather than telling you what to trade next.",
     },
     pricing: {
       feature: 'Pricing',
@@ -119,6 +134,7 @@ export default function App() {
     content = (
       <LandingPage
         onLaunch={goApp}
+        onConnectBroker={goConnectBroker}
         onHome={goHome}
         onPrivacy={goPrivacy}
         onTerms={goTerms}

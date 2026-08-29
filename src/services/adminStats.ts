@@ -23,6 +23,7 @@ export interface AdminServerStats {
   brokerAccountCount: number;
   brokerAbandonedCount: number;
   brokerInstitutions: BrokerInstitutionCount[];
+  brokerStatsPartial: boolean;
 }
 
 export interface AdminServerStatsResult {
@@ -82,6 +83,7 @@ export async function fetchAdminServerStats(): Promise<AdminServerStatsResult> {
         brokerAccountCount: num(data.brokerAccountCount),
         brokerAbandonedCount: num(data.brokerAbandonedCount),
         brokerInstitutions: Array.isArray(data.brokerInstitutions) ? data.brokerInstitutions : [],
+        brokerStatsPartial: data.brokerStatsPartial === true,
       },
       error: null,
     };

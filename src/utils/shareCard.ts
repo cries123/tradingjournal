@@ -12,21 +12,69 @@ export function getShareCardDimensions(orientation: ShareCardOrientation): { wid
   return orientation === 'portrait' ? { width: 450, height: 800 } : { width: 600, height: 400 };
 }
 
+/**
+ * How much bigger the exported PNG is than the card's layout coordinates.
+ *
+ * The card was previously written out at its design size — 450x800 — which is a fraction of what
+ * anything displays it at. A story slot is 1080x1920, so a 450-wide export was being blown up
+ * 2.4x by Instagram before anyone even saw it, and on a 3x phone screen it was soft in the photo
+ * roll too. That upscaling is what read as "pixelated"; nothing was wrong with the card itself.
+ *
+ * Portrait targets 1080x1920 exactly so a story does no resampling at all. Landscape goes to
+ * 1800x1200, comfortably above what any timeline renders it at.
+ *
+ * The card is vector, so this costs nothing in quality. The one raster asset is the logo mark
+ * (240x230), drawn at 58 units wide — 139px at 2.4x — so it stays well inside its native
+ * resolution and doesn't become the new soft spot.
+ */
+export function getShareExportScale(orientation: ShareCardOrientation): number {
+  return orientation === 'portrait' ? 2.4 : 3;
+}
+
+/**
+ * Rewrites the root <svg> element's width/height to the target pixel size, leaving viewBox alone
+ * so every coordinate in the card still means the same thing.
+ *
+ * Needed because a browser rasterizes an SVG loaded into an <img> at its *intrinsic* size, and
+ * only some engines re-rasterize the vector when drawImage scales it up. Chromium happens to
+ * (measured: an upscaled draw and a natively-sized one came out equally sharp), but Safari — the
+ * browser most of this feature's users are on — is not reliable about it. Setting the intrinsic
+ * size explicitly means the vector is rasterized at full resolution everywhere rather than
+ * depending on that.
+ */
+function withSvgPixelSize(svg: string, width: number, height: number): string {
+  return svg.replace(
+    /^(\s*<svg\b[^>]*?)\swidth="[\d.]+"\s+height="[\d.]+"/,
+    `$1 width="${width}" height="${height}"`,
+  );
+}
+
 export function resolveShareCardOrientation(isMobileViewport: boolean): ShareCardOrientation {
   return isMobileViewport ? 'portrait' : 'landscape';
 }
 
-// Standalone raster mark (public/share-mark.png) referenced by a root-relative path rather than
-// inlined — this SVG gets rasterized through an <img>/<canvas> round-trip (see renderSharePngBlob
-// below), so keeping the mark as a same-origin image request avoids bloating the JS bundle with a
-// base64 copy on every page load just for a feature most visitors never use. This MUST stay
-// relative (not `${SITE_ORIGIN}/...`) — the export is generated wherever the app is actually
-// running (localhost, a preview deploy, the real domain), and an absolute production URL is only
-// same-origin on the real domain; everywhere else it 404s or gets treated as cross-origin and the
-// mark silently fails to load.
-const SHARE_LOGO_MARK = `<image href="/share-mark.png" x="38" y="36" width="46" height="44"/>`;
+export const SHARE_MARK_PATH = '/share-mark.png';
 
-const SHARE_LOGO_MARK_SMALL = `<image href="/share-mark.png" x="38" y="337" width="24" height="23"/>`;
+/**
+ * Where the logo mark comes from, per render target.
+ *
+ * The live preview inlines its SVG into the DOM, where a root-relative href resolves against the
+ * page and loads fine. The PNG export does NOT: it serialises the SVG to a Blob and loads it via
+ * `new Image()`, and a relative href inside a document loaded from a `blob:` URL has no usable
+ * base to resolve against, so the request never happens and the logo silently vanishes from the
+ * downloaded image. Measured in a real browser through the exact export pipeline — relative href
+ * drew 0 pixels, a data URI drew the mark correctly.
+ *
+ * So the export path must pass a data URI (see resolveShareMarkDataUri). The relative default is
+ * only ever used by the preview.
+ */
+function shareLogoMark(href: string): string {
+  return `<image href="${href}" x="38" y="36" width="46" height="44"/>`;
+}
+
+function shareLogoMarkSmall(href: string): string {
+  return `<image href="${href}" x="38" y="337" width="24" height="23"/>`;
+}
 
 /** The two accent colors that drive the card's nebula glow, badge and username — mirrors how
  *  Starfield.tsx reads --color-profit-bright / --color-accent so the share card matches whichever
@@ -232,6 +280,37 @@ export async function resolveBackgroundImageDataUri(url: string | null | undefin
   }
 }
 
+let markDataUriPromise: Promise<string | null> | null = null;
+
+/**
+ * Loads the logo mark as a base64 data URI for the PNG export.
+ *
+ * Cached for the session: the file is a few KB and never changes, and the export is usually
+ * triggered more than once. Returns null on failure so the caller can fall back to the relative
+ * path — a card with no logo still beats a card that won't export at all.
+ */
+export function resolveShareMarkDataUri(): Promise<string | null> {
+  if (markDataUriPromise) return markDataUriPromise;
+
+  markDataUriPromise = (async () => {
+    try {
+      const res = await fetch(SHARE_MARK_PATH);
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('Could not read logo mark'));
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return null;
+    }
+  })();
+
+  return markDataUriPromise;
+}
+
 const PERIOD_BADGE: Record<SharePeriod, string> = {
   day: 'TRADING SESSION',
   month: 'MONTHLY RECAP',
@@ -311,15 +390,20 @@ export function buildShareSvg(
   orientation: ShareCardOrientation = 'landscape',
   accent: ShareCardAccent = DEFAULT_SHARE_ACCENT,
   backgroundImageHref?: string | null,
+  /** Data URI for the logo mark. Required for the PNG export — see shareLogoMark. */
+  markHref: string = SHARE_MARK_PATH,
 ): string {
-  if (orientation === 'portrait') return buildShareSvgPortrait(data, accent, backgroundImageHref);
-  return buildShareSvgLandscape(data, accent, backgroundImageHref);
+  if (orientation === 'portrait') {
+    return buildShareSvgPortrait(data, accent, backgroundImageHref, markHref);
+  }
+  return buildShareSvgLandscape(data, accent, backgroundImageHref, markHref);
 }
 
 function buildShareSvgLandscape(
   data: ShareSvgInput,
   accent: ShareCardAccent,
   backgroundImageHref?: string | null,
+  markHref: string = SHARE_MARK_PATH,
 ): string {
   const pnlColor = data.isProfit ? '#34d399' : '#f87171';
   const badge = PERIOD_BADGE[data.period];
@@ -353,7 +437,7 @@ function buildShareSvgLandscape(
   <rect width="600" height="96" fill="rgba(15,20,31,0.65)"/>
   <line x1="0" y1="96" x2="600" y2="96" stroke="rgba(148,163,184,0.12)" stroke-width="1"/>
 
-  ${SHARE_LOGO_MARK}
+  ${shareLogoMark(markHref)}
   <text x="92" y="52" fill="#6cd59f" font-family="Montserrat, system-ui, sans-serif" font-size="14" font-weight="900" letter-spacing="1.5">TREND</text>
   <text x="92" y="68" fill="#f8fafc" font-family="Montserrat, system-ui, sans-serif" font-size="14" font-weight="900" letter-spacing="1.5">CHASERS</text>
   <text x="92" y="82" fill="#8e939d" font-family="system-ui, sans-serif" font-size="10">Track · Analyze · Improve</text>
@@ -376,16 +460,28 @@ function buildShareSvgLandscape(
   <text x="400" y="296" fill="#64748b" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="600" letter-spacing="1">PROFIT FACTOR</text>
   <text x="400" y="322" fill="#f1f5f9" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="700">${escapeXml(data.profitFactor)}</text>
 
-  ${SHARE_LOGO_MARK_SMALL}
+  ${shareLogoMarkSmall(markHref)}
   <text x="70" y="367" fill="#64748b" font-family="system-ui,-apple-system,sans-serif" font-size="13" font-weight="500">${SHARE_SITE_URL}</text>
   </g>
 </svg>`;
+}
+
+/** One of the three stat columns on the portrait card. 118 wide with 8px gutters spans 40..410. */
+function statColumn(x: number, value: string, label: string, accent: ShareCardAccent): string {
+  const centre = x + 59;
+  return `<rect x="${x}" y="455" width="118" height="96" rx="16" fill="rgba(15,20,31,0.6)" stroke="${hexToRgba(
+    accent.primary,
+    0.16,
+  )}" stroke-width="1"/>
+  <text x="${centre}" y="505" fill="#f1f5f9" font-family="system-ui,-apple-system,sans-serif" font-size="26" font-weight="700" text-anchor="middle">${value}</text>
+  <text x="${centre}" y="529" fill="#64748b" font-family="system-ui,-apple-system,sans-serif" font-size="9" font-weight="600" letter-spacing="0.8" text-anchor="middle">${label}</text>`;
 }
 
 function buildShareSvgPortrait(
   data: ShareSvgInput,
   accent: ShareCardAccent,
   backgroundImageHref?: string | null,
+  markHref: string = SHARE_MARK_PATH,
 ): string {
   const pnlColor = data.isProfit ? '#34d399' : '#f87171';
   const badge = PERIOD_BADGE[data.period];
@@ -396,6 +492,9 @@ function buildShareSvgPortrait(
   const badgeX = (450 - badgeWidth) / 2;
   const badgeFill = hexToRgba(accent.primary, 0.14);
   const badgeBorder = hexToRgba(accent.primary, 0.4);
+  // Win rate arrives pre-formatted ("45.9%" or "—"), so parse rather than re-deriving it.
+  const winPct = Number.parseFloat(data.winRate);
+  const winBarWidth = Number.isFinite(winPct) ? Math.max(0, Math.min(100, winPct)) * 3.3 : 0;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="450" height="800" viewBox="0 0 450 800">
   <defs>
@@ -418,7 +517,7 @@ function buildShareSvgPortrait(
   <g clip-path="url(#cardClipPortrait)">
   ${backgroundLayer('portrait', backgroundImageHref)}
 
-  <image href="/share-mark.png" x="196" y="24" width="58" height="56"/>
+  <image href="${markHref}" x="196" y="24" width="58" height="56"/>
   <text x="225" y="118" fill="#6cd59f" font-family="Montserrat, system-ui, sans-serif" font-size="15" font-weight="900" letter-spacing="1.5" text-anchor="middle">TREND CHASERS</text>
   <text x="225" y="138" fill="#8e939d" font-family="system-ui, sans-serif" font-size="11" text-anchor="middle">Track · Analyze · Improve</text>
   <text x="225" y="168" fill="${accent.primary}" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="600" text-anchor="middle">@${username}</text>
@@ -427,22 +526,23 @@ function buildShareSvgPortrait(
   <text x="225" y="215" fill="${accent.primary}" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="700" letter-spacing="1.2" text-anchor="middle">${badge}</text>
   <text x="225" y="252" fill="#94a3b8" font-family="system-ui,-apple-system,sans-serif" font-size="12" font-weight="600" letter-spacing="1.2" text-anchor="middle">${periodLabel}</text>
 
-  <text x="225" y="340" fill="${pnlColor}" font-family="system-ui,-apple-system,sans-serif" font-size="58" font-weight="800" text-anchor="middle" filter="url(#pnlGlow)">${pnlDisplay}</text>
+  <text x="225" y="310" fill="#64748b" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="600" letter-spacing="1.6" text-anchor="middle">NET P&amp;L</text>
+  <text x="225" y="375" fill="${pnlColor}" font-family="system-ui,-apple-system,sans-serif" font-size="64" font-weight="800" text-anchor="middle" filter="url(#pnlGlow)">${pnlDisplay}</text>
 
-  <rect x="40" y="390" width="370" height="72" rx="18" fill="rgba(15,20,31,0.55)" stroke="rgba(148,163,184,0.12)" stroke-width="1"/>
-  <text x="225" y="418" fill="#64748b" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="600" letter-spacing="1" text-anchor="middle">WIN RATE</text>
-  <text x="225" y="448" fill="#f1f5f9" font-family="system-ui,-apple-system,sans-serif" font-size="24" font-weight="700" text-anchor="middle">${escapeXml(data.winRate)}</text>
+  <!-- Win/loss split. Three identical numbers in a row say nothing about their relationship;
+       this bar shows the shape of the month at a glance before you read a single figure. -->
+  <rect x="60" y="415" width="330" height="6" rx="3" fill="rgba(148,163,184,0.14)"/>
+  <rect x="60" y="415" width="${winBarWidth}" height="6" rx="3" fill="${pnlColor}" opacity="0.85"/>
 
-  <rect x="40" y="478" width="370" height="72" rx="18" fill="rgba(15,20,31,0.55)" stroke="rgba(148,163,184,0.12)" stroke-width="1"/>
-  <text x="225" y="506" fill="#64748b" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="600" letter-spacing="1" text-anchor="middle">TRADES</text>
-  <text x="225" y="536" fill="#f1f5f9" font-family="system-ui,-apple-system,sans-serif" font-size="24" font-weight="700" text-anchor="middle">${escapeXml(data.trades)}</text>
+  <!-- One row of three, matching the landscape card. Stacked full-width boxes spent 250px of an
+       800px card on three short numbers and pushed everything else into dead space. -->
+  ${statColumn(40, escapeXml(data.winRate), 'WIN RATE', accent)}
+  ${statColumn(166, escapeXml(data.trades), 'TRADES', accent)}
+  ${statColumn(292, escapeXml(data.profitFactor), 'PROFIT FACTOR', accent)}
 
-  <rect x="40" y="566" width="370" height="72" rx="18" fill="rgba(15,20,31,0.55)" stroke="rgba(148,163,184,0.12)" stroke-width="1"/>
-  <text x="225" y="594" fill="#64748b" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="600" letter-spacing="1" text-anchor="middle">PROFIT FACTOR</text>
-  <text x="225" y="624" fill="#f1f5f9" font-family="system-ui,-apple-system,sans-serif" font-size="24" font-weight="700" text-anchor="middle">${escapeXml(data.profitFactor)}</text>
-
-  <line x1="40" y1="680" x2="410" y2="680" stroke="rgba(148,163,184,0.18)" stroke-width="1"/>
-  <text x="225" y="720" fill="#64748b" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="500" text-anchor="middle">${SHARE_SITE_URL}</text>
+  <line x1="120" y1="622" x2="330" y2="622" stroke="rgba(148,163,184,0.16)" stroke-width="1"/>
+  <image href="${markHref}" x="203" y="650" width="44" height="42" opacity="0.85"/>
+  <text x="225" y="726" fill="#94a3b8" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="600" letter-spacing="0.4" text-anchor="middle">${SHARE_SITE_URL}</text>
   </g>
 </svg>`;
 }
@@ -456,7 +556,13 @@ export async function renderSharePngBlob(
   orientation: ShareCardOrientation = 'landscape',
 ): Promise<Blob | null> {
   const { width, height } = getShareCardDimensions(orientation);
-  const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+  const scale = getShareExportScale(orientation);
+  const outWidth = Math.round(width * scale);
+  const outHeight = Math.round(height * scale);
+
+  const blob = new Blob([withSvgPixelSize(svg, outWidth, outHeight)], {
+    type: 'image/svg+xml;charset=utf-8',
+  });
   const url = URL.createObjectURL(blob);
   const img = new Image();
 
@@ -468,17 +574,18 @@ export async function renderSharePngBlob(
     });
 
     const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = outWidth;
+    canvas.height = outHeight;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
+    ctx.imageSmoothingQuality = 'high';
 
     // No fallback fill here on purpose: the card itself is a rounded shape clipped inside the
     // SVG (see the cardClipLandscape/cardClipPortrait <g> wrapper in buildShareSvgLandscape /
     // Portrait), so the four corners outside that rounded silhouette are meant to stay fully
     // transparent in the exported PNG — a solid fill would turn "rounded corners" back into a
     // plain rectangle with rounded corners painted over a solid background.
-    ctx.drawImage(img, 0, 0, width, height);
+    ctx.drawImage(img, 0, 0, outWidth, outHeight);
 
     return await new Promise<Blob | null>((resolve) => {
       canvas.toBlob((png) => resolve(png), 'image/png', 1);

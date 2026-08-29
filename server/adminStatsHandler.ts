@@ -1,6 +1,8 @@
 import type { IncomingHttpHeaders } from 'http';
+import type { Firestore } from 'firebase-admin/firestore';
 import { AdminRequestError, assertCallerIsAdmin, getBearerToken } from './adminAuth';
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin';
+import { getSnaptrade, SNAPTRADE_CONFIGURED } from './snaptradeClient';
 
 export interface BrokerInstitutionCount {
   name: string;
@@ -32,6 +34,199 @@ export interface AdminStatsResponse {
   /** Registered with SnapTrade but never completed a link. */
   brokerAbandonedCount: number;
   brokerInstitutions: BrokerInstitutionCount[];
+  /** True when the live SnapTrade check couldn't cover every registered user (timed out, or
+   *  SnapTrade isn't configured) and some rows fell back to the last cached status. */
+  brokerStatsPartial: boolean;
+}
+
+export interface BrokerConnectionState {
+  connected: boolean;
+  accountCount: number;
+  institutions: string[];
+}
+
+/**
+ * Turns per-user connection states into the panel's totals.
+ *
+ * Split out from the I/O above so it can be tested without Firestore or SnapTrade: the previous
+ * version of this feature shipped with aggregation that was only ever exercised against an empty
+ * collection, which is precisely why it read zero in production.
+ */
+export function aggregateBrokerStates(
+  registeredUids: string[],
+  states: Map<string, BrokerConnectionState>,
+): Omit<BrokerStats, 'partial'> {
+  let connected = 0;
+  let accounts = 0;
+  const institutionUsers = new Map<string, number>();
+
+  for (const uid of registeredUids) {
+    const state = states.get(uid);
+    if (!state?.connected) continue;
+
+    connected++;
+    accounts += state.accountCount;
+    // Once per user per institution — two Schwab accounts is one Schwab user.
+    for (const name of new Set(state.institutions)) {
+      institutionUsers.set(name, (institutionUsers.get(name) ?? 0) + 1);
+    }
+  }
+
+  return {
+    registered: registeredUids.length,
+    connected,
+    accounts,
+    institutions: [...institutionUsers.entries()]
+      .map(([name, users]) => ({ name, users }))
+      .sort((a, b) => b.users - a.users),
+  };
+}
+
+interface BrokerStats {
+  registered: number;
+  connected: number;
+  accounts: number;
+  institutions: BrokerInstitutionCount[];
+  partial: boolean;
+}
+
+/** Leaves headroom inside a Netlify function's execution limit for the Auth paging above. */
+const BROKER_CHECK_BUDGET_MS = 8000;
+const BROKER_CHECK_CONCURRENCY = 5;
+
+/**
+ * Counts who actually has a brokerage linked, by asking SnapTrade.
+ *
+ * The first version of this read a brokerConnections/{uid} doc that the broker-connect function
+ * wrote whenever it checked a user's status — but that endpoint is only called from the Connect
+ * Broker page, so the collection stayed empty until users happened to visit it and the panel
+ * reported zero connections for people who were plainly connected. SnapTrade is the only real
+ * source of truth here, so we go to it.
+ *
+ * The work is bounded by the number of users who ever STARTED the connect flow (they're the only
+ * ones who can have a connection), runs a few at a time, and stops at a deadline. Anyone not
+ * reached falls back to their cached row, and the caller is told the answer was partial rather
+ * than being handed a confidently wrong total.
+ */
+async function collectBrokerStats(db: Firestore): Promise<BrokerStats> {
+  // A `users/{uid}/private/snaptrade` doc is created the moment someone opens the connect flow,
+  // so its existence is the definition of "registered" — no page visit required for this half.
+  const privateDocs = await db.collectionGroup('private').get();
+  const registeredUsers: { uid: string; userId: string; userSecret: string }[] = [];
+
+  for (const docSnap of privateDocs.docs) {
+    if (docSnap.id !== 'snaptrade') continue;
+    const uid = docSnap.ref.parent.parent?.id;
+    const data = docSnap.data() as { userId?: string; userSecret?: string };
+    if (uid && data.userId && data.userSecret) {
+      registeredUsers.push({ uid, userId: data.userId, userSecret: data.userSecret });
+    }
+  }
+
+  const cachedSnap = await db.collection('brokerConnections').get();
+  const cached = new Map<string, { connected?: boolean; accountCount?: number; institutions?: string[] }>();
+  for (const docSnap of cachedSnap.docs) {
+    cached.set(docSnap.id, docSnap.data());
+  }
+
+  const results = new Map<string, { connected: boolean; accountCount: number; institutions: string[] }>();
+  let partial = false;
+
+  if (!SNAPTRADE_CONFIGURED) {
+    partial = registeredUsers.length > 0;
+  } else {
+    const deadline = Date.now() + BROKER_CHECK_BUDGET_MS;
+    const snaptrade = getSnaptrade();
+    const queue = [...registeredUsers];
+
+    const worker = async () => {
+      for (;;) {
+        if (queue.length > 0 && Date.now() > deadline) {
+          partial = true;
+          return;
+        }
+        const next = queue.shift();
+        if (!next) return;
+
+        try {
+          const res = await snaptrade.accountInformation.listUserAccounts({
+            userId: next.userId,
+            userSecret: next.userSecret,
+          });
+          const institutions = [
+            ...new Set(
+              res.data
+                .map((a) => a.institution_name)
+                .filter((n): n is string => Boolean(n)),
+            ),
+          ];
+          results.set(next.uid, {
+            connected: res.data.length > 0,
+            accountCount: res.data.length,
+            institutions,
+          });
+        } catch {
+          // One user's lookup failing (revoked auth, a SnapTrade hiccup) shouldn't cost us the
+          // other 18 — fall through to their cached row below.
+          partial = true;
+        }
+      }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(BROKER_CHECK_CONCURRENCY, queue.length) }, worker),
+    );
+  }
+
+  // Anyone SnapTrade couldn't be asked about this run keeps their last known state.
+  const effective = new Map<string, BrokerConnectionState>();
+  const writes: Promise<unknown>[] = [];
+  const now = new Date().toISOString();
+
+  for (const user of registeredUsers) {
+    const live = results.get(user.uid);
+    const fallback = cached.get(user.uid);
+
+    effective.set(
+      user.uid,
+      live ?? {
+        connected: Boolean(fallback?.connected),
+        accountCount: fallback?.accountCount ?? 0,
+        institutions: fallback?.institutions ?? [],
+      },
+    );
+
+    // Refresh the cache so a later run that can't reach SnapTrade still has something true.
+    if (live) {
+      writes.push(
+        db
+          .collection('brokerConnections')
+          .doc(user.uid)
+          .set(
+            {
+              uid: user.uid,
+              connected: live.connected,
+              accountCount: live.accountCount,
+              institutions: live.institutions,
+              lastCheckedAt: now,
+              ...(live.connected && !fallback?.connected ? { firstConnectedAt: now } : {}),
+            },
+            { merge: true },
+          )
+          .catch(() => {}),
+      );
+    }
+  }
+
+  await Promise.all(writes);
+
+  return {
+    ...aggregateBrokerStates(
+      registeredUsers.map((u) => u.uid),
+      effective,
+    ),
+    partial,
+  };
 }
 
 export async function handleAdminStatsRequest(
@@ -106,14 +301,21 @@ export async function handleAdminStatsRequest(
       pageToken = result.pageToken;
     } while (pageToken);
 
-    const [firestoreUserCountSnap, usernameCountSnap, firestoreUsersSnap, brokerSnap] =
+    const [firestoreUserCountSnap, usernameCountSnap, firestoreUsersSnap, brokerStats] =
       await Promise.all([
         db.collection('users').count().get(),
         db.collection('usernames').count().get(),
         db.collection('users').select().get(),
-        // Written by the broker-connect function whenever it learns a user's real link state.
-        // Small (one doc per user who has ever opened the broker flow), so a full read is fine.
-        db.collection('brokerConnections').get(),
+        collectBrokerStats(db).catch((err) => {
+          console.warn('[admin-stats] broker stats failed:', err);
+          return {
+            registered: 0,
+            connected: 0,
+            accounts: 0,
+            institutions: [] as BrokerInstitutionCount[],
+            partial: true,
+          };
+        }),
       ]);
 
     const firestoreUids = new Set(firestoreUsersSnap.docs.map((doc) => doc.id));
@@ -121,31 +323,6 @@ export async function handleAdminStatsRequest(
     for (const uid of authUids) {
       if (!firestoreUids.has(uid)) authUsersMissingProfile++;
     }
-
-    let brokerConnectedCount = 0;
-    let brokerAccountCount = 0;
-    const institutionUsers = new Map<string, number>();
-
-    for (const docSnap of brokerSnap.docs) {
-      const data = docSnap.data() as {
-        connected?: boolean;
-        accountCount?: number;
-        institutions?: string[];
-      };
-      if (!data.connected) continue;
-
-      brokerConnectedCount++;
-      brokerAccountCount += data.accountCount ?? 0;
-      // Counted once per user per institution, so a user with two Schwab accounts is one Schwab
-      // user rather than two.
-      for (const name of new Set(data.institutions ?? [])) {
-        institutionUsers.set(name, (institutionUsers.get(name) ?? 0) + 1);
-      }
-    }
-
-    const brokerInstitutions: BrokerInstitutionCount[] = [...institutionUsers.entries()]
-      .map(([name, users]) => ({ name, users }))
-      .sort((a, b) => b.users - a.users);
 
     const stats: AdminStatsResponse = {
       authUserCount,
@@ -160,11 +337,12 @@ export async function handleAdminStatsRequest(
       authNeverSignedIn,
       authActiveLast30Days,
       signupsByDay: [...signupsByDayMap.entries()].map(([date, count]) => ({ date, count })),
-      brokerRegisteredCount: brokerSnap.size,
-      brokerConnectedCount,
-      brokerAccountCount,
-      brokerAbandonedCount: Math.max(0, brokerSnap.size - brokerConnectedCount),
-      brokerInstitutions,
+      brokerRegisteredCount: brokerStats.registered,
+      brokerConnectedCount: brokerStats.connected,
+      brokerAccountCount: brokerStats.accounts,
+      brokerAbandonedCount: Math.max(0, brokerStats.registered - brokerStats.connected),
+      brokerInstitutions: brokerStats.institutions,
+      brokerStatsPartial: brokerStats.partial,
     };
 
     return { statusCode: 200, body: { ok: true, ...stats } };

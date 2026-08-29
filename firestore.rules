@@ -197,6 +197,13 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Per-user daily counter for assistant questions, written by the ai-assistant function via
+    // the Admin SDK. Denied to clients on purpose: a rate limit the client can edit is not a
+    // rate limit.
+    match /aiUsage/{docId} {
+      allow read, write: if false;
+    }
+
     // Written only by the broker-connect serverless function via the Admin SDK (which bypasses
     // these rules). No client ever needs to read or write it, so nothing is granted here.
     match /brokerConnections/{userId} {

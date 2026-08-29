@@ -13,6 +13,10 @@ interface BrokerAdoptionPanelProps {
  * credentials (registered), completing it links accounts (connected), and the gap between them
  * is people who bailed partway through — usually the most actionable number on this panel,
  * since it's the step where a broker-specific bug would show up.
+ *
+ * The counts come from a live SnapTrade lookup done when this page loads, not from a cache that
+ * fills in as users happen to browse — that earlier design reported zero connections for users
+ * who were plainly connected, because nothing had triggered a status check for them yet.
  */
 export function BrokerAdoptionPanel({ serverStats, serverError }: BrokerAdoptionPanelProps) {
   if (!serverStats) {
@@ -50,7 +54,7 @@ export function BrokerAdoptionPanel({ serverStats, serverError }: BrokerAdoption
           <div>
             <h2 className="text-sm font-semibold">Broker connections</h2>
             <p className="text-[10px] text-text-secondary mt-0.5">
-              Recorded whenever a user&apos;s connection status is checked
+              Checked live against SnapTrade each time this page loads
             </p>
           </div>
         </div>
@@ -116,9 +120,17 @@ export function BrokerAdoptionPanel({ serverStats, serverError }: BrokerAdoption
         </div>
       ) : (
         <p className="text-[11px] text-text-secondary mt-4 pt-4 border-t border-border/50">
-          No linked brokerages recorded yet. This fills in as users open the Connect Broker page —
-          it reflects connection checks, so a user who linked before this tracking shipped appears
-          the next time they load that page.
+          {brokerRegisteredCount > 0
+            ? 'Users have started the connect flow, but SnapTrade reports no linked accounts for them.'
+            : 'Nobody has opened the broker connect flow yet.'}
+        </p>
+      )}
+
+      {serverStats.brokerStatsPartial && (
+        <p className="text-[11px] text-amber-400/90 mt-3">
+          Some users couldn&apos;t be checked against SnapTrade on this load (it timed out, or
+          isn&apos;t configured) — those rows show their last known status, so the totals may be
+          low. Refresh to try again.
         </p>
       )}
     </div>

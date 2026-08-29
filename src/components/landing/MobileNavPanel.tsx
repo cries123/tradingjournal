@@ -96,9 +96,8 @@ export function MobileNavPanel({
           onClick={() => go('ai-assistant')}
           className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
         >
-          <Sparkles className="h-4 w-4 text-text-secondary shrink-0" aria-hidden />
+          <Sparkles className="h-4 w-4 text-emerald-400 shrink-0" aria-hidden />
           <span className="text-sm font-medium text-text-primary">AI Assistant</span>
-          <SoonBadge />
         </button>
         <button
           type="button"

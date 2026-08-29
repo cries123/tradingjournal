@@ -22,7 +22,7 @@ export function ReportBugPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers,
         <ReportBugContent onBack={onHome} backLabel="Back to home" />
       </main>
 
-      <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} />
+      <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate} onLaunch={onLaunch} />
     </div>
   );
 }

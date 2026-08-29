@@ -7,6 +7,7 @@ import {
   Link2,
   Lock,
   Pencil,
+  Trophy,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
@@ -17,6 +18,11 @@ import { FadeIn } from '../components/motion/FadeIn';
 import { Starfield } from '../components/Starfield';
 import { brokerIdFromName, BrokerLogo } from '../components/brokers/BrokerLogo';
 import { COMING_SOON_BROKERS, SUPPORTED_BROKERS } from '../data/brokers';
+import {
+  BROKER_COUNT_PHRASE,
+  BROKER_EXAMPLES,
+  SHORT_BROKER_EXAMPLES,
+} from '../data/brokerCopy';
 import { LANDING_FAQ } from '../seo/faq';
 import { GUIDE_ARTICLES } from '../seo/guides';
 import { fetchBrokersConfig, type BrokerConfig } from '../services/brokersConfig';
@@ -24,6 +30,9 @@ import type { ExtraNavRoute } from '../hooks/useRoute';
 
 interface LandingPageProps {
   onLaunch: () => void;
+  /** Opens the journal straight on the broker connect screen. Falls back to onLaunch when the
+   *  host doesn't provide it, so the button is never dead. */
+  onConnectBroker?: () => void;
   onHome: () => void;
   onPrivacy: () => void;
   onTerms: () => void;
@@ -44,7 +53,7 @@ const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
     icon: Link2,
     title: 'Broker Sync',
     description:
-      'Connect Schwab or Robinhood and let round-trip trades sync in automatically — read-only, disconnect anytime.',
+      `Connect any of ${BROKER_COUNT_PHRASE} and let round-trip trades sync in automatically — read-only, disconnect anytime.`,
   },
   {
     icon: Pencil,
@@ -64,17 +73,33 @@ const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
     description:
       'Sign in with Google or email to sync across devices — or stay local-only. One-click backup puts your entire journal in a file you own.',
   },
+  {
+    icon: Trophy,
+    title: 'Leaderboard & Share Cards',
+    description:
+      'Opt in to a public leaderboard ranked by profit, consistency, or risk management — or keep it private and just export a share card of your month.',
+  },
 ];
 
 const FAQ = LANDING_FAQ.map((item) => ({ q: item.question, a: item.answer }));
 
 const STEPS = [
-  { n: '01', title: 'Connect or log', body: 'Sync Schwab or Robinhood automatically, or enter trades manually — get your data into the journal in seconds.' },
+  { n: '01', title: 'Connect or log', body: `Sync ${BROKER_COUNT_PHRASE} automatically, or enter trades manually — get your data into the journal in seconds.` },
   { n: '02', title: 'Review on calendar', body: 'Daily P&L colors show winning and losing sessions at a glance.' },
   { n: '03', title: 'Analyze your edge', body: 'See which setups pay and which bleed — streaks, expectancy, and your best and worst days.' },
 ];
 
-export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, onGuides, onGuide, onNavigate }: LandingPageProps) {
+export function LandingPage({
+  onLaunch,
+  onConnectBroker,
+  onHome,
+  onPrivacy,
+  onTerms,
+  onBrokers,
+  onGuides,
+  onGuide,
+  onNavigate,
+}: LandingPageProps) {
   const [brokers, setBrokers] = useState<{ supported: BrokerConfig[]; comingSoon: string[] }>({
     supported: SUPPORTED_BROKERS.map((b) => ({ ...b, methods: [...b.methods] })),
     comingSoon: [...COMING_SOON_BROKERS],
@@ -106,7 +131,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs font-medium mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Broker sync or manual entry — your choice
+              {BROKER_COUNT_PHRASE} now sync automatically
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-[3.25rem] font-bold leading-[1.1] tracking-tight">
               <span className="text-gradient-brand">Trend Chasers</span>
@@ -114,8 +139,9 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
               <span className="text-gradient-brand">how you actually trade</span>
             </h1>
             <p className="mt-5 text-base md:text-lg text-text-secondary leading-relaxed max-w-xl">
-              Track daily P&L on a visual calendar. Connect Schwab or Robinhood for automatic sync, or log
-              trades manually — nothing is forced, and you can switch anytime.
+              Track daily P&L on a visual calendar. Connect {BROKER_COUNT_PHRASE} — {SHORT_BROKER_EXAMPLES}{' '}
+              and more — for automatic sync, or log trades manually. Nothing is forced, and you can
+              switch anytime.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <button type="button" onClick={onLaunch} className="btn-primary text-base px-7 py-3.5">
@@ -158,9 +184,10 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
               <h2 className="text-xl md:text-2xl font-bold mb-2">Connecting is optional, and never held by us</h2>
               <p className="text-text-secondary leading-relaxed">
                 Broker sync is entirely opt-in — plenty of traders just log trades manually and never connect
-                anything. If you do connect Schwab or Robinhood, your credentials go to your broker or to
-                SnapTrade&apos;s secure connection portal, never to Trend Chasers&apos; servers. Connections are
-                read-only by default, and you can disconnect at any time from the app.
+                anything. If you do connect one of the {BROKER_COUNT_PHRASE} we support, your credentials go
+                to your broker or to SnapTrade&apos;s secure connection portal, never to Trend Chasers&apos;
+                servers. Connections are read-only by default, and you can disconnect at any time from
+                the app.
               </p>
             </div>
           </div>
@@ -178,9 +205,10 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
                 Connect once. Trades sync automatically.
               </h2>
               <p className="text-text-secondary leading-relaxed mb-6">
-                Link Schwab or Robinhood through SnapTrade, a broker-data connection provider, and your
-                round-trip trades sync straight to your calendar. It&apos;s entirely optional — manual entry
-                works just as well if you&apos;d rather keep everything separate.
+                Link any of {BROKER_COUNT_PHRASE} — {BROKER_EXAMPLES} and more — through SnapTrade, a
+                broker-data connection provider, and your round-trip trades sync straight to your
+                calendar. It&apos;s entirely optional — manual entry works just as well if you&apos;d rather
+                keep everything separate.
               </p>
               <ul className="space-y-3 text-sm text-text-secondary">
                 {[
@@ -194,7 +222,11 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
                   </li>
                 ))}
               </ul>
-              <button type="button" onClick={onLaunch} className="btn-primary text-sm px-6 py-2.5 mt-6">
+              <button
+                type="button"
+                onClick={onConnectBroker ?? onLaunch}
+                className="btn-primary text-sm px-6 py-2.5 mt-6"
+              >
                 Connect a broker
               </button>
             </div>
@@ -204,9 +236,9 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
               <p className="text-xs uppercase tracking-widest text-text-secondary mb-4">How broker sync works</p>
               <ol className="space-y-4">
                 {[
-                  { step: '1', text: 'Pick Schwab or Robinhood and approve a read-only connection on their site' },
+                  { step: '1', text: `Pick your broker from ${BROKER_COUNT_PHRASE} and approve a read-only connection on their site` },
                   { step: '2', text: 'Trend Chasers pulls your recent activity and matches opens to closes' },
-                  { step: '3', text: 'Review the synced trades on your calendar — edit tags and notes anytime' },
+                  { step: '3', text: 'Open the journal and it refreshes itself — new trades appear on your calendar, ready to tag' },
                 ].map((s) => (
                   <li key={s.step} className="flex gap-4">
                     <span className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0">
@@ -233,8 +265,9 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
                   Connect your broker, sync in seconds
                 </h2>
                 <p className="text-text-secondary leading-relaxed mb-6 max-w-md">
-                  Schwab and Robinhood sync automatically today, with thinkorswim covered through your Schwab
-                  connection. More brokers are on the way — manual entry works for any broker in the meantime.
+                  {BROKER_COUNT_PHRASE} sync automatically today, with thinkorswim covered through your
+                  Schwab connection. More are on the way — and manual entry works for any broker in the
+                  meantime.
                 </p>
                 <div className="flex flex-wrap gap-x-6 gap-y-2 mb-8 text-sm">
                   {[
@@ -254,11 +287,11 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
             </FadeIn>
             <FadeIn delay={100}>
               <div>
-                <div className="grid grid-cols-1 gap-3 mb-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 md:gap-2.5 mb-6">
                   {brokers.supported.map((b) => (
                     <div
                       key={b.name}
-                      className="rounded-xl border border-border/60 bg-bg-primary/60 p-4 flex items-center hover:border-emerald-500/40 transition-colors"
+                      className="rounded-lg border border-border/60 bg-bg-primary/60 px-3 py-2.5 flex items-center hover:border-emerald-500/40 transition-colors min-w-0"
                     >
                       <BrokerLogo broker={brokerIdFromName(b.name)} />
                     </div>
@@ -279,6 +312,71 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
                     </div>
                   </>
                 )}
+              </div>
+            </FadeIn>
+          </div>
+        </div>
+      </section>
+
+      {/* Trading assistant */}
+      <section id="assistant" className="relative z-10 border-t border-border/50 py-16 md:py-24">
+        <div className="max-w-[1680px] mx-auto px-4 md:px-6">
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+            <FadeIn>
+              <div>
+                <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">
+                  Trading Assistant
+                </p>
+                <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+                  Ask your journal what went wrong
+                </h2>
+                <p className="text-text-secondary leading-relaxed mb-6 max-w-md">
+                  Your stats already know which setup is bleeding and which hour of the day costs
+                  you money. Now you can ask about them in plain English — and get an answer that
+                  cites your own numbers.
+                </p>
+                <ul className="space-y-3 text-sm text-text-secondary mb-8">
+                  {[
+                    'Reads the stats your journal already computed — its numbers always match your dashboard',
+                    'Reviews what you actually did; it won’t tell you what to trade next',
+                    'Says when a sample is too small to mean anything',
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2">
+                      <span className="text-emerald-400 mt-0.5">→</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                <button type="button" onClick={onLaunch} className="btn-primary text-sm px-6 py-2.5">
+                  Open your journal
+                </button>
+              </div>
+            </FadeIn>
+
+            <FadeIn delay={100}>
+              <div className="glass-card rounded-2xl p-5 md:p-6 glow-border-brand">
+                <p className="text-xs uppercase tracking-widest text-text-secondary mb-4">
+                  Questions it asks you first
+                </p>
+                <div className="flex flex-wrap gap-2 mb-5">
+                  {[
+                    'Why is FOMO losing?',
+                    'What happens when I trade the open?',
+                    'Am I exiting winners too early?',
+                    'Is my win rate good enough?',
+                  ].map((q) => (
+                    <span
+                      key={q}
+                      className="text-xs px-3 py-1.5 rounded-full border border-border/60 text-text-secondary"
+                    >
+                      {q}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-xs text-text-secondary leading-relaxed border-t border-border/50 pt-4">
+                  Those aren&apos;t examples — they&apos;re built from whatever is actually in your
+                  journal. A trader whose losses cluster at the open gets asked about the open.
+                </p>
               </div>
             </FadeIn>
           </div>
@@ -419,7 +517,7 @@ export function LandingPage({ onLaunch, onHome, onPrivacy, onTerms, onBrokers, o
         </FadeIn>
       </section>
 
-      <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} onBrokers={onBrokers} onGuides={onGuides} onGuide={onGuide} />
+      <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} onBrokers={onBrokers} onGuides={onGuides} onGuide={onGuide} onNavigate={onNavigate} onLaunch={onLaunch} />
     </div>
   );
 }

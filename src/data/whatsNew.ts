@@ -11,6 +11,30 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'August 2026',
+    title: 'Ask questions about your own trading',
+    description:
+      'A new panel on your dashboard reviews the period with you. It opens with questions drawn from your actual data \u2014 your worst setup, your weakest time of day \u2014 and you can ask follow-ups in your own words. Every number it quotes is computed by the app first, so it can\u2019t contradict your dashboard, and it reviews what already happened rather than telling you what to trade next.',
+  },
+  {
+    date: 'August 2026',
+    title: 'Broker sync now runs on its own',
+    description:
+      'Until now, syncing only happened when you opened Connect Broker and tapped the button \u2014 so trades from the week were sitting there waiting for you to go fetch them. Opening your journal now refreshes your connected brokers by itself, at most once every few hours, and a small line beside the Month/Year toggle tells you when it last ran and how many trades came in. Tap it to sync on demand.',
+  },
+  {
+    date: 'August 2026',
+    title: 'The mobile app got a real navigation bar',
+    description:
+      'The bar at the bottom of your phone now holds actual destinations \u2014 Overview, Ranks, Settings and More \u2014 highlights the one you\u2019re on, and stays put when you move between them instead of vanishing. Log Trade keeps the middle. Sign out moved into the More menu, where it can\u2019t be hit by mistake reaching for the plus button. The header slimmed down and the broker banner is much shorter on a phone, so your P&L is visible the moment the journal opens.',
+  },
+  {
+    date: 'August 2026',
+    title: 'Share cards: sharper, logo fixed, and Share sends the image',
+    description:
+      'Cards now export at full resolution \u2014 1080\u00d71920 for the phone format, which is exactly the size a story slot wants, so nothing gets blown up and softened on the way in. Two bugs fixed alongside it. The logo was missing from every downloaded card \u2014 the export renders the card through a blob URL, where the logo\u2019s relative path had nothing to resolve against, so it silently never loaded. And the Share button was sending a line of text instead of the card itself; it now shares the actual image with the stats as its caption. The card was redesigned too: your three stats sit in one row under a win/loss bar instead of three stacked boxes.',
+  },
+  {
+    date: 'August 2026',
     title: 'Broker sync status is now tracked properly',
     description:
       'Behind the scenes, whether your brokerage is actually linked is now recorded when your connection is checked, instead of being re-derived every time. Nothing changes in how you connect \u2014 it just means the site owner can see which brokers people actually use, and spot a broker whose setup flow is failing.',

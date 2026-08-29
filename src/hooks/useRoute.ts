@@ -19,8 +19,17 @@ export type AppRoute =
   | 'help-center'
   | 'whats-new';
 
-/** The nav destinations that only exist as "coming soon" or changelog pages, reached from the Products dropdown / Help Center link. */
-export type ExtraNavRoute = 'market-simulator' | 'ai-assistant' | 'pricing' | 'help-center' | 'whats-new';
+/** Nav destinations reachable from the header dropdown and the footer — the "coming soon" and
+ *  changelog pages, plus the two support pages the footer links to. Kept as its own union so a
+ *  nav handler can't be passed a route like 'coach' that needs a token. */
+export type ExtraNavRoute =
+  | 'market-simulator'
+  | 'ai-assistant'
+  | 'pricing'
+  | 'help-center'
+  | 'whats-new'
+  | 'report-bug'
+  | 'request-broker';
 
 const ROUTE_PATHS: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>, string> = {
   landing: '/',

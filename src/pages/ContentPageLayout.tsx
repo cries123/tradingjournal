@@ -57,7 +57,7 @@ export function ContentPageLayout({
         onTerms={onTerms}
         onHome={onHome}
         onBrokers={onBrokers}
-        onGuides={onGuides}
+        onGuides={onGuides} onNavigate={onNavigate} onLaunch={onLaunch}
       />
     </div>
   );

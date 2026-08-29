@@ -14,6 +14,20 @@ interface LandingFooterProps {
   onBrokers?: () => void;
   onGuides?: () => void;
   onGuide?: (slug: string) => void;
+  /** Client-side nav for the Help Center / What's New / bug / broker-request links. Without it
+   *  those anchors fall back to a full page load, which works but flashes. */
+  onNavigate?: (route: ExtraNavRoute) => void;
+  onLaunch?: () => void;
+}
+
+/** Wraps a plain href so it navigates client-side when a handler exists, and stays a real link
+ *  (crawlable, middle-clickable, and still functional) when one doesn't. */
+function navHandler(handler?: () => void) {
+  return (e: React.MouseEvent) => {
+    if (!handler) return;
+    e.preventDefault();
+    handler();
+  };
 }
 
 export function LandingFooter({
@@ -23,6 +37,8 @@ export function LandingFooter({
   onBrokers,
   onGuides,
   onGuide,
+  onNavigate,
+  onLaunch,
 }: LandingFooterProps) {
   const goHomeSection = (hash: string) => (e: React.MouseEvent) => {
     if (onHome) {
@@ -37,7 +53,7 @@ export function LandingFooter({
   return (
     <footer className="relative z-10 mt-auto border-t border-border/50 bg-bg-secondary/40 shrink-0">
       <div className="max-w-[1680px] mx-auto px-4 md:px-6 py-10 md:py-14">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-8 mb-10">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-6 gap-8 mb-10">
           <div className="sm:col-span-2 lg:col-span-1">
             {onHome ? (
               <a
@@ -83,20 +99,68 @@ export function LandingFooter({
                 </a>
               </li>
               <li>
-                <a href="/app" className="hover:text-emerald-400 transition-colors">Open journal</a>
+                <a
+                  href="/app"
+                  onClick={navHandler(onLaunch)}
+                  className="hover:text-emerald-400 transition-colors"
+                >
+                  Open journal
+                </a>
               </li>
               <li>
                 <a
                   href="/guides"
-                  onClick={(e) => {
-                    if (onGuides) {
-                      e.preventDefault();
-                      onGuides();
-                    }
-                  }}
+                  onClick={navHandler(onGuides)}
                   className="hover:text-emerald-400 transition-colors"
                 >
                   Guides
+                </a>
+              </li>
+              <li>
+                <a href="/#faq" onClick={goHomeSection('#faq')} className="hover:text-emerald-400 transition-colors">
+                  FAQ
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-text-primary mb-3">Company</p>
+            <ul className="space-y-2 text-sm text-text-secondary">
+              <li>
+                <a
+                  href="/help-center"
+                  onClick={navHandler(onNavigate && (() => onNavigate('help-center')))}
+                  className="hover:text-emerald-400 transition-colors"
+                >
+                  Help Center
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/whats-new"
+                  onClick={navHandler(onNavigate && (() => onNavigate('whats-new')))}
+                  className="hover:text-emerald-400 transition-colors"
+                >
+                  What&apos;s New
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/pricing"
+                  onClick={navHandler(onNavigate && (() => onNavigate('pricing')))}
+                  className="hover:text-emerald-400 transition-colors"
+                >
+                  Pricing
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/#security"
+                  onClick={goHomeSection('#security')}
+                  className="hover:text-emerald-400 transition-colors"
+                >
+                  Security
                 </a>
               </li>
             </ul>
@@ -123,7 +187,12 @@ export function LandingFooter({
               ))}
               {BROKER_GUIDES.map((guide) => (
                 <li key={guide.slug}>
-                  <a href={guide.path} className="hover:text-emerald-400 transition-colors">
+                  <a
+                    href={guide.path}
+                    /* Left as a plain link on purpose: these are crawlable SEO landing pages and
+                       no page above the footer carries a broker-guide nav handler to pass down. */
+                    className="hover:text-emerald-400 transition-colors"
+                  >
                     {guide.brokerName} journal guide
                   </a>
                 </li>
@@ -170,12 +239,20 @@ export function LandingFooter({
                 </a>
               </li>
               <li>
-                <a href="/report-bug" className="hover:text-emerald-400 transition-colors">
+                <a
+                  href="/report-bug"
+                  onClick={navHandler(onNavigate && (() => onNavigate('report-bug')))}
+                  className="hover:text-emerald-400 transition-colors"
+                >
                   Report a bug
                 </a>
               </li>
               <li>
-                <a href="/request-broker" className="hover:text-emerald-400 transition-colors">
+                <a
+                  href="/request-broker"
+                  onClick={navHandler(onNavigate && (() => onNavigate('request-broker')))}
+                  className="hover:text-emerald-400 transition-colors"
+                >
                   Request broker support
                 </a>
               </li>

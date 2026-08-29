@@ -25,6 +25,10 @@ import { useLeaderboardSync } from '../hooks/useLeaderboardSync';
 import { useTrades } from '../hooks/useTrades';
 import type { Trade } from '../types';
 import { computeStats, getMonthTrades } from '../utils/stats';
+import { takePendingAppView } from '../utils/pendingAppView';
+import { useAutoBrokerSync } from '../hooks/useAutoBrokerSync';
+import { AssistantDock } from '../components/analytics/AssistantDock';
+import { formatMonthYear } from '../utils/format';
 
 interface JournalAppProps {
   onHome?: () => void;
@@ -60,7 +64,18 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
-  const [appView, setAppView] = useState<AppView>('dashboard');
+  // Open straight to the broker screen when the URL asks for it, so the landing page's
+  // "Connect a broker" button lands where it says it will instead of dropping you on the
+  // dashboard to go find it. Also covers SnapTrade's post-connect redirect (?brokerConnected=1).
+  const [appView, setAppView] = useState<AppView>(() => {
+    if (typeof window === 'undefined') return 'dashboard';
+    // Either the landing page asked for the broker screen, or SnapTrade just redirected the
+    // user back here after they approved a connection.
+    if (takePendingAppView() === 'connect-broker') return 'connect-broker';
+    return new URLSearchParams(window.location.search).has('brokerConnected')
+      ? 'connect-broker'
+      : 'dashboard';
+  });
   const [showTradeModal, setShowTradeModal] = useState(false);
   const [tradeModalDate, setTradeModalDate] = useState<string | undefined>();
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
@@ -69,6 +84,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   const [clearConfirmStage, setClearConfirmStage] = useState<0 | 1 | 2>(0);
   const [showShareCard, setShowShareCard] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => !hasCompletedOnboarding());
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   const showAuthModal = firebaseEnabled && !loading && !user;
   const showUsernameModal = firebaseEnabled && !loading && !profileLoading && needsUsername;
@@ -84,6 +100,10 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   // Every journal's trades, not just the active one — a trader's leaderboard standing is about
   // them, not whichever journal happens to be selected right now.
   useLeaderboardSync(everyTrade);
+  // Pulls in anything the connected broker has that the journal doesn't, when the app is opened
+  // and the data is more than a few hours old. Passing everyTrade (not just the active journal's)
+  // so dedupe sees every sourceId already imported anywhere.
+  const brokerSync = useAutoBrokerSync(everyTrade, addTrades);
 
   const filterSetups = useMemo(
     () => [...new Set([...settings.setupTags, ...setups])].sort(),
@@ -184,7 +204,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
 
       {/* relative: keeps this content painting above the fixed Starfield canvas behind it */}
       <div className={`relative flex-1 flex flex-col min-w-0 w-full ${isDesktop ? '' : 'min-h-0'}`}>
-        {!isDesktop && <MobileHeader onOpenMenu={() => setMobileMenuOpen(true)} onHome={onHome} />}
+        {!isDesktop && <MobileHeader onHome={onHome} />}
 
         <main
           className={`flex-1 p-2 md:p-5 ${
@@ -221,6 +241,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
               <DashboardSkeleton />
             ) : (
               <DashboardView
+                brokerSync={brokerSync}
                 trades={trades}
                 hasAnyTrades={allTrades.length > 0}
                 year={year}
@@ -246,14 +267,26 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
           </div>
         </main>
 
-        {!isDesktop && appView === 'dashboard' && (
+        {!isDesktop && (
           <MobileBottomNav
+            appView={appView}
             onOpenMenu={() => setMobileMenuOpen(true)}
             onAddTrade={() => openAddTrade()}
-            onConnectBroker={() => setAppView('connect-broker')}
+            onDashboard={() => setAppView('dashboard')}
+            onLeaderboard={() => setAppView('leaderboard')}
+            onAssistant={() => setAssistantOpen((v) => !v)}
+            assistantOpen={assistantOpen}
           />
         )}
       </div>
+
+      <AssistantDock
+        open={assistantOpen}
+        onOpenChange={setAssistantOpen}
+        trades={monthTrades}
+        periodLabel={formatMonthYear(year, month)}
+        showLauncher={isDesktop}
+      />
 
       {!isDesktop && (
         <MobileDrawer open={mobileMenuOpen} onClose={closeMobileMenu}>

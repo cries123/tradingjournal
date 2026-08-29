@@ -33,6 +33,8 @@ import { StatsCards } from './StatsCards';
 import { WeekdayChart } from './WeekdayChart';
 import { YearHeatmap } from './YearHeatmap';
 import { TradingInsightsSection } from './analytics/TradingInsightsSection';
+import { BrokerSyncStatus } from './BrokerSyncStatus';
+import type { AutoBrokerSync } from '../hooks/useAutoBrokerSync';
 import { EquityCurve } from './analytics/EquityCurve';
 import { ExecutionPanel } from './analytics/ExecutionPanel';
 import { SessionChart } from './analytics/SessionChart';
@@ -61,6 +63,8 @@ interface DashboardViewProps {
   sampleActive?: boolean;
   onLoadSample?: () => void;
   onClearSample?: () => void;
+  /** Broker auto-sync state, surfaced next to the period toggle. */
+  brokerSync?: AutoBrokerSync;
 }
 
 export function DashboardView({
@@ -84,6 +88,7 @@ export function DashboardView({
   sampleActive = false,
   onLoadSample,
   onClearSample,
+  brokerSync,
 }: DashboardViewProps) {
   const { settings } = useSettings();
   const [mode, setMode] = useState<DashboardMode>('month');
@@ -165,11 +170,17 @@ export function DashboardView({
           </button>
         </div>
 
+        {brokerSync && (
+          <div className="ml-auto flex items-center">
+            <BrokerSyncStatus sync={brokerSync} />
+          </div>
+        )}
+
         {(mode === 'month' ? monthTrades.length > 0 : yearTrades.length > 0) && (
           <button
             type="button"
             onClick={() => setShowShare(true)}
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border/60 text-text-secondary hover:text-text-primary hover:border-accent/30 transition-colors focus-ring"
+            className={`${brokerSync ? '' : 'ml-auto '}flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border/60 text-text-secondary hover:text-text-primary hover:border-accent/30 transition-colors focus-ring`}
           >
             <Share2 size={14} />
             {mode === 'month' ? 'Share month' : 'Share year'}

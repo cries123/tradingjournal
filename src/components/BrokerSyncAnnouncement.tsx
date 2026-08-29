@@ -38,10 +38,15 @@ export function BrokerSyncAnnouncement({ onConnectBroker }: BrokerSyncAnnounceme
       </div>
       <div className="flex-1 min-w-[220px]">
         <p className="text-sm font-semibold text-text-primary">New: broker sync now covers 20 brokers</p>
-        <p className="text-xs text-text-secondary leading-relaxed mt-0.5 max-w-2xl">
+        <p className="text-xs text-text-secondary leading-relaxed mt-0.5 max-w-2xl hidden sm:block">
           Connect your broker — Schwab, Fidelity, Robinhood, Interactive Brokers, Webull, and 15 more
           — and your round-trip trades sync in automatically. It&apos;s read-only — Trend Chasers
           can&apos;t see your balance or place trades on your behalf, and you can disconnect anytime.
+        </p>
+        {/* Phones get the short version. The full pitch is one tap away on the connect screen,
+            and it isn't worth half a phone screen sitting above the user's own P&L. */}
+        <p className="text-xs text-text-secondary leading-relaxed mt-0.5 sm:hidden">
+          Read-only sync from 20 brokers. Disconnect anytime.
         </p>
         <button
           type="button"

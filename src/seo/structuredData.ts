@@ -3,6 +3,7 @@ import { getBrokerGuideBySlug } from './brokerGuides';
 import { LANDING_FAQ } from './faq';
 import { GUIDE_ARTICLES, getGuideBySlug } from './guides';
 import { SITE_ORIGIN } from './pageMeta';
+import { BROKER_COUNT_PHRASE } from '../data/brokerCopy';
 
 const ORGANIZATION = {
   '@type': 'Organization',
@@ -11,7 +12,7 @@ const ORGANIZATION = {
   url: SITE_ORIGIN,
   logo: `${SITE_ORIGIN}/logo-mark.svg`,
   description:
-    'Free trading journal with a visual P&L calendar, performance analytics, and automatic sync with 20 brokers.',
+    `Free trading journal with a visual P&L calendar, performance analytics, and automatic sync with ${BROKER_COUNT_PHRASE}.`,
   contactPoint: {
     '@type': 'ContactPoint',
     email: 'support@trendchasers.net',
@@ -43,7 +44,7 @@ const SOFTWARE_APP = {
     priceCurrency: 'USD',
   },
   description:
-    'Free trading journal with P&L calendar, automatic sync with 20 brokers, manual entry, and performance analytics.',
+    `Free trading journal with P&L calendar, automatic sync with ${BROKER_COUNT_PHRASE}, manual entry, and performance analytics.`,
 };
 
 const NAV_LINKS = [

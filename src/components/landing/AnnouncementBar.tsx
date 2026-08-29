@@ -37,17 +37,16 @@ export function AnnouncementBar({ onGuide }: AnnouncementBarProps) {
       <div className="max-w-6xl mx-auto px-4 md:px-6 py-2.5 flex items-center gap-3 text-sm">
         <Sparkles size={16} className="shrink-0 text-emerald-400" />
         <p className="flex-1 min-w-0 leading-snug text-text-primary">
-          <span className="font-semibold text-emerald-300">Now live —</span> connect your broker from a
-          list of 20, including Schwab, Fidelity, Robinhood, and Interactive Brokers, and sync trades
-          automatically. Read-only: Trend Chasers can&apos;t see your balance or place trades on your
-          behalf.
+          <span className="font-semibold text-emerald-300">Now live —</span> ask your journal why a
+          setup keeps losing, or whether you&apos;re cutting winners early. The new trading assistant
+          reads the stats your journal already computed, so its answers always match your dashboard.
           {onGuide && (
             <button
               type="button"
               onClick={() => onGuide('broker-sync-now-live')}
               className="ml-1.5 font-medium text-emerald-300 underline underline-offset-2 hover:text-emerald-200 whitespace-nowrap"
             >
-              How it works →
+              See broker sync too →
             </button>
           )}
         </p>

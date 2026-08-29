@@ -5,6 +5,8 @@ import type { ExtraNavRoute } from '../hooks/useRoute';
 interface ComingSoonPageProps {
   feature: string;
   description: string;
+  /** Overridable so a route that has since shipped doesn't keep announcing itself as upcoming. */
+  eyebrow?: string;
   onHome: () => void;
   onLaunch: () => void;
   onPrivacy: () => void;
@@ -17,6 +19,7 @@ interface ComingSoonPageProps {
 export function ComingSoonPage({
   feature,
   description,
+  eyebrow = 'Coming soon',
   onHome,
   onLaunch,
   onPrivacy,
@@ -41,7 +44,7 @@ export function ComingSoonPage({
           <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-400/10 text-emerald-400 mb-6">
             <Construction className="h-7 w-7" aria-hidden />
           </span>
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400 mb-3">Coming soon</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400 mb-3">{eyebrow}</p>
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">{feature}</h1>
           <p className="text-base text-text-secondary leading-relaxed mb-8">{description}</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -59,7 +62,7 @@ export function ComingSoonPage({
         </div>
       </main>
 
-      <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} />
+      <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate} onLaunch={onLaunch} />
     </div>
   );
 }

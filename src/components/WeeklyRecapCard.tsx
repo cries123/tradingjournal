@@ -31,18 +31,16 @@ export function WeeklyRecapCard({ trades }: { trades: Trade[] }) {
             <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium">
               Your week
             </p>
-            <p className="text-sm md:text-base font-semibold flex items-baseline gap-1.5 min-w-0">
-              <span className="truncate min-w-0">
-                <span className={recap.net >= 0 ? 'text-profit-bright' : 'text-loss-bright'}>
-                  {fmt(recap.net)}
-                </span>
-                <span className="text-text-secondary font-normal">
-                  {' '}· {recap.greenDays} green / {recap.redDays} red · {recap.tradeCount} trade
-                  {recap.tradeCount === 1 ? '' : 's'}
-                </span>
+            <p className="text-sm md:text-base font-semibold flex flex-wrap items-baseline gap-x-1.5 min-w-0">
+              <span className={recap.net >= 0 ? 'text-profit-bright' : 'text-loss-bright'}>
+                {fmt(recap.net)}
+              </span>
+              <span className="text-text-secondary font-normal">
+                · {recap.greenDays} green / {recap.redDays} red · {recap.tradeCount} trade
+                {recap.tradeCount === 1 ? '' : 's'}
               </span>
               {trend && (
-                <span className={`text-xs shrink-0 ${trend === 'up' ? 'text-profit-bright' : 'text-loss-bright'}`}>
+                <span className={`text-xs ${trend === 'up' ? 'text-profit-bright' : 'text-loss-bright'}`}>
                   {trend === 'up' ? '▲' : '▼'} vs last week
                 </span>
               )}

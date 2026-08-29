@@ -15,8 +15,10 @@ import {
   formatSharePeriodLabel,
   formatShareStats,
   hexToRgba,
+  renderSharePngBlob,
   resolveBackgroundImageDataUri,
   resolveShareCardAccent,
+  resolveShareMarkDataUri,
   resolveShareCardOrientation,
   resolveShareUsername,
   shareDownloadSlug,
@@ -104,31 +106,47 @@ export function ShareCardModal({ period, stats, dateKey = '', year, month = 0, o
     void deleteShareCardBackground(url);
   };
 
+  /**
+   * Builds the export SVG with every external asset inlined as a data URI.
+   *
+   * Both the logo and any custom background have to be inlined here: the export renders the SVG
+   * through `new Image()` from a blob: URL, where a root-relative href has no base to resolve
+   * against and simply never loads — which is why the downloaded PNG had a hole where the logo
+   * should be while the on-screen preview looked fine.
+   */
+  const buildExportSvg = async () => {
+    const [backgroundHref, markHref] = await Promise.all([
+      resolveBackgroundImageDataUri(selectedBackground),
+      resolveShareMarkDataUri(),
+    ]);
+
+    return buildShareSvg(
+      {
+        period,
+        periodLabel,
+        username,
+        pnlStr,
+        sign,
+        winRate: formatted.winRate,
+        trades: formatted.trades,
+        profitFactor: formatted.profitFactor,
+        isProfit,
+      },
+      orientation,
+      accent,
+      backgroundHref,
+      markHref ?? undefined,
+    );
+  };
+
+  const exportFilename = () =>
+    `trend-chasers-${shareDownloadSlug(period, dateKey, year, month)}.png`;
+
   const downloadImage = async () => {
     setExporting(true);
     try {
-      const backgroundHref = await resolveBackgroundImageDataUri(selectedBackground);
-      const svg = buildShareSvg(
-        {
-          period,
-          periodLabel,
-          username,
-          pnlStr,
-          sign,
-          winRate: formatted.winRate,
-          trades: formatted.trades,
-          profitFactor: formatted.profitFactor,
-          isProfit,
-        },
-        orientation,
-        accent,
-        backgroundHref,
-      );
-      const result = await downloadSharePng(
-        svg,
-        `trend-chasers-${shareDownloadSlug(period, dateKey, year, month)}.png`,
-        orientation,
-      );
+      const svg = await buildExportSvg();
+      const result = await downloadSharePng(svg, exportFilename(), orientation);
 
       if (result === 'shared') {
         setSaveHint('Choose Save Image to add it to your Photos.');
@@ -148,15 +166,48 @@ export function ShareCardModal({ period, stats, dateKey = '', year, month = 0, o
     setTimeout(() => setCopied(false), 2000);
   };
 
+  /**
+   * Shares the rendered card image, with the stats line as its caption.
+   *
+   * This used to call navigator.share({ title, text }) — text only — so "Share" sent a recipient
+   * a sentence about the card instead of the card. Sharing files needs an explicit `files` array
+   * and a canShare() check, since file sharing isn't supported everywhere the API exists.
+   *
+   * Falls back down the chain rather than failing: image share -> text share -> copy to
+   * clipboard, so the button always does something useful.
+   */
   const nativeShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: 'Trend Chasers', text: shareText });
-      } catch {
-        /* cancelled */
-      }
-    } else {
+    if (typeof navigator.share !== 'function') {
       void copyText();
+      return;
+    }
+
+    setExporting(true);
+    let file: File | null = null;
+    try {
+      const svg = await buildExportSvg();
+      const png = await renderSharePngBlob(svg, orientation);
+      if (png) file = new File([png], exportFilename(), { type: 'image/png' });
+    } catch {
+      // Fall through to the text-only share below.
+    } finally {
+      setExporting(false);
+    }
+
+    if (file && (typeof navigator.canShare !== 'function' || navigator.canShare({ files: [file] }))) {
+      try {
+        await navigator.share({ files: [file], text: shareText, title: 'Trend Chasers' });
+        return;
+      } catch (err) {
+        // A cancelled share sheet is not a failure — don't fall back to a second prompt.
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+      }
+    }
+
+    try {
+      await navigator.share({ title: 'Trend Chasers', text: shareText });
+    } catch (err) {
+      if (!(err instanceof DOMException && err.name === 'AbortError')) void copyText();
     }
   };
 
@@ -317,6 +368,9 @@ function ShareCardPreview({
   // ancestor stacking context instead of staying local — which buried it behind the whole modal.
   const shellClass = 'relative isolate overflow-hidden shadow-lg shadow-black/40';
   const usernameStyle = { color: accent.primary };
+  // Mirrors the SVG's win bar: winRate arrives pre-formatted ("45.9%" / "—"), so parse it.
+  const parsedWinRate = Number.parseFloat(winRate);
+  const winBarPct = Number.isFinite(parsedWinRate) ? Math.max(0, Math.min(100, parsedWinRate)) : 0;
   const badgeStyle = {
     color: accent.primary,
     backgroundColor: hexToRgba(accent.primary, 0.12),
@@ -355,13 +409,27 @@ function ShareCardPreview({
           >
             {PERIOD_BADGE[period]}
           </span>
-          <p className="text-xs text-text-secondary uppercase tracking-widest mb-2">{periodLabel}</p>
-          <p className={`text-4xl font-extrabold ${isProfit ? 'text-profit-bright' : 'text-loss-bright'}`}>
+          <p className="text-xs text-text-secondary uppercase tracking-widest mb-3">{periodLabel}</p>
+          <p className="text-[10px] text-text-secondary uppercase tracking-[0.16em] font-semibold">
+            Net P&amp;L
+          </p>
+          <p
+            className={`text-[2.75rem] leading-none font-extrabold mt-1.5 ${
+              isProfit ? 'text-profit-bright' : 'text-loss-bright'
+            }`}
+          >
             {sign}
             {pnlStr}
           </p>
 
-          <div className="space-y-2.5 mt-6">
+          <div className="h-1.5 rounded-full bg-white/10 overflow-hidden mt-5 mx-3">
+            <div
+              className={`h-full rounded-full ${isProfit ? 'bg-profit-bright' : 'bg-loss-bright'}`}
+              style={{ width: `${winBarPct}%`, opacity: 0.85 }}
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 mt-5">
             {[
               { label: 'Win rate', value: winRate },
               { label: 'Trades', value: trades },
@@ -369,17 +437,20 @@ function ShareCardPreview({
             ].map((stat) => (
               <div
                 key={stat.label}
-                className="rounded-2xl border border-border/40 bg-white/[0.03] px-4 py-3"
+                className="rounded-2xl border bg-white/[0.03] px-2 py-3"
+                style={{ borderColor: hexToRgba(accent.primary, 0.16) }}
               >
-                <p className="text-[10px] text-text-secondary uppercase tracking-wide">{stat.label}</p>
-                <p className="text-lg font-bold mt-0.5">{stat.value}</p>
+                <p className="text-lg font-bold leading-none">{stat.value}</p>
+                <p className="text-[8px] text-text-secondary uppercase mt-1.5 leading-none whitespace-nowrap">
+                  {stat.label}
+                </p>
               </div>
             ))}
           </div>
 
-          <div className="flex items-center justify-center gap-2 mt-6 pt-4 border-t border-border/30">
-            <img src="/logo-mark.svg" alt="" aria-hidden className="w-5 h-5 shrink-0" />
-            <span className="text-xs text-text-secondary">{SHARE_SITE_URL}</span>
+          <div className="mt-7 pt-5 border-t border-border/30 flex flex-col items-center gap-2">
+            <img src="/logo-mark.svg" alt="" aria-hidden className="w-8 h-8 opacity-90" />
+            <span className="text-xs text-text-secondary font-semibold">{SHARE_SITE_URL}</span>
           </div>
         </div>
       </div>

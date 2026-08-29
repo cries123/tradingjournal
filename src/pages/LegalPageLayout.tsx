@@ -44,7 +44,7 @@ export function LegalPageLayout({
         <p className="text-sm text-text-secondary mb-10">Last updated: {lastUpdated}</p>
         <div className="prose-legal">{children}</div>
       </main>
-      <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} />
+      <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate} onLaunch={onLaunch} />
     </div>
   );
 }
