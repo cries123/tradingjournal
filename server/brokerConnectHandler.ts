@@ -35,6 +35,24 @@ function privateSnaptradeDoc(uid: string) {
   return getAdminFirestore().doc(`users/${uid}/private/snaptrade`);
 }
 
+/**
+ * True when SnapTrade is telling us this user is already registered with them.
+ *
+ * This is the state you land in when our stored secret and SnapTrade's records disagree: we think
+ * the user is new, SnapTrade knows they aren't, and registering again is rejected forever. Without
+ * recovery it is a permanent dead end — every Connect attempt fails identically, with a 500 that
+ * says nothing useful.
+ */
+function isAlreadyRegistered(err: unknown): boolean {
+  const status = (err as { status?: number; response?: { status?: number } } | null)?.response
+    ?.status ?? (err as { status?: number } | null)?.status;
+  const message = err instanceof Error ? err.message.toLowerCase() : '';
+  return (
+    status === 400 &&
+    (message.includes('already') || message.includes('exist') || message.includes('registered'))
+  );
+}
+
 async function getOrRegisterCreds(uid: string): Promise<SnaptradeCreds> {
   const ref = privateSnaptradeDoc(uid);
   const snap = await ref.get();
@@ -42,10 +60,27 @@ async function getOrRegisterCreds(uid: string): Promise<SnaptradeCreds> {
   if (existing?.userSecret) return existing;
 
   const snaptrade = getSnaptrade();
-  const res = await snaptrade.authentication.registerSnapTradeUser({ userId: uid });
-  const creds: SnaptradeCreds = { userId: uid, userSecret: res.data.userSecret! };
-  await ref.set(creds);
-  return creds;
+
+  try {
+    const res = await snaptrade.authentication.registerSnapTradeUser({ userId: uid });
+    const creds: SnaptradeCreds = { userId: uid, userSecret: res.data.userSecret! };
+    await ref.set(creds);
+    return creds;
+  } catch (err) {
+    if (!isAlreadyRegistered(err)) throw err;
+
+    // SnapTrade has this user but we've lost the secret — ask for a new one rather than leaving
+    // the account permanently unable to connect. The old secret is invalidated by this call, which
+    // is fine: we didn't have it. Existing brokerage authorizations survive.
+    console.warn(`[broker-connect] ${uid} exists at SnapTrade but we have no secret — resetting.`);
+    const reset = await snaptrade.authentication.resetSnapTradeUserSecret({
+      userId: uid,
+      userSecret: existing?.userSecret ?? '',
+    });
+    const creds: SnaptradeCreds = { userId: uid, userSecret: reset.data.userSecret! };
+    await ref.set(creds);
+    return creds;
+  }
 }
 
 async function getCredsIfRegistered(uid: string): Promise<SnaptradeCreds | null> {
