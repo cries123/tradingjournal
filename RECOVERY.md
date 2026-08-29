@@ -1,5 +1,74 @@
 # Recovery — what broke, what's fixed, what you need to do
 
+---
+
+## THE ROOT CAUSE: Firestore daily read quota was exhausted
+
+Everything that looked like separate catastrophes was one thing.
+
+Firestore's free tier allows 50,000 document reads per day. Once that trips, **Firestore refuses
+every read for the rest of the day.** It does not return an error users understand — it just fails,
+and each part of the app reports the failure in its own misleading words:
+
+| What you saw | What was actually happening |
+|---|---|
+| "All my July trades are gone" | The trades were never deleted. The read was refused, so the calendar rendered empty. |
+| Admin panel "Access denied" | The panel reads `config/admin` to check your uid. The read threw; the code catches any error and can only say "denied". |
+| Broker "not connected" / 500 | Your SnapTrade credentials live in a Firestore document. The server couldn't read it, so it reported "not registered". |
+
+**No data was lost.** Not one trade.
+
+### Why the quota blew out — this part is mine
+
+Two of my mistakes multiplied:
+
+1. **The duplication doubled every connected user's document count.** Twice the documents means
+   twice the reads, on every single load.
+2. **The journal had no local cache.** `subscribeTrades` streamed the *entire* trades collection
+   from the server on every app open. A trader with 800 trades billed 800 reads just to look at
+   their dashboard — again on every reload, every device, all day.
+
+Together: enough traffic to burn 50,000 reads well before the day was out.
+
+### The fix in this build
+
+`src/lib/firebase.ts` now initialises Firestore with a **persistent on-disk cache**
+(`persistentLocalCache` + `persistentMultipleTabManager`). First load pays for the documents once;
+after that they're served from IndexedDB and the listener pulls only what changed. A journal that
+gains a few trades a day costs a few reads a day instead of its entire history every time.
+
+This is the difference between a journal that costs pennies and one that doesn't — and now that
+you're on Blaze it's a billing question rather than a lockout one.
+
+`server/brokerConnectHandler.ts` also stops lying about the cause: a Firestore quota or
+availability failure now returns a message saying the database is unavailable and that **nothing
+has been disconnected**, instead of "Broker connect request failed. Please try again" — advice that
+cannot possibly work when the database is refusing reads.
+
+### You're on Blaze — good. Two things to check
+
+1. **Billing account actually linked.** Firebase Console → ⚙️ → Usage and billing → Details &
+   settings. "Blaze" with no Cloud Billing account attached doesn't lift anything.
+2. **Legacy App Engine daily spending limit.** Google Cloud Console → App Engine → Settings. Older
+   projects carry a daily spending limit that defaults to **$0**, which keeps enforcing free-tier
+   caps even on Blaze. If it's there and it's $0, that's why the limit message persisted.
+
+If both are fine, the quota window clears on its own at **midnight Pacific** and everything returns.
+
+### Set a budget alert today
+
+You're on pay-as-you-go now. Google Cloud Console → Billing → Budgets & alerts → Create budget.
+Set something like $25/month with alerts at 50/90/100%. It won't cap spend, but you'll never be
+surprised. Do this before you close the laptop.
+
+### Do NOT turn on App Check
+
+You were one click from enabling it. App Check with reCAPTCHA Enterprise, once enforced, blocks
+every client that can't produce a valid attestation token — which right now is all of them. It
+would take your app fully offline and it has nothing to do with any of this.
+
+---
+
 Three things went wrong at once. They have **three different causes**, and only one of them is
 fixed by deploying code. Do them in this order.
 

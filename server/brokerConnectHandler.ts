@@ -229,6 +229,27 @@ async function handleDisconnect(uid: string, authorizationId?: string): Promise<
   return { statusCode: 200, body: { ok: true } };
 }
 
+/**
+ * True when the failure is Firestore being unable to serve us, not anything broker-related.
+ *
+ * RESOURCE_EXHAUSTED is the one that matters most: on the free tier it means the daily read quota
+ * is spent, and every read fails for the rest of the day. It reads as total data loss from the
+ * outside, so it needs to be named rather than swallowed into a generic 500.
+ */
+function isDatastoreUnavailable(err: unknown): boolean {
+  const code = (err as { code?: string | number } | null)?.code;
+  const message = err instanceof Error ? err.message.toUpperCase() : '';
+  return (
+    code === 8 ||
+    code === 'resource-exhausted' ||
+    code === 14 ||
+    code === 'unavailable' ||
+    message.includes('RESOURCE_EXHAUSTED') ||
+    message.includes('QUOTA') ||
+    message.includes('DEADLINE_EXCEEDED')
+  );
+}
+
 export async function handleBrokerConnectRequest(
   headers: IncomingHttpHeaders,
   body: BrokerConnectRequestBody,
@@ -259,8 +280,26 @@ export async function handleBrokerConnectRequest(
     if (err instanceof BrokerRequestError) {
       return { statusCode: err.statusCode, body: { error: err.message } };
     }
+
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('[broker-connect] failed:', message);
+
+    // Your broker credentials live in Firestore, so a Firestore outage or an exhausted quota
+    // surfaces here as "broker connect failed" — which sends the owner hunting through SnapTrade
+    // keys and connection settings for a problem that is nowhere near either. Telling the truth
+    // about the cause is worth the extra branch; "please try again" is advice that cannot work
+    // when the database is refusing reads.
+    if (isDatastoreUnavailable(err)) {
+      return {
+        statusCode: 503,
+        body: {
+          error:
+            'Your broker connection can\u2019t be read right now because the database is unavailable \u2014 ' +
+            'this is not a problem with your broker, and nothing has been disconnected. Try again shortly.',
+        },
+      };
+    }
+
     return { statusCode: 500, body: { error: 'Broker connect request failed. Please try again.' } };
   }
 }
