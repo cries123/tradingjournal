@@ -17,6 +17,7 @@ import {
   Users,
 } from 'lucide-react';
 import { AuthModal } from '../components/AuthModal';
+import { BUILD_SHA, BUILD_TIME, formatBuildStamp } from '../config/build';
 import { AcquisitionFunnel } from '../components/admin/AcquisitionFunnel';
 import { BrokerAdoptionPanel } from '../components/admin/BrokerAdoptionPanel';
 import { SignupTrendPanel } from '../components/admin/SignupTrendPanel';
@@ -893,13 +894,23 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                   </span>
                 )}
               </p>
-              <button
-                type="button"
-                onClick={() => void loadAdmin()}
-                className="text-sm text-text-secondary hover:text-emerald-400 transition-colors"
-              >
-                Refresh
-              </button>
+              <div className="flex items-center gap-3">
+                {/* Which bundle is actually running. Makes "I deployed but nothing changed"
+                    a one-glance check instead of a guess. */}
+                <span
+                  className="text-[11px] text-text-secondary/70 tabular-nums"
+                  title={`Bundle built ${BUILD_TIME} from commit ${BUILD_SHA}`}
+                >
+                  Build {formatBuildStamp()}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void loadAdmin()}
+                  className="text-sm text-text-secondary hover:text-emerald-400 transition-colors"
+                >
+                  Refresh
+                </button>
+              </div>
             </div>
 
             {ready.health && (
