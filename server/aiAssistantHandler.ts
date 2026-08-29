@@ -18,6 +18,14 @@ import { getAdminFirestore } from './firebaseAdmin';
  */
 
 export const AI_MODEL = process.env.AI_MODEL || 'gpt-5-mini';
+
+/**
+ * Used when the configured model is rejected outright (wrong name, or not enabled on this
+ * account). Without it, one bad AI_MODEL value is a total outage for every user with no signal
+ * anywhere except a function log nobody is watching — which is exactly how this failed in
+ * production. A degraded assistant beats a dead one.
+ */
+export const AI_FALLBACK_MODEL = process.env.AI_FALLBACK_MODEL || 'gpt-4o-mini';
 const AI_API_KEY = process.env.OPENAI_API_KEY;
 const AI_BASE_URL = process.env.AI_BASE_URL || 'https://api.openai.com/v1';
 
@@ -80,7 +88,9 @@ export interface AiAssistantResult {
  * Stored server-side in Firestore rather than in the client, for the obvious reason that a limit
  * the client enforces is not a limit. Keyed by UTC day so it resets on its own with no cleanup job.
  */
-async function consumeRateLimit(uid: string): Promise<{ ok: boolean; remaining: number }> {
+async function consumeRateLimit(
+  uid: string,
+): Promise<{ ok: true; remaining: number } | { ok: false; reason: 'capped' | 'unavailable' }> {
   const day = new Date().toISOString().slice(0, 10);
   const ref = getAdminFirestore().doc(`aiUsage/${uid}_${day}`);
 
@@ -90,17 +100,19 @@ async function consumeRateLimit(uid: string): Promise<{ ok: boolean; remaining: 
       const used = (snap.data()?.count as number | undefined) ?? 0;
 
       if (used >= DAILY_QUESTION_LIMIT) {
-        return { ok: false, remaining: 0 };
+        return { ok: false as const, reason: 'capped' as const };
       }
 
       tx.set(ref, { uid, day, count: used + 1, updatedAt: new Date().toISOString() }, { merge: true });
-      return { ok: true, remaining: DAILY_QUESTION_LIMIT - (used + 1) };
+      return { ok: true as const, remaining: DAILY_QUESTION_LIMIT - (used + 1) };
     });
   } catch (err) {
     // Firestore being unavailable shouldn't hand out unlimited requests — fail closed, because
-    // the failure mode of failing open is an unbounded bill.
+    // the failure mode of failing open is an unbounded bill. But report it as an outage rather
+    // than as a cap: telling every user they've hit a 15-question limit they never used sends the
+    // owner looking in entirely the wrong place.
     console.error('[ai-assistant] rate limit check failed:', err);
-    return { ok: false, remaining: 0 };
+    return { ok: false as const, reason: 'unavailable' as const };
   }
 }
 
@@ -108,11 +120,19 @@ async function consumeRateLimit(uid: string): Promise<{ ok: boolean; remaining: 
  * Calls the model. Isolated behind a single function and driven by AI_BASE_URL/AI_MODEL so
  * switching provider is an env change, not a rewrite — any OpenAI-compatible endpoint works.
  */
-async function askModel(
+interface ModelCallOutcome {
+  ok: boolean;
+  status: number;
+  answer?: string;
+  detail?: string;
+}
+
+async function callModel(
+  model: string,
   facts: unknown,
   question: string,
   history: { role: 'user' | 'assistant'; content: string }[],
-): Promise<string> {
+): Promise<ModelCallOutcome> {
   const res = await fetch(`${AI_BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -120,7 +140,7 @@ async function askModel(
       Authorization: `Bearer ${AI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: AI_MODEL,
+      model,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         {
@@ -136,18 +156,58 @@ async function askModel(
 
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
-    console.error('[ai-assistant] model call failed:', res.status, detail.slice(0, 400));
+    return { ok: false, status: res.status, detail: detail.slice(0, 500) };
+  }
+
+  const data = (await res.json().catch(() => ({}))) as {
+    choices?: { message?: { content?: string } }[];
+  };
+  return { ok: true, status: res.status, answer: data.choices?.[0]?.message?.content?.trim() };
+}
+
+/**
+ * Calls the model, falling back once if the configured one is rejected.
+ *
+ * A 400/404 from the provider means the model name is wrong or not enabled on this account — a
+ * configuration mistake, not a transient fault, so retrying the same name is pointless and the
+ * assistant simply stays dead for everyone. Retrying once on a known-good model keeps the feature
+ * alive while the owner fixes AI_MODEL, and logs loudly enough to be findable.
+ */
+async function askModel(
+  facts: unknown,
+  question: string,
+  history: { role: 'user' | 'assistant'; content: string }[],
+): Promise<string> {
+  let outcome = await callModel(AI_MODEL, facts, question, history);
+
+  const modelRejected = !outcome.ok && (outcome.status === 400 || outcome.status === 404);
+  if (modelRejected && AI_FALLBACK_MODEL && AI_FALLBACK_MODEL !== AI_MODEL) {
+    console.error(
+      `[ai-assistant] model "${AI_MODEL}" was rejected (${outcome.status}) — falling back to ` +
+        `"${AI_FALLBACK_MODEL}". Fix AI_MODEL in your environment variables. Provider said: ` +
+        `${outcome.detail ?? ''}`,
+    );
+    outcome = await callModel(AI_FALLBACK_MODEL, facts, question, history);
+  }
+
+  if (!outcome.ok) {
+    console.error('[ai-assistant] model call failed:', outcome.status, outcome.detail ?? '');
+    if (outcome.status === 401 || outcome.status === 403) {
+      throw new BrokerRequestError(
+        'The assistant isn\u2019t configured correctly \u2014 its API key was rejected. The site owner has been notified.',
+        502,
+      );
+    }
+    if (outcome.status === 429) {
+      throw new BrokerRequestError('The assistant is busy right now. Try again in a moment.', 503);
+    }
     throw new BrokerRequestError('The assistant is unavailable right now. Try again shortly.', 502);
   }
 
-  const data = (await res.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  const answer = data.choices?.[0]?.message?.content?.trim();
-  if (!answer) {
+  if (!outcome.answer) {
     throw new BrokerRequestError('The assistant returned an empty answer. Try rephrasing.', 502);
   }
-  return answer;
+  return outcome.answer;
 }
 
 export async function handleAiAssistantRequest(
@@ -180,6 +240,12 @@ export async function handleAiAssistantRequest(
 
     const limit = await consumeRateLimit(uid);
     if (!limit.ok) {
+      if (limit.reason === 'unavailable') {
+        return {
+          statusCode: 503,
+          body: { error: 'The assistant is briefly unavailable. Try again in a moment.' },
+        };
+      }
       return {
         statusCode: 429,
         body: {

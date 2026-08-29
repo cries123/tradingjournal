@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Calendar, Grid3X3, Share2 } from 'lucide-react';
+import { Calendar, Grid3X3, RefreshCw, Share2 } from 'lucide-react';
 import type { Filters, Trade } from '../types';
 import {
   computeStats,
@@ -23,6 +23,7 @@ import { computeTakeaway } from '../utils/takeaway';
 import { useSettings } from '../context/SettingsContext';
 import { AccountSwitcher } from './AccountSwitcher';
 import { BrokerSyncAnnouncement } from './BrokerSyncAnnouncement';
+import { DuplicateCleanupNotice } from './DuplicateCleanupNotice';
 import { WeeklyRecapCard } from './WeeklyRecapCard';
 import { DailyPnlChart } from './DailyPnlChart';
 import { DashboardCalendar } from './DashboardCalendar';
@@ -33,8 +34,6 @@ import { StatsCards } from './StatsCards';
 import { WeekdayChart } from './WeekdayChart';
 import { YearHeatmap } from './YearHeatmap';
 import { TradingInsightsSection } from './analytics/TradingInsightsSection';
-import { BrokerSyncStatus } from './BrokerSyncStatus';
-import type { AutoBrokerSync } from '../hooks/useAutoBrokerSync';
 import { EquityCurve } from './analytics/EquityCurve';
 import { ExecutionPanel } from './analytics/ExecutionPanel';
 import { SessionChart } from './analytics/SessionChart';
@@ -63,8 +62,13 @@ interface DashboardViewProps {
   sampleActive?: boolean;
   onLoadSample?: () => void;
   onClearSample?: () => void;
-  /** Broker auto-sync state, surfaced next to the period toggle. */
-  brokerSync?: AutoBrokerSync;
+  /** How many duplicate rows the cleanup removed this session, if any. */
+  duplicatesRemoved?: number | null;
+  onDismissDuplicateNotice?: () => void;
+  /** Sends the trader to the broker screen, where syncing is done by hand. */
+  onSyncBroker?: () => void;
+  /** True once a broker is linked — the sync shortcut is noise for everyone else. */
+  hasBrokerTrades?: boolean;
 }
 
 export function DashboardView({
@@ -88,7 +92,10 @@ export function DashboardView({
   sampleActive = false,
   onLoadSample,
   onClearSample,
-  brokerSync,
+  duplicatesRemoved,
+  onDismissDuplicateNotice,
+  onSyncBroker,
+  hasBrokerTrades = false,
 }: DashboardViewProps) {
   const { settings } = useSettings();
   const [mode, setMode] = useState<DashboardMode>('month');
@@ -142,6 +149,12 @@ export function DashboardView({
 
   return (
     <div className="flex flex-col gap-2 md:gap-3 pb-2">
+      {/* Above everything else: if the numbers below just changed, the trader is owed the reason
+          before they read a single stat. */}
+      {duplicatesRemoved != null && duplicatesRemoved > 0 && (
+        <DuplicateCleanupNotice count={duplicatesRemoved} onDismiss={onDismissDuplicateNotice} />
+      )}
+
       <BrokerSyncAnnouncement onConnectBroker={onConnectBroker} />
 
       <AccountSwitcher />
@@ -170,17 +183,24 @@ export function DashboardView({
           </button>
         </div>
 
-        {brokerSync && (
-          <div className="ml-auto flex items-center">
-            <BrokerSyncStatus sync={brokerSync} />
-          </div>
+        {/* Syncing is something you do, not something that happens to you — so the affordance is a
+            plain shortcut to the broker screen rather than a status line about a background job. */}
+        {hasBrokerTrades && onSyncBroker && (
+          <button
+            type="button"
+            onClick={onSyncBroker}
+            className="ml-auto flex items-center gap-1.5 text-[11px] text-text-secondary hover:text-accent transition-colors focus-ring rounded shrink-0"
+          >
+            <RefreshCw size={11} />
+            Sync broker
+          </button>
         )}
 
         {(mode === 'month' ? monthTrades.length > 0 : yearTrades.length > 0) && (
           <button
             type="button"
             onClick={() => setShowShare(true)}
-            className={`${brokerSync ? '' : 'ml-auto '}flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border/60 text-text-secondary hover:text-text-primary hover:border-accent/30 transition-colors focus-ring`}
+            className={`${hasBrokerTrades && onSyncBroker ? '' : 'ml-auto '}flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border/60 text-text-secondary hover:text-text-primary hover:border-accent/30 transition-colors focus-ring`}
           >
             <Share2 size={14} />
             {mode === 'month' ? 'Share month' : 'Share year'}

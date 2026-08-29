@@ -210,13 +210,20 @@ export function BrokerConnectContent({ onBack, onImportTrades, existingTrades }:
 
         <p className="text-xs uppercase tracking-widest text-accent font-medium mb-3">Connect a broker</p>
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-          Sync trades automatically
+          Import trades from your broker
         </h1>
         <p className="text-text-secondary text-base leading-relaxed max-w-2xl mb-8">
-          Connect any of the brokers below through SnapTrade, a broker-data connection provider, to
-          pull your trade history in automatically. Your broker credentials go directly to your
-          broker or to SnapTrade&apos;s secure portal — never to Trend Chasers. You can disconnect
-          anytime. Prefer not to connect? You can still log trades manually.
+          Connect any of the brokers below through SnapTrade, a broker-data connection provider, and
+          pull your trade history in with one tap — no typing it out. Your broker credentials go
+          directly to your broker or to SnapTrade&apos;s secure portal — never to Trend Chasers. You
+          can disconnect anytime. Prefer not to connect? You can still log trades manually.
+        </p>
+        <p className="text-sm text-text-secondary leading-relaxed max-w-2xl mb-8 rounded-xl border border-border/60 bg-bg-tertiary/40 px-4 py-3">
+          <span className="font-semibold text-text-primary">Syncing is on your say-so.</span>{' '}
+          Trend Chasers never pulls from your broker on its own — press{' '}
+          <span className="font-medium text-text-primary">Sync</span> on an account below whenever
+          you want the latest fills. Re-syncing is safe: trades you already have are recognised and
+          skipped, never added twice.
         </p>
 
         {!firebaseEnabled ? (

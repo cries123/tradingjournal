@@ -4,6 +4,7 @@ import { useSettings } from '../context/SettingsContext';
 import type { Filters, Trade } from '../types';
 import {
   deleteTradeDoc,
+  deleteTradesBatch,
   migrateLocalTrades,
   saveTrade,
   saveTradesBatch,
@@ -201,6 +202,31 @@ export function useTrades() {
     [user, firebaseEnabled],
   );
 
+  /**
+   * Removes many trades in one go — used by the duplicate cleanup.
+   *
+   * Separate from calling deleteTrade in a loop because that would fire a Firestore write per
+   * trade and re-render the journal after each one; a journal with hundreds of duplicates would
+   * spend a minute visibly shrinking row by row.
+   */
+  const removeTrades = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) return;
+      if (user && firebaseEnabled) {
+        setSyncStatus('syncing');
+        await deleteTradesBatch(user.uid, ids);
+      } else {
+        const toRemove = new Set(ids);
+        setTrades((prev) => {
+          const next = prev.filter((t) => !toRemove.has(t.id));
+          saveTrades(next, null);
+          return next;
+        });
+      }
+    },
+    [user, firebaseEnabled],
+  );
+
   const updateTrade = useCallback(
     async (trade: Trade) => {
       await persistTrade(trade);
@@ -230,18 +256,40 @@ export function useTrades() {
     [user, firebaseEnabled],
   );
 
+  /**
+   * Wipes the active journal.
+   *
+   * Deletes through the chunked batch writer rather than firing one request per trade. The old
+   * version did `Promise.all(ids.map(deleteTradeDoc))`, which opens as many concurrent writes as
+   * you have trades — fine for a journal of thirty, and a wall of throttled requests for a journal
+   * of several hundred. Worse, a single rejection failed the whole Promise.all, so a big journal
+   * would half-clear and then look like the button simply hadn't worked.
+   *
+   * Throws on failure so the caller can say something. Silently doing nothing is the one outcome a
+   * destructive button must never have.
+   */
   const clearAll = useCallback(async () => {
     const activeId = settings.activeAccountId;
-    const toRemove = new Set(
-      trades.filter((t) => resolveTradeAccountId(t.accountId) === activeId).map((t) => t.id),
-    );
+    const toRemove = trades
+      .filter((t) => resolveTradeAccountId(t.accountId) === activeId)
+      .map((t) => t.id);
+
+    if (toRemove.length === 0) return;
 
     if (user && firebaseEnabled) {
       setSyncStatus('syncing');
-      await Promise.all([...toRemove].map((id) => deleteTradeDoc(user.uid, id)));
+      try {
+        await deleteTradesBatch(user.uid, toRemove);
+      } catch (err) {
+        // The snapshot listener never fired, so nothing re-set the status — put it back rather
+        // than leaving the dashboard stuck on a spinner forever.
+        setSyncStatus('cloud');
+        throw err;
+      }
     } else {
+      const removing = new Set(toRemove);
       setTrades((prev) => {
-        const next = prev.filter((t) => !toRemove.has(t.id));
+        const next = prev.filter((t) => !removing.has(t.id));
         saveTrades(next, null);
         return next;
       });
@@ -261,6 +309,7 @@ export function useTrades() {
     addTrades,
     updateTrade,
     deleteTrade,
+    removeTrades,
     restoreTrades,
     clearAll,
     syncStatus,

@@ -6,20 +6,24 @@ export interface ChangelogEntry {
 }
 
 // Add new entries to the TOP of this array as real updates ship — newest first.
-// Keep it to updates a user would actually notice (new features, broker support,
-// major fixes), not every commit.
+//
+// This page is for TRADERS. Every entry has to answer "what changed in my journal?" — new
+// features, broker support, fixes they'd have noticed. Nothing about the admin panel, internal
+// analytics, or how anything is stored or tracked behind the scenes: a trader has no admin panel
+// and doesn't care that a number is now cached instead of recomputed. If an entry's real subject
+// is something only the site owner can see, it doesn't belong here at all.
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: 'August 2026',
+    title: 'Duplicate trades removed, and broker sync is back to manual',
+    description:
+      'We shipped an automatic broker sync a few days ago and got it wrong. It could run before your journal had finished loading, which meant it couldn\u2019t see the trades you already had \u2014 so it imported your broker history a second time. If your numbers doubled, that was us, not your broker and not anything you did.\n\nTwo things have happened. The automatic sync is gone: your broker is only ever contacted when you open Connect Broker and press Sync, and there is no background job of any kind. And your journal cleans itself up \u2014 next time you open it, the duplicate rows are removed and you\u2019ll see a note saying how many went. Every synced trade carries an id from your broker, so a duplicate is something we can identify exactly rather than guess at; anything you logged or wrote by hand was never a candidate and hasn\u2019t been touched, and where a trade existed twice we kept the copy with your notes, tags and screenshots on it.\n\nWe also found a second way this could have bitten you: if you had a filter active on your dashboard and pressed Sync, the check for \u201calready imported\u201d only looked at the filtered trades. That\u2019s fixed too \u2014 it now checks every trade in every one of your journals. Sorry for the mess.',
+  },
   {
     date: 'August 2026',
     title: 'Ask questions about your own trading',
     description:
       'A new panel on your dashboard reviews the period with you. It opens with questions drawn from your actual data \u2014 your worst setup, your weakest time of day \u2014 and you can ask follow-ups in your own words. Every number it quotes is computed by the app first, so it can\u2019t contradict your dashboard, and it reviews what already happened rather than telling you what to trade next.',
-  },
-  {
-    date: 'August 2026',
-    title: 'Broker sync now runs on its own',
-    description:
-      'Until now, syncing only happened when you opened Connect Broker and tapped the button \u2014 so trades from the week were sitting there waiting for you to go fetch them. Opening your journal now refreshes your connected brokers by itself, at most once every few hours, and a small line beside the Month/Year toggle tells you when it last ran and how many trades came in. Tap it to sync on demand.',
   },
   {
     date: 'August 2026',
@@ -32,12 +36,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'Share cards: sharper, logo fixed, and Share sends the image',
     description:
       'Cards now export at full resolution \u2014 1080\u00d71920 for the phone format, which is exactly the size a story slot wants, so nothing gets blown up and softened on the way in. Two bugs fixed alongside it. The logo was missing from every downloaded card \u2014 the export renders the card through a blob URL, where the logo\u2019s relative path had nothing to resolve against, so it silently never loaded. And the Share button was sending a line of text instead of the card itself; it now shares the actual image with the stats as its caption. The card was redesigned too: your three stats sit in one row under a win/loss bar instead of three stacked boxes.',
-  },
-  {
-    date: 'August 2026',
-    title: 'Broker sync status is now tracked properly',
-    description:
-      'Behind the scenes, whether your brokerage is actually linked is now recorded when your connection is checked, instead of being re-derived every time. Nothing changes in how you connect \u2014 it just means the site owner can see which brokers people actually use, and spot a broker whose setup flow is failing.',
   },
   {
     date: 'August 2026',

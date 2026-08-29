@@ -3,12 +3,12 @@ import { BROKER_REGISTRY, THINKORSWIM_DISPLAY } from './brokerRegistry';
 export const SUPPORTED_BROKERS = [
   {
     name: THINKORSWIM_DISPLAY.name,
-    detail: 'Automatic sync via Schwab',
+    detail: 'One-tap import via Schwab',
     methods: ['Syncs through the Charles Schwab connection', 'Round-trip trade matching', 'Manual entry always available'],
   },
   ...BROKER_REGISTRY.map((b) => ({
     name: b.name,
-    detail: 'Automatic sync',
+    detail: 'One-tap import',
     methods: ['Read-only connection via SnapTrade', 'Round-trip trade matching', 'Manual entry always available'],
   })),
 ] as const;

@@ -26,7 +26,7 @@ import { useTrades } from '../hooks/useTrades';
 import type { Trade } from '../types';
 import { computeStats, getMonthTrades } from '../utils/stats';
 import { takePendingAppView } from '../utils/pendingAppView';
-import { useAutoBrokerSync } from '../hooks/useAutoBrokerSync';
+import { useDuplicateCleanup } from '../hooks/useDuplicateCleanup';
 import { AssistantDock } from '../components/analytics/AssistantDock';
 import { formatMonthYear } from '../utils/format';
 
@@ -53,6 +53,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
     addTrades,
     updateTrade,
     deleteTrade,
+    removeTrades,
     restoreTrades,
     clearAll,
     syncStatus,
@@ -82,6 +83,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [clearConfirmStage, setClearConfirmStage] = useState<0 | 1 | 2>(0);
+  const [clearError, setClearError] = useState<string | null>(null);
   const [showShareCard, setShowShareCard] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => !hasCompletedOnboarding());
   const [assistantOpen, setAssistantOpen] = useState(false);
@@ -100,10 +102,19 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   // Every journal's trades, not just the active one — a trader's leaderboard standing is about
   // them, not whichever journal happens to be selected right now.
   useLeaderboardSync(everyTrade);
-  // Pulls in anything the connected broker has that the journal doesn't, when the app is opened
-  // and the data is more than a few hours old. Passing everyTrade (not just the active journal's)
-  // so dedupe sees every sourceId already imported anywhere.
-  const brokerSync = useAutoBrokerSync(everyTrade, addTrades);
+  // Broker syncing is manual: it happens on the Connect Broker screen when the trader presses the
+  // button, and nowhere else. An automatic version shipped briefly and had to be pulled — it could
+  // fire before the journal finished loading, dedupe against an empty list, and re-import someone's
+  // entire history. Anything automatic here needs a much stronger guarantee than that one had.
+  //
+  // This clears up the rows that bug already wrote. Gated on the journal being loaded, and it only
+  // ever removes a row while a surviving copy of the same broker trade is visible beside it.
+  const duplicateCleanup = useDuplicateCleanup(
+    everyTrade,
+    removeTrades,
+    syncStatus !== 'loading' && syncStatus !== 'syncing',
+  );
+  const hasBrokerTrades = useMemo(() => everyTrade.some((t) => Boolean(t.sourceId)), [everyTrade]);
 
   const filterSetups = useMemo(
     () => [...new Set([...settings.setupTags, ...setups])].sort(),
@@ -230,7 +241,15 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 onRequestBroker={() => setAppView('request-broker')}
               />
             ) : appView === 'connect-broker' ? (
-              <BrokerConnectContent onBack={() => setAppView('dashboard')} onImportTrades={addTrades} existingTrades={trades} />
+              <BrokerConnectContent
+                onBack={() => setAppView('dashboard')}
+                onImportTrades={addTrades}
+                /* everyTrade, not `trades`: `trades` is the FILTERED view, so syncing with a
+                   symbol or tag filter active would dedupe against a subset and re-import
+                   everything hidden by the filter. It also has to span every journal, since a
+                   trade already imported into another one is still already imported. */
+                existingTrades={everyTrade}
+              />
             ) : appView === 'report-bug' ? (
               <ReportBugContent onBack={() => setAppView('dashboard')} />
             ) : appView === 'request-broker' ? (
@@ -241,7 +260,10 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
               <DashboardSkeleton />
             ) : (
               <DashboardView
-                brokerSync={brokerSync}
+                duplicatesRemoved={duplicateCleanup.removed}
+                onDismissDuplicateNotice={duplicateCleanup.acknowledge}
+                onSyncBroker={() => setAppView('connect-broker')}
+                hasBrokerTrades={hasBrokerTrades}
                 trades={trades}
                 hasAnyTrades={allTrades.length > 0}
                 year={year}
@@ -331,10 +353,26 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
           cancelLabel="Keep my trades"
           danger
           onConfirm={() => {
-            void clearAll();
             setClearConfirmStage(0);
+            setClearError(null);
+            void clearAll().catch((err) => {
+              console.error('[clear-journal] failed:', err);
+              setClearError(
+                "Couldn't clear the journal — some trades may still be there. Check your connection and try again.",
+              );
+            });
           }}
           onCancel={() => setClearConfirmStage(0)}
+        />
+      )}
+
+      {clearError && (
+        <ConfirmDialog
+          title="Clearing didn't finish"
+          message={clearError}
+          confirmLabel="OK"
+          onConfirm={() => setClearError(null)}
+          onCancel={() => setClearError(null)}
         />
       )}
 

@@ -82,11 +82,30 @@ export async function deleteTradeDoc(uid: string, tradeId: string): Promise<void
   await deleteDoc(doc(tradesCollection(uid), tradeId));
 }
 
+/**
+ * Deletes many trades at once, chunked to stay under Firestore's per-batch write limit.
+ *
+ * Used by the duplicate cleanup, where the whole point is that the count can be large — a journal
+ * that got imported twice can easily have more rows to remove than a single batch will take.
+ */
+export async function deleteTradesBatch(uid: string, tradeIds: string[]): Promise<void> {
+  if (tradeIds.length === 0) return;
+
+  for (let offset = 0; offset < tradeIds.length; offset += BATCH_LIMIT) {
+    const chunk = tradeIds.slice(offset, offset + BATCH_LIMIT);
+    const batch = writeBatch(getFirebaseDb());
+    for (const id of chunk) {
+      batch.delete(doc(tradesCollection(uid), id));
+    }
+    await batch.commit();
+  }
+}
+
 export async function deleteAllTrades(uid: string): Promise<void> {
   const snap = await getDocs(tradesCollection(uid));
-  const batch = writeBatch(getFirebaseDb());
-  snap.docs.forEach((d) => batch.delete(d.ref));
-  await batch.commit();
+  // Chunked for the same reason as the batch writes above: one commit can't clear a journal with
+  // more than a few hundred trades, and it fails outright rather than partially.
+  await deleteTradesBatch(uid, snap.docs.map((d) => d.id));
 }
 
 export async function migrateLocalTrades(uid: string, localTrades: Trade[]): Promise<number> {

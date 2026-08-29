@@ -31,7 +31,7 @@ export function EmptyDashboard({ onAddTrade, onConnectBroker, onLoadSample }: Em
           </div>
           <h3 className="text-lg md:text-xl font-semibold mb-1.5">Start your journal</h3>
           <p className="text-sm text-text-secondary leading-relaxed">
-            Connect a broker to sync automatically, log a session by hand, or take a look around
+            Connect a broker and import your trades, log a session by hand, or take a look around
             with an example month first.
           </p>
         </div>

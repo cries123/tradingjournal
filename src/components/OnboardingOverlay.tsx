@@ -8,7 +8,7 @@ const STEPS = [
   {
     icon: Link2,
     title: 'Get your trades in',
-    body: 'Connect Schwab or Robinhood to sync trades automatically, or log sessions manually — your call.',
+    body: 'Connect Schwab or Robinhood and pull your trades in with one tap, or log sessions manually — your call.',
   },
   {
     icon: Calendar,

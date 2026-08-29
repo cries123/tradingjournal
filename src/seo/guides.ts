@@ -12,7 +12,7 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
     slug: 'broker-sync-now-live',
     title: 'Broker Sync Is Live',
     description:
-      `Automatic trade sync for ${BROKER_COUNT_PHRASE} is now live — read-only, so Trend Chasers never sees your balance or places trades on your behalf.`,
+      `One-tap trade import for ${BROKER_COUNT_PHRASE} is now live — read-only, so Trend Chasers never sees your balance or places trades on your behalf.`,
     path: '/guides/broker-sync-now-live',
     sections: [
       {
@@ -37,6 +37,14 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
         ],
       },
       {
+        heading: 'Syncing happens when you ask for it',
+        paragraphs: [
+          'Trend Chasers never reaches out to your broker on its own. There is no background job and no schedule — your trades come in when you open Connect broker and press Sync, and at no other time.',
+          'That is a deliberate choice. A version that synced by itself on app open was briefly live in August 2026 and was withdrawn: it could run before your journal had finished loading, fail to recognise the trades you already had, and import your history a second time. Anything that touches your trading record unattended needs a stronger guarantee than that one had, so until it has one, you press the button.',
+          'Pressing Sync as often as you like is safe. Every synced trade carries an id from your broker, so a trade already in your journal is recognised and skipped rather than added again.',
+        ],
+      },
+      {
         heading: 'Disconnect anytime',
         paragraphs: [
           'Go to Connect broker and click Disconnect on any linked account. That revokes access immediately — the trades you already synced stay in your journal, but nothing new comes in until you reconnect.',
@@ -55,7 +63,7 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
         heading: 'What makes a good free trading journal?',
         paragraphs: [
           'A trading journal should show your results clearly — not bury them in rows. Trend Chasers is built around a visual P&L calendar so green and red days stand out immediately.',
-          `You get net P&L, win rate, profit factor, and average profit per trade without exporting to another tool. Connect any of ${BROKER_COUNT_PHRASE} to sync trades automatically, or log them manually.`,
+          `You get net P&L, win rate, profit factor, and average profit per trade without exporting to another tool. Connect any of ${BROKER_COUNT_PHRASE} to import trades in one tap, or log them manually.`,
         ],
       },
       {
@@ -71,7 +79,7 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
     slug: 'how-broker-sync-works',
     title: 'How Broker Sync Works',
     description:
-      `Connect any of ${BROKER_COUNT_PHRASE} and let trades sync automatically — how the connection works, what data it reads, and how to disconnect.`,
+      `Connect any of ${BROKER_COUNT_PHRASE} and pull your trades in whenever you want them — how the connection works, what data it reads, and how to disconnect.`,
     path: '/guides/how-broker-sync-works',
     sections: [
       {
