@@ -54,6 +54,48 @@ async function getCredsIfRegistered(uid: string): Promise<SnaptradeCreds | null>
   return existing?.userSecret ? existing : null;
 }
 
+/**
+ * Mirrors "does this user actually have a broker linked" into a plain Firestore doc.
+ *
+ * SnapTrade is the source of truth for connections, and asking it is a per-user API call — fine
+ * for one user loading their own page, useless for an admin dashboard that wants a single
+ * number across everyone. So each time we learn a user's real connection state, we write it
+ * down here. Contains no secrets: institution names and counts only, unlike users/{uid}/private
+ * /snaptrade which holds the userSecret.
+ *
+ * Best-effort by design — a failure to record analytics must never fail the broker call the
+ * user is actually waiting on.
+ */
+async function recordBrokerConnectionState(
+  uid: string,
+  institutions: string[],
+  accountCount: number,
+): Promise<void> {
+  try {
+    const ref = getAdminFirestore().doc(`brokerConnections/${uid}`);
+    const now = new Date().toISOString();
+    const existing = await ref.get();
+
+    await ref.set(
+      {
+        uid,
+        connected: accountCount > 0,
+        accountCount,
+        institutions,
+        lastCheckedAt: now,
+        // Only stamped the first time we ever see them connected, so it survives a later
+        // disconnect and still answers "when did this user first link a broker".
+        ...(accountCount > 0 && !existing.data()?.firstConnectedAt
+          ? { firstConnectedAt: now }
+          : {}),
+      },
+      { merge: true },
+    );
+  } catch (err) {
+    console.warn('[broker-connect] could not record connection state:', err);
+  }
+}
+
 async function handleConnect(uid: string, broker?: string): Promise<BrokerConnectResult> {
   if (!isBrokerRegistryKey(broker)) {
     const keys = BROKER_REGISTRY.map((b) => b.key).join(', ');
@@ -86,6 +128,7 @@ async function handleStatus(uid: string): Promise<BrokerConnectResult> {
   if (!creds) {
     return { statusCode: 200, body: { registered: false, accounts: [] } };
   }
+  await recordBrokerConnectionState(uid, [], 0).catch(() => {});
 
   const snaptrade = getSnaptrade();
   const res = await snaptrade.accountInformation.listUserAccounts({
@@ -100,6 +143,12 @@ async function handleStatus(uid: string): Promise<BrokerConnectResult> {
     authorizationId: a.brokerage_authorization,
     status: a.sync_status,
   }));
+
+  await recordBrokerConnectionState(
+    uid,
+    [...new Set(accounts.map((a) => a.institutionName).filter((n): n is string => Boolean(n)))],
+    accounts.length,
+  );
 
   return { statusCode: 200, body: { registered: true, accounts } };
 }

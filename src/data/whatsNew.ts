@@ -11,6 +11,12 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'August 2026',
+    title: 'Broker sync status is now tracked properly',
+    description:
+      'Behind the scenes, whether your brokerage is actually linked is now recorded when your connection is checked, instead of being re-derived every time. Nothing changes in how you connect \u2014 it just means the site owner can see which brokers people actually use, and spot a broker whose setup flow is failing.',
+  },
+  {
+    date: 'August 2026',
     title: 'The dashboard now tells you what to fix',
     description:
       'A new line at the top of your dashboard names the single biggest thing costing you money this period \u2014 a setup that keeps bleeding, a part of the day you should stop trading, or winners you\u2019re exiting too early. Below it, a full equity curve with your drawdown shaded in, so you can see the ride and not just the result.',

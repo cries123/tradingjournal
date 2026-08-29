@@ -17,6 +17,9 @@ import {
   Users,
 } from 'lucide-react';
 import { AuthModal } from '../components/AuthModal';
+import { AcquisitionFunnel } from '../components/admin/AcquisitionFunnel';
+import { BrokerAdoptionPanel } from '../components/admin/BrokerAdoptionPanel';
+import { SignupTrendPanel } from '../components/admin/SignupTrendPanel';
 import { AdminUserDetailModal } from '../components/admin/AdminUserDetailModal';
 import { AdminHelpArticleModal } from '../components/admin/AdminHelpArticleModal';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
@@ -66,7 +69,11 @@ import {
   type BugReport,
   type BugReportStatus,
 } from '../services/bugReports';
-import { fetchVisitorStats, type VisitorStats } from '../services/visitorAnalytics';
+import {
+  emptyVisitorStats,
+  fetchVisitorStats,
+  type VisitorStats,
+} from '../services/visitorAnalytics';
 import { fetchAdminServerStats, type AdminServerStats } from '../services/adminStats';
 
 interface AdminPageProps {
@@ -479,15 +486,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
       const signupStats = computeSignupStats(users);
       const [visitorResult, serverResult] = await Promise.all([
         fetchVisitorStats(signupStats.last7Days).catch(() => ({
-          stats: {
-            totalUniqueVisitors: 0,
-            totalConverted: 0,
-            conversionRate: 0,
-            last7DaysVisitors: 0,
-            last7DaysSignups: signupStats.last7Days,
-            last7DaysConversionRate: 0,
-            dailyLast7: [],
-          },
+          stats: emptyVisitorStats(signupStats.last7Days),
           error: 'Could not load visitor stats',
         })),
         fetchAdminServerStats(),
@@ -521,15 +520,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         userCount: 0,
         users: [],
         health: null,
-        visitorStats: {
-          totalUniqueVisitors: 0,
-          totalConverted: 0,
-          conversionRate: 0,
-          last7DaysVisitors: 0,
-          last7DaysSignups: 0,
-          last7DaysConversionRate: 0,
-          dailyLast7: [],
-        },
+        visitorStats: emptyVisitorStats(0),
         visitorStatsError: null,
         serverStats: null,
         serverStatsError: null,
@@ -970,6 +961,25 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
               </div>
             )}
 
+            <AcquisitionFunnel
+              visitors={ready.visitorStats}
+              serverStats={ready.serverStats}
+              fallbackSignups={ready.userCount}
+              visitorError={ready.visitorStatsError}
+              serverError={ready.serverStatsError}
+            />
+
+            <div className="grid lg:grid-cols-2 gap-4 mb-8">
+              <SignupTrendPanel
+                serverStats={ready.serverStats}
+                serverError={ready.serverStatsError}
+              />
+              <BrokerAdoptionPanel
+                serverStats={ready.serverStats}
+                serverError={ready.serverStatsError}
+              />
+            </div>
+
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               <div className="glass-card rounded-xl p-5 md:p-6">
                 <div className="flex items-center gap-3 mb-3">
@@ -977,30 +987,16 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                     <Eye size={18} />
                   </div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-                    Anonymous visitors
+                    Visitors (7 days)
                   </p>
                 </div>
-                {ready.visitorStatsError && (
-                  <p className="text-xs text-amber-400 mt-2">{ready.visitorStatsError}</p>
-                )}
                 <p className="text-3xl font-bold tracking-tight">
-                  {ready.visitorStats.totalUniqueVisitors.toLocaleString()}
+                  {ready.visitorStats.last7DaysVisitors.toLocaleString()}
                 </p>
                 <p className="text-xs text-text-secondary mt-2">
-                  {ready.visitorStats.last7DaysVisitors} unique in the last 7 days
+                  {ready.visitorStats.totalUniqueVisitors.toLocaleString()} all time
                 </p>
-                <p className="text-xs text-emerald-300 mt-2">
-                  {ready.visitorStats.conversionRate.toFixed(1)}% all-time signup rate
-                </p>
-                <p className="text-xs text-text-secondary mt-0.5">
-                  {ready.visitorStats.last7DaysConversionRate.toFixed(1)}% last 7 days (
-                  {ready.visitorStats.last7DaysSignups} signups /{' '}
-                  {ready.visitorStats.last7DaysVisitors} visitors)
-                </p>
-                <p className="text-[10px] text-text-secondary mt-2">
-                  Counts logged-out visits only · once per browser per day
-                </p>
-                {ready.visitorStats.dailyLast7.some((d) => d.visitors > 0) && (
+                {ready.visitorStats.dailyLast7.some((d) => d.visitors > 0) ? (
                   <div className="mt-4 flex items-end gap-1 h-12">
                     {ready.visitorStats.dailyLast7.map((day) => (
                       <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
@@ -1013,45 +1009,26 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                       </div>
                     ))}
                   </div>
+                ) : (
+                  <p className="text-[10px] text-text-secondary mt-3">
+                    No visits recorded yet this week.
+                  </p>
                 )}
               </div>
 
-              <div className="glass-card rounded-xl p-5 md:p-6 sm:col-span-1 lg:col-span-1">
+              <div className="glass-card rounded-xl p-5 md:p-6">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
                     <Users size={18} />
                   </div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-                    Signed up users
+                    Journals in use
                   </p>
                 </div>
-                <p className="text-3xl font-bold tracking-tight">{ready.userCount.toLocaleString()}</p>
-                {signupStats && (
-                  <p className="text-xs text-text-secondary mt-2">
-                    {signupStats.last7Days} new in the last 7 days · {signupStats.thisMonth} this month
-                  </p>
-                )}
-                {ready.serverStats && (
-                  <p className="text-xs text-text-secondary mt-1">
-                    {ready.serverStats.authUserCount} Firebase Auth accounts
-                    {ready.serverStats.authSignupsLast7Days > 0 && (
-                      <> · {ready.serverStats.authSignupsLast7Days} Auth signups (7d)</>
-                    )}
-                  </p>
-                )}
-                {ready.serverStats && ready.serverStats.authUsersMissingProfile > 0 && (
-                  <p className="text-xs text-amber-400 mt-1">
-                    {ready.serverStats.authUsersMissingProfile} Auth account
-                    {ready.serverStats.authUsersMissingProfile === 1 ? '' : 's'} missing a Firestore profile
-                  </p>
-                )}
-                {ready.serverStatsError && (
-                  <p className="text-xs text-text-secondary mt-1">{ready.serverStatsError}</p>
-                )}
-                <p className="text-xs text-text-secondary mt-1">
-                  {usersWithTrades} with trades imported
+                <p className="text-3xl font-bold tracking-tight">{usersWithTrades.toLocaleString()}</p>
+                <p className="text-xs text-text-secondary mt-2">
+                  of {ready.userCount.toLocaleString()} profiles have trades
                 </p>
-
                 {signupStats && signupStats.dailyLast7.some((d) => d.count > 0) && (
                   <div className="mt-4 flex items-end gap-1 h-12">
                     {signupStats.dailyLast7.map((day) => (

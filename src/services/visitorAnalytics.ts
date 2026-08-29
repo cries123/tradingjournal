@@ -2,20 +2,28 @@ import {
   collection,
   doc,
   getCountFromServer,
-  getDoc,
   getDocs,
   query,
   setDoc,
+  updateDoc,
   where,
 } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
 
 const VISITOR_ID_KEY = 'tc_visitor_id';
+/** Last UTC date this browser successfully wrote a daily visit doc for. */
+const VISITOR_DAY_KEY = 'tc_visitor_day';
 
 export interface VisitorStats {
   totalUniqueVisitors: number;
   totalConverted: number;
   conversionRate: number;
+  /** Visitors who opened the journal itself, signed up or not. */
+  openedApp: number;
+  /** Opened the journal and never created an account — the local-only crowd. */
+  localOnlyUsers: number;
+  /** Never got past the marketing pages. */
+  browsedOnly: number;
   last7DaysVisitors: number;
   last7DaysSignups: number;
   last7DaysConversionRate: number;
@@ -27,11 +35,16 @@ export interface VisitorStatsResult {
   error: string | null;
 }
 
-function emptyVisitorStats(signupsLast7Days: number): VisitorStats {
+/** Exported so callers building a fallback state can't drift out of sync with the real shape —
+ *  two hand-rolled copies of this object in AdminPage were exactly how that happened before. */
+export function emptyVisitorStats(signupsLast7Days: number): VisitorStats {
   return {
     totalUniqueVisitors: 0,
     totalConverted: 0,
     conversionRate: 0,
+    openedApp: 0,
+    localOnlyUsers: 0,
+    browsedOnly: 0,
     last7DaysVisitors: 0,
     last7DaysSignups: signupsLast7Days,
     last7DaysConversionRate: 0,
@@ -72,7 +85,34 @@ function last7DayKeys(): string[] {
   return keys;
 }
 
-/** Records one anonymous visit per visitor per day (logged-out users only). */
+function alreadyRecordedToday(): boolean {
+  try {
+    return localStorage.getItem(VISITOR_DAY_KEY) === todayUtc();
+  } catch {
+    return false;
+  }
+}
+
+function markRecordedToday(): void {
+  try {
+    localStorage.setItem(VISITOR_DAY_KEY, todayUtc());
+  } catch {
+    // Private browsing with storage disabled — we simply re-attempt the write next navigation.
+  }
+}
+
+/**
+ * Records one anonymous visit per visitor per day (logged-out users only).
+ *
+ * Deliberately never READS from Firestore. The previous version called getDoc() on the daily
+ * doc to decide whether to create it, but the security rule on that collection is
+ * `allow read: if isAdmin()` — so for an actual anonymous visitor that first read threw
+ * permission-denied and the whole function rejected before writing anything. The result was a
+ * visitor counter that could never move off zero. Dedupe now happens against localStorage
+ * instead, which is where the visitor id already lives.
+ *
+ * Errors are swallowed on purpose: analytics must never be able to break a page load.
+ */
 export async function recordAnonymousVisit(path: string): Promise<void> {
   if (!isFirebaseConfigured()) return;
   if (getFirebaseAuth().currentUser) return;
@@ -80,51 +120,70 @@ export async function recordAnonymousVisit(path: string): Promise<void> {
   const visitorId = getVisitorId();
   if (!visitorId) return;
 
-  const date = todayUtc();
   const db = getFirebaseDb();
-  const dailyRef = doc(db, 'analyticsDailyVisitors', `${date}_${visitorId}`);
-  const existing = await getDoc(dailyRef);
   const now = new Date().toISOString();
+  // Anything under /app means they're actually using the journal, not just reading the pitch.
+  const openedApp = path === '/app' || path.startsWith('/app/');
 
-  if (!existing.exists()) {
-    await setDoc(dailyRef, {
+  // Heartbeat the profile every navigation so lastPath/openedApp stay current. updateDoc is
+  // tried first because it can't clobber the conversion flag; it throws if the profile doesn't
+  // exist yet, which is exactly when the create below is the right call.
+  try {
+    await updateDoc(doc(db, 'analyticsVisitors', visitorId), {
+      lastSeenAt: now,
+      lastPath: path,
+      ...(openedApp ? { openedApp: true } : {}),
+    });
+  } catch {
+    try {
+      await setDoc(doc(db, 'analyticsVisitors', visitorId), {
+        visitorId,
+        firstSeenAt: now,
+        lastSeenAt: now,
+        lastPath: path,
+        openedApp,
+        converted: false,
+      });
+    } catch {
+      // Rules rejected it, or the network is down. Nothing else to do — this is best-effort.
+    }
+  }
+
+  // The daily doc is create-only by rule, so only attempt it once per UTC day per browser.
+  if (alreadyRecordedToday()) return;
+
+  try {
+    await setDoc(doc(db, 'analyticsDailyVisitors', `${todayUtc()}_${visitorId}`), {
       visitorId,
-      date,
+      date: todayUtc(),
       path,
       createdAt: now,
     });
-    await setDoc(doc(db, 'analyticsVisitors', visitorId), {
-      visitorId,
-      firstSeenAt: now,
-      lastSeenAt: now,
-      lastPath: path,
-      converted: false,
-    });
-    return;
+    markRecordedToday();
+  } catch {
+    // Most likely this browser already has today's doc from a session where localStorage was
+    // cleared; the rule denies the overwrite, which is the correct outcome either way.
+    markRecordedToday();
   }
-
-  await setDoc(
-    doc(db, 'analyticsVisitors', visitorId),
-    {
-      lastSeenAt: now,
-      lastPath: path,
-    },
-    { merge: true },
-  );
 }
 
 export async function markVisitorConverted(visitorId: string, uid: string): Promise<void> {
   if (!isFirebaseConfigured() || !visitorId) return;
 
-  await setDoc(
-    doc(getFirebaseDb(), 'analyticsVisitors', visitorId),
-    {
-      converted: true,
-      convertedAt: new Date().toISOString(),
-      signupUid: uid,
-    },
-    { merge: true },
-  );
+  try {
+    await setDoc(
+      doc(getFirebaseDb(), 'analyticsVisitors', visitorId),
+      {
+        converted: true,
+        convertedAt: new Date().toISOString(),
+        signupUid: uid,
+      },
+      { merge: true },
+    );
+  } catch {
+    // A missed conversion flag costs one row of accuracy in the funnel; it must never be
+    // allowed to fail the signup that triggered it.
+  }
 }
 
 export async function fetchVisitorStats(signupsLast7Days: number): Promise<VisitorStatsResult> {
@@ -138,14 +197,25 @@ export async function fetchVisitorStats(signupsLast7Days: number): Promise<Visit
   const weekStart = dayKeys[0];
 
   try {
-    const [totalSnap, convertedSnap, weekSnap] = await Promise.all([
+    // Every query here uses at most one equality filter so it runs on Firestore's automatic
+    // single-field indexes — no composite index to create in the console. The converted set is
+    // fetched in full rather than counted because it's bounded by the signup count (small) and
+    // we need to know how many of those had opened the app, which a count query can't tell us
+    // without a composite index on (converted, openedApp).
+    const [totalSnap, openedAppSnap, convertedDocs, weekSnap] = await Promise.all([
       getCountFromServer(collection(db, 'analyticsVisitors')),
-      getCountFromServer(query(collection(db, 'analyticsVisitors'), where('converted', '==', true))),
+      getCountFromServer(query(collection(db, 'analyticsVisitors'), where('openedApp', '==', true))),
+      getDocs(query(collection(db, 'analyticsVisitors'), where('converted', '==', true))),
       getDocs(query(collection(db, 'analyticsDailyVisitors'), where('date', '>=', weekStart))),
     ]);
 
     const totalUniqueVisitors = totalSnap.data().count;
-    const totalConverted = convertedSnap.data().count;
+    const openedApp = openedAppSnap.data().count;
+    const totalConverted = convertedDocs.size;
+    const convertedWhoOpenedApp = convertedDocs.docs.filter(
+      (d) => (d.data() as { openedApp?: boolean }).openedApp === true,
+    ).length;
+
     const conversionRate =
       totalUniqueVisitors > 0 ? (totalConverted / totalUniqueVisitors) * 100 : 0;
 
@@ -180,6 +250,9 @@ export async function fetchVisitorStats(signupsLast7Days: number): Promise<Visit
         totalUniqueVisitors,
         totalConverted,
         conversionRate,
+        openedApp,
+        localOnlyUsers: Math.max(0, openedApp - convertedWhoOpenedApp),
+        browsedOnly: Math.max(0, totalUniqueVisitors - openedApp),
         last7DaysVisitors,
         last7DaysSignups: signupsLast7Days,
         last7DaysConversionRate,
@@ -190,8 +263,7 @@ export async function fetchVisitorStats(signupsLast7Days: number): Promise<Visit
   } catch {
     return {
       stats: empty,
-      error:
-        'Could not load visitor stats. Run: firebase deploy --only firestore:rules',
+      error: 'Could not load visitor stats — re-publish firestore.rules in the Firebase console.',
     };
   }
 }

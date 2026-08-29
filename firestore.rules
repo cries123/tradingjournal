@@ -175,13 +175,32 @@ service cloud.firestore {
       allow create: if validVisitorProfileWrite()
         && request.resource.data.converted == false
         && request.resource.data.firstSeenAt is string;
+
+      // Two legal updates, and nothing else:
+      //   1. the per-visit heartbeat, which may touch lastSeenAt/lastPath/openedApp but must
+      //      leave `converted` exactly as it was;
+      //   2. the one-way flip to converted, which is only allowed from false.
+      //
+      // The previous version of rule 1 required `converted` to be ABSENT from the incoming
+      // data. That can never hold: Firestore evaluates request.resource.data as the document
+      // AFTER the merge, so an existing `converted` field is always present in it, and every
+      // heartbeat after the very first visit was denied. Comparing the old and new values is
+      // the check that was actually intended.
       allow update: if resource.data.visitorId == visitorId
         && (
-          (validVisitorProfileWrite() && !('converted' in request.resource.data))
+          (validVisitorProfileWrite()
+            && request.resource.data.converted == resource.data.converted)
           || (resource.data.converted == false && validVisitorConversionWrite())
         );
+
       allow read: if isAdmin();
       allow delete: if false;
+    }
+
+    // Written only by the broker-connect serverless function via the Admin SDK (which bypasses
+    // these rules). No client ever needs to read or write it, so nothing is granted here.
+    match /brokerConnections/{userId} {
+      allow read, write: if false;
     }
 
     match /deletedAccounts/{userId} {
