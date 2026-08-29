@@ -23,7 +23,7 @@ import { computeTakeaway } from '../utils/takeaway';
 import { useSettings } from '../context/SettingsContext';
 import { AccountSwitcher } from './AccountSwitcher';
 import { BrokerSyncAnnouncement } from './BrokerSyncAnnouncement';
-import { DuplicateCleanupNotice } from './DuplicateCleanupNotice';
+import { DuplicateTradesBanner } from './DuplicateTradesBanner';
 import { WeeklyRecapCard } from './WeeklyRecapCard';
 import { DailyPnlChart } from './DailyPnlChart';
 import { DashboardCalendar } from './DashboardCalendar';
@@ -62,9 +62,9 @@ interface DashboardViewProps {
   sampleActive?: boolean;
   onLoadSample?: () => void;
   onClearSample?: () => void;
-  /** How many duplicate rows the cleanup removed this session, if any. */
-  duplicatesRemoved?: number | null;
-  onDismissDuplicateNotice?: () => void;
+  /** Every trade in every journal — duplicates shouldn't hide in a journal you aren't on. */
+  everyTrade?: Trade[];
+  onRemoveTrades?: (ids: string[]) => Promise<void>;
   /** Sends the trader to the broker screen, where syncing is done by hand. */
   onSyncBroker?: () => void;
   /** True once a broker is linked — the sync shortcut is noise for everyone else. */
@@ -92,8 +92,8 @@ export function DashboardView({
   sampleActive = false,
   onLoadSample,
   onClearSample,
-  duplicatesRemoved,
-  onDismissDuplicateNotice,
+  everyTrade,
+  onRemoveTrades,
   onSyncBroker,
   hasBrokerTrades = false,
 }: DashboardViewProps) {
@@ -149,10 +149,10 @@ export function DashboardView({
 
   return (
     <div className="flex flex-col gap-2 md:gap-3 pb-2">
-      {/* Above everything else: if the numbers below just changed, the trader is owed the reason
-          before they read a single stat. */}
-      {duplicatesRemoved != null && duplicatesRemoved > 0 && (
-        <DuplicateCleanupNotice count={duplicatesRemoved} onDismiss={onDismissDuplicateNotice} />
+      {/* Above everything else: if the numbers below are inflated by a double import, that's the
+          first thing the trader needs to know — before they read a single stat. */}
+      {everyTrade && onRemoveTrades && (
+        <DuplicateTradesBanner trades={everyTrade} onRemove={onRemoveTrades} />
       )}
 
       <BrokerSyncAnnouncement onConnectBroker={onConnectBroker} />

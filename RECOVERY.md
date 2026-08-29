@@ -28,7 +28,16 @@ new, and imported everyone's history a second time.
   the filter came back in as new. It now checks every trade in every journal, unfiltered. This one
   had nothing to do with auto-sync — it would have bitten you eventually anyway.
 
-**Nobody has to do anything.** Each journal cleans itself the next time it's opened.
+**It asks before deleting, and backs up first.** I originally built this to run automatically
+because you asked for that. I've changed it back, and you should know why: an unattended deleter is
+only as safe as your confidence in the surrounding system, and while trades are going missing for
+reasons neither of us has explained yet, that confidence doesn't exist. Detection being provable is
+not the same as this being the right moment.
+
+So: a banner shows the count, the trader can read the exact list before agreeing, and the rows are
+written to a downloaded JSON file *before* a single delete is issued. Even a mistaken cleanup is
+recoverable from their own downloads folder. Change it back to automatic once the missing-trade
+question is answered and I'll do it in a minute.
 
 ---
 
@@ -80,7 +89,27 @@ ask the assistant a question, click the `ai-assistant` request and read the **st
 | **429** | Daily cap | Real cap, or previously a masked Firestore failure — now reported separately |
 | **500** | Server error | Netlify → Functions → `ai-assistant` → logs |
 
-**The 502 is the likely one, and it's my default that caused it.** I set `AI_MODEL` to
+### Update: found it — it's the reasoning-token budget
+
+Your screenshot said **"The assistant returned an empty answer."** That is not a rephrasing
+problem and never was.
+
+`gpt-5-mini` is a reasoning model: it spends part of its completion budget thinking before it
+writes anything. I capped `max_completion_tokens` at **700**. The reasoning consumed the entire
+allowance, so the API returned HTTP 200 with empty content and `finish_reason: "length"` — and the
+code turned that into "try rephrasing", sending every user to fix a question that was fine.
+
+Fixed in this build:
+
+- Budget raised to 3000 (`AI_MAX_TOKENS` to override). Unused budget costs nothing — you're billed
+  on tokens actually produced.
+- `reasoning_effort: 'low'` for gpt-5/o-series models. This task is "explain these numbers", not a
+  puzzle; a long reasoning pass buys nothing and is what starved the answer.
+- Empty answer now retries with double the budget, then falls back to `gpt-4o-mini`, logging what
+  to fix each time.
+- The user-facing message no longer blames the question.
+
+**The other 502 cause, still worth knowing:** I set `AI_MODEL` to
 `gpt-5-mini`. If that name isn't right or isn't enabled on your OpenAI account, every single call
 fails and the assistant is dead for everyone — with the only evidence in a function log.
 

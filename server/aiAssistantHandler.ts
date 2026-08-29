@@ -125,33 +125,59 @@ interface ModelCallOutcome {
   status: number;
   answer?: string;
   detail?: string;
+  /** Why the model stopped. 'length' with no answer is the reasoning-budget failure below. */
+  finishReason?: string;
 }
+
+/**
+ * Reasoning models spend part of the completion budget thinking before they write anything.
+ *
+ * This is what took the assistant down: with a 700-token budget, a reasoning model can burn the
+ * entire allowance on hidden reasoning tokens and return HTTP 200 with empty content and
+ * finish_reason "length" — which surfaced to every user as "The assistant returned an empty
+ * answer." Nothing was wrong with the key, the model, or the prompt; the budget was simply too
+ * small to reach the visible answer.
+ */
+function isReasoningModel(model: string): boolean {
+  return /^(gpt-5|o1|o3|o4)/i.test(model);
+}
+
+/** Generous enough that reasoning tokens can't crowd out the answer. Answers stay short anyway
+ *  because the system prompt asks for a few short paragraphs — unused budget costs nothing. */
+const MAX_COMPLETION_TOKENS = Number(process.env.AI_MAX_TOKENS || 3000);
 
 async function callModel(
   model: string,
   facts: unknown,
   question: string,
   history: { role: 'user' | 'assistant'; content: string }[],
+  maxTokens = MAX_COMPLETION_TOKENS,
 ): Promise<ModelCallOutcome> {
+  const payload: Record<string, unknown> = {
+    model,
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      {
+        role: 'system',
+        content: `The user's journal stats for this period:\n${JSON.stringify(facts)}`,
+      },
+      ...history,
+      { role: 'user', content: question },
+    ],
+    max_completion_tokens: maxTokens,
+  };
+
+  // Keep the thinking short: this task is "explain these numbers", not a puzzle, so a long
+  // reasoning pass buys nothing and is what starves the answer.
+  if (isReasoningModel(model)) payload.reasoning_effort = 'low';
+
   const res = await fetch(`${AI_BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${AI_API_KEY}`,
     },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        {
-          role: 'system',
-          content: `The user's journal stats for this period:\n${JSON.stringify(facts)}`,
-        },
-        ...history,
-        { role: 'user', content: question },
-      ],
-      max_completion_tokens: 700,
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!res.ok) {
@@ -160,9 +186,14 @@ async function callModel(
   }
 
   const data = (await res.json().catch(() => ({}))) as {
-    choices?: { message?: { content?: string } }[];
+    choices?: { message?: { content?: string }; finish_reason?: string }[];
   };
-  return { ok: true, status: res.status, answer: data.choices?.[0]?.message?.content?.trim() };
+  return {
+    ok: true,
+    status: res.status,
+    answer: data.choices?.[0]?.message?.content?.trim(),
+    finishReason: data.choices?.[0]?.finish_reason,
+  };
 }
 
 /**
@@ -190,6 +221,25 @@ async function askModel(
     outcome = await callModel(AI_FALLBACK_MODEL, facts, question, history);
   }
 
+  // 200 OK, no text: the budget ran out before the model wrote anything. One more pass with room
+  // to finish, then a non-reasoning model, rather than telling the user to "rephrase" a question
+  // that was never the problem.
+  if (outcome.ok && !outcome.answer) {
+    console.error(
+      `[ai-assistant] "${AI_MODEL}" returned an empty answer (finish_reason=` +
+        `${outcome.finishReason ?? 'unknown'}) — retrying with a larger completion budget.`,
+    );
+    outcome = await callModel(AI_MODEL, facts, question, history, MAX_COMPLETION_TOKENS * 2);
+
+    if (outcome.ok && !outcome.answer && AI_FALLBACK_MODEL !== AI_MODEL) {
+      console.error(
+        `[ai-assistant] "${AI_MODEL}" still returned nothing — falling back to ` +
+          `"${AI_FALLBACK_MODEL}". Consider setting AI_MODEL to a non-reasoning model.`,
+      );
+      outcome = await callModel(AI_FALLBACK_MODEL, facts, question, history);
+    }
+  }
+
   if (!outcome.ok) {
     console.error('[ai-assistant] model call failed:', outcome.status, outcome.detail ?? '');
     if (outcome.status === 401 || outcome.status === 403) {
@@ -205,7 +255,8 @@ async function askModel(
   }
 
   if (!outcome.answer) {
-    throw new BrokerRequestError('The assistant returned an empty answer. Try rephrasing.', 502);
+    // Not the user's fault and not fixable by rephrasing — don't send them chasing that.
+    throw new BrokerRequestError('The assistant is unavailable right now. Try again shortly.', 502);
   }
   return outcome.answer;
 }

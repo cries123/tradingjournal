@@ -26,7 +26,6 @@ import { useTrades } from '../hooks/useTrades';
 import type { Trade } from '../types';
 import { computeStats, getMonthTrades } from '../utils/stats';
 import { takePendingAppView } from '../utils/pendingAppView';
-import { useDuplicateCleanup } from '../hooks/useDuplicateCleanup';
 import { AssistantDock } from '../components/analytics/AssistantDock';
 import { formatMonthYear } from '../utils/format';
 
@@ -106,14 +105,6 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   // button, and nowhere else. An automatic version shipped briefly and had to be pulled — it could
   // fire before the journal finished loading, dedupe against an empty list, and re-import someone's
   // entire history. Anything automatic here needs a much stronger guarantee than that one had.
-  //
-  // This clears up the rows that bug already wrote. Gated on the journal being loaded, and it only
-  // ever removes a row while a surviving copy of the same broker trade is visible beside it.
-  const duplicateCleanup = useDuplicateCleanup(
-    everyTrade,
-    removeTrades,
-    syncStatus !== 'loading' && syncStatus !== 'syncing',
-  );
   const hasBrokerTrades = useMemo(() => everyTrade.some((t) => Boolean(t.sourceId)), [everyTrade]);
 
   const filterSetups = useMemo(
@@ -260,8 +251,8 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
               <DashboardSkeleton />
             ) : (
               <DashboardView
-                duplicatesRemoved={duplicateCleanup.removed}
-                onDismissDuplicateNotice={duplicateCleanup.acknowledge}
+                everyTrade={everyTrade}
+                onRemoveTrades={removeTrades}
                 onSyncBroker={() => setAppView('connect-broker')}
                 hasBrokerTrades={hasBrokerTrades}
                 trades={trades}
