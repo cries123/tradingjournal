@@ -21,7 +21,8 @@ export type AdminAuditAction =
   | 'help-article.updated'
   | 'help-article.published'
   | 'help-article.unpublished'
-  | 'help-article.deleted';
+  | 'help-article.deleted'
+  | 'announcement.published';
 
 export interface AdminAuditEntry {
   id: string;
@@ -29,7 +30,7 @@ export interface AdminAuditEntry {
   adminUid: string;
   adminEmail: string;
   action: AdminAuditAction;
-  targetType: 'user' | 'bug-report' | 'broker-request' | 'help-article';
+  targetType: 'user' | 'bug-report' | 'broker-request' | 'help-article' | 'announcement';
   targetId: string;
   targetLabel: string;
   detail: string;

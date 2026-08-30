@@ -18,9 +18,9 @@ export function TermsOfServicePage({ onHome, onLaunch, onPrivacy, onTerms, onBro
       <section>
         <h2>Who you are agreeing with</h2>
         <p>
-          Trend Chasers is operated by {LEGAL_ENTITY} (&ldquo;we&rdquo;, &ldquo;us&rdquo;). By using
-          Trend Chasers you agree to these Terms of Service. If you do not agree, please do not use
-          the app. Questions about these terms go to{' '}
+          These terms are an agreement between you and {LEGAL_ENTITY} (&ldquo;we&rdquo;,
+          &ldquo;us&rdquo;). By using Trend Chasers you agree to them. If you do not agree, please
+          do not use the app. Questions about these terms go to{' '}
           <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
         </p>
       </section>

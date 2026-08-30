@@ -23,7 +23,7 @@ import { computeTakeaway } from '../utils/takeaway';
 import { useSettings } from '../context/SettingsContext';
 import { AccountSwitcher } from './AccountSwitcher';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-import { BrokerSyncAnnouncement } from './BrokerSyncAnnouncement';
+import { SiteAnnouncement } from './SiteAnnouncement';
 import { DuplicateTradesBanner } from './DuplicateTradesBanner';
 import { WeeklyRecapCard } from './WeeklyRecapCard';
 import { DailyPnlChart } from './DailyPnlChart';
@@ -157,7 +157,7 @@ export function DashboardView({
         <DuplicateTradesBanner trades={everyTrade} onRemove={onRemoveTrades} />
       )}
 
-      <BrokerSyncAnnouncement onConnectBroker={onConnectBroker} />
+      <SiteAnnouncement onConnectBroker={onConnectBroker} />
 
       {/* Phone only. On desktop the sidebar already carries the journal switcher, and rendering
           both put the same control on screen twice, a few hundred pixels apart. */}

@@ -25,6 +25,7 @@ import { BUILD_SHA, BUILD_TIME, formatBuildStamp } from '../config/build';
 import { AcquisitionFunnel } from '../components/admin/AcquisitionFunnel';
 import { BrokerAdoptionPanel } from '../components/admin/BrokerAdoptionPanel';
 import { SignupTrendPanel } from '../components/admin/SignupTrendPanel';
+import { AdminAnnouncementCard } from '../components/admin/AdminAnnouncementCard';
 import { AdminUserDetailModal } from '../components/admin/AdminUserDetailModal';
 import { AdminHelpArticleModal } from '../components/admin/AdminHelpArticleModal';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
@@ -366,6 +367,7 @@ const AUDIT_ACTION_LABELS: Record<AdminAuditEntry['action'], string> = {
   'user.password-changed': 'Set a new password for',
   'user.password-reset-sent': 'Sent password reset to',
   'user.deleted': 'Deleted user',
+  'announcement.published': 'Updated the site announcement',
   'user.tier-granted': 'Granted a plan to',
   'user.tier-grant-cleared': 'Removed the granted plan from',
   'user.note-saved': 'Updated internal note for',
@@ -1770,6 +1772,19 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
             )}
 
             {tab === 'content' && (
+              <>
+              <AdminAnnouncementCard
+                onAudit={(detail) =>
+                  void logAdminAction({
+                    ...adminIdentity,
+                    action: 'announcement.published',
+                    targetType: 'announcement',
+                    targetId: 'site',
+                    targetLabel: 'Site announcement',
+                    detail,
+                  })
+                }
+              />
               <div className="glass-card rounded-xl p-5 md:p-6 mb-8">
                 <div className="flex items-center justify-between gap-3 mb-4">
                   <div className="flex items-center gap-2">
@@ -1872,6 +1887,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                   </div>
                 )}
               </div>
+              </>
             )}
           </>
         )}

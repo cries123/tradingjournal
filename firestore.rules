@@ -51,6 +51,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // The site-wide banner, edited from the admin panel. Public read because every visitor has to
+    // render it; admin-only write because it's a message shown to everyone in the product's own
+    // voice, and anyone who could write it could put anything there.
+    match /config/announcement {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /config/admin {
       allow read: if request.auth != null;
       allow create: if request.auth != null

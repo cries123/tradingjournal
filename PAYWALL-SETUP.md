@@ -48,10 +48,11 @@ secret is the first thing to check.
 
 ## 4. Publish the Firestore rules
 
-`firestore.rules` gained four blocks: `entitlements`, `syncUsage`, `creemEvents`,
-and a tightened read on the existing counters. Deploy them (Firebase console →
-Firestore → Rules, or `firebase deploy --only firestore:rules`) or the admin
-panel won't be able to read anyone's plan.
+`firestore.rules` gained five blocks: `entitlements`, `syncUsage`, `creemEvents`,
+`config/announcement`, and a tightened read on the existing counters. Paste the
+whole file in (Firebase console → Firestore → Rules) or run
+`firebase deploy --only firestore:rules`. Skip this and the admin panel can't
+read anyone's plan and can't publish the site banner.
 
 ## 5. Grandfather the people already using broker sync
 
@@ -92,3 +93,23 @@ with Creem's test card, and watch the function log for
 Faster still: grant yourself a tier from the admin panel. That exercises
 everything downstream of payment — the gates, the meters, the badge — without
 touching Creem at all.
+
+
+## The site banner
+
+Admin panel → Content → **Site announcement**. It writes one message that shows in
+two places: the slim bar across the top of the public site, and the card at the
+top of the journal dashboard. Closing it in one closes it in both.
+
+Publishing bumps a version number, and each browser remembers the version it
+dismissed — so **any** edit, including fixing a typo, brings the banner back for
+everyone who had closed the previous one. That's the intended behaviour, but it
+means small corrections are not free: people will see it again.
+
+It's cached for five minutes per browser, so a change takes up to five minutes to
+reach someone already on the site. That cache is deliberate — a banner read from
+Firestore on every page view by every visitor is exactly the kind of thing that
+exhausted the read quota before.
+
+Nothing is published to start with, so the old broker-sync bar is gone until you
+write one. Untick "Show it" to take a banner down without deleting the text.

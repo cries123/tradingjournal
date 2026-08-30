@@ -103,9 +103,9 @@ export function RefundPolicyPage({
       <section>
         <h2>Contact</h2>
         <p>
-          Trend Chasers is operated by {LEGAL_ENTITY}. For any question about billing, refunds or
-          cancellation, email <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>. We answer
-          every message.
+          For any question about billing, refunds or cancellation, email{' '}
+          <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a> and you will be answered by
+          {' '}{LEGAL_ENTITY}. We answer every message.
         </p>
       </section>
     </LegalPageLayout>

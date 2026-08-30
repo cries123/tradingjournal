@@ -121,7 +121,7 @@ export function LandingPage({
           which Theme accent a signed-in user has picked in Settings — same reasoning as the logo. */}
       <Starfield reactive={false} />
       <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
-      <AnnouncementBar onGuide={onGuide} />
+      <AnnouncementBar />
       <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate} />
 
       {/* Hero */}
