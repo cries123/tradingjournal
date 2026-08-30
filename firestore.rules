@@ -204,6 +204,28 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Same deal for broker syncs per day. Read it through /api/entitlement, which counts it
+    // server-side; a client that could edit this could sync as often as it liked, and every sync
+    // costs a paid SnapTrade call.
+    match /syncUsage/{docId} {
+      allow read, write: if false;
+    }
+
+    // What a user has paid for (or been granted). Written ONLY by the Admin SDK — the Creem
+    // webhook and the admin panel — because an entitlement the client can write is not an
+    // entitlement, it's a suggestion. Users may read their own so the UI knows what to show,
+    // and the admin can list them to manage tiers.
+    match /entitlements/{userId} {
+      allow get: if request.auth != null && request.auth.uid == userId;
+      allow get, list: if isAdmin();
+      allow write: if false;
+    }
+
+    // Delivered Creem webhook ids, used to make retries idempotent. Server-only.
+    match /creemEvents/{eventId} {
+      allow read, write: if false;
+    }
+
     // Written only by the broker-connect serverless function via the Admin SDK (which bypasses
     // these rules). No client ever needs to read or write it, so nothing is granted here.
     match /brokerConnections/{userId} {

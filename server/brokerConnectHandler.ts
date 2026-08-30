@@ -4,6 +4,9 @@ import { getSnaptrade, resolveBrokerSlug, SNAPTRADE_CONFIGURED } from './snaptra
 import { getAdminFirestore } from './firebaseAdmin';
 import { mapSnapTradeActivitiesToTrades, type SnapTradeActivityLike } from './mapSnapTradeActivities';
 import { BROKER_REGISTRY, isBrokerRegistryKey } from '../src/data/brokerRegistry';
+import { resolveAccess } from './entitlements';
+import { consumeDaily } from './usage';
+import { lowestTierWith, TIER_PLANS, type Tier } from '../src/config/tiers';
 
 export type SupportedBroker = string;
 
@@ -131,13 +134,60 @@ async function recordBrokerConnectionState(
   }
 }
 
+/**
+ * Refuses the request when the caller's plan doesn't include broker sync at all.
+ *
+ * Every SnapTrade connection costs a real $1/month whether or not it's used, so this gate is the
+ * one standing between the free tier and an unbounded bill. It runs on the server because the
+ * client-side lock is a courtesy, not a control.
+ */
+function assertBrokerSyncIncluded(tier: Tier, brokers: number): void {
+  if (brokers > 0) return;
+  const needed = lowestTierWith('brokerSync');
+  throw new BrokerRequestError(
+    `Connecting a broker is part of ${needed ? TIER_PLANS[needed].name : 'a paid plan'}. Upgrade your plan to sync trades automatically.`,
+    402,
+  );
+}
+
+/** How many distinct brokerages this user already has authorised. */
+async function countConnections(creds: SnaptradeCreds): Promise<number> {
+  const res = await getSnaptrade().accountInformation.listUserAccounts({
+    userId: creds.userId,
+    userSecret: creds.userSecret,
+  });
+  // Counted by authorisation, not by account: one brokerage login can expose several accounts
+  // (cash, margin, IRA), and charging someone three of their connections for one broker would be
+  // wrong on the plan they actually bought.
+  return new Set(
+    res.data.map((a) => a.brokerage_authorization).filter((id): id is string => Boolean(id)),
+  ).size;
+}
+
 async function handleConnect(uid: string, broker?: string): Promise<BrokerConnectResult> {
   if (!isBrokerRegistryKey(broker)) {
     const keys = BROKER_REGISTRY.map((b) => b.key).join(', ');
     throw new BrokerRequestError(`Unsupported broker. Use one of: ${keys}.`, 400);
   }
 
+  const { tier, limits } = await resolveAccess(uid);
+  assertBrokerSyncIncluded(tier, limits.brokers);
+
   const creds = await getOrRegisterCreds(uid);
+
+  // Checked against live connections rather than a stored count, because a connection can also be
+  // removed from the broker's own side and a stale counter would lock someone out of a slot they
+  // no longer occupy.
+  const existing = await countConnections(creds).catch(() => 0);
+  if (existing >= limits.brokers) {
+    throw new BrokerRequestError(
+      limits.brokers === 1
+        ? `${TIER_PLANS[tier].name} includes one broker connection, and you already have one. Disconnect it first, or upgrade for more.`
+        : `${TIER_PLANS[tier].name} includes ${limits.brokers} broker connections and you're using all of them. Disconnect one first, or upgrade for more.`,
+      402,
+    );
+  }
+
   const snaptrade = getSnaptrade();
   const brokerSlug = await resolveBrokerSlug(broker);
   const siteUrl = (process.env.SITE_URL || 'https://trendchasers.net').replace(/\/$/, '');
@@ -152,16 +202,38 @@ async function handleConnect(uid: string, broker?: string): Promise<BrokerConnec
 
   const data = res.data;
   if (!('redirectURI' in data) || !data.redirectURI) {
-    throw new BrokerRequestError('SnapTrade did not return a connection link. Try again.', 502);
+    // SnapTrade answers a refused connection with a detail payload rather than an HTTP error, and
+    // this branch used to discard it — so "SnapTrade did not return a connection link" was all
+    // anyone ever saw, whether the real reason was a plan limit, an unsupported broker, or an
+    // expired secret. The reason is the whole value of the message.
+    const detail = data as { detail?: string; code?: string | number; status_code?: number };
+    console.error(
+      `[broker-connect] SnapTrade refused a ${brokerSlug} connection for ${uid}:`,
+      JSON.stringify(detail).slice(0, 500),
+    );
+
+    const reason = typeof detail.detail === 'string' ? detail.detail : '';
+    throw new BrokerRequestError(
+      reason
+        ? `${brokerSlug} couldn\u2019t be connected: ${reason}`
+        : 'SnapTrade did not return a connection link. Try again.',
+      502,
+    );
   }
 
   return { statusCode: 200, body: { redirectURI: data.redirectURI } };
 }
 
 async function handleStatus(uid: string): Promise<BrokerConnectResult> {
+  // Status is never gated — someone who has downgraded still needs to see and disconnect what
+  // they connected. The plan travels with the answer so the UI can say "1 of 2 used" without a
+  // second round trip.
+  const { tier, limits } = await resolveAccess(uid);
+  const plan = { tier, brokers: limits.brokers, syncsPerDay: limits.syncsPerDay };
+
   const creds = await getCredsIfRegistered(uid);
   if (!creds) {
-    return { statusCode: 200, body: { registered: false, accounts: [] } };
+    return { statusCode: 200, body: { registered: false, accounts: [], plan } };
   }
   await recordBrokerConnectionState(uid, [], 0).catch(() => {});
 
@@ -185,7 +257,7 @@ async function handleStatus(uid: string): Promise<BrokerConnectResult> {
     accounts.length,
   );
 
-  return { statusCode: 200, body: { registered: true, accounts } };
+  return { statusCode: 200, body: { registered: true, accounts, plan } };
 }
 
 async function handleSync(uid: string, accountId?: string, startDate?: string, endDate?: string): Promise<BrokerConnectResult> {
@@ -193,9 +265,28 @@ async function handleSync(uid: string, accountId?: string, startDate?: string, e
     throw new BrokerRequestError('accountId is required', 400);
   }
 
+  const { tier, limits } = await resolveAccess(uid);
+  assertBrokerSyncIncluded(tier, limits.brokers);
+
   const creds = await getCredsIfRegistered(uid);
   if (!creds) {
     throw new BrokerRequestError('No broker connected yet', 400);
+  }
+
+  // Counted before the pull, not after: a sync that fails halfway still cost the SnapTrade call
+  // it was capped for, and counting afterwards would let a retry loop pull for free.
+  const spend = await consumeDaily('sync', uid, limits.syncsPerDay);
+  if (!spend.ok) {
+    if (spend.reason === 'unavailable') {
+      throw new BrokerRequestError('Sync is briefly unavailable. Try again in a moment.', 503);
+    }
+    if (spend.reason === 'not_included') {
+      assertBrokerSyncIncluded(tier, 0);
+    }
+    throw new BrokerRequestError(
+      `You've used ${limits.syncsPerDay === 1 ? "today's sync" : `all ${limits.syncsPerDay} of today's syncs`} on ${TIER_PLANS[tier].name}. Syncs reset at midnight UTC.`,
+      429,
+    );
   }
 
   const snaptrade = getSnaptrade();
@@ -240,7 +331,15 @@ async function handleSync(uid: string, accountId?: string, startDate?: string, e
 
   return {
     statusCode: 200,
-    body: { trades, activityCount: activities.length, totalActivityCount: total ?? activities.length, truncated },
+    body: {
+      trades,
+      activityCount: activities.length,
+      totalActivityCount: total ?? activities.length,
+      truncated,
+      syncsRemaining: spend.remaining,
+      syncsPerDay: limits.syncsPerDay,
+      tier,
+    },
   };
 }
 

@@ -1,14 +1,22 @@
 import type { IncomingHttpHeaders } from 'http';
 import { AdminRequestError, assertCallerIsAdmin, getBearerToken } from './adminAuth';
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin';
+import { readEntitlement, writeEntitlement } from './entitlements';
+import { isTier, TIER_PLANS, type Tier } from '../src/config/tiers';
 
-export type AdminUserAction = 'updateEmail' | 'updatePassword' | 'deleteUser';
+export type AdminUserAction =
+  | 'updateEmail'
+  | 'updatePassword'
+  | 'deleteUser'
+  | 'setTier'
+  | 'clearTierGrant';
 
 export interface AdminUserRequestBody {
   action: AdminUserAction;
   targetUid: string;
   email?: string;
   password?: string;
+  tier?: string;
 }
 
 async function deleteCollectionDocs(collectionPath: string): Promise<number> {
@@ -97,6 +105,45 @@ async function handleDeleteUser(callerUid: string, targetUid: string): Promise<{
   return { message: 'User deleted' };
 }
 
+/**
+ * Grants a tier by hand — the grandfathering path.
+ *
+ * Written with source 'admin', which billing webhooks deliberately refuse to overwrite (see
+ * applyBillingUpdate). That's the whole point: someone given Diamond has no subscription, so a
+ * webhook about a lapsed or absent one must never take it back off them.
+ */
+async function handleSetTier(callerUid: string, targetUid: string, tier: Tier) {
+  await writeEntitlement(targetUid, {
+    tier,
+    source: 'admin',
+    status: 'active',
+    grantedBy: callerUid,
+  });
+  return { message: `${TIER_PLANS[tier].name} granted` };
+}
+
+/**
+ * Removes a hand-granted tier.
+ *
+ * If there's a real subscription underneath, the grant is handed back to billing rather than
+ * deleted, so the next webhook can manage it again and the customer keeps what they paid for.
+ * With no subscription there's nothing to hand back, so the record goes.
+ */
+async function handleClearTierGrant(targetUid: string) {
+  const existing = await readEntitlement(targetUid);
+  if (!existing || existing.source !== 'admin') {
+    return { message: 'No manual grant to remove' };
+  }
+
+  if (existing.creemSubscriptionId) {
+    await writeEntitlement(targetUid, { source: 'purchase', grantedBy: '' });
+    return { message: 'Grant removed — their own subscription applies again' };
+  }
+
+  await getAdminFirestore().doc(`entitlements/${targetUid}`).delete();
+  return { message: 'Grant removed — back to Free' };
+}
+
 export async function handleAdminUserRequest(
   headers: IncomingHttpHeaders,
   body: AdminUserRequestBody,
@@ -108,7 +155,7 @@ export async function handleAdminUserRequest(
 
   try {
     const callerUid = await assertCallerIsAdmin(token);
-    const { action, targetUid, email, password } = body;
+    const { action, targetUid, email, password, tier } = body;
 
     if (!targetUid?.trim()) {
       return { statusCode: 400, body: { error: 'targetUid is required' } };
@@ -131,6 +178,17 @@ export async function handleAdminUserRequest(
       }
       case 'deleteUser': {
         const result = await handleDeleteUser(callerUid, targetUid);
+        return { statusCode: 200, body: { ok: true, ...result } };
+      }
+      case 'setTier': {
+        if (!isTier(tier)) {
+          return { statusCode: 400, body: { error: 'Unknown tier' } };
+        }
+        const result = await handleSetTier(callerUid, targetUid, tier);
+        return { statusCode: 200, body: { ok: true, ...result } };
+      }
+      case 'clearTierGrant': {
+        const result = await handleClearTierGrant(targetUid);
         return { statusCode: 200, body: { ok: true, ...result } };
       }
       default:

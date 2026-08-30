@@ -4,6 +4,7 @@ import type { Trade } from '../../types';
 import { buildJournalFacts, suggestedQuestions } from '../../utils/journalFacts';
 import { AssistantError, streamAssistant, type AssistantMessage } from '../../services/aiAssistant';
 import { useAssistantThread } from '../../hooks/useAssistantThread';
+import { useEntitlement } from '../../context/EntitlementContext';
 import { AnswerBody } from './AnswerBody';
 
 export type AssistantScope = 'month' | 'year' | 'all';
@@ -49,6 +50,7 @@ function readNotesOptIn(): boolean {
  */
 export function AssistantPanel({ periods, rules, bare = false }: AssistantPanelProps) {
   const { messages, append, rollbackTo, clear } = useAssistantThread();
+  const { limits, noteUsage } = useEntitlement();
   const [scope, setScope] = useState<AssistantScope>(periods[0]?.scope ?? 'month');
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -126,6 +128,12 @@ export function AssistantPanel({ periods, rules, bare = false }: AssistantPanelP
       );
       append([{ role: 'assistant', content: reply.answer }]);
       setRemaining(reply.remaining);
+      // Keeps the sidebar meter honest without another round trip — the server has already
+      // counted this message, so the number it hands back is the truth.
+      noteUsage({
+        aiMessagesUsed: Math.max(0, limits.aiMessagesPerDay - reply.remaining),
+        aiMessagesRemaining: reply.remaining,
+      });
     } catch (err) {
       // Take the optimistic user turn back out and return the text to the box, so a failed send
       // costs nothing but the wait.

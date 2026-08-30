@@ -12,6 +12,7 @@ import { ShareCardModal } from '../components/ShareCardModal';
 import { Sidebar, type SidebarAppView } from '../components/Sidebar';
 import { Starfield } from '../components/Starfield';
 import { BrokerConnectContent } from '../components/brokers/BrokerConnectContent';
+import { LockedFeature } from '../components/plan/LockedFeature';
 import { BrokersContent } from '../components/support/BrokersContent';
 import { ReportBugContent } from '../components/support/ReportBugContent';
 import { RequestBrokerContent } from '../components/support/RequestBrokerContent';
@@ -243,16 +244,22 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 onRequestBroker={() => setAppView('request-broker')}
               />
             ) : appView === 'connect-broker' ? (
-              <BrokerConnectContent
-                onBack={() => setAppView('dashboard')}
-                onImportTrades={addTrades}
-                /* everyTrade, not `trades`: `trades` is the FILTERED view, so syncing with a
-                   symbol or tag filter active would dedupe against a subset and re-import
-                   everything hidden by the filter. It also has to span every journal, since a
-                   trade already imported into another one is still already imported. */
-                existingTrades={everyTrade}
-                journalReady={syncStatus !== 'loading'}
-              />
+              <LockedFeature
+                feature="brokerSync"
+                title="Broker sync is a paid feature"
+                description="Connect your brokerage and your fills land in the journal on their own — entries, exits, fees and all, matched into round-trip trades."
+              >
+                <BrokerConnectContent
+                  onBack={() => setAppView('dashboard')}
+                  onImportTrades={addTrades}
+                  /* everyTrade, not `trades`: `trades` is the FILTERED view, so syncing with a
+                     symbol or tag filter active would dedupe against a subset and re-import
+                     everything hidden by the filter. It also has to span every journal, since a
+                     trade already imported into another one is still already imported. */
+                  existingTrades={everyTrade}
+                  journalReady={syncStatus !== 'loading'}
+                />
+              </LockedFeature>
             ) : appView === 'report-bug' ? (
               <ReportBugContent onBack={() => setAppView('dashboard')} />
             ) : appView === 'request-broker' ? (

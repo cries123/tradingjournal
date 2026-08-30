@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Trophy,
 } from 'lucide-react';
+import { PlanBadge } from './plan/PlanBadge';
 import { BrandLogo } from './BrandLogo';
 import { SidebarJournalPicker } from './SidebarJournalPicker';
 import { useAuth } from '../context/AuthContext';
@@ -209,6 +210,8 @@ export function Sidebar({
       </div>
 
       <div className="p-3 border-t border-border/60 shrink-0 space-y-3">
+        <PlanBadge />
+
         {firebaseEnabled && !loading && user && (
           <div className="flex items-center gap-2 px-1 min-w-0">
             <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />

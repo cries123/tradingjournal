@@ -106,7 +106,7 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
         heading: 'Connecting is optional',
         paragraphs: [
           'You do not need to connect anything to use the journal. Manual entry works exactly as it always has, and you can mix the two — sync one account, log another by hand.',
-          'If you\'d rather not link a broker at all, every feature outside of automatic sync (the calendar, analytics, tags, notes) works the same either way.',
+          'If you\'d rather not link a broker at all, every feature outside broker import (the calendar, analytics, tags, notes) works the same either way.',
         ],
       },
       {

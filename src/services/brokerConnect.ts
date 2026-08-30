@@ -75,7 +75,15 @@ export async function syncBrokerAccount(
   accountId: string,
   startDate?: string,
   endDate?: string,
-): Promise<{ trades: ParsedTradeInput[]; activityCount: number; totalActivityCount: number; truncated: boolean }> {
+): Promise<{
+  trades: ParsedTradeInput[];
+  activityCount: number;
+  totalActivityCount: number;
+  truncated: boolean;
+  /** Syncs left today on this plan, counted server-side. */
+  syncsRemaining?: number;
+  syncsPerDay?: number;
+}> {
   return brokerApiPost({ action: 'sync', accountId, startDate, endDate });
 }
 

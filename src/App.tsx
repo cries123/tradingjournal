@@ -17,6 +17,8 @@ const GuidePage = lazy(() => import('./pages/GuidePage').then((m) => ({ default:
 const GuidesIndexPage = lazy(() => import('./pages/GuidesIndexPage').then((m) => ({ default: m.GuidesIndexPage })));
 const HelpCenterPage = lazy(() => import('./pages/HelpCenterPage').then((m) => ({ default: m.HelpCenterPage })));
 const JournalApp = lazy(() => import('./pages/JournalApp').then((m) => ({ default: m.JournalApp })));
+const RefundPolicyPage = lazy(() => import('./pages/RefundPolicyPage').then((m) => ({ default: m.RefundPolicyPage })));
+const PricingPage = lazy(() => import('./pages/PricingPage').then((m) => ({ default: m.PricingPage })));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage').then((m) => ({ default: m.PrivacyPolicyPage })));
 const ReportBugPage = lazy(() => import('./pages/ReportBugPage').then((m) => ({ default: m.ReportBugPage })));
 const RequestBrokerPage = lazy(() => import('./pages/RequestBrokerPage').then((m) => ({ default: m.RequestBrokerPage })));
@@ -74,7 +76,7 @@ export default function App() {
   };
 
   const COMING_SOON_COPY: Record<
-    'market-simulator' | 'ai-assistant' | 'pricing',
+    'market-simulator' | 'ai-assistant',
     { feature: string; description: string; eyebrow?: string }
   > = {
     'market-simulator': {
@@ -86,10 +88,6 @@ export default function App() {
       eyebrow: 'Now live',
       description:
         "Open your journal and ask why a setup keeps losing, what happens when you trade the open, or whether you're cutting winners early. It reads the stats your journal already computed \u2014 so its numbers always match your dashboard \u2014 and it reviews what you actually did rather than telling you what to trade next.",
-    },
-    pricing: {
-      feature: 'Pricing',
-      description: "Trend Chasers is free to use today. We're still finalizing what a paid tier would include — pricing details will land here first.",
     },
   };
 
@@ -121,9 +119,13 @@ export default function App() {
     content = <AdminPage {...publicPageProps} />;
   } else if (route === 'whats-new') {
     content = <WhatsNewPage {...publicPageProps} />;
+  } else if (route === 'refunds') {
+    content = <RefundPolicyPage {...publicPageProps} />;
   } else if (route === 'help-center') {
     content = <HelpCenterPage {...publicPageProps} />;
-  } else if (route === 'market-simulator' || route === 'ai-assistant' || route === 'pricing') {
+  } else if (route === 'pricing') {
+    content = <PricingPage {...publicPageProps} />;
+  } else if (route === 'market-simulator' || route === 'ai-assistant') {
     content = <ComingSoonPage {...publicPageProps} {...COMING_SOON_COPY[route]} />;
   } else if (route === 'app') {
     content = (

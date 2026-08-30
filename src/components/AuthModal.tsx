@@ -30,8 +30,10 @@ function authErrorMessage(code: string): string {
   }
 }
 
+// Only things a free account actually gets. Broker sync moved behind a plan, and listing it as a
+// signup benefit would be selling something the account they're creating doesn't include.
 const BENEFITS = [
-  'Auto-sync trades from 20 brokers, read-only',
+  'Log unlimited trades — free, no card',
   'See which setups pay and which ones bleed',
   'Know if you exit winners too early',
   'Your journal syncs across every device',

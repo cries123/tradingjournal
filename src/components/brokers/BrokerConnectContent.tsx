@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, CheckCircle2, ExternalLink, Link2, Loader2, RefreshCw, Unlink } from 'lucide-react';
 import { BrokerLogo } from './BrokerLogo';
+import { useEntitlement } from '../../context/EntitlementContext';
+import { TIER_PLANS } from '../../config/tiers';
 import { useAuth } from '../../context/AuthContext';
 import {
   checkBrokerConnectAvailable,
@@ -113,6 +115,7 @@ export function BrokerConnectContent({
   journalReady = true,
 }: BrokerConnectContentProps) {
   const { user, loading, firebaseEnabled } = useAuth();
+  const { noteUsage, limits, tier, usage } = useEntitlement();
   const [available, setAvailable] = useState<boolean | null>(null);
   const [status, setStatus] = useState<{ registered: boolean; accounts: BrokerAccountSummary[] } | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -169,7 +172,12 @@ export function BrokerConnectContent({
     setSyncMessage(null);
     setSyncingAccountId(account.id);
     try {
-      const { trades, truncated } = await syncBrokerAccount(account.id);
+      const { trades, truncated, syncsRemaining, syncsPerDay } = await syncBrokerAccount(account.id);
+      // The server has already spent one of today's syncs by the time this returns, so the meter
+      // is updated from its answer rather than guessed at.
+      if (typeof syncsRemaining === 'number' && typeof syncsPerDay === 'number') {
+        noteUsage({ syncsUsed: Math.max(0, syncsPerDay - syncsRemaining), syncsRemaining });
+      }
 
       // Two ways to recognise a trade we already have, because one isn't enough.
       //
@@ -278,6 +286,26 @@ export function BrokerConnectContent({
           you want the latest fills. Re-syncing is safe: trades you already have are recognised and
           skipped, never added twice.
         </p>
+
+        {/* Shown from the plan, not from a count of what's on screen: someone who has downgraded
+            still sees the connections they made, and the honest number is what their plan allows
+            now — otherwise a refused Connect looks like a bug. */}
+        {limits.brokers > 0 && (
+          <p className="text-sm text-text-secondary max-w-2xl mb-8 -mt-4">
+            {TIER_PLANS[tier].name} includes{' '}
+            <span className="text-text-primary font-medium">
+              {limits.brokers} broker connection{limits.brokers === 1 ? '' : 's'}
+            </span>{' '}
+            and{' '}
+            <span className="text-text-primary font-medium">
+              {limits.syncsPerDay} sync{limits.syncsPerDay === 1 ? '' : 's'} a day
+            </span>
+            {usage.syncsRemaining < limits.syncsPerDay && (
+              <> — {usage.syncsRemaining} left today</>
+            )}
+            .
+          </p>
+        )}
 
         {!firebaseEnabled ? (
           <div className="panel-card p-6 text-sm text-text-secondary mb-6">

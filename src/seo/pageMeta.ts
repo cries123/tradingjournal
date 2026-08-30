@@ -17,13 +17,17 @@ const PAGE_SEO: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>, Pa
   landing: {
     title: 'Trend Chasers — Trading Journal & P&L Calendar',
     description:
-      `Free trading journal to track and improve your performance. Visual P&L calendar, automatic sync with ${BROKER_COUNT_PHRASE} including ${SHORT_BROKER_EXAMPLES}, or log trades manually.`,
+      // Written to be the single best summary of the page, because Google was ignoring the old
+      // one and lifting an FAQ answer instead. Front-loads what the product is, names the brokers
+      // people search for, and says "import" rather than "automatic sync" — syncing is manual now,
+      // so the old copy was promising something the app no longer does.
+      `Free trading journal with a visual P&L calendar. Import from ${BROKER_COUNT_PHRASE} including Schwab and Robinhood, or log by hand. Track win rate and profit factor.`,
     path: '/',
   },
   brokers: {
     title: 'Supported Brokers — Trend Chasers Trading Journal',
     description:
-      `Connect any of ${BROKER_COUNT_PHRASE}, including ${SHORT_BROKER_EXAMPLES}, for automatic trade sync — or log trades manually. See how Trend Chasers fits your workflow.`,
+      `Connect any of ${BROKER_COUNT_PHRASE}, including ${SHORT_BROKER_EXAMPLES}, for read-only trade import — or log trades manually. See how Trend Chasers fits your workflow.`,
     path: '/brokers',
   },
   guides: {
@@ -32,6 +36,12 @@ const PAGE_SEO: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>, Pa
     description:
       'Step-by-step walkthroughs for connecting a broker, syncing trades, and getting the most out of your Trend Chasers journal.',
     path: '/guides',
+  },
+  refunds: {
+    title: 'Refund Policy — Trend Chasers',
+    description:
+      '30-day money-back guarantee on every paid plan. No questions asked, no conditions. Cancel any time and keep your journal.',
+    path: '/refunds',
   },
   privacy: {
     title: 'Privacy Policy — Trend Chasers',
@@ -166,6 +176,7 @@ export const PRERENDER_ROUTES = [
   '/guides/pnl-calendar-trading-journal',
   '/privacy',
   '/terms',
+  '/refunds',
   '/request-broker',
   '/report-bug',
   '/whats-new',

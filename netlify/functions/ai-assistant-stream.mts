@@ -1,5 +1,6 @@
 import type { Config, Context } from '@netlify/functions';
 import { openModelStream, prepareAssistantStream } from '../../server/aiAssistantHandler';
+import { refundDaily } from '../../server/usage';
 
 /**
  * Streaming variant of the assistant.
@@ -28,13 +29,20 @@ export default async (req: Request, _context: Context): Promise<Response> => {
 
   if (!pre.ok || !pre.messages) {
     const rejection = pre.rejection ?? { statusCode: 500, error: 'Something went wrong.' };
-    return Response.json({ error: rejection.error }, { status: rejection.statusCode });
+    return Response.json(
+      { error: rejection.error, ...(rejection.upgradeTo ? { upgradeTo: rejection.upgradeTo } : {}) },
+      { status: rejection.statusCode },
+    );
   }
 
   const upstream = await openModelStream(pre.messages);
   if (!upstream.ok || !upstream.body) {
     const detail = await upstream.text().catch(() => '');
     console.error('[ai-assistant-stream] upstream failed:', upstream.status, detail.slice(0, 300));
+    // Nothing was generated, so the message the preflight counted was never delivered. The client
+    // retries on the non-streaming endpoint, which counts its own — without this refund a single
+    // upstream hiccup silently costs the user two of their daily messages.
+    if (pre.uid) await refundDaily('ai', pre.uid);
     // 502 tells the client to retry on the non-streaming endpoint, which has the model fallback
     // and the empty-answer retry that a stream can't do halfway through.
     return Response.json(
@@ -54,7 +62,11 @@ export default async (req: Request, _context: Context): Promise<Response> => {
 
       // The remaining-question count rides ahead of the text so the UI can update its counter
       // without waiting for the answer to finish.
-      controller.enqueue(encoder.encode(`event: meta\ndata: ${JSON.stringify({ remaining: pre.remaining })}\n\n`));
+      controller.enqueue(
+        encoder.encode(
+          `event: meta\ndata: ${JSON.stringify({ remaining: pre.remaining, limit: pre.limit, tier: pre.tier })}\n\n`,
+        ),
+      );
 
       try {
         for (;;) {

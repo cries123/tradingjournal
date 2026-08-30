@@ -28,6 +28,7 @@ const ROUTES = [
   '/guides/pnl-calendar-trading-journal',
   '/privacy',
   '/terms',
+  '/refunds',
   '/request-broker',
   '/report-bug',
 ];

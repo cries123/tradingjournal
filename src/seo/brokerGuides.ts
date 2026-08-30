@@ -15,7 +15,7 @@ export const BROKER_GUIDES: BrokerGuide[] = [
     brokerName: 'Thinkorswim',
     title: 'Thinkorswim Trading Journal — Automatic Sync or Manual Entry',
     description:
-      'Journal Thinkorswim trades with a P&L calendar. Connect your Schwab account for automatic sync, or log trades manually.',
+      'Journal Thinkorswim trades with a P&L calendar. Connect your Schwab account and import trades in one tap, or log them manually.',
     path: '/brokers/thinkorswim',
     intro:
       'Track your Thinkorswim trades on a visual P&L calendar. Thinkorswim accounts are Schwab accounts, so connecting Schwab through Trend Chasers syncs your Thinkorswim activity too — or log sessions manually if you\'d rather not connect anything.',
@@ -65,13 +65,13 @@ export const BROKER_GUIDES: BrokerGuide[] = [
     brokerName: 'Charles Schwab',
     title: 'Charles Schwab Trading Journal — Automatic Sync or Manual Entry',
     description:
-      'Journal Charles Schwab trades on a P&L calendar. Connect for automatic sync via a secure, read-only connection, or log trades manually.',
+      'Journal Charles Schwab trades on a P&L calendar. Import through a secure, read-only connection, or log trades manually.',
     path: '/brokers/charles-schwab',
     intro:
-      'Turn your Schwab account activity into a visual trading journal. Connect once for automatic sync, or keep full manual control — both are free.',
+      'Turn your Schwab account activity into a visual trading journal. Connect once and import whenever you want, or keep full manual control — both are free.',
     sections: [
       {
-        heading: 'Connect Schwab for automatic sync',
+        heading: 'Connect Schwab and import your trades',
         paragraphs: [
           'Open Connect broker from the sidebar, choose Charles Schwab, and approve a connection through SnapTrade — a broker-data connection provider that handles the secure link on Schwab\'s own site. Trend Chasers never sees your Schwab password.',
           'Once connected, Trend Chasers reads your recent activity, matches round-trip trades, and computes P&L per position automatically. Sync again anytime to pull in new activity.',
@@ -114,13 +114,13 @@ export const BROKER_GUIDES: BrokerGuide[] = [
     brokerName: 'Robinhood',
     title: 'Robinhood Trading Journal — Automatic Sync or Manual Entry',
     description:
-      'Journal Robinhood trades on a visual P&L calendar. Connect for read-only automatic sync, or log trades manually.',
+      'Journal Robinhood trades on a visual P&L calendar. Import through a read-only connection, or log trades manually.',
     path: '/brokers/robinhood',
     intro:
-      'Robinhood shows you today\'s P/L and little else. Journal your trades on a calendar, tag your setups, and see your real win rate — connect for automatic sync or log sessions yourself.',
+      'Robinhood shows you today\'s P/L and little else. Journal your trades on a calendar, tag your setups, and see your real win rate — connect and import your fills, or log sessions yourself.',
     sections: [
       {
-        heading: 'Connect Robinhood for automatic sync',
+        heading: 'Connect Robinhood and import your trades',
         paragraphs: [
           'Robinhood doesn\'t offer a public trading API, so Trend Chasers connects through SnapTrade, a broker-data connection provider that brokers a secure, read-only link to your account. Open Connect broker in the sidebar to get started.',
           'Once connected, your trade history syncs in and round-trip trades are matched automatically — buys paired with sells, P&L computed per trade.',

@@ -227,6 +227,20 @@ export function LandingFooter({
                   Terms of Service
                 </a>
               </li>
+              <li>
+                {/* Processors look for a refund policy that is reachable from every page, not
+                    buried inside the terms. */}
+                <a
+                  href="/refunds"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onNavigate?.('refunds');
+                  }}
+                  className="hover:text-emerald-400 transition-colors"
+                >
+                  Refund Policy
+                </a>
+              </li>
             </ul>
           </div>
 

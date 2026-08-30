@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Flag, KeyRound, Mail, Trash2, User, X } from 'lucide-react';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { AdminUserPlanSection } from './AdminUserPlanSection';
 import type { AdminUserSummary } from '../../services/admin';
 import { logAdminAction } from '../../services/adminAuditLog';
 import type { AdminUserNote } from '../../services/adminUserNotes';
@@ -204,6 +205,19 @@ export function AdminUserDetailModal({
               <dd className="mt-0.5">{user.coachShareEnabled ? 'On' : 'Off'}</dd>
             </div>
           </dl>
+
+          <AdminUserPlanSection
+            uid={user.uid}
+            onDone={(m) => {
+              setError(null);
+              setMessage(m);
+            }}
+            onError={(m) => {
+              setMessage(null);
+              setError(m);
+            }}
+            onAudit={logSelf}
+          />
 
           <div className="border-t border-border/50 pt-5 space-y-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Account</p>

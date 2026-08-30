@@ -7,6 +7,7 @@ export type AppRoute =
   | 'broker-guide'
   | 'privacy'
   | 'terms'
+  | 'refunds'
   | 'coach'
   | 'report-bug'
   | 'request-broker'
@@ -23,6 +24,7 @@ export type AppRoute =
  *  changelog pages, plus the two support pages the footer links to. Kept as its own union so a
  *  nav handler can't be passed a route like 'coach' that needs a token. */
 export type ExtraNavRoute =
+  | 'refunds'
   | 'market-simulator'
   | 'ai-assistant'
   | 'pricing'
@@ -45,6 +47,7 @@ const ROUTE_PATHS: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>,
   'ai-assistant': '/ai-assistant',
   pricing: '/pricing',
   'help-center': '/help-center',
+  refunds: '/refunds',
   'whats-new': '/whats-new',
 };
 
@@ -75,6 +78,7 @@ function readRoute(): RouteState {
   if (path.startsWith('/brokers')) return { route: 'brokers' };
   if (path.startsWith('/privacy')) return { route: 'privacy' };
   if (path.startsWith('/terms')) return { route: 'terms' };
+  if (path.startsWith('/refunds')) return { route: 'refunds' };
   if (path.startsWith('/report-bug')) return { route: 'report-bug' };
   if (path.startsWith('/request-broker')) return { route: 'request-broker' };
   if (path.startsWith('/admin')) return { route: 'admin' };

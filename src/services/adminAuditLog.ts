@@ -6,6 +6,8 @@ export type AdminAuditAction =
   | 'user.password-changed'
   | 'user.password-reset-sent'
   | 'user.deleted'
+  | 'user.tier-granted'
+  | 'user.tier-grant-cleared'
   | 'user.note-saved'
   | 'user.flagged'
   | 'user.unflagged'

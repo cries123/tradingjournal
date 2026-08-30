@@ -366,6 +366,8 @@ const AUDIT_ACTION_LABELS: Record<AdminAuditEntry['action'], string> = {
   'user.password-changed': 'Set a new password for',
   'user.password-reset-sent': 'Sent password reset to',
   'user.deleted': 'Deleted user',
+  'user.tier-granted': 'Granted a plan to',
+  'user.tier-grant-cleared': 'Removed the granted plan from',
   'user.note-saved': 'Updated internal note for',
   'user.flagged': 'Flagged',
   'user.unflagged': 'Unflagged',

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { MessageCircle, X } from 'lucide-react';
 import { useEscapeToClose } from '../../hooks/useEscapeToClose';
+import { LockedFeature } from '../plan/LockedFeature';
 import { AssistantPanel, type AssistantPeriod } from './AssistantPanel';
 
 interface AssistantDockProps {
@@ -89,7 +90,14 @@ export function AssistantDock({
             {/* min-h-0 and no overflow here: the panel owns its own scrolling, so the message
                 list scrolls while the composer stays pinned to the bottom of the sheet. */}
             <div className="flex-1 min-h-0 flex flex-col p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-              <AssistantPanel periods={periods} rules={rules} bare />
+              <LockedFeature
+                feature="aiAssistant"
+                title="Ask your journal anything"
+                description="The assistant reads the stats your dashboard already computed and tells you what they mean — why a setup keeps losing, whether you cut winners early, what changed last month."
+                className="flex-1 min-h-0"
+              >
+                <AssistantPanel periods={periods} rules={rules} bare />
+              </LockedFeature>
             </div>
           </div>
         </>

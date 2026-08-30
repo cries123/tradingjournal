@@ -1,4 +1,5 @@
 import { LegalPageLayout } from './LegalPageLayout';
+import { LEGAL_ENTITY, REFUND_WINDOW_DAYS, SUPPORT_EMAIL } from '../config/legal';
 import type { ExtraNavRoute } from '../hooks/useRoute';
 
 interface TermsOfServicePageProps {
@@ -15,10 +16,34 @@ export function TermsOfServicePage({ onHome, onLaunch, onPrivacy, onTerms, onBro
   return (
     <LegalPageLayout title="Terms of Service" lastUpdated="August 23, 2026" onHome={onHome} onLaunch={onLaunch} onPrivacy={onPrivacy} onTerms={onTerms} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate}>
       <section>
-        <h2>Agreement</h2>
+        <h2>Who you are agreeing with</h2>
         <p>
-          By using Trend Chasers, you agree to these Terms of Service. If you do not agree, please do not
-          use the app.
+          Trend Chasers is operated by {LEGAL_ENTITY} (&ldquo;we&rdquo;, &ldquo;us&rdquo;). By using
+          Trend Chasers you agree to these Terms of Service. If you do not agree, please do not use
+          the app. Questions about these terms go to{' '}
+          <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
+        </p>
+      </section>
+
+      <section>
+        <h2>Paid plans, billing and refunds</h2>
+        <p>
+          Trend Chasers is free to use. Paid plans add broker connections, the AI assistant and
+          higher usage limits; the current plans and prices are on the Pricing page.
+        </p>
+        <p>
+          Paid plans are monthly subscriptions that renew automatically until cancelled. You can
+          cancel at any time from Settings, which stops all future charges — your plan then stays
+          active until the end of the period you have already paid for.
+        </p>
+        <p>
+          Every paid plan carries a {REFUND_WINDOW_DAYS}-day money-back guarantee. Email{' '}
+          <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a> within {REFUND_WINDOW_DAYS} days of
+          a payment and we will refund it in full, no questions asked. See the Refund Policy for the
+          full detail.
+        </p>
+        <p>
+          Payments are processed by our payment provider. We never see or store your card details.
         </p>
       </section>
 

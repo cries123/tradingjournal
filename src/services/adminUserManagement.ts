@@ -1,5 +1,6 @@
 import { sendPasswordResetEmail } from 'firebase/auth';
 import type { AdminUserAction } from '../../server/adminUserHandler';
+import type { Tier } from '../config/tiers';
 import { deleteUserViaFirestore } from './adminDeleteUserClient';
 import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebase';
 
@@ -8,6 +9,7 @@ async function adminApiPost(payload: {
   targetUid: string;
   email?: string;
   password?: string;
+  tier?: Tier;
 }): Promise<{ ok: true; message: string }> {
   if (!isFirebaseConfigured()) {
     throw new Error('Firebase is not configured');
@@ -72,4 +74,14 @@ export async function adminDeleteUser(targetUid: string): Promise<{ message: str
     }
     throw err;
   }
+}
+
+/** Grandfathers a user into a tier by hand. Survives billing webhooks until it's cleared. */
+export async function adminSetUserTier(targetUid: string, tier: Tier): Promise<{ message: string }> {
+  return adminApiPost({ action: 'setTier', targetUid, tier });
+}
+
+/** Removes a hand-granted tier, handing the account back to whatever they actually pay for. */
+export async function adminClearUserTierGrant(targetUid: string): Promise<{ message: string }> {
+  return adminApiPost({ action: 'clearTierGrant', targetUid });
 }

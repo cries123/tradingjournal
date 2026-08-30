@@ -155,7 +155,10 @@ export function LandingPage({
               No signup needed to try it — your journal stays in your browser until you choose to sync.
             </p>
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-text-secondary">
-              {['Broker sync or manual entry', 'Free — no credit card', 'Read-only broker connections'].map((item) => (
+              {/* Says what's free and what isn't. "Free — no credit card" sitting next to "broker
+                  sync" read as though the sync were free too, which stopped being true the day
+                  plans shipped — and a pricing surprise after signup is how you earn a chargeback. */}
+              {['Journal free — no credit card', 'Broker sync from $5/month', 'Read-only broker connections'].map((item) => (
                 <span key={item} className="flex items-center gap-2">
                   <Check size={14} className="text-emerald-400" />
                   {item}

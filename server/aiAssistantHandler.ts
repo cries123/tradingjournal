@@ -1,6 +1,8 @@
 import type { IncomingHttpHeaders } from 'http';
 import { assertCallerUid, BrokerRequestError } from './snaptradeAuth';
-import { getAdminFirestore } from './firebaseAdmin';
+import { resolveAccess } from './entitlements';
+import { consumeDaily, refundDaily } from './usage';
+import { lowestTierWith, TIER_PLANS, type Tier } from '../src/config/tiers';
 
 /**
  * Backend for the journal assistant.
@@ -32,14 +34,10 @@ const AI_BASE_URL = process.env.AI_BASE_URL || 'https://api.openai.com/v1';
 export const AI_CONFIGURED = Boolean(AI_API_KEY?.trim());
 
 /**
- * Per-user daily cap, and the only thing bounding spend.
- *
- * A question costs well under a cent, so the model price isn't the risk — the exposure is exactly
- * users x cap x price. At 200 users a 40/day cap has a ~$150/month ceiling; 15/day puts it near
- * $57 and is still far more than anyone reviewing a trading month actually asks. Raise it with
- * AI_DAILY_LIMIT if real usage ever justifies it.
+ * The daily cap now comes from the caller's plan (src/config/tiers.ts), not from an env var —
+ * Gold gets 15 a day, Diamond 50, and anything below Gold gets none at all. That's also the only
+ * thing bounding spend: exposure is exactly paid-users x their cap x model price.
  */
-const DAILY_QUESTION_LIMIT = Number(process.env.AI_DAILY_LIMIT || 15);
 
 /** Keeps a pasted essay from becoming a bill. */
 const MAX_QUESTION_CHARS = 600;
@@ -106,37 +104,49 @@ export interface AiAssistantResult {
 }
 
 /**
- * Counts one question against the caller's daily allowance.
+ * Counts one question against the caller's plan allowance.
  *
- * Stored server-side in Firestore rather than in the client, for the obvious reason that a limit
- * the client enforces is not a limit. Keyed by UTC day so it resets on its own with no cleanup job.
+ * The allowance is a property of what they pay for, so it's resolved from their entitlement on
+ * every request rather than trusted from the client. Stored server-side in Firestore, keyed by
+ * UTC day so it resets on its own with no cleanup job.
  */
-async function consumeRateLimit(
-  uid: string,
-): Promise<{ ok: true; remaining: number } | { ok: false; reason: 'capped' | 'unavailable' }> {
-  const day = new Date().toISOString().slice(0, 10);
-  const ref = getAdminFirestore().doc(`aiUsage/${uid}_${day}`);
+type RateOutcome =
+  | { ok: true; remaining: number; limit: number; tier: Tier }
+  | { ok: false; reason: 'capped' | 'not_included' | 'unavailable'; limit: number; tier: Tier };
 
-  try {
-    return await getAdminFirestore().runTransaction(async (tx) => {
-      const snap = await tx.get(ref);
-      const used = (snap.data()?.count as number | undefined) ?? 0;
+async function consumeRateLimit(uid: string): Promise<RateOutcome> {
+  const { tier, limits } = await resolveAccess(uid);
+  const limit = limits.aiMessagesPerDay;
+  const result = await consumeDaily('ai', uid, limit);
 
-      if (used >= DAILY_QUESTION_LIMIT) {
-        return { ok: false as const, reason: 'capped' as const };
-      }
+  return result.ok
+    ? { ok: true, remaining: result.remaining, limit, tier }
+    : { ok: false, reason: result.reason, limit, tier };
+}
 
-      tx.set(ref, { uid, day, count: used + 1, updatedAt: new Date().toISOString() }, { merge: true });
-      return { ok: true as const, remaining: DAILY_QUESTION_LIMIT - (used + 1) };
-    });
-  } catch (err) {
-    // Firestore being unavailable shouldn't hand out unlimited requests — fail closed, because
-    // the failure mode of failing open is an unbounded bill. But report it as an outage rather
-    // than as a cap: telling every user they've hit a 15-question limit they never used sends the
-    // owner looking in entirely the wrong place.
-    console.error('[ai-assistant] rate limit check failed:', err);
-    return { ok: false as const, reason: 'unavailable' as const };
+/** The message shown when a request is refused, phrased for why it was refused. */
+function rateLimitRejection(outcome: Extract<RateOutcome, { ok: false }>): {
+  statusCode: number;
+  error: string;
+  upgradeTo?: Tier;
+} {
+  if (outcome.reason === 'unavailable') {
+    return { statusCode: 503, error: 'The assistant is briefly unavailable. Try again in a moment.' };
   }
+  if (outcome.reason === 'not_included') {
+    // Named from the tier table rather than hardcoded, so it stays true if the plans change.
+    const needed = lowestTierWith('aiAssistant');
+    const name = needed ? TIER_PLANS[needed].name : 'a paid plan';
+    return {
+      statusCode: 402,
+      error: `AI trade analysis is part of ${name}. Upgrade your plan to ask the assistant about your journal.`,
+      upgradeTo: needed ?? undefined,
+    };
+  }
+  return {
+    statusCode: 429,
+    error: `You've used all ${outcome.limit} of today's AI messages on ${TIER_PLANS[outcome.tier].name}. They reset at midnight UTC.`,
+  };
 }
 
 /**
@@ -303,9 +313,14 @@ async function askModel(
 export interface StreamPreflight {
   ok: boolean;
   /** Set when the request should be refused outright — status and message for the response. */
-  rejection?: { statusCode: number; error: string };
+  rejection?: { statusCode: number; error: string; upgradeTo?: Tier };
   messages?: { role: string; content: string }[];
   remaining?: number;
+  /** The caller's plan allowance, so the UI can render "3 of 15 left" rather than a bare number. */
+  limit?: number;
+  tier?: Tier;
+  /** Needed so the caller can hand back the counted message if the stream never delivers one. */
+  uid?: string;
 }
 
 /**
@@ -346,21 +361,7 @@ export async function prepareAssistantStream(
 
     const limit = await consumeRateLimit(uid);
     if (!limit.ok) {
-      return limit.reason === 'unavailable'
-        ? {
-            ok: false,
-            rejection: {
-              statusCode: 503,
-              error: 'The assistant is briefly unavailable. Try again in a moment.',
-            },
-          }
-        : {
-            ok: false,
-            rejection: {
-              statusCode: 429,
-              error: `You've reached today's limit of ${DAILY_QUESTION_LIMIT} questions. It resets at midnight UTC.`,
-            },
-          };
+      return { ok: false, rejection: rateLimitRejection(limit) };
     }
 
     const history = Array.isArray(body.history)
@@ -374,6 +375,9 @@ export async function prepareAssistantStream(
       ok: true,
       messages: buildMessages(body.facts, question, history, body.compareFacts),
       remaining: limit.remaining,
+      limit: limit.limit,
+      tier: limit.tier,
+      uid,
     };
   } catch (err) {
     if (err instanceof BrokerRequestError) {
@@ -438,17 +442,10 @@ export async function handleAiAssistantRequest(
 
     const limit = await consumeRateLimit(uid);
     if (!limit.ok) {
-      if (limit.reason === 'unavailable') {
-        return {
-          statusCode: 503,
-          body: { error: 'The assistant is briefly unavailable. Try again in a moment.' },
-        };
-      }
+      const rejection = rateLimitRejection(limit);
       return {
-        statusCode: 429,
-        body: {
-          error: `You've reached today's limit of ${DAILY_QUESTION_LIMIT} questions. It resets at midnight UTC.`,
-        },
+        statusCode: rejection.statusCode,
+        body: { error: rejection.error, ...(rejection.upgradeTo ? { upgradeTo: rejection.upgradeTo } : {}) },
       };
     }
 
@@ -461,9 +458,21 @@ export async function handleAiAssistantRequest(
           .map((m) => ({ role: m.role, content: m.content.slice(0, MAX_QUESTION_CHARS) }))
       : [];
 
-    const answer = await askModel(body.facts, question, history, body.compareFacts);
+    let answer: string;
+    try {
+      answer = await askModel(body.facts, question, history, body.compareFacts);
+    } catch (err) {
+      // The allowance is spent before the model is called so a failing request can't be retried
+      // for free in a loop. When the failure is ours, give it back — charging someone a message
+      // for an answer they never received is the kind of small unfairness people remember.
+      await refundDaily('ai', uid);
+      throw err;
+    }
 
-    return { statusCode: 200, body: { answer, remaining: limit.remaining } };
+    return {
+      statusCode: 200,
+      body: { answer, remaining: limit.remaining, limit: limit.limit, tier: limit.tier },
+    };
   } catch (err) {
     if (err instanceof BrokerRequestError) {
       return { statusCode: err.statusCode, body: { error: err.message } };
