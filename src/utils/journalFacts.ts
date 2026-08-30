@@ -7,6 +7,20 @@ import {
   computeSessionPerformance,
 } from './tradeQuality';
 import { breakevenWinRate } from './metricVerdict';
+import {
+  computeChecklistAdherence,
+  computeDirectionSplit,
+  computeFees,
+  computeHoldTime,
+  computeSelfAssessment,
+  computeWeekdaySplit,
+  type ChecklistFacts,
+  type DirectionFacts,
+  type HoldTimeFacts,
+  type SelfAssessmentFacts,
+  type WeekdayFact,
+} from './behaviourFacts';
+import { checkRuleViolations } from './tradingRules';
 
 /**
  * Compiles a trader's journal into a compact set of already-computed facts for the assistant.
@@ -52,6 +66,58 @@ export interface JournalFacts {
     sampleSize: number;
   } | null;
   rMultiple: { avgR: number; best: number; worst: number; sample: number } | null;
+
+  /** How long winners are held versus losers — the discipline signal P&L can't show. */
+  holdTime: HoldTimeFacts | null;
+  /** What the trader's own A–F grades were actually worth. */
+  selfAssessment: SelfAssessmentFacts | null;
+  /** P&L on trades that followed the trader's checklist versus the ones that didn't. */
+  checklist: ChecklistFacts | null;
+  direction: DirectionFacts | null;
+  weekdays: WeekdayFact[] | null;
+  fees: { total: number; trades: number } | null;
+  /** Breaches of the trader's OWN configured limits — their rules, not ours. */
+  ruleBreaches: { date: string; type: string; message: string }[] | null;
+  /**
+   * The trader's own words on their trades, when they've opted in.
+   *
+   * Off by default. These are personal notes, and sending them to a model is a decision the trader
+   * makes rather than one the app makes for them.
+   */
+  notes: { date: string; symbol: string; pnl: number; note: string }[] | null;
+}
+
+export interface JournalFactsOptions {
+  /** Include the trader's written notes. Requires their explicit opt-in. */
+  includeNotes?: boolean;
+  /** The trader's configured risk limits, so breaches can be reported against their own rules. */
+  rules?: { enabled: boolean; maxDailyLoss?: number; maxTradesPerDay?: number; maxDailyGain?: number };
+}
+
+/** Notes are the only free-text in the payload, so they're the only part that needs bounding. */
+const MAX_NOTES = 12;
+const MAX_NOTE_CHARS = 180;
+
+/**
+ * Picks the notes worth sending: the biggest winners and losers.
+ *
+ * A trader's note on a $600 loss is where the useful pattern lives; the note on a $4 scratch is
+ * not worth a token. Sorting by absolute P&L and taking from both ends keeps the sample honest —
+ * only sending losses would let the model conclude the trader never writes about winning.
+ */
+function selectNotes(trades: Trade[]): { date: string; symbol: string; pnl: number; note: string }[] {
+  const withNotes = trades.filter((t) => t.notes?.trim());
+  if (withNotes.length === 0) return [];
+
+  return [...withNotes]
+    .sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl))
+    .slice(0, MAX_NOTES)
+    .map((t) => ({
+      date: t.date,
+      symbol: t.symbol,
+      pnl: money(t.pnl),
+      note: t.notes!.trim().slice(0, MAX_NOTE_CHARS),
+    }));
 }
 
 /** Rounds to cents so the payload doesn't carry meaningless float precision into the prompt. */
@@ -63,13 +129,18 @@ function pct(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
-export function buildJournalFacts(trades: Trade[], period: string): JournalFacts | null {
+export function buildJournalFacts(
+  trades: Trade[],
+  period: string,
+  options: JournalFactsOptions = {},
+): JournalFacts | null {
   if (trades.length === 0) return null;
 
   const stats = computeStats(trades);
   const insights = computeTradingInsights(trades);
   if (!insights) return null;
 
+  const selectedNotes = options.includeNotes ? selectNotes(trades) : [];
   const excursion = computeExcursionInsights(trades);
   const rMultiple = computeRMultipleInsights(trades);
   const sessions = computeSessionPerformance(trades);
@@ -148,6 +219,20 @@ export function buildJournalFacts(trades: Trade[], period: string): JournalFacts
           sample: rMultiple.sample,
         }
       : null,
+
+    holdTime: computeHoldTime(trades),
+    selfAssessment: computeSelfAssessment(trades),
+    checklist: computeChecklistAdherence(trades),
+    direction: computeDirectionSplit(trades),
+    weekdays: computeWeekdaySplit(trades),
+    fees: computeFees(trades),
+    ruleBreaches: options.rules?.enabled
+      ? (() => {
+          const breaches = checkRuleViolations(trades, options.rules!);
+          return breaches.length > 0 ? breaches.slice(0, 10) : null;
+        })()
+      : null,
+    notes: selectedNotes.length > 0 ? selectedNotes : null,
   };
 }
 
@@ -167,6 +252,45 @@ export interface SuggestedQuestion {
  */
 export function suggestedQuestions(facts: JournalFacts): SuggestedQuestion[] {
   const out: SuggestedQuestion[] = [];
+
+  // Behavioural findings lead. A trader who holds losers seven times longer than winners has a
+  // bigger problem than their worst setup, and it's the one they're least likely to ask about
+  // unaided — which is exactly what these openers are for.
+  if (facts.holdTime?.holdsLosersLonger) {
+    out.push({
+      id: 'hold-time',
+      label: 'Why do I hold losers longer?',
+      question:
+        'I hold my losers much longer than my winners. What does that pattern look like in my data, and what does it cost me?',
+    });
+  }
+
+  if (facts.selfAssessment?.gradingInverted) {
+    out.push({
+      id: 'grades',
+      label: 'Are my trade grades wrong?',
+      question:
+        'Compare the grades I gave my own trades against what they actually made. Am I judging my execution accurately?',
+    });
+  }
+
+  if (facts.checklist && facts.checklist.skippedPnl < 0) {
+    out.push({
+      id: 'checklist',
+      label: 'Does my checklist actually help?',
+      question:
+        'Compare the trades where I followed my checklist against the ones where I skipped it. Is the checklist earning its place?',
+    });
+  }
+
+  if (facts.ruleBreaches && facts.ruleBreaches.length > 0) {
+    out.push({
+      id: 'rules',
+      label: `I broke my rules ${facts.ruleBreaches.length}×`,
+      question:
+        'I broke my own risk limits on some days this period. What happened on those days compared with the days I stayed inside them?',
+    });
+  }
 
   const worstSetup = facts.worstSetups[0];
   if (worstSetup) {
@@ -213,5 +337,8 @@ export function suggestedQuestions(facts: JournalFacts): SuggestedQuestion[] {
       'Walk me through this period overall — what went well, what cost me money, and what one thing should I focus on?',
   });
 
-  return out.slice(0, 5);
+  // Cap the list, but never at the cost of the catch-all — a trader with four behavioural findings
+  // should still be able to just ask for the overview.
+  const review = out[out.length - 1];
+  return out.length <= 5 ? out : [...out.slice(0, 4), review];
 }

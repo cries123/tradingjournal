@@ -505,6 +505,22 @@ details.glass-card > p {
   box-shadow: 0 0 0 3px rgba(var(--color-profit-bright-rgb), 0.1);
 }
 
+/* iOS Safari zooms the whole page in when you focus an input whose font-size is under 16px, and it
+   does not zoom back out when you leave the field. Every input here was 12-14px, so tapping any of
+   them shoved the layout sideways — most visibly in the assistant, where it pushed the send button
+   off the edge and left you pinching to get back.
+ 
+   16px on touch-sized screens is the entire fix. Utility classes on the element (text-xs, text-sm)
+   would win on specificity, so this is scoped to the raw element and marked important; desktop
+   keeps whatever size the component asked for. */
+@media (max-width: 767px) {
+  input.input-field,
+  textarea.input-field,
+  select.input-field {
+    font-size: 16px !important;
+  }
+}
+
 .prose-legal section {
   margin-bottom: 2rem;
 }

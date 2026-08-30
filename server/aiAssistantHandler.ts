@@ -64,6 +64,25 @@ HARD RULES
   trades, say so and treat it as a hint, not a conclusion.
 - If the data doesn't answer the question, say so.
 
+WHAT THE FIELDS MEAN
+- holdTime: average minutes winners vs losers are held. holdsLosersLonger being true is a
+  discipline finding worth naming plainly — cutting winners early while letting losers run.
+- selfAssessment: the trader's own A-F grades against what those trades actually made.
+  gradingInverted true means their best-graded trades made less than their worst-graded ones.
+  Say so directly; it is the most useful thing a journal can tell someone.
+- checklist: P&L on trades that met their own checklist threshold vs trades that didn't.
+- ruleBreaches: days the trader broke limits THEY set. Refer to them as their own rules.
+- weekdays: sorted worst first. Only comment if the spread is large relative to the trade counts.
+- fees: total commissions. Worth mentioning when it's large next to netPnl.
+- notes: the trader's own words on their biggest trades, when they've shared them. Quote them back
+  when a pattern shows up across several. Never invent a note that isn't in the JSON.
+- Every block carries its sample size. Say when a sample is thin instead of implying certainty.
+- A null field means not enough data or not recorded — say you don't have it, don't guess.
+
+COMPARING PERIODS
+If a second period's stats are provided, the question is about what CHANGED. Lead with the
+direction of the change and the size of it, and only mention figures present in both.
+
 HOW TO WRITE
 - Speak plainly to an experienced trader. No hedging padding, no "as an AI".
 - Lead with the answer, then the evidence from the JSON.
@@ -74,7 +93,11 @@ HOW TO WRITE
 interface AiRequestBody {
   question?: string;
   facts?: unknown;
+  /** A second period's stats, when the trader is asking what changed between two of them. */
+  compareFacts?: unknown;
   history?: { role: 'user' | 'assistant'; content: string }[];
+  /** Ask for the answer as an SSE token stream instead of one JSON blob. */
+  stream?: boolean;
 }
 
 export interface AiAssistantResult {
@@ -146,24 +169,39 @@ function isReasoningModel(model: string): boolean {
  *  because the system prompt asks for a few short paragraphs — unused budget costs nothing. */
 const MAX_COMPLETION_TOKENS = Number(process.env.AI_MAX_TOKENS || 3000);
 
+export function buildMessages(
+  facts: unknown,
+  question: string,
+  history: { role: 'user' | 'assistant'; content: string }[],
+  compareFacts?: unknown,
+): { role: string; content: string }[] {
+  return [
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: `The user's journal stats for this period:\n${JSON.stringify(facts)}` },
+    ...(compareFacts
+      ? [
+          {
+            role: 'system',
+            content: `The comparison period's stats:\n${JSON.stringify(compareFacts)}`,
+          },
+        ]
+      : []),
+    ...history,
+    { role: 'user', content: question },
+  ];
+}
+
 async function callModel(
   model: string,
   facts: unknown,
   question: string,
   history: { role: 'user' | 'assistant'; content: string }[],
   maxTokens = MAX_COMPLETION_TOKENS,
+  compareFacts?: unknown,
 ): Promise<ModelCallOutcome> {
   const payload: Record<string, unknown> = {
     model,
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      {
-        role: 'system',
-        content: `The user's journal stats for this period:\n${JSON.stringify(facts)}`,
-      },
-      ...history,
-      { role: 'user', content: question },
-    ],
+    messages: buildMessages(facts, question, history, compareFacts),
     max_completion_tokens: maxTokens,
   };
 
@@ -208,8 +246,9 @@ async function askModel(
   facts: unknown,
   question: string,
   history: { role: 'user' | 'assistant'; content: string }[],
+  compareFacts?: unknown,
 ): Promise<string> {
-  let outcome = await callModel(AI_MODEL, facts, question, history);
+  let outcome = await callModel(AI_MODEL, facts, question, history, MAX_COMPLETION_TOKENS, compareFacts);
 
   const modelRejected = !outcome.ok && (outcome.status === 400 || outcome.status === 404);
   if (modelRejected && AI_FALLBACK_MODEL && AI_FALLBACK_MODEL !== AI_MODEL) {
@@ -218,7 +257,7 @@ async function askModel(
         `"${AI_FALLBACK_MODEL}". Fix AI_MODEL in your environment variables. Provider said: ` +
         `${outcome.detail ?? ''}`,
     );
-    outcome = await callModel(AI_FALLBACK_MODEL, facts, question, history);
+    outcome = await callModel(AI_FALLBACK_MODEL, facts, question, history, MAX_COMPLETION_TOKENS, compareFacts);
   }
 
   // 200 OK, no text: the budget ran out before the model wrote anything. One more pass with room
@@ -229,14 +268,14 @@ async function askModel(
       `[ai-assistant] "${AI_MODEL}" returned an empty answer (finish_reason=` +
         `${outcome.finishReason ?? 'unknown'}) — retrying with a larger completion budget.`,
     );
-    outcome = await callModel(AI_MODEL, facts, question, history, MAX_COMPLETION_TOKENS * 2);
+    outcome = await callModel(AI_MODEL, facts, question, history, MAX_COMPLETION_TOKENS * 2, compareFacts);
 
     if (outcome.ok && !outcome.answer && AI_FALLBACK_MODEL !== AI_MODEL) {
       console.error(
         `[ai-assistant] "${AI_MODEL}" still returned nothing — falling back to ` +
           `"${AI_FALLBACK_MODEL}". Consider setting AI_MODEL to a non-reasoning model.`,
       );
-      outcome = await callModel(AI_FALLBACK_MODEL, facts, question, history);
+      outcome = await callModel(AI_FALLBACK_MODEL, facts, question, history, MAX_COMPLETION_TOKENS, compareFacts);
     }
   }
 
@@ -259,6 +298,114 @@ async function askModel(
     throw new BrokerRequestError('The assistant is unavailable right now. Try again shortly.', 502);
   }
   return outcome.answer;
+}
+
+export interface StreamPreflight {
+  ok: boolean;
+  /** Set when the request should be refused outright — status and message for the response. */
+  rejection?: { statusCode: number; error: string };
+  messages?: { role: string; content: string }[];
+  remaining?: number;
+}
+
+/**
+ * Runs every check the normal path runs, then hands back the prepared messages.
+ *
+ * Split out so the streaming endpoint cannot accidentally become the unguarded door into the same
+ * model: auth, the question limits, and the daily cap all still have to pass here before a single
+ * token is generated, and the rate limit is consumed at the same point it would be otherwise.
+ */
+export async function prepareAssistantStream(
+  headers: IncomingHttpHeaders,
+  body: AiRequestBody,
+): Promise<StreamPreflight> {
+  if (!AI_CONFIGURED) {
+    return {
+      ok: false,
+      rejection: {
+        statusCode: 503,
+        error: 'The assistant is not set up yet. Ask the site owner to add OPENAI_API_KEY.',
+      },
+    };
+  }
+
+  try {
+    const uid = await assertCallerUid(headers);
+    const question = typeof body.question === 'string' ? body.question.trim() : '';
+
+    if (!question) return { ok: false, rejection: { statusCode: 400, error: 'Ask a question first.' } };
+    if (question.length > MAX_QUESTION_CHARS) {
+      return {
+        ok: false,
+        rejection: { statusCode: 400, error: `Keep questions under ${MAX_QUESTION_CHARS} characters.` },
+      };
+    }
+    if (!body.facts) {
+      return { ok: false, rejection: { statusCode: 400, error: 'No journal data to review yet.' } };
+    }
+
+    const limit = await consumeRateLimit(uid);
+    if (!limit.ok) {
+      return limit.reason === 'unavailable'
+        ? {
+            ok: false,
+            rejection: {
+              statusCode: 503,
+              error: 'The assistant is briefly unavailable. Try again in a moment.',
+            },
+          }
+        : {
+            ok: false,
+            rejection: {
+              statusCode: 429,
+              error: `You've reached today's limit of ${DAILY_QUESTION_LIMIT} questions. It resets at midnight UTC.`,
+            },
+          };
+    }
+
+    const history = Array.isArray(body.history)
+      ? body.history
+          .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+          .slice(-MAX_HISTORY_TURNS)
+          .map((m) => ({ role: m.role, content: m.content.slice(0, MAX_QUESTION_CHARS) }))
+      : [];
+
+    return {
+      ok: true,
+      messages: buildMessages(body.facts, question, history, body.compareFacts),
+      remaining: limit.remaining,
+    };
+  } catch (err) {
+    if (err instanceof BrokerRequestError) {
+      return { ok: false, rejection: { statusCode: err.statusCode, error: err.message } };
+    }
+    console.error('[ai-assistant] stream preflight failed:', err);
+    return { ok: false, rejection: { statusCode: 500, error: 'Something went wrong. Try again.' } };
+  }
+}
+
+/** Opens the upstream token stream. Streaming has no fallback retry — a stream that fails mid-flight
+ *  can't be silently restarted without the user seeing the answer restart, so the client falls back
+ *  to the normal endpoint instead. */
+export async function openModelStream(
+  messages: { role: string; content: string }[],
+): Promise<Response> {
+  const payload: Record<string, unknown> = {
+    model: AI_MODEL,
+    messages,
+    max_completion_tokens: MAX_COMPLETION_TOKENS,
+    stream: true,
+  };
+  if (isReasoningModel(AI_MODEL)) payload.reasoning_effort = 'low';
+
+  return fetch(`${AI_BASE_URL}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${AI_API_KEY}`,
+    },
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function handleAiAssistantRequest(
@@ -314,7 +461,7 @@ export async function handleAiAssistantRequest(
           .map((m) => ({ role: m.role, content: m.content.slice(0, MAX_QUESTION_CHARS) }))
       : [];
 
-    const answer = await askModel(body.facts, question, history);
+    const answer = await askModel(body.facts, question, history, body.compareFacts);
 
     return { statusCode: 200, body: { answer, remaining: limit.remaining } };
   } catch (err) {

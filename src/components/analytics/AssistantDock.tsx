@@ -1,14 +1,15 @@
 import { useEffect } from 'react';
 import { MessageCircle, X } from 'lucide-react';
-import type { Trade } from '../../types';
 import { useEscapeToClose } from '../../hooks/useEscapeToClose';
-import { AssistantPanel } from './AssistantPanel';
+import { AssistantPanel, type AssistantPeriod } from './AssistantPanel';
 
 interface AssistantDockProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  trades: Trade[];
-  periodLabel: string;
+  /** Periods the trader can switch between without leaving the chat. */
+  periods: AssistantPeriod[];
+  /** The trader's own risk limits, so the assistant can report breaches of their rules. */
+  rules?: { enabled: boolean; maxDailyLoss?: number; maxTradesPerDay?: number; maxDailyGain?: number };
   /** Hides the floating launcher where the nav already provides an entry point. */
   showLauncher: boolean;
 }
@@ -24,8 +25,8 @@ interface AssistantDockProps {
 export function AssistantDock({
   open,
   onOpenChange,
-  trades,
-  periodLabel,
+  periods,
+  rules,
   showLauncher,
 }: AssistantDockProps) {
   useEscapeToClose(() => onOpenChange(false));
@@ -85,8 +86,10 @@ export function AssistantDock({
               </button>
             </div>
 
-            <div className="flex-1 min-h-0 flex flex-col overflow-y-auto p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-              <AssistantPanel trades={trades} periodLabel={periodLabel} bare />
+            {/* min-h-0 and no overflow here: the panel owns its own scrolling, so the message
+                list scrolls while the composer stays pinned to the bottom of the sheet. */}
+            <div className="flex-1 min-h-0 flex flex-col p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+              <AssistantPanel periods={periods} rules={rules} bare />
             </div>
           </div>
         </>

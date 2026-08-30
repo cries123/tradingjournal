@@ -24,7 +24,7 @@ import { useJournalReminder } from '../hooks/useJournalReminder';
 import { useLeaderboardSync } from '../hooks/useLeaderboardSync';
 import { useTrades } from '../hooks/useTrades';
 import type { Trade } from '../types';
-import { computeStats, getMonthTrades } from '../utils/stats';
+import { computeStats, getMonthTrades, getYearTrades } from '../utils/stats';
 import { takePendingAppView } from '../utils/pendingAppView';
 import { AssistantDock } from '../components/analytics/AssistantDock';
 import { formatMonthYear } from '../utils/format';
@@ -96,6 +96,17 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
 
   const monthTrades = useMemo(() => getMonthTrades(allTrades, year, month), [allTrades, year, month]);
   const monthStats = useMemo(() => computeStats(monthTrades), [monthTrades]);
+
+  // The assistant can review any of these without the trader having to change what the dashboard
+  // is showing — asking "how was my year?" shouldn't mean navigating away from the month first.
+  const assistantPeriods = useMemo(
+    () => [
+      { scope: 'month' as const, label: formatMonthYear(year, month), trades: monthTrades },
+      { scope: 'year' as const, label: String(year), trades: getYearTrades(allTrades, year) },
+      { scope: 'all' as const, label: 'All time', trades: allTrades },
+    ],
+    [allTrades, monthTrades, year, month],
+  );
 
   useJournalReminder(settings.remindersEnabled, settings.reminderTime, allTrades);
   // Every journal's trades, not just the active one — a trader's leaderboard standing is about
@@ -297,8 +308,8 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
       <AssistantDock
         open={assistantOpen}
         onOpenChange={setAssistantOpen}
-        trades={monthTrades}
-        periodLabel={formatMonthYear(year, month)}
+        periods={assistantPeriods}
+        rules={settings.tradingRules}
         showLauncher={isDesktop}
       />
 
