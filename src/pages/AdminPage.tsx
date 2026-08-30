@@ -1510,7 +1510,6 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                         onChange={(e) => setUserSearch(e.target.value)}
                         placeholder="Search username, email, UID…"
                         className="input-field text-xs py-1.5 pl-8 pr-3 w-52"
-                        style={{ paddingLeft: '2rem' }}
                         aria-label="Search users"
                       />
                     </div>

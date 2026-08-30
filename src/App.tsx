@@ -67,6 +67,7 @@ export default function App() {
     onRequestBroker: goRequestBroker,
     onGuides: goGuides,
     onGuide: navigateGuide,
+    onHelp: () => navigate('help-center'),
     onBrokerGuide: navigateBrokerGuide,
     onReportBug: goReportBug,
     onNavigate: navigate,

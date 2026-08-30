@@ -502,21 +502,31 @@ details.glass-card > p {
   }
 }
 
-.input-field {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  background-color: var(--color-bg-tertiary);
-  border: 1px solid var(--color-border);
-  border-radius: 0.5rem;
-  color: var(--color-text-primary);
-  font-size: 0.875rem;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
+/* Layered so Tailwind utilities can override it.
+ *
+ * `@import "tailwindcss"` puts every utility in the `utilities` layer, and unlayered CSS beats
+ * layered CSS outright — so this rule's `padding` shorthand silently defeated any `pl-*` utility
+ * on the element. That is why a search input with a leading icon had its placeholder running
+ * underneath the icon, and why one of these already carried an inline `paddingLeft` to work around
+ * it. Inside a layer, the utility wins as expected and the workaround isn't needed.
+ */
+@layer components {
+  .input-field {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background-color: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    color: var(--color-text-primary);
+    font-size: 0.875rem;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
 
-.input-field:focus {
-  outline: none;
-  border-color: rgba(var(--color-profit-bright-rgb), 0.5);
-  box-shadow: 0 0 0 3px rgba(var(--color-profit-bright-rgb), 0.1);
+  .input-field:focus {
+    outline: none;
+    border-color: rgba(var(--color-profit-bright-rgb), 0.5);
+    box-shadow: 0 0 0 3px rgba(var(--color-profit-bright-rgb), 0.1);
+  }
 }
 
 /* iOS Safari zooms the whole page in when you focus an input whose font-size is under 16px, and it

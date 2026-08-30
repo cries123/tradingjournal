@@ -10,6 +10,7 @@ interface BrokersPageProps {
   onBrokers: () => void;
   onRequestBroker?: () => void;
   onGuides?: () => void;
+  onHelp?: () => void;
   onNavigate?: (route: ExtraNavRoute) => void;
 }
 
@@ -21,6 +22,7 @@ export function BrokersPage({
   onBrokers,
   onRequestBroker,
   onGuides,
+  onHelp,
   onNavigate,
 }: BrokersPageProps) {
   return (
@@ -40,8 +42,11 @@ export function BrokersPage({
           onBack={onHome}
           backLabel="Back to home"
           onRequestBroker={onRequestBroker}
+          wide
+          onGuides={onGuides}
+          onHelp={onHelp}
         />
-        <div className="max-w-4xl mx-auto px-4 md:px-6 pb-16 text-center">
+        <div className="max-w-[1680px] mx-auto px-4 md:px-8 pb-16 text-center">
           <button type="button" onClick={onLaunch} className="btn-primary text-base px-8 py-3">
             Open Trend Chasers
           </button>

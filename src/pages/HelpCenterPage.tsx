@@ -8,6 +8,7 @@ import {
   type HelpArticleCategory,
 } from '../services/adminHelpArticles';
 import type { ExtraNavRoute } from '../hooks/useRoute';
+import { SupportLinks } from '../components/support/SupportLinks';
 
 interface HelpCenterPageProps {
   onHome: () => void;
@@ -16,6 +17,7 @@ interface HelpCenterPageProps {
   onTerms: () => void;
   onBrokers?: () => void;
   onGuides?: () => void;
+  onReportBug?: () => void;
   onNavigate?: (route: ExtraNavRoute) => void;
 }
 
@@ -79,6 +81,7 @@ export function HelpCenterPage({
   onTerms,
   onBrokers,
   onGuides,
+  onReportBug,
   onNavigate,
 }: HelpCenterPageProps) {
   const [articles, setArticles] = useState<HelpArticle[]>([]);
@@ -139,7 +142,7 @@ export function HelpCenterPage({
         onNavigate={onNavigate}
       />
 
-      <main className="relative z-10 flex-1 max-w-5xl mx-auto px-4 md:px-6 py-12 md:py-16 w-full">
+      <main className="relative z-10 flex-1 max-w-[1680px] mx-auto px-4 md:px-8 py-12 md:py-16 w-full">
         <a
           href="/"
           onClick={(e) => {
@@ -160,6 +163,10 @@ export function HelpCenterPage({
           Report a bug or Request broker support in the footer.
         </p>
 
+        {/* Controls that cannot do anything are worse than no controls: a search box over an
+            empty library and a filter over zero categories both make a new Help Center read as a
+            broken one. They appear with the first article. */}
+        {articles.length > 0 && (
         <div className="relative mb-8 max-w-md">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" aria-hidden />
           <input
@@ -168,12 +175,13 @@ export function HelpCenterPage({
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search the Help Center"
             className="input-field text-sm w-full pl-10"
-            style={{ paddingLeft: '2.5rem' }}
             aria-label="Search help articles"
           />
         </div>
+        )}
 
-        <div className="grid md:grid-cols-[200px_1fr] gap-8">
+        <div className={articles.length > 0 ? 'grid md:grid-cols-[200px_1fr] gap-8' : ''}>
+          {articles.length > 0 && (
           <nav aria-label="Help Center categories" className="flex md:flex-col gap-2 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
             <button
               type="button"
@@ -187,7 +195,9 @@ export function HelpCenterPage({
               All articles
               <span className="ml-1.5 opacity-70">({articles.length})</span>
             </button>
-            {HELP_CATEGORIES.map((c) => (
+            {/* A sidebar of eight categories all reading (0) is what made an empty Help Center
+                look broken rather than new. Only categories with something in them are offered. */}
+            {HELP_CATEGORIES.filter((c) => (countByCategory.get(c.key) ?? 0) > 0).map((c) => (
               <button
                 key={c.key}
                 type="button"
@@ -203,17 +213,21 @@ export function HelpCenterPage({
               </button>
             ))}
           </nav>
+          )}
 
           <div className="min-w-0">
             {loading ? (
               <p className="text-sm text-text-secondary">Loading articles…</p>
             ) : grouped.length === 0 ? (
-              <div className="glass-card rounded-xl p-8 text-center text-text-secondary text-sm">
-                {search.trim()
-                  ? 'No articles match your search.'
-                  : category === 'all'
-                    ? 'No articles yet — check back soon.'
-                    : 'No articles in this category yet — check back soon.'}
+              <div className="rounded-xl border border-border/50 bg-bg-secondary/40 p-8 text-center">
+                <p className="text-sm text-text-primary font-medium mb-1.5">
+                  {search.trim() ? `Nothing here for “${search.trim()}”` : 'No articles here yet'}
+                </p>
+                <p className="text-sm text-text-secondary max-w-md mx-auto leading-relaxed">
+                  {search.trim()
+                    ? 'Try a different word, or take a look at the tutorials and broker guides below.'
+                    : 'The tutorials and broker guides below cover most of what people ask — and if your question is not in them, tell us.'}
+                </p>
               </div>
             ) : (
               <div className="space-y-8">
@@ -234,6 +248,15 @@ export function HelpCenterPage({
               </div>
             )}
           </div>
+        </div>
+
+        <div className="mt-12">
+          <SupportLinks
+            current="help"
+            onGuides={onGuides}
+            onBrokers={onBrokers}
+            onReportBug={onReportBug}
+          />
         </div>
       </main>
 
