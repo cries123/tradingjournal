@@ -148,6 +148,85 @@ export async function createCheckout(args: CreateCheckoutArgs): Promise<{ url: s
   return { url, id: parsed.id ?? '' };
 }
 
+/** Shared plumbing for the authenticated Creem calls that aren't checkout. */
+async function creemPost(
+  path: string,
+  body: Record<string, unknown>,
+  failureMessage: string,
+): Promise<Record<string, unknown>> {
+  if (!CREEM_CONFIGURED) {
+    throw new CreemError('Payments are not configured yet. Please try again later.', 503);
+  }
+
+  const res = await fetch(`${CREEM_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': CREEM_API_KEY },
+    body: JSON.stringify(body),
+  });
+
+  const text = await res.text();
+  if (!res.ok) {
+    console.error(`[creem] ${path} failed`, res.status, text.slice(0, 500));
+    throw new CreemError(failureMessage, 502, `Creem returned ${res.status}: ${text.slice(0, 300)}`);
+  }
+
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Moves an existing subscription onto a different plan, in place.
+ *
+ * This is the whole reason the endpoint exists: starting a second checkout for someone who already
+ * subscribes leaves them with TWO live subscriptions and two monthly charges. They notice on the
+ * statement, not at the checkout, which makes it a refund and a chargeback rather than a bug
+ * report.
+ *
+ * Proration differs by direction on purpose. Going up, the customer is charged the difference now
+ * and gets the bigger plan now — charging later for access granted today is how you end up
+ * arguing about an invoice. Going down, the credit is settled against the next invoice instead:
+ * taking an immediate payment from someone who just reduced their spend would be absurd.
+ */
+export async function changeSubscriptionPlan(
+  subscriptionId: string,
+  productId: string,
+  direction: 'upgrade' | 'downgrade',
+): Promise<void> {
+  await creemPost(
+    `/subscriptions/${encodeURIComponent(subscriptionId)}/upgrade`,
+    {
+      product_id: productId,
+      update_behavior:
+        direction === 'upgrade' ? 'proration-charge-immediately' : 'proration-charge',
+    },
+    'Could not change your plan. Please try again in a moment.',
+  );
+}
+
+/**
+ * A link to Creem's own billing portal, where the customer manages their card and cancels.
+ *
+ * Deliberately not rebuilt in-app. Card details and cancellation flows are the processor's job,
+ * and a cancel button of my own would be one more thing that can silently fail between here and
+ * the actual subscription.
+ */
+export async function createBillingPortalLink(customerId: string): Promise<string> {
+  const data = await creemPost(
+    '/customers/billing',
+    { customer_id: customerId },
+    'Could not open the billing portal. Please try again in a moment.',
+  );
+
+  const link = data.customer_portal_link;
+  if (typeof link !== 'string' || !link) {
+    throw new CreemError('Payment provider did not return a billing link.', 502);
+  }
+  return link;
+}
+
 /**
  * Verifies the `creem-signature` header against the raw request body.
  *
@@ -245,8 +324,28 @@ export function parseBillingEvent(event: CreemWebhookEvent): ParsedBillingEvent 
     uid,
     tier,
     status,
-    creemSubscriptionId: readId(obj.subscription) ?? obj.id,
+    creemSubscriptionId: subscriptionIdFrom(event),
     creemCustomerId: readId(obj.customer),
     currentPeriodEnd: obj.current_period_end_date ?? undefined,
   };
+}
+
+/**
+ * The id of the SUBSCRIPTION this event concerns — never the checkout's own id.
+ *
+ * One purchase emits both `checkout.completed` and `subscription.paid`, in no guaranteed order,
+ * and on the checkout event `object.id` is a checkout id. Storing that as the subscription id
+ * looks harmless until you try to change the plan later: the upgrade call 404s, and the fallback
+ * is to sell them a second subscription. So a bare `object.id` is only trusted on an event that
+ * is actually about a subscription.
+ */
+function subscriptionIdFrom(event: CreemWebhookEvent): string | undefined {
+  const obj = event.object;
+  if (!obj) return undefined;
+
+  const nested = readId(obj.subscription);
+  if (nested) return nested;
+
+  const type = (event.eventType ?? '').toLowerCase();
+  return type.startsWith('subscription') ? obj.id : undefined;
 }

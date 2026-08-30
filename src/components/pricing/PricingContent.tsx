@@ -18,8 +18,9 @@ import { useAuth } from '../../context/AuthContext';
 import { useEntitlement } from '../../context/EntitlementContext';
 import {
   CheckoutError,
+  choosePlan,
   fetchPaymentsStatus,
-  startCheckout,
+  openBillingPortal,
   type PaymentsStatus,
 } from '../../services/entitlement';
 
@@ -80,6 +81,8 @@ export function PricingContent({
   const [error, setError] = useState<string | null>(null);
   /** The payment provider's own words. Only ever populated for the site admin. */
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [portalBusy, setPortalBusy] = useState(false);
   const [payments, setPayments] = useState<PaymentsStatus | null>(null);
   // Read from the URL at mount rather than set from an effect, so the banner is right on the
   // first paint the buyer sees after being sent back from checkout.
@@ -120,17 +123,40 @@ export function PricingContent({
   }, []);
 
   const currentIndex = useMemo(() => TIER_ORDER.indexOf(currentTier), [currentTier]);
+  /** Paying customer with a real subscription — as opposed to free, or a hand-granted tier. */
+  const subscribed = Boolean(user) && loaded && source === 'purchase' && currentTier !== 'free';
+
+  const handlePortal = async () => {
+    setError(null);
+    setPortalBusy(true);
+    try {
+      window.location.assign(await openBillingPortal());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not open the billing portal.');
+      setPortalBusy(false);
+    }
+  };
 
   const handleChoose = async (tier: Tier) => {
     setError(null);
     setErrorDetail(null);
+    setNotice(null);
     if (!user) {
       onLaunch?.();
       return;
     }
     setBusy(tier);
     try {
-      window.location.assign(await startCheckout(tier));
+      const result = await choosePlan(tier);
+      if (result.kind === 'checkout') {
+        window.location.assign(result.url);
+        return;
+      }
+      // An existing subscriber was moved in place — no checkout page to send them to, so the page
+      // has to say what happened and re-read the plan it now shows.
+      setNotice(result.message);
+      await refresh();
+      setBusy(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start checkout.');
       setErrorDetail(err instanceof CheckoutError ? (err.detail ?? null) : null);
@@ -178,6 +204,13 @@ export function PricingContent({
           sandbox — cards are not charged and no real subscription is created. Set{' '}
           <code className="font-mono text-xs">CREEM_TEST_MODE=false</code> with live keys before
           taking payments.
+        </div>
+      )}
+
+      {notice && (
+        <div className="mt-8 rounded-xl border border-emerald-400/40 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200 flex items-center gap-2">
+          <BadgeCheck className="w-4 h-4 shrink-0" aria-hidden />
+          {notice}
         </div>
       )}
 
@@ -283,13 +316,22 @@ export function PricingContent({
                     onClick={() => void handleChoose(tier)}
                     className={`w-full rounded-lg px-4 py-2.5 text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${accent.button}`}
                   >
+                    {/* A subscriber is moving an existing subscription, not buying another one, so
+                        the label says so. "Add to cart" next to a plan they already pay for is how
+                        someone ends up expecting two of something they can only have one of. */}
                     {busy === tier
-                      ? 'Opening checkout…'
+                      ? subscribed
+                        ? 'Changing your plan…'
+                        : 'Opening checkout…'
                       : !user
                         ? `Sign in to get ${plan.name}`
-                        : isDowngrade
-                          ? `Switch to ${plan.name}`
-                          : `Add ${plan.name} to cart`}
+                        : subscribed
+                          ? isDowngrade
+                            ? `Move down to ${plan.name}`
+                            : `Upgrade to ${plan.name}`
+                          : isDowngrade
+                            ? `Switch to ${plan.name}`
+                            : `Add ${plan.name} to cart`}
                   </button>
                 )}
               </div>
@@ -297,6 +339,20 @@ export function PricingContent({
           );
         })}
       </div>
+
+      {subscribed && (
+        <p className="mt-5 text-sm text-text-secondary">
+          Changing plans moves your existing subscription — you are never billed for two.{' '}
+          <button
+            type="button"
+            onClick={() => void handlePortal()}
+            disabled={portalBusy}
+            className="text-emerald-400 hover:text-emerald-300 transition-colors disabled:opacity-60"
+          >
+            {portalBusy ? 'Opening…' : 'Manage billing or cancel →'}
+          </button>
+        </p>
+      )}
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-border bg-bg-secondary/60 p-5">

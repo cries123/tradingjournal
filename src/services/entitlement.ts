@@ -56,8 +56,18 @@ export class CheckoutError extends Error {
   }
 }
 
-/** Sends the buyer to Creem's hosted checkout for a plan. */
-export async function startCheckout(tier: Tier): Promise<string> {
+/**
+ * What happened when the user chose a plan.
+ *
+ * Two different outcomes, because someone who already subscribes has their existing subscription
+ * moved rather than buying a second one — no checkout page, no redirect, the plan just changes.
+ */
+export type PlanChoiceResult =
+  | { kind: 'checkout'; url: string }
+  | { kind: 'changed'; tier: Tier; message: string };
+
+/** Buys a plan, or moves an existing subscription onto it. The server decides which. */
+export async function choosePlan(tier: Tier): Promise<PlanChoiceResult> {
   if (!isFirebaseConfigured()) throw new Error('Sign in to upgrade your plan.');
   const user = getFirebaseAuth().currentUser;
   if (!user) throw new Error('Sign in to upgrade your plan.');
@@ -69,10 +79,37 @@ export async function startCheckout(tier: Tier): Promise<string> {
     body: JSON.stringify({ tier }),
   });
 
-  const data = (await res.json()) as { url?: string; error?: string; detail?: string };
-  if (!res.ok || !data.url) {
-    throw new CheckoutError(data.error ?? 'Could not start checkout.', data.detail);
+  const data = (await res.json()) as {
+    url?: string;
+    changed?: boolean;
+    tier?: Tier;
+    message?: string;
+    error?: string;
+    detail?: string;
+  };
+
+  if (!res.ok) throw new CheckoutError(data.error ?? 'Could not start checkout.', data.detail);
+  if (data.changed && data.tier) {
+    return { kind: 'changed', tier: data.tier, message: data.message ?? 'Your plan has changed.' };
   }
+  if (data.url) return { kind: 'checkout', url: data.url };
+  throw new CheckoutError('Could not start checkout.', data.detail);
+}
+
+/** Opens Creem's billing portal, where the customer changes their card or cancels. */
+export async function openBillingPortal(): Promise<string> {
+  if (!isFirebaseConfigured()) throw new Error('Sign in first.');
+  const user = getFirebaseAuth().currentUser;
+  if (!user) throw new Error('Sign in first.');
+
+  const token = await user.getIdToken();
+  const res = await fetch('/api/creem-portal', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+  });
+
+  const data = (await res.json()) as { url?: string; error?: string };
+  if (!res.ok || !data.url) throw new Error(data.error ?? 'Could not open the billing portal.');
   return data.url;
 }
 

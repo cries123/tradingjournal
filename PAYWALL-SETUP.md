@@ -95,6 +95,25 @@ everything downstream of payment — the gates, the meters, the badge — withou
 touching Creem at all.
 
 
+## Changing plans
+
+An existing subscriber never gets a second checkout. When someone who already pays picks a
+different tier, the server moves their existing Creem subscription onto the new product
+(`POST /v1/subscriptions/{id}/upgrade`) rather than starting a new one — otherwise they end up
+with two live subscriptions and two monthly charges, which they discover on a statement weeks
+later.
+
+Proration differs by direction. Upgrading charges the difference immediately, because access
+changes immediately. Downgrading settles the credit against the next invoice rather than taking a
+payment from someone who just reduced their spend.
+
+If the plan change fails, the request errors out — it never falls back to a fresh checkout. A
+clear error beats a duplicate subscription.
+
+**Cancelling and changing cards** happen in Creem's own billing portal, reached from the "Manage
+billing or cancel" link under the pricing table. That link only appears for people with a real
+subscription; a hand-granted tier has nothing to manage.
+
 ## The site banner
 
 Admin panel → Content → **Site announcement**. It writes one message that shows in
