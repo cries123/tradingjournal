@@ -1,9 +1,19 @@
 import type { Handler } from '@netlify/functions';
 import { assertCallerUid, BrokerRequestError } from '../../server/snaptradeAuth';
-import { getAdminAuth } from '../../server/firebaseAdmin';
+import { getAdminAuth, getAdminFirestore } from '../../server/firebaseAdmin';
 import { createCheckout, CreemError, CREEM_CONFIGURED } from '../../server/creemClient';
 import { readEntitlement } from '../../server/entitlements';
 import { isTier, PAID_TIERS, TIER_PLANS } from '../../src/config/tiers';
+
+/** Whether this uid is the single site admin. Never throws — a failed check just means "no". */
+async function isSiteAdmin(uid: string): Promise<boolean> {
+  try {
+    const snap = await getAdminFirestore().doc('config/admin').get();
+    return snap.exists && (snap.data() as { uid?: string }).uid === uid;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Starts a Creem checkout for the signed-in user.
@@ -89,11 +99,19 @@ export const handler: Handler = async (event) => {
   } catch (err) {
     const status = err instanceof CreemError ? err.statusCode : 500;
     console.error('[creem-checkout] failed:', err);
+
+    // The site owner gets the real upstream error; everyone else gets the polite one. A buyer has
+    // no use for "Creem returned 401" and shouldn't be shown our infrastructure, but making the
+    // owner read function logs to find out their key is from the wrong environment is a bad trade.
+    const detail = err instanceof CreemError ? err.detail : undefined;
+    const showDetail = detail ? await isSiteAdmin(uid) : false;
+
     return {
       statusCode: status,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         error: err instanceof CreemError ? err.message : 'Could not start checkout.',
+        ...(showDetail ? { detail } : {}),
       }),
     };
   }

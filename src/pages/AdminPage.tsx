@@ -534,6 +534,7 @@ function NeedsAttention({
     if (!health.brokerSync.ok) down.push('Broker sync');
     if (!health.benchmark.ok) down.push('SPY benchmark');
     if (!health.firebase.ok) down.push('Firebase');
+    if (!health.payments.ok) down.push('Payments');
   }
 
   const waiting: string[] = [];
@@ -1219,7 +1220,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                       status text drifted to the far edge of its column and ended up sitting
                       against the NEXT service's name — so "Down" read as belonging to whatever
                       came after it. */}
-                  <div className="grid sm:grid-cols-3 gap-2 text-sm">
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm">
                     <div className="flex items-center gap-2 rounded-lg bg-bg-tertiary/30 border border-border/40 px-3 py-2">
                       <HealthDot ok={ready.health.brokerSync.ok && Boolean(ready.health.brokerSync.configured)} />
                       <span>Broker sync</span>
@@ -1249,7 +1250,67 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                         {ready.health.firebase.ok ? 'Connected' : 'Error'}
                       </span>
                     </div>
+                    <div className="flex items-center gap-2 rounded-lg bg-bg-tertiary/30 border border-border/40 px-3 py-2">
+                      <HealthDot ok={ready.health.payments.ok} />
+                      <span>Payments</span>
+                      <span className="text-text-secondary text-xs ml-auto">
+                        {ready.health.payments.error
+                          ? 'Down'
+                          : ready.health.payments.ok
+                            ? ready.health.payments.testMode
+                              ? 'Test mode'
+                              : 'Ready'
+                            : ready.health.payments.checkoutReady
+                              ? 'No webhook'
+                              : 'Not set up'}
+                      </span>
+                    </div>
                   </div>
+
+                  {/* Which host the key is being sent to. A present key says nothing about the
+                      environment it belongs to, and the mismatch between those two is the only
+                      thing that makes a correctly-copied key come back "Invalid API Key" — so it's
+                      worth stating outright rather than leaving to be inferred from a 401. */}
+                  {ready.health.payments.baseUrl && (
+                    <p className="mt-3 text-xs text-text-secondary">
+                      Calling{' '}
+                      <span className="font-mono text-text-primary">
+                        {ready.health.payments.baseUrl}
+                      </span>{' '}
+                      in {ready.health.payments.testMode ? 'test' : 'live'} mode. The API key and
+                      all three product ids must come from that same Creem environment.
+                    </p>
+                  )}
+
+                  {ready.health.payments.modeMismatch && (
+                    <div className="mt-3 rounded-lg border border-loss/40 bg-loss/10 px-3 py-2.5 text-xs leading-relaxed text-loss-bright">
+                      Your key looks like a test key but CREEM_TEST_MODE is set to false, so it is
+                      being sent to the live host and will always be rejected. Remove that variable
+                      or set it to true.
+                    </div>
+                  )}
+
+                  {/* Named, not just flagged. "Payments: not set up" sends you hunting; the list of
+                      variables the server can't see tells you exactly what to paste into Netlify.
+                      Names only — no values, no lengths, nothing derived from a key. */}
+                  {ready.health.payments.missing.length > 0 && (
+                    <div className="mt-3 rounded-lg border border-amber-400/30 bg-amber-400/5 px-3 py-2.5 text-xs leading-relaxed">
+                      <p className="text-amber-300 font-medium mb-1">
+                        {ready.health.payments.missing.length} payment variable
+                        {ready.health.payments.missing.length === 1 ? '' : 's'} missing in Netlify
+                      </p>
+                      <p className="text-text-secondary font-mono break-all">
+                        {ready.health.payments.missing.join('  ·  ')}
+                      </p>
+                      <p className="text-text-secondary/80 mt-1.5">
+                        Add them under Site configuration → Environment variables, scope Production,
+                        then trigger a redeploy — functions only pick up variables at deploy time.
+                        {!ready.health.payments.webhookReady &&
+                          ready.health.payments.checkoutReady &&
+                          ' Checkout works without CREEM_WEBHOOK_SECRET, but nobody gets upgraded after paying.'}
+                      </p>
+                    </div>
+                  )}
 
                   {ready.healthHistory.length > 1 && (
                     <div className="mt-5 pt-4 border-t border-border/50 grid sm:grid-cols-3 gap-4">

@@ -13,13 +13,22 @@ const CREEM_API_KEY = process.env.CREEM_API_KEY?.trim() ?? '';
 const CREEM_WEBHOOK_SECRET = process.env.CREEM_WEBHOOK_SECRET?.trim() ?? '';
 
 /**
- * Creem runs a completely separate test environment on its own host with its own keys and its own
- * product ids. Pointing at the wrong one is the classic way to end up with a checkout that
- * "works" but never charges anybody, so it's a single explicit switch rather than something
- * inferred from the key.
+ * Creem runs a completely separate test environment on its own host, with its own keys and its own
+ * product ids. A test key sent to the live host comes back "Invalid API Key" even when it was
+ * copied perfectly — which reads as a typo and sends you checking the wrong thing.
+ *
+ * So the key itself decides, and CREEM_TEST_MODE is only the override for a key whose prefix
+ * doesn't say. Deriving it removes the mismatch as a possible state rather than documenting it.
  */
-const CREEM_TEST_MODE = String(process.env.CREEM_TEST_MODE ?? '').toLowerCase() === 'true';
-const CREEM_BASE_URL =
+const KEY_LOOKS_LIKE_TEST = /^creem_test/i.test(CREEM_API_KEY);
+const TEST_MODE_ENV = process.env.CREEM_TEST_MODE?.trim().toLowerCase();
+export const CREEM_TEST_MODE =
+  TEST_MODE_ENV === 'true' ? true : TEST_MODE_ENV === 'false' ? false : KEY_LOOKS_LIKE_TEST;
+
+/** True when the two disagree — the one state that produces a confusing 401. */
+export const CREEM_MODE_MISMATCH = KEY_LOOKS_LIKE_TEST && TEST_MODE_ENV === 'false';
+
+export const CREEM_BASE_URL =
   process.env.CREEM_BASE_URL?.trim() ||
   (CREEM_TEST_MODE ? 'https://test-api.creem.io/v1' : 'https://api.creem.io/v1');
 
@@ -27,11 +36,21 @@ export const CREEM_CONFIGURED = Boolean(CREEM_API_KEY);
 
 export class CreemError extends Error {
   statusCode: number;
+  /**
+   * The upstream status and body, for the site owner's eyes only.
+   *
+   * Creem's own error messages are specific and useful ("Invalid API Key", a missing product) and
+   * burying them in a function log means every misconfiguration costs a round trip through the
+   * Netlify dashboard. The handler decides who is allowed to see this; the client never sends it
+   * to an ordinary buyer.
+   */
+  detail?: string;
 
-  constructor(message: string, statusCode: number) {
+  constructor(message: string, statusCode: number, detail?: string) {
     super(message);
     this.name = 'CreemError';
     this.statusCode = statusCode;
+    this.detail = detail;
   }
 }
 
@@ -91,8 +110,26 @@ export async function createCheckout(args: CreateCheckoutArgs): Promise<{ url: s
 
   const text = await res.text();
   if (!res.ok) {
-    console.error('[creem] checkout failed', res.status, text.slice(0, 500));
-    throw new CreemError('Could not start checkout. Please try again in a moment.', 502);
+    console.error(
+      `[creem] checkout failed (${CREEM_TEST_MODE ? 'test' : 'live'} mode, ${CREEM_BASE_URL})`,
+      res.status,
+      text.slice(0, 500),
+    );
+
+    // A 401 here is almost never a mistyped key — it's a key from the other environment. Say so,
+    // because "invalid key" sends the owner to re-copy a key that was already correct.
+    const hint =
+      res.status === 401
+        ? ` — a 401 from ${CREEM_BASE_URL} usually means the key belongs to Creem's ${
+            CREEM_TEST_MODE ? 'live' : 'test'
+          } environment instead. Check CREEM_API_KEY and CREEM_TEST_MODE together, and make sure the product ids came from the same environment as the key.`
+        : '';
+
+    throw new CreemError(
+      'Could not start checkout. Please try again in a moment.',
+      502,
+      `Creem returned ${res.status}: ${text.slice(0, 300)}${hint}`,
+    );
   }
 
   let parsed: { checkout_url?: string; url?: string; id?: string };

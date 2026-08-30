@@ -16,7 +16,12 @@ import { REFUND_WINDOW_DAYS } from '../../config/legal';
 import { BROKER_COUNT_PHRASE } from '../../data/brokerCopy';
 import { useAuth } from '../../context/AuthContext';
 import { useEntitlement } from '../../context/EntitlementContext';
-import { startCheckout } from '../../services/entitlement';
+import {
+  CheckoutError,
+  fetchPaymentsStatus,
+  startCheckout,
+  type PaymentsStatus,
+} from '../../services/entitlement';
 
 const TIER_ICON: Record<Tier, typeof Notebook> = {
   free: Notebook,
@@ -73,6 +78,9 @@ export function PricingContent({
   const { tier: currentTier, loaded, source, refresh } = useEntitlement();
   const [busy, setBusy] = useState<Tier | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** The payment provider's own words. Only ever populated for the site admin. */
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const [payments, setPayments] = useState<PaymentsStatus | null>(null);
   // Read from the URL at mount rather than set from an effect, so the banner is right on the
   // first paint the buyer sees after being sent back from checkout.
   const [justPaid] = useState(
@@ -98,10 +106,24 @@ export function PricingContent({
     };
   }, [refresh, justPaid]);
 
+  // Cheap, public and unauthenticated — it only reports which env vars exist, never their values.
+  // Worth one request so a site left in test mode can say so on the page instead of quietly taking
+  // pretend money from real customers.
+  useEffect(() => {
+    let cancelled = false;
+    void fetchPaymentsStatus().then((s) => {
+      if (!cancelled) setPayments(s);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const currentIndex = useMemo(() => TIER_ORDER.indexOf(currentTier), [currentTier]);
 
   const handleChoose = async (tier: Tier) => {
     setError(null);
+    setErrorDetail(null);
     if (!user) {
       onLaunch?.();
       return;
@@ -111,6 +133,7 @@ export function PricingContent({
       window.location.assign(await startCheckout(tier));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start checkout.');
+      setErrorDetail(err instanceof CheckoutError ? (err.detail ?? null) : null);
       setBusy(null);
     }
   };
@@ -146,12 +169,31 @@ export function PricingContent({
         </div>
       )}
 
+      {/* Only rendered while the server is pointed at Creem's sandbox. Leaving test mode on in
+          production means every "purchase" succeeds and charges nobody — the failure you'd
+          discover from a month of revenue that never arrived. Better to say it on the page. */}
+      {payments?.testMode && (
+        <div className="mt-8 rounded-xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">
+          <span className="font-semibold">Test mode.</span> Checkout is pointed at Creem&apos;s
+          sandbox — cards are not charged and no real subscription is created. Set{' '}
+          <code className="font-mono text-xs">CREEM_TEST_MODE=false</code> with live keys before
+          taking payments.
+        </div>
+      )}
+
       {error && (
         <div
           className="mt-8 rounded-xl border border-loss/40 bg-loss/10 px-4 py-3 text-sm text-loss-bright"
           role="alert"
         >
           {error}
+          {/* The server attaches this for the site admin only, so if it's here you're the person
+              who can act on it. Saves a trip through the function logs for every setup mistake. */}
+          {errorDetail && (
+            <p className="mt-2 pt-2 border-t border-loss/30 font-mono text-xs text-loss-bright/80 break-words">
+              {errorDetail}
+            </p>
+          )}
         </div>
       )}
 

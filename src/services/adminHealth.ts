@@ -1,10 +1,27 @@
 import { addDoc, collection, doc, getDoc, getDocs, limit as fbLimit, orderBy, query } from 'firebase/firestore';
 import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
 
+export interface PaymentsHealth {
+  ok: boolean;
+  /** Enough set up to start a checkout: API key plus all three product ids. */
+  checkoutReady: boolean;
+  /** The webhook secret. Without it payments succeed and nobody is ever upgraded. */
+  webhookReady: boolean;
+  testMode: boolean;
+  /** The Creem host the server will actually call — the half of a 401 you can't otherwise see. */
+  baseUrl?: string;
+  /** A test-looking key with CREEM_TEST_MODE explicitly false. Guaranteed "Invalid API Key". */
+  modeMismatch?: boolean;
+  /** Names of the environment variables the server can't see. Never any values. */
+  missing: string[];
+  error?: string;
+}
+
 export interface AdminHealthStatus {
   brokerSync: { ok: boolean; configured?: boolean; error?: string };
   benchmark: { ok: boolean; asOf?: string; error?: string };
   firebase: { ok: boolean; error?: string };
+  payments: PaymentsHealth;
 }
 
 export interface AdminHealthSnapshot {
@@ -12,6 +29,7 @@ export interface AdminHealthSnapshot {
   brokerSyncOk: boolean;
   benchmarkOk: boolean;
   firebaseOk: boolean;
+  paymentsOk?: boolean;
 }
 
 /**
@@ -27,7 +45,7 @@ async function describeFailure(res: Response): Promise<string> {
 }
 
 export async function fetchAdminHealth(): Promise<AdminHealthStatus> {
-  const [brokerResult, benchmarkResult, firebaseResult] = await Promise.allSettled([
+  const [brokerResult, benchmarkResult, firebaseResult, paymentsResult] = await Promise.allSettled([
     fetch('/api/broker-status').then(async (res) => {
       if (!res.ok) throw new Error(await describeFailure(res));
       return res.json() as Promise<{ ok?: boolean; configured?: boolean }>;
@@ -40,6 +58,10 @@ export async function fetchAdminHealth(): Promise<AdminHealthStatus> {
       if (!isFirebaseConfigured()) throw new Error('Not configured');
       await getDoc(doc(getFirebaseDb(), 'config', 'admin'));
     })(),
+    fetch('/api/payments-status').then(async (res) => {
+      if (!res.ok) throw new Error(await describeFailure(res));
+      return res.json() as Promise<Omit<PaymentsHealth, 'error'>>;
+    }),
   ]);
 
   return {
@@ -58,6 +80,17 @@ export async function fetchAdminHealth(): Promise<AdminHealthStatus> {
       firebaseResult.status === 'fulfilled'
         ? { ok: true }
         : { ok: false, error: String(firebaseResult.reason) },
+    payments:
+      paymentsResult.status === 'fulfilled'
+        ? paymentsResult.value
+        : {
+            ok: false,
+            checkoutReady: false,
+            webhookReady: false,
+            testMode: false,
+            missing: [],
+            error: String(paymentsResult.reason),
+          },
   };
 }
 
@@ -70,6 +103,7 @@ export async function recordAdminHealthSnapshot(status: AdminHealthStatus): Prom
       brokerSyncOk: status.brokerSync.ok,
       benchmarkOk: status.benchmark.ok,
       firebaseOk: status.firebase.ok,
+      paymentsOk: status.payments.ok,
     });
   } catch {
     // Non-critical — the live status already rendered from the check itself.

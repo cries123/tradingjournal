@@ -40,6 +40,22 @@ export async function fetchEntitlement(): Promise<EntitlementSnapshot> {
   return (await res.json()) as EntitlementSnapshot;
 }
 
+/**
+ * A checkout failure that came back with the payment provider's own explanation.
+ *
+ * The server only attaches `detail` for the site admin, so this being set at all means the person
+ * looking at the screen is the one who can fix it.
+ */
+export class CheckoutError extends Error {
+  detail?: string;
+
+  constructor(message: string, detail?: string) {
+    super(message);
+    this.name = 'CheckoutError';
+    this.detail = detail;
+  }
+}
+
 /** Sends the buyer to Creem's hosted checkout for a plan. */
 export async function startCheckout(tier: Tier): Promise<string> {
   if (!isFirebaseConfigured()) throw new Error('Sign in to upgrade your plan.');
@@ -53,7 +69,28 @@ export async function startCheckout(tier: Tier): Promise<string> {
     body: JSON.stringify({ tier }),
   });
 
-  const data = (await res.json()) as { url?: string; error?: string };
-  if (!res.ok || !data.url) throw new Error(data.error ?? 'Could not start checkout.');
+  const data = (await res.json()) as { url?: string; error?: string; detail?: string };
+  if (!res.ok || !data.url) {
+    throw new CheckoutError(data.error ?? 'Could not start checkout.', data.detail);
+  }
   return data.url;
+}
+
+export interface PaymentsStatus {
+  ok: boolean;
+  checkoutReady: boolean;
+  webhookReady: boolean;
+  testMode: boolean;
+  missing: string[];
+}
+
+/** Public, unauthenticated: which payment env vars the server can see. Booleans and names only. */
+export async function fetchPaymentsStatus(): Promise<PaymentsStatus | null> {
+  try {
+    const res = await fetch('/api/payments-status');
+    if (!res.ok) return null;
+    return (await res.json()) as PaymentsStatus;
+  } catch {
+    return null;
+  }
 }
