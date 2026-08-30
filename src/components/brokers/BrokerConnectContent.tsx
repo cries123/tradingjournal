@@ -13,6 +13,7 @@ import {
 } from '../../services/brokerConnect';
 import { BROKER_REGISTRY, matchesBrokerEntry, type BrokerRegistryEntry } from '../../data/brokerRegistry';
 import type { Trade } from '../../types';
+import { executionFingerprint } from '../../utils/duplicateTrades';
 
 interface BrokerCardCopy {
   key: SupportedBroker;
@@ -94,9 +95,23 @@ interface BrokerConnectContentProps {
   onImportTrades: (trades: Trade[]) => void;
   /** Already-saved trades, used to skip re-importing anything a previous sync already pulled in. */
   existingTrades: Trade[];
+  /**
+   * False while the journal is still loading from Firestore.
+   *
+   * Load-bearing. Dedupe compares against `existingTrades`, so syncing before the journal has
+   * arrived compares against an empty list and re-imports the trader's entire history. That is
+   * exactly how the first duplication incident happened on the automatic path; the Sync button is
+   * the same hazard with a person's finger on it, so it gets the same gate.
+   */
+  journalReady?: boolean;
 }
 
-export function BrokerConnectContent({ onBack, onImportTrades, existingTrades }: BrokerConnectContentProps) {
+export function BrokerConnectContent({
+  onBack,
+  onImportTrades,
+  existingTrades,
+  journalReady = true,
+}: BrokerConnectContentProps) {
   const { user, loading, firebaseEnabled } = useAuth();
   const [available, setAvailable] = useState<boolean | null>(null);
   const [status, setStatus] = useState<{ registered: boolean; accounts: BrokerAccountSummary[] } | null>(null);
@@ -145,13 +160,44 @@ export function BrokerConnectContent({ onBack, onImportTrades, existingTrades }:
   };
 
   const handleSync = async (account: BrokerAccountSummary) => {
+    if (!journalReady) {
+      setError('Still loading your journal — give it a second, then sync.');
+      return;
+    }
+
     setError(null);
     setSyncMessage(null);
     setSyncingAccountId(account.id);
     try {
       const { trades, truncated } = await syncBrokerAccount(account.id);
-      const known = new Set(existingTrades.map((t) => t.sourceId).filter(Boolean));
-      const freshTrades = trades.filter((t) => !t.sourceId || !known.has(t.sourceId));
+
+      // Two ways to recognise a trade we already have, because one isn't enough.
+      //
+      // sourceId is the broker's id for the round trip and is the normal path. But rows imported
+      // before the id bug was fixed carry sourceIds with a random component, which nothing will
+      // ever match again — so checking only sourceId would re-import every one of them, once, on
+      // the very first sync after the fix. The execution fingerprint (date, symbol, side, size,
+      // both prices, both times, P&L) recognises those rows as the fills they are.
+      const knownSourceIds = new Set(existingTrades.map((t) => t.sourceId).filter(Boolean));
+      const knownExecutions = new Set(
+        existingTrades.filter((t) => t.sourceId).map((t) => executionFingerprint(t)),
+      );
+
+      let skippedUnidentified = 0;
+      const freshTrades = trades.filter((t) => {
+        // No sourceId means nothing about this row can ever be recognised again, so importing it
+        // guarantees a fresh copy on every future sync. This used to read `!t.sourceId || ...`,
+        // which imported such rows unconditionally — a duplicate generator waiting for the day a
+        // broker returns a fill we can't identify.
+        if (!t.sourceId) {
+          skippedUnidentified++;
+          return false;
+        }
+        if (knownSourceIds.has(t.sourceId)) return false;
+        if (knownExecutions.has(executionFingerprint(t))) return false;
+        return true;
+      });
+
       const label = account.name ?? account.institutionName;
 
       if (freshTrades.length === 0) {
@@ -161,6 +207,13 @@ export function BrokerConnectContent({ onBack, onImportTrades, existingTrades }:
             : `You're up to date — all ${trades.length} trade${trades.length === 1 ? '' : 's'} from ${label} ${trades.length === 1 ? 'was' : 'were'} already imported.`,
         );
         return;
+      }
+
+      if (skippedUnidentified > 0) {
+        // Rare, and worth saying out loud rather than silently dropping someone's fills.
+        console.warn(
+          `[broker-sync] skipped ${skippedUnidentified} trade(s) with no source id from ${label}.`,
+        );
       }
 
       const withIds: Trade[] = freshTrades.map((t, i) => ({

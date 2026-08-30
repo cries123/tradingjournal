@@ -240,6 +240,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                    everything hidden by the filter. It also has to span every journal, since a
                    trade already imported into another one is still already imported. */
                 existingTrades={everyTrade}
+                journalReady={syncStatus !== 'loading'}
               />
             ) : appView === 'report-bug' ? (
               <ReportBugContent onBack={() => setAppView('dashboard')} />

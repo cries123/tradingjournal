@@ -14,14 +14,26 @@ export interface AdminHealthSnapshot {
   firebaseOk: boolean;
 }
 
+/**
+ * Turns a failed API response into something worth reading.
+ *
+ * "HTTP 500" tells the site owner that something is broken, which they already knew from the
+ * users complaining. The handlers all return a JSON `error` explaining what actually went wrong,
+ * so surface it — the point of a health panel is to end the guessing, not to confirm it.
+ */
+async function describeFailure(res: Response): Promise<string> {
+  const body = (await res.json().catch(() => null)) as { error?: string } | null;
+  return body?.error ? `HTTP ${res.status} — ${body.error}` : `HTTP ${res.status}`;
+}
+
 export async function fetchAdminHealth(): Promise<AdminHealthStatus> {
   const [brokerResult, benchmarkResult, firebaseResult] = await Promise.allSettled([
     fetch('/api/broker-status').then(async (res) => {
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(await describeFailure(res));
       return res.json() as Promise<{ ok?: boolean; configured?: boolean }>;
     }),
     fetch('/api/benchmark?symbol=SPY').then(async (res) => {
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(await describeFailure(res));
       return res.json() as Promise<{ asOf?: string }>;
     }),
     (async () => {

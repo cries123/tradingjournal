@@ -10,17 +10,26 @@ import { resolveTradeAccountId } from './accounts';
  * but that only stops it happening again — the rows it already wrote are still sitting in people's
  * journals, and only a cleanup gets them out.
  *
- * WHAT COUNTS AS A DUPLICATE
- * Only trades that share a sourceId inside the same journal. sourceId is the broker's own stable
- * id for a round trip ("snaptrade:<open>:<close>"), so two rows carrying it are provably the same
- * fill reported twice — there is no judgement call and no way for this to be a coincidence.
+ * WHAT COUNTS AS A DUPLICATE — two ways, both restricted to broker-imported rows.
  *
- * Deliberately NOT matched: trades with no sourceId. A manually-logged trade has no stable id, and
- * two trades on the same symbol, same day, for the same amount are something traders genuinely do
- * — scaling into a level, taking the same setup twice. Guessing at those would mean this cleanup
- * could delete real work, which is a worse failure than leaving a duplicate on screen. Journals are
- * kept separate for the same reason: collapsing across them would silently touch a journal the
- * trader wasn't looking at.
+ * 1. Same sourceId, same journal. sourceId is the broker's own id for a round trip
+ *    ("snaptrade:<open>:<close>"), so two rows carrying it are provably the same fill twice.
+ *
+ * 2. Same execution fingerprint, same journal. This exists because sourceId turned out NOT to be
+ *    stable: when SnapTrade's activity payload had no id of its own, the importer synthesised one
+ *    ending in Math.random(), so the same fill got a different sourceId on every sync. Those
+ *    duplicates are real but invisible to rule 1, and there are potentially thousands of them.
+ *    The fingerprint is date + symbol + side + quantity + entry price + exit price + entry time +
+ *    exit time + P&L — every execution detail the broker reported. Two round trips agreeing on all
+ *    of that, down to the minute of entry and exit, are the same trade; a trader cannot open and
+ *    close two separate positions at identical times for identical prices.
+ *
+ * Deliberately NOT matched: trades with no sourceId at all. A manually-logged trade has no broker
+ * record behind it, and two trades on the same symbol, same day, for the same amount are something
+ * traders genuinely do — scaling into a level, taking the same setup twice. Guessing at those would
+ * mean this cleanup could delete real work, which is worse than leaving a duplicate on screen.
+ * Journals are kept separate for the same reason: collapsing across them would silently touch a
+ * journal the trader wasn't looking at.
  */
 
 export interface DuplicateReport {
@@ -64,6 +73,49 @@ function duplicateKey(trade: Trade): string | null {
 }
 
 /**
+ * Every execution detail the broker reported, as one key. Journal-agnostic on purpose.
+ *
+ * Exported because the Sync button needs the same notion of "this is the same fill" that the
+ * cleanup uses. Comparing sourceIds alone is not enough after the random-id bug: rows already in
+ * people's journals carry random sourceIds that nothing will ever match again, so a sync that only
+ * checked sourceId would import the whole history one final time. Matching on the execution itself
+ * recognises those rows for what they are.
+ *
+ * A field being absent is part of the key, so a sparse row only ever matches another equally
+ * sparse row rather than collapsing into a rich one.
+ */
+export function executionFingerprint(
+  trade: Pick<
+    Trade,
+    'date' | 'symbol' | 'side' | 'contract' | 'quantity' | 'tradePrice' | 'exitPrice' | 'entryTime' | 'exitTime' | 'pnl'
+  >,
+): string {
+  return [
+    trade.date,
+    trade.symbol,
+    trade.side ?? '',
+    trade.contract ?? '',
+    trade.quantity ?? '',
+    trade.tradePrice ?? '',
+    trade.exitPrice ?? '',
+    trade.entryTime ?? '',
+    trade.exitTime ?? '',
+    trade.pnl,
+  ].join('|');
+}
+
+/**
+ * The cleanup's grouping key: the fingerprint, scoped to one journal.
+ *
+ * Only rows carrying a sourceId qualify — a manually-logged trade has no broker record behind it,
+ * and two identical manual entries are something traders genuinely do.
+ */
+function executionKey(trade: Trade): string | null {
+  if (!trade.sourceId) return null;
+  return `${resolveTradeAccountId(trade.accountId)}|${executionFingerprint(trade)}`;
+}
+
+/**
  * Returns the copies that should go, keeping exactly one of each real trade.
  *
  * The keeper is the most annotated copy; ties go to whichever was saved first, and then to
@@ -73,8 +125,12 @@ function duplicateKey(trade: Trade): string | null {
 export function findDuplicateTrades(trades: Trade[]): DuplicateReport {
   const groups = new Map<string, { trade: Trade; index: number }[]>();
 
+  // Fingerprint first: it catches everything the sourceId rule catches (two rows with one sourceId
+  // necessarily describe the same execution) plus the random-sourceId duplicates it cannot see.
+  // Falling back to the sourceId key keeps rows that lack execution detail — an older import, or a
+  // broker that reported no times — grouped the way they always were.
   trades.forEach((trade, index) => {
-    const key = duplicateKey(trade);
+    const key = executionKey(trade) ?? duplicateKey(trade);
     if (!key) return;
     const group = groups.get(key);
     if (group) group.push({ trade, index });

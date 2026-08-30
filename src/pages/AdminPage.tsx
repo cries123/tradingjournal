@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
+  AlertTriangle,
   ArrowLeft,
   BarChart3,
   Building2,
@@ -11,12 +12,14 @@ import {
   LifeBuoy,
   Lock,
   Plus,
+  RefreshCw,
   ScrollText,
   Search,
   ShieldCheck,
   Users,
 } from 'lucide-react';
 import { AuthModal } from '../components/AuthModal';
+import { useEscapeToClose } from '../hooks/useEscapeToClose';
 import { BUILD_SHA, BUILD_TIME, formatBuildStamp } from '../config/build';
 import { AcquisitionFunnel } from '../components/admin/AcquisitionFunnel';
 import { BrokerAdoptionPanel } from '../components/admin/BrokerAdoptionPanel';
@@ -426,9 +429,211 @@ function StatusFilterBar({
   );
 }
 
+type AdminTab = 'overview' | 'users' | 'requests' | 'content';
+
+const ADMIN_TABS: { id: AdminTab; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'users', label: 'Users' },
+  { id: 'requests', label: 'Requests' },
+  { id: 'content', label: 'Content' },
+];
+
+/**
+ * Splits the panel into four views instead of one continuous scroll.
+ *
+ * A dozen panels here serve three unrelated jobs — is the site healthy, how is it growing, and
+ * what needs me. Stacked in one column they read as a single undifferentiated list, and the two
+ * sections with actual work in them sat at the very bottom, furthest from where you land.
+ * Grouping by job is most of the fix; the badge does the rest, making "something needs you"
+ * visible from every tab instead of only after scrolling to it.
+ */
+function AdminTabBar({
+  tab,
+  onChange,
+  openCount,
+  userCount,
+}: {
+  tab: AdminTab;
+  onChange: (tab: AdminTab) => void;
+  openCount: number;
+  userCount: number;
+}) {
+  const badgeFor = (id: AdminTab): string | null => {
+    if (id === 'requests' && openCount > 0) return String(openCount);
+    if (id === 'users') return String(userCount);
+    return null;
+  };
+
+  return (
+    <div className="flex items-center gap-1 border-b border-border/60 mb-6 overflow-x-auto">
+      {ADMIN_TABS.map((t) => {
+        const active = t.id === tab;
+        const badge = badgeFor(t.id);
+        return (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => onChange(t.id)}
+            aria-current={active ? 'page' : undefined}
+            className={`relative shrink-0 px-3.5 py-2.5 text-sm font-medium transition-colors focus-ring rounded-t-lg ${
+              active ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            <span className="flex items-center gap-1.5">
+              {t.label}
+              {badge && (
+                <span
+                  className={`text-[10px] font-semibold tabular-nums rounded-full px-1.5 py-0.5 ${
+                    t.id === 'requests'
+                      ? 'bg-amber-500/15 text-amber-400'
+                      : 'bg-bg-tertiary text-text-secondary'
+                  }`}
+                >
+                  {badge}
+                </span>
+              )}
+            </span>
+            {active && (
+              <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-emerald-400" />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The one strip that answers "is there anything I have to do right now".
+ *
+ * Renders nothing when everything is fine, deliberately. A banner that is always present stops
+ * being read; one that appears only when it has something to say keeps its meaning.
+ */
+function NeedsAttention({
+  openBugs,
+  openBrokers,
+  health,
+  onGoToRequests,
+}: {
+  openBugs: number;
+  openBrokers: number;
+  health: AdminHealthStatus | null;
+  onGoToRequests: () => void;
+}) {
+  const down: string[] = [];
+  if (health) {
+    if (!health.brokerSync.ok) down.push('Broker sync');
+    if (!health.benchmark.ok) down.push('SPY benchmark');
+    if (!health.firebase.ok) down.push('Firebase');
+  }
+
+  const waiting: string[] = [];
+  if (openBugs > 0) waiting.push(`${openBugs} open bug report${openBugs === 1 ? '' : 's'}`);
+  if (openBrokers > 0) {
+    waiting.push(`${openBrokers} broker request${openBrokers === 1 ? '' : 's'}`);
+  }
+
+  if (waiting.length === 0 && down.length === 0) return null;
+
+  const critical = down.length > 0;
+
+  return (
+    <div
+      className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border px-4 py-3 mb-5 ${
+        critical ? 'border-red-500/30 bg-red-500/5' : 'border-amber-400/25 bg-amber-400/5'
+      }`}
+    >
+      <AlertTriangle
+        size={15}
+        className={`shrink-0 ${critical ? 'text-red-400' : 'text-amber-400'}`}
+      />
+      <p className="text-sm text-text-primary flex-1 min-w-[200px]">
+        {down.length > 0 && (
+          <span className="font-semibold">
+            {down.join(' and ')} {down.length === 1 ? 'is' : 'are'} down.
+          </span>
+        )}
+        {down.length > 0 && waiting.length > 0 && ' '}
+        {waiting.length > 0 && (
+          <span className="text-text-secondary">{waiting.join(' \u00b7 ')} waiting.</span>
+        )}
+      </p>
+      {waiting.length > 0 && (
+        <button
+          type="button"
+          onClick={onGoToRequests}
+          className="text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors focus-ring rounded shrink-0"
+        >
+          Review &rarr;
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** CSV exports collapsed into one control. They were a full panel competing with real data. */
+function ExportMenu({
+  onUsers,
+  onBugs,
+  onBrokers,
+}: {
+  onUsers: () => void;
+  onBugs: () => void;
+  onBrokers: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  useEscapeToClose(() => setOpen(false));
+
+  const items = [
+    { label: 'Users CSV', run: onUsers },
+    { label: 'Bug reports CSV', run: onBugs },
+    { label: 'Broker requests CSV', run: onBrokers },
+  ];
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary hover:border-emerald-400/40 transition-colors focus-ring"
+      >
+        <Download size={13} />
+        Export
+      </button>
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-label="Close export menu"
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-30 cursor-default"
+          />
+          <div className="absolute right-0 top-full mt-1.5 z-40 w-44 rounded-lg border border-border bg-bg-secondary shadow-xl py-1">
+            {items.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => {
+                  item.run();
+                  setOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60 transition-colors"
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onGuides, onNavigate }: AdminPageProps) {
   const { user, username, loading, firebaseEnabled, logout } = useAuth();
   const [state, setState] = useState<AdminState>({ phase: 'loading' });
+  const [tab, setTab] = useState<AdminTab>('overview');
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   const [bugFilter, setBugFilter] = useState<StatusFilter>('all');
   const [brokerFilter, setBrokerFilter] = useState<StatusFilter>('all');
@@ -884,665 +1089,676 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
               </div>
             )}
 
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-              <p className="text-text-secondary text-sm">
-                Signed in as {user?.email}
-                {username ? ` (@${username})` : ''}
-                {openCount > 0 && (
-                  <span className="ml-2 inline-flex px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 text-xs font-medium">
-                    {openCount} open
-                  </span>
-                )}
-              </p>
-              <div className="flex items-center gap-3">
+            {/* One header bar: who you are, what build is live, and the utilities. Export used to
+                be a panel of its own, competing for attention with the data it exports. */}
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+              <div className="min-w-0">
+                <h1 className="text-lg font-semibold tracking-tight">Admin</h1>
+                <p className="text-text-secondary text-xs mt-0.5 truncate">
+                  {user?.email}
+                  {username ? ` (@${username})` : ''}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
                 {/* Which bundle is actually running. Makes "I deployed but nothing changed"
                     a one-glance check instead of a guess. */}
                 <span
-                  className="text-[11px] text-text-secondary/70 tabular-nums"
+                  className="text-[11px] text-text-secondary/70 tabular-nums mr-1"
                   title={`Bundle built ${BUILD_TIME} from commit ${BUILD_SHA}`}
                 >
                   Build {formatBuildStamp()}
                 </span>
+                <ExportMenu
+                  onUsers={() => exportUsersCsv(ready.users, ready.userNotes)}
+                  onBugs={() => exportBugReportsCsv(ready.reports)}
+                  onBrokers={() => exportBrokerRequestsCsv(ready.brokerRequests)}
+                />
                 <button
                   type="button"
                   onClick={() => void loadAdmin()}
-                  className="text-sm text-text-secondary hover:text-emerald-400 transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary hover:border-emerald-400/40 transition-colors focus-ring"
                 >
+                  <RefreshCw size={13} />
                   Refresh
                 </button>
               </div>
             </div>
 
-            {ready.health && (
-              <div className="glass-card rounded-xl p-4 md:p-5 mb-6">
-                <div className="flex items-center gap-1.5 mb-3">
-                  <History size={13} className="text-text-secondary" />
-                  <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-                    System health
-                  </p>
-                </div>
-                <div className="grid sm:grid-cols-3 gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <HealthDot ok={ready.health.brokerSync.ok && Boolean(ready.health.brokerSync.configured)} />
-                    <span>Broker sync</span>
-                    <span className="text-text-secondary text-xs ml-auto">
-                      {ready.health.brokerSync.ok
-                        ? ready.health.brokerSync.configured
-                          ? 'Ready'
-                          : 'No API keys'
-                        : 'Down'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <HealthDot ok={ready.health.benchmark.ok} />
-                    <span>SPY benchmark</span>
-                    <span className="text-text-secondary text-xs ml-auto">
-                      {ready.health.benchmark.ok
-                        ? ready.health.benchmark.asOf
-                          ? formatDate(ready.health.benchmark.asOf)
-                          : 'Live'
-                        : 'Unavailable'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <HealthDot ok={ready.health.firebase.ok} />
-                    <span>Firebase</span>
-                    <span className="text-text-secondary text-xs ml-auto">
-                      {ready.health.firebase.ok ? 'Connected' : 'Error'}
-                    </span>
-                  </div>
-                </div>
-
-                {ready.healthHistory.length > 1 && (
-                  <div className="mt-5 pt-4 border-t border-border/50 grid sm:grid-cols-3 gap-4">
-                    <HealthTimeline
-                      label="Broker sync"
-                      values={ready.healthHistory.map((h) => h.brokerSyncOk)}
-                    />
-                    <HealthTimeline
-                      label="SPY benchmark"
-                      values={ready.healthHistory.map((h) => h.benchmarkOk)}
-                    />
-                    <HealthTimeline
-                      label="Firebase"
-                      values={ready.healthHistory.map((h) => h.firebaseOk)}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
-            <AcquisitionFunnel
-              visitors={ready.visitorStats}
-              serverStats={ready.serverStats}
-              fallbackSignups={ready.userCount}
-              visitorError={ready.visitorStatsError}
-              serverError={ready.serverStatsError}
+            <NeedsAttention
+              openBugs={openBugCount}
+              openBrokers={openBrokerCount}
+              health={ready.health}
+              onGoToRequests={() => setTab('requests')}
             />
 
-            <div className="grid lg:grid-cols-2 gap-4 mb-8">
-              <SignupTrendPanel
-                serverStats={ready.serverStats}
-                serverError={ready.serverStatsError}
-              />
-              <BrokerAdoptionPanel
-                serverStats={ready.serverStats}
-                serverError={ready.serverStatsError}
-              />
-            </div>
+            <AdminTabBar
+              tab={tab}
+              onChange={setTab}
+              openCount={openCount}
+              userCount={ready.users.length}
+            />
 
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <div className="glass-card rounded-xl p-5 md:p-6">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
-                    <Eye size={18} />
+
+            {tab === 'overview' && (
+              <>
+
+              {ready.health && (
+                <div className="glass-card rounded-xl p-4 md:p-5 mb-6">
+                  <div className="flex items-center gap-1.5 mb-3">
+                    <History size={13} className="text-text-secondary" />
+                    <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                      System health
+                    </p>
                   </div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-                    Visitors (7 days)
+                  {/* Each service gets its own bounded cell. In a bare 3-column grid the ml-auto
+                      status text drifted to the far edge of its column and ended up sitting
+                      against the NEXT service's name — so "Down" read as belonging to whatever
+                      came after it. */}
+                  <div className="grid sm:grid-cols-3 gap-2 text-sm">
+                    <div className="flex items-center gap-2 rounded-lg bg-bg-tertiary/30 border border-border/40 px-3 py-2">
+                      <HealthDot ok={ready.health.brokerSync.ok && Boolean(ready.health.brokerSync.configured)} />
+                      <span>Broker sync</span>
+                      <span className="text-text-secondary text-xs ml-auto">
+                        {ready.health.brokerSync.ok
+                          ? ready.health.brokerSync.configured
+                            ? 'Ready'
+                            : 'No API keys'
+                          : 'Down'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 rounded-lg bg-bg-tertiary/30 border border-border/40 px-3 py-2">
+                      <HealthDot ok={ready.health.benchmark.ok} />
+                      <span>SPY benchmark</span>
+                      <span className="text-text-secondary text-xs ml-auto">
+                        {ready.health.benchmark.ok
+                          ? ready.health.benchmark.asOf
+                            ? formatDate(ready.health.benchmark.asOf)
+                            : 'Live'
+                          : 'Unavailable'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 rounded-lg bg-bg-tertiary/30 border border-border/40 px-3 py-2">
+                      <HealthDot ok={ready.health.firebase.ok} />
+                      <span>Firebase</span>
+                      <span className="text-text-secondary text-xs ml-auto">
+                        {ready.health.firebase.ok ? 'Connected' : 'Error'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {ready.healthHistory.length > 1 && (
+                    <div className="mt-5 pt-4 border-t border-border/50 grid sm:grid-cols-3 gap-4">
+                      <HealthTimeline
+                        label="Broker sync"
+                        values={ready.healthHistory.map((h) => h.brokerSyncOk)}
+                      />
+                      <HealthTimeline
+                        label="SPY benchmark"
+                        values={ready.healthHistory.map((h) => h.benchmarkOk)}
+                      />
+                      <HealthTimeline
+                        label="Firebase"
+                        values={ready.healthHistory.map((h) => h.firebaseOk)}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <AcquisitionFunnel
+                visitors={ready.visitorStats}
+                serverStats={ready.serverStats}
+                fallbackSignups={ready.userCount}
+                visitorError={ready.visitorStatsError}
+                serverError={ready.serverStatsError}
+              />
+
+              <div className="grid lg:grid-cols-2 gap-4 mb-8">
+                <SignupTrendPanel
+                  serverStats={ready.serverStats}
+                  serverError={ready.serverStatsError}
+                />
+                <BrokerAdoptionPanel
+                  serverStats={ready.serverStats}
+                  serverError={ready.serverStatsError}
+                />
+              </div>
+
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div className="glass-card rounded-xl p-5 md:p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
+                      <Eye size={18} />
+                    </div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                      Visitors (7 days)
+                    </p>
+                  </div>
+                  <p className="text-3xl font-bold tracking-tight">
+                    {ready.visitorStats.last7DaysVisitors.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-text-secondary mt-2">
+                    {ready.visitorStats.totalUniqueVisitors.toLocaleString()} all time
+                  </p>
+                  {ready.visitorStats.dailyLast7.some((d) => d.visitors > 0) ? (
+                    <div className="mt-4 flex items-end gap-1 h-12">
+                      {ready.visitorStats.dailyLast7.map((day) => (
+                        <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
+                          <div
+                            className="w-full bg-cyan-500/40 rounded-sm min-h-[2px]"
+                            style={{ height: `${(day.visitors / maxDailyVisitors) * 100}%` }}
+                            title={`${day.visitors} visitor${day.visitors === 1 ? '' : 's'}`}
+                          />
+                          <span className="text-[9px] text-text-secondary">{day.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-text-secondary mt-3">
+                      No visits recorded yet this week.
+                    </p>
+                  )}
+                </div>
+
+                <div className="glass-card rounded-xl p-5 md:p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+                      <Users size={18} />
+                    </div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                      Journals in use
+                    </p>
+                  </div>
+                  <p className="text-3xl font-bold tracking-tight">{usersWithTrades.toLocaleString()}</p>
+                  <p className="text-xs text-text-secondary mt-2">
+                    of {ready.userCount.toLocaleString()} profiles have trades
+                  </p>
+                  {signupStats && signupStats.dailyLast7.some((d) => d.count > 0) && (
+                    <div className="mt-4 flex items-end gap-1 h-12">
+                      {signupStats.dailyLast7.map((day) => (
+                        <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
+                          <div
+                            className="w-full bg-emerald-500/40 rounded-sm min-h-[2px]"
+                            style={{ height: `${(day.count / maxDailySignup) * 100}%` }}
+                            title={`${day.count} signup${day.count === 1 ? '' : 's'}`}
+                          />
+                          <span className="text-[9px] text-text-secondary">{day.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="glass-card rounded-xl p-5 md:p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
+                      <ShieldCheck size={18} />
+                    </div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                      Bug reports
+                    </p>
+                  </div>
+                  <p className="text-3xl font-bold tracking-tight">{ready.reports.length.toLocaleString()}</p>
+                  <p className="text-xs text-text-secondary mt-2">
+                    {openBugCount > 0 ? `${openBugCount} open · ` : ''}
+                    {ready.reports.filter((r) => r.status === 'resolved').length} resolved
                   </p>
                 </div>
-                <p className="text-3xl font-bold tracking-tight">
-                  {ready.visitorStats.last7DaysVisitors.toLocaleString()}
-                </p>
-                <p className="text-xs text-text-secondary mt-2">
-                  {ready.visitorStats.totalUniqueVisitors.toLocaleString()} all time
-                </p>
-                {ready.visitorStats.dailyLast7.some((d) => d.visitors > 0) ? (
-                  <div className="mt-4 flex items-end gap-1 h-12">
-                    {ready.visitorStats.dailyLast7.map((day) => (
-                      <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
-                        <div
-                          className="w-full bg-cyan-500/40 rounded-sm min-h-[2px]"
-                          style={{ height: `${(day.visitors / maxDailyVisitors) * 100}%` }}
-                          title={`${day.visitors} visitor${day.visitors === 1 ? '' : 's'}`}
-                        />
-                        <span className="text-[9px] text-text-secondary">{day.label}</span>
-                      </div>
-                    ))}
+
+                <div className="glass-card rounded-xl p-5 md:p-6 sm:col-span-2 lg:col-span-1">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
+                      <Building2 size={18} />
+                    </div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                      Broker requests
+                    </p>
                   </div>
+                  <p className="text-3xl font-bold tracking-tight">
+                    {ready.brokerRequests.length.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-text-secondary mt-2">
+                    {openBrokerCount > 0 ? `${openBrokerCount} open · ` : ''}
+                    {ready.brokerRequests.filter((r) => r.status === 'resolved').length} resolved
+                  </p>
+                  {topBrokers.length > 0 && (
+                    <ul className="mt-4 space-y-1">
+                      {topBrokers.map((b) => (
+                        <li key={b.name} className="flex justify-between text-xs text-text-secondary">
+                          <span>{b.name}</span>
+                          <span className="font-medium text-text-primary">{b.count}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              {platformStats && (
+                <div className="glass-card rounded-xl p-5 md:p-6 mb-8">
+                  <div className="flex items-center gap-2 mb-4">
+                    <BarChart3 size={16} className="text-emerald-400" />
+                    <div>
+                      <h2 className="text-sm font-semibold text-text-primary">Journaling activity</h2>
+                      <p className="text-[10px] text-text-secondary mt-0.5">
+                        Journaled (7d) counts saved trades and session dates in the last week
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
+                    <div>
+                      <p className="text-2xl font-bold tracking-tight">
+                        {platformStats.totalTrades.toLocaleString()}
+                      </p>
+                      <p className="text-xs text-text-secondary mt-1">Total trades</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold tracking-tight">
+                        {platformStats.tradesSavedLast7Days.toLocaleString()}
+                      </p>
+                      <p className="text-xs text-text-secondary mt-1">Trades saved (7d)</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold tracking-tight">
+                        {platformStats.activeLast7Days.toLocaleString()}
+                      </p>
+                      <p className="text-xs text-text-secondary mt-1">Users logged in (7d)</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold tracking-tight">
+                        {platformStats.journaledLast7Days.toLocaleString()}
+                      </p>
+                      <p className="text-xs text-text-secondary mt-1">Users journaled (7d)</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold tracking-tight">
+                        {platformStats.activationRate.toFixed(0)}%
+                      </p>
+                      <p className="text-xs text-text-secondary mt-1">Users with trades</p>
+                    </div>
+                    <div>
+                      <p
+                        className={`text-2xl font-bold tracking-tight ${
+                          platformStats.combinedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'
+                        }`}
+                      >
+                        {formatCurrency(platformStats.combinedPnl)}
+                      </p>
+                      <p className="text-xs text-text-secondary mt-1">Combined P&L</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+                {/* The site's activity and your own, side by side and named apart. They were
+                    two stacked panels called "Recent activity" and "Recent admin activity" —
+                    adjacent, near-identical names, entirely different data. */}
+                <div className="grid md:grid-cols-2 gap-4 mb-8">
+                <div className="glass-card rounded-xl p-5 md:p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Activity size={16} className="text-emerald-400" />
+                    <h2 className="text-sm font-semibold text-text-primary">Site activity</h2>
+                  </div>
+                  {activityFeed.length === 0 ? (
+                    <p className="text-xs text-text-secondary">No activity yet.</p>
+                  ) : (
+                    <ul className="space-y-2">{activityFeed.map((item) => (
+                      <ActivityFeedItem key={`${item.type}-${item.type === 'signup' ? item.uid : item.id}-${item.at}`} item={item} />
+                    ))}</ul>
+                  )}
+                </div>
+              <div className="glass-card rounded-xl p-5 md:p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <ScrollText size={16} className="text-emerald-400" />
+                  <h2 className="text-sm font-semibold text-text-primary">Your recent actions</h2>
+                </div>
+                {ready.auditLog.length === 0 ? (
+                  <p className="text-xs text-text-secondary">
+                    No admin actions recorded yet — this fills in as you triage reports, update
+                    priorities, and manage accounts.
+                  </p>
                 ) : (
-                  <p className="text-[10px] text-text-secondary mt-3">
-                    No visits recorded yet this week.
-                  </p>
-                )}
-              </div>
-
-              <div className="glass-card rounded-xl p-5 md:p-6">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
-                    <Users size={18} />
-                  </div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-                    Journals in use
-                  </p>
-                </div>
-                <p className="text-3xl font-bold tracking-tight">{usersWithTrades.toLocaleString()}</p>
-                <p className="text-xs text-text-secondary mt-2">
-                  of {ready.userCount.toLocaleString()} profiles have trades
-                </p>
-                {signupStats && signupStats.dailyLast7.some((d) => d.count > 0) && (
-                  <div className="mt-4 flex items-end gap-1 h-12">
-                    {signupStats.dailyLast7.map((day) => (
-                      <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
-                        <div
-                          className="w-full bg-emerald-500/40 rounded-sm min-h-[2px]"
-                          style={{ height: `${(day.count / maxDailySignup) * 100}%` }}
-                          title={`${day.count} signup${day.count === 1 ? '' : 's'}`}
-                        />
-                        <span className="text-[9px] text-text-secondary">{day.label}</span>
-                      </div>
+                  <ul className="space-y-2.5 max-h-[280px] overflow-y-auto pr-1">
+                    {ready.auditLog.map((entry) => (
+                      <AuditLogItem key={entry.id} entry={entry} />
                     ))}
-                  </div>
+                  </ul>
                 )}
               </div>
-
-              <div className="glass-card rounded-xl p-5 md:p-6">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
-                    <ShieldCheck size={18} />
-                  </div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-                    Bug reports
-                  </p>
                 </div>
-                <p className="text-3xl font-bold tracking-tight">{ready.reports.length.toLocaleString()}</p>
-                <p className="text-xs text-text-secondary mt-2">
-                  {openBugCount > 0 ? `${openBugCount} open · ` : ''}
-                  {ready.reports.filter((r) => r.status === 'resolved').length} resolved
-                </p>
-              </div>
+              </>
+            )}
 
-              <div className="glass-card rounded-xl p-5 md:p-6 sm:col-span-2 lg:col-span-1">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
-                    <Building2 size={18} />
+            {tab === 'users' && (
+              <div className="glass-card rounded-xl p-5 md:p-6 mb-8">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    <Users size={16} className="text-emerald-400" />
+                    <h2 className="text-sm font-semibold text-text-primary">Users ({ready.users.length})</h2>
                   </div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-                    Broker requests
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative">
+                      <Search
+                        size={14}
+                        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-secondary"
+                        aria-hidden
+                      />
+                      <input
+                        type="search"
+                        value={userSearch}
+                        onChange={(e) => setUserSearch(e.target.value)}
+                        placeholder="Search username, email, UID…"
+                        className="input-field text-xs py-1.5 pl-8 pr-3 w-52"
+                        style={{ paddingLeft: '2rem' }}
+                        aria-label="Search users"
+                      />
+                    </div>
+                    <select
+                      value={userSort}
+                      onChange={(e) => setUserSort(e.target.value as UserSortKey)}
+                      className="input-field text-xs py-1.5 px-2"
+                      aria-label="Sort users"
+                    >
+                      {USER_SORTS.map((s) => (
+                        <option key={s.key} value={s.key}>
+                          {s.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <p className="text-3xl font-bold tracking-tight">
-                  {ready.brokerRequests.length.toLocaleString()}
-                </p>
-                <p className="text-xs text-text-secondary mt-2">
-                  {openBrokerCount > 0 ? `${openBrokerCount} open · ` : ''}
-                  {ready.brokerRequests.filter((r) => r.status === 'resolved').length} resolved
-                </p>
-                {topBrokers.length > 0 && (
-                  <ul className="mt-4 space-y-1">
-                    {topBrokers.map((b) => (
-                      <li key={b.name} className="flex justify-between text-xs text-text-secondary">
-                        <span>{b.name}</span>
-                        <span className="font-medium text-text-primary">{b.count}</span>
+
+                {visibleUsers.length === 0 ? (
+                  <p className="text-xs text-text-secondary">
+                    {ready.users.length === 0 ? 'No users loaded.' : 'No users match this search.'}
+                  </p>
+                ) : (
+                  <ul className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                    {visibleUsers.map((entry) => (
+                      <li key={entry.uid}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedUser(entry)}
+                          className="w-full text-left rounded-lg border border-border/40 bg-bg-tertiary/40 px-3 py-2.5 text-xs hover:border-emerald-500/30 transition-colors"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-text-primary">
+                                {entry.username ? `@${entry.username}` : 'No username'}
+                                {entry.coachShareEnabled && (
+                                  <span className="ml-2 inline-flex px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400 text-[9px] font-medium uppercase tracking-wide">
+                                    Coach share
+                                  </span>
+                                )}
+                                {ready.userNotes.get(entry.uid)?.flagged && (
+                                  <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 text-[9px] font-medium uppercase tracking-wide">
+                                    <Flag size={9} />
+                                    Flagged
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-text-secondary mt-0.5 truncate">
+                                {entry.email || 'Email not stored'}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="font-semibold text-text-primary">
+                                {entry.tradeCount > 0 ? `${entry.tradeCount} trades` : 'No trades'}
+                              </p>
+                              {entry.totalPnl != null && entry.tradeCount > 0 && (
+                                <p
+                                  className={`mt-0.5 font-medium ${
+                                    entry.totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'
+                                  }`}
+                                >
+                                  {formatCurrency(entry.totalPnl)}
+                                  {entry.winRate != null && (
+                                    <span className="text-text-secondary font-normal">
+                                      {' '}· {entry.winRate.toFixed(0)}% win
+                                    </span>
+                                  )}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-text-secondary mt-1.5">
+                            {[
+                              entry.lastTradeActivityAt &&
+                                `last journaled ${formatDate(entry.lastTradeActivityAt)}`,
+                              entry.lastTradeDate && `last session ${formatDate(entry.lastTradeDate)}`,
+                              entry.lastLoginAt && `last login ${formatDate(entry.lastLoginAt)}`,
+                              entry.createdAt && `joined ${formatDate(entry.createdAt)}`,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ') || 'No activity recorded'}
+                          </p>
+                        </button>
                       </li>
                     ))}
                   </ul>
                 )}
               </div>
-            </div>
-
-            {platformStats && (
-              <div className="glass-card rounded-xl p-5 md:p-6 mb-8">
-                <div className="flex items-center gap-2 mb-4">
-                  <BarChart3 size={16} className="text-emerald-400" />
-                  <div>
-                    <h2 className="text-sm font-semibold">Journaling activity</h2>
-                    <p className="text-[10px] text-text-secondary mt-0.5">
-                      Journaled (7d) counts saved trades and session dates in the last week
-                    </p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
-                  <div>
-                    <p className="text-2xl font-bold tracking-tight">
-                      {platformStats.totalTrades.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-text-secondary mt-1">Total trades</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold tracking-tight">
-                      {platformStats.tradesSavedLast7Days.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-text-secondary mt-1">Trades saved (7d)</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold tracking-tight">
-                      {platformStats.activeLast7Days.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-text-secondary mt-1">Users logged in (7d)</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold tracking-tight">
-                      {platformStats.journaledLast7Days.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-text-secondary mt-1">Users journaled (7d)</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold tracking-tight">
-                      {platformStats.activationRate.toFixed(0)}%
-                    </p>
-                    <p className="text-xs text-text-secondary mt-1">Users with trades</p>
-                  </div>
-                  <div>
-                    <p
-                      className={`text-2xl font-bold tracking-tight ${
-                        platformStats.combinedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'
-                      }`}
-                    >
-                      {formatCurrency(platformStats.combinedPnl)}
-                    </p>
-                    <p className="text-xs text-text-secondary mt-1">Combined P&L</p>
-                  </div>
-                </div>
-              </div>
             )}
 
-            <div className="glass-card rounded-xl p-5 md:p-6 mb-8">
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <div className="flex items-center gap-2">
-                  <Users size={16} className="text-emerald-400" />
-                  <h2 className="text-sm font-semibold">Users ({ready.users.length})</h2>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="relative">
-                    <Search
-                      size={14}
-                      className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-secondary"
-                      aria-hidden
-                    />
-                    <input
-                      type="search"
-                      value={userSearch}
-                      onChange={(e) => setUserSearch(e.target.value)}
-                      placeholder="Search username, email, UID…"
-                      className="input-field text-xs py-1.5 pl-8 pr-3 w-52"
-                      style={{ paddingLeft: '2rem' }}
-                      aria-label="Search users"
-                    />
-                  </div>
-                  <select
-                    value={userSort}
-                    onChange={(e) => setUserSort(e.target.value as UserSortKey)}
-                    className="input-field text-xs py-1.5 px-2"
-                    aria-label="Sort users"
-                  >
-                    {USER_SORTS.map((s) => (
-                      <option key={s.key} value={s.key}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+            {tab === 'requests' && (
+              <>
+              <h2 className="text-base font-semibold mb-2">Broker support requests</h2>
+              <StatusFilterBar value={brokerFilter} onChange={setBrokerFilter} counts={brokerFilterCounts} />
 
-              {visibleUsers.length === 0 ? (
-                <p className="text-xs text-text-secondary">
-                  {ready.users.length === 0 ? 'No users loaded.' : 'No users match this search.'}
-                </p>
+              {filteredBrokers.length === 0 ? (
+                <div className="glass-card rounded-xl p-8 text-center text-text-secondary text-sm mb-10">
+                  {ready.brokerRequests.length === 0
+                    ? 'No broker support requests yet.'
+                    : 'No requests match this filter.'}
+                </div>
               ) : (
-                <ul className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-                  {visibleUsers.map((entry) => (
-                    <li key={entry.uid}>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedUser(entry)}
-                        className="w-full text-left rounded-lg border border-border/40 bg-bg-tertiary/40 px-3 py-2.5 text-xs hover:border-emerald-500/30 transition-colors"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="font-semibold text-text-primary">
-                              {entry.username ? `@${entry.username}` : 'No username'}
-                              {entry.coachShareEnabled && (
-                                <span className="ml-2 inline-flex px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400 text-[9px] font-medium uppercase tracking-wide">
-                                  Coach share
-                                </span>
-                              )}
-                              {ready.userNotes.get(entry.uid)?.flagged && (
-                                <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 text-[9px] font-medium uppercase tracking-wide">
-                                  <Flag size={9} />
-                                  Flagged
-                                </span>
-                              )}
-                            </p>
-                            <p className="text-text-secondary mt-0.5 truncate">
-                              {entry.email || 'Email not stored'}
-                            </p>
+                <div className="space-y-4 mb-10">
+                  {filteredBrokers.map((request) => (
+                    <article key={request.id} className="glass-card rounded-xl p-5 md:p-6">
+                      <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${statusBadgeClass(request.status)}`}
+                            >
+                              {STATUS_LABELS[request.status]}
+                            </span>
+                            <PrioritySelect
+                              value={request.priority ?? 'medium'}
+                              disabled={updatingKey === `broker-priority:${request.id}`}
+                              onChange={(priority) =>
+                                void handleBrokerPriorityChange(request.id, priority, request.brokerName)
+                              }
+                            />
                           </div>
-                          <div className="text-right shrink-0">
-                            <p className="font-semibold text-text-primary">
-                              {entry.tradeCount > 0 ? `${entry.tradeCount} trades` : 'No trades'}
-                            </p>
-                            {entry.totalPnl != null && entry.tradeCount > 0 && (
-                              <p
-                                className={`mt-0.5 font-medium ${
-                                  entry.totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'
-                                }`}
-                              >
-                                {formatCurrency(entry.totalPnl)}
-                                {entry.winRate != null && (
-                                  <span className="text-text-secondary font-normal">
-                                    {' '}· {entry.winRate.toFixed(0)}% win
-                                  </span>
-                                )}
-                              </p>
+                          <p className="text-sm font-semibold mt-2">{request.brokerName}</p>
+                          <p className="text-xs text-text-secondary mt-1">
+                            {new Date(request.createdAt).toLocaleString()}
+                            {' · '}
+                            {request.email}
+                            {request.username ? ` (@${request.username})` : ''}
+                          </p>
+                        </div>
+                        <select
+                          value={request.status}
+                          disabled={updatingKey === `broker:${request.id}`}
+                          onChange={(e) =>
+                            void handleBrokerStatusChange(
+                              request.id,
+                              e.target.value as BrokerSupportStatus,
+                              request.brokerName,
+                            )
+                          }
+                          className="input-field text-sm py-1.5 px-2 min-w-[120px]"
+                          aria-label="Update broker request status"
+                        >
+                          <option value="open">Open</option>
+                          <option value="resolved">Resolved</option>
+                          <option value="closed">Closed</option>
+                        </select>
+                      </div>
+
+                      <p className="text-sm whitespace-pre-wrap leading-relaxed">{request.exportMethod}</p>
+
+                      {request.details && (
+                        <div className="mt-4 pt-4 border-t border-border/50">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-2">
+                            Additional details
+                          </p>
+                          <p className="text-sm text-text-secondary whitespace-pre-wrap">{request.details}</p>
+                        </div>
+                      )}
+
+                      <AdminNoteField
+                        value={request.adminNote ?? ''}
+                        disabled={updatingKey === `broker-note:${request.id}`}
+                        onSave={(note) => handleBrokerNoteSave(request.id, note, request.brokerName)}
+                        label="Broker request admin note"
+                      />
+                    </article>
+                  ))}
+                </div>
+              )}
+
+
+              <h2 className="text-base font-semibold mb-2">Bug reports</h2>
+              <StatusFilterBar value={bugFilter} onChange={setBugFilter} counts={bugFilterCounts} />
+
+              {filteredBugs.length === 0 ? (
+                <div className="glass-card rounded-xl p-8 text-center text-text-secondary text-sm">
+                  {ready.reports.length === 0 ? 'No bug reports yet.' : 'No reports match this filter.'}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredBugs.map((report) => (
+                    <article key={report.id} className="glass-card rounded-xl p-5 md:p-6">
+                      <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${statusBadgeClass(report.status)}`}
+                            >
+                              {STATUS_LABELS[report.status]}
+                            </span>
+                            <PrioritySelect
+                              value={report.priority ?? 'medium'}
+                              disabled={updatingKey === `bug-priority:${report.id}`}
+                              onChange={(priority) =>
+                                void handleBugPriorityChange(report.id, priority, report.description.slice(0, 40))
+                              }
+                            />
+                          </div>
+                          <p className="text-xs text-text-secondary mt-2">
+                            {new Date(report.createdAt).toLocaleString()}
+                            {' · '}
+                            {report.email}
+                            {report.username ? ` (@${report.username})` : ''}
+                          </p>
+                        </div>
+                        <select
+                          value={report.status}
+                          disabled={updatingKey === `bug:${report.id}`}
+                          onChange={(e) =>
+                            void handleBugStatusChange(
+                              report.id,
+                              e.target.value as BugReportStatus,
+                              report.description.slice(0, 40),
+                            )
+                          }
+                          className="input-field text-sm py-1.5 px-2 min-w-[120px]"
+                          aria-label="Update report status"
+                        >
+                          <option value="open">Open</option>
+                          <option value="resolved">Resolved</option>
+                          <option value="closed">Closed</option>
+                        </select>
+                      </div>
+
+                      <p className="text-sm whitespace-pre-wrap leading-relaxed">{report.description}</p>
+
+                      {report.steps && (
+                        <div className="mt-4 pt-4 border-t border-border/50">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-2">
+                            Steps to reproduce
+                          </p>
+                          <p className="text-sm text-text-secondary whitespace-pre-wrap">{report.steps}</p>
+                        </div>
+                      )}
+
+                      {report.pageUrl && (
+                        <p className="mt-3 text-xs text-text-secondary truncate">
+                          Page:{' '}
+                          <a href={report.pageUrl} className="text-emerald-400 hover:underline">
+                            {report.pageUrl}
+                          </a>
+                        </p>
+                      )}
+
+                      <AdminNoteField
+                        value={report.adminNote ?? ''}
+                        disabled={updatingKey === `bug-note:${report.id}`}
+                        onSave={(note) => handleBugNoteSave(report.id, note, report.description.slice(0, 40))}
+                        label="Bug report admin note"
+                      />
+                    </article>
+                  ))}
+                </div>
+              )}
+              </>
+            )}
+
+            {tab === 'content' && (
+              <div className="glass-card rounded-xl p-5 md:p-6 mb-8">
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    <LifeBuoy size={16} className="text-emerald-400" />
+                    <h2 className="text-sm font-semibold text-text-primary">Help Center articles</h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setArticleModal('new')}
+                    className="btn-secondary text-xs px-3 py-2 inline-flex items-center gap-1.5"
+                  >
+                    <Plus size={14} />
+                    New article
+                  </button>
+                </div>
+
+                {helpArticles.length === 0 ? (
+                  <p className="text-xs text-text-secondary">
+                    No articles yet — the public Help Center stays empty until you add one.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {helpArticles.map((article) => (
+                      <li
+                        key={article.id}
+                        className="flex items-center gap-3 rounded-lg border border-border/40 px-3 py-2.5"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-text-primary truncate">{article.title}</p>
+                            {!article.published && (
+                              <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 bg-zinc-500/15 text-zinc-400">
+                                Draft
+                              </span>
                             )}
                           </div>
+                          <p className="text-xs text-text-secondary mt-0.5">
+                            {helpCategoryLabel(article.category)} · Updated {formatDateTime(article.updatedAt)}
+                          </p>
                         </div>
-                        <p className="text-[10px] text-text-secondary mt-1.5">
-                          {[
-                            entry.lastTradeActivityAt &&
-                              `last journaled ${formatDate(entry.lastTradeActivityAt)}`,
-                            entry.lastTradeDate && `last session ${formatDate(entry.lastTradeDate)}`,
-                            entry.lastLoginAt && `last login ${formatDate(entry.lastLoginAt)}`,
-                            entry.createdAt && `joined ${formatDate(entry.createdAt)}`,
-                          ]
-                            .filter(Boolean)
-                            .join(' · ') || 'No activity recorded'}
-                        </p>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-6 mb-8">
-              <div className="glass-card rounded-xl p-5 md:p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Activity size={16} className="text-emerald-400" />
-                  <h2 className="text-sm font-semibold">Recent activity</h2>
-                </div>
-                {activityFeed.length === 0 ? (
-                  <p className="text-xs text-text-secondary">No activity yet.</p>
-                ) : (
-                  <ul className="space-y-2">{activityFeed.map((item) => (
-                    <ActivityFeedItem key={`${item.type}-${item.type === 'signup' ? item.uid : item.id}-${item.at}`} item={item} />
-                  ))}</ul>
+                        <button
+                          type="button"
+                          onClick={() => setArticleModal(article)}
+                          className="btn-secondary text-xs px-3 py-1.5 shrink-0"
+                        >
+                          Edit
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
                 )}
-              </div>
-
-              <div className="glass-card rounded-xl p-5 md:p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Download size={16} className="text-emerald-400" />
-                  <h2 className="text-sm font-semibold">Export</h2>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => exportUsersCsv(ready.users, ready.userNotes)}
-                    className="btn-secondary text-xs px-3 py-2"
-                  >
-                    Users CSV
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => exportBugReportsCsv(ready.reports)}
-                    className="btn-secondary text-xs px-3 py-2"
-                  >
-                    Bug reports CSV
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => exportBrokerRequestsCsv(ready.brokerRequests)}
-                    className="btn-secondary text-xs px-3 py-2"
-                  >
-                    Broker requests CSV
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="glass-card rounded-xl p-5 md:p-6 mb-8">
-              <div className="flex items-center gap-2 mb-4">
-                <ScrollText size={16} className="text-emerald-400" />
-                <h2 className="text-sm font-semibold">Recent admin activity</h2>
-              </div>
-              {ready.auditLog.length === 0 ? (
-                <p className="text-xs text-text-secondary">
-                  No admin actions recorded yet — this fills in as you triage reports, update
-                  priorities, and manage accounts.
-                </p>
-              ) : (
-                <ul className="space-y-2.5 max-h-[280px] overflow-y-auto pr-1">
-                  {ready.auditLog.map((entry) => (
-                    <AuditLogItem key={entry.id} entry={entry} />
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <div className="glass-card rounded-xl p-5 md:p-6 mb-8">
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <div className="flex items-center gap-2">
-                  <LifeBuoy size={16} className="text-emerald-400" />
-                  <h2 className="text-sm font-semibold">Help Center articles</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setArticleModal('new')}
-                  className="btn-secondary text-xs px-3 py-2 inline-flex items-center gap-1.5"
-                >
-                  <Plus size={14} />
-                  New article
-                </button>
-              </div>
-
-              {helpArticles.length === 0 ? (
-                <p className="text-xs text-text-secondary">
-                  No articles yet — the public Help Center stays empty until you add one.
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {helpArticles.map((article) => (
-                    <li
-                      key={article.id}
-                      className="flex items-center gap-3 rounded-lg border border-border/40 px-3 py-2.5"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-text-primary truncate">{article.title}</p>
-                          {!article.published && (
-                            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 bg-zinc-500/15 text-zinc-400">
-                              Draft
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-text-secondary mt-0.5">
-                          {helpCategoryLabel(article.category)} · Updated {formatDateTime(article.updatedAt)}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setArticleModal(article)}
-                        className="btn-secondary text-xs px-3 py-1.5 shrink-0"
-                      >
-                        Edit
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <h2 className="text-lg font-semibold mb-2">Broker support requests</h2>
-            <StatusFilterBar value={brokerFilter} onChange={setBrokerFilter} counts={brokerFilterCounts} />
-
-            {filteredBrokers.length === 0 ? (
-              <div className="glass-card rounded-xl p-8 text-center text-text-secondary text-sm mb-10">
-                {ready.brokerRequests.length === 0
-                  ? 'No broker support requests yet.'
-                  : 'No requests match this filter.'}
-              </div>
-            ) : (
-              <div className="space-y-4 mb-10">
-                {filteredBrokers.map((request) => (
-                  <article key={request.id} className="glass-card rounded-xl p-5 md:p-6">
-                    <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${statusBadgeClass(request.status)}`}
-                          >
-                            {STATUS_LABELS[request.status]}
-                          </span>
-                          <PrioritySelect
-                            value={request.priority ?? 'medium'}
-                            disabled={updatingKey === `broker-priority:${request.id}`}
-                            onChange={(priority) =>
-                              void handleBrokerPriorityChange(request.id, priority, request.brokerName)
-                            }
-                          />
-                        </div>
-                        <p className="text-sm font-semibold mt-2">{request.brokerName}</p>
-                        <p className="text-xs text-text-secondary mt-1">
-                          {new Date(request.createdAt).toLocaleString()}
-                          {' · '}
-                          {request.email}
-                          {request.username ? ` (@${request.username})` : ''}
-                        </p>
-                      </div>
-                      <select
-                        value={request.status}
-                        disabled={updatingKey === `broker:${request.id}`}
-                        onChange={(e) =>
-                          void handleBrokerStatusChange(
-                            request.id,
-                            e.target.value as BrokerSupportStatus,
-                            request.brokerName,
-                          )
-                        }
-                        className="input-field text-sm py-1.5 px-2 min-w-[120px]"
-                        aria-label="Update broker request status"
-                      >
-                        <option value="open">Open</option>
-                        <option value="resolved">Resolved</option>
-                        <option value="closed">Closed</option>
-                      </select>
-                    </div>
-
-                    <p className="text-sm whitespace-pre-wrap leading-relaxed">{request.exportMethod}</p>
-
-                    {request.details && (
-                      <div className="mt-4 pt-4 border-t border-border/50">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-2">
-                          Additional details
-                        </p>
-                        <p className="text-sm text-text-secondary whitespace-pre-wrap">{request.details}</p>
-                      </div>
-                    )}
-
-                    <AdminNoteField
-                      value={request.adminNote ?? ''}
-                      disabled={updatingKey === `broker-note:${request.id}`}
-                      onSave={(note) => handleBrokerNoteSave(request.id, note, request.brokerName)}
-                      label="Broker request admin note"
-                    />
-                  </article>
-                ))}
-              </div>
-            )}
-
-            <h2 className="text-lg font-semibold mb-2">Bug reports</h2>
-            <StatusFilterBar value={bugFilter} onChange={setBugFilter} counts={bugFilterCounts} />
-
-            {filteredBugs.length === 0 ? (
-              <div className="glass-card rounded-xl p-8 text-center text-text-secondary text-sm">
-                {ready.reports.length === 0 ? 'No bug reports yet.' : 'No reports match this filter.'}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredBugs.map((report) => (
-                  <article key={report.id} className="glass-card rounded-xl p-5 md:p-6">
-                    <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${statusBadgeClass(report.status)}`}
-                          >
-                            {STATUS_LABELS[report.status]}
-                          </span>
-                          <PrioritySelect
-                            value={report.priority ?? 'medium'}
-                            disabled={updatingKey === `bug-priority:${report.id}`}
-                            onChange={(priority) =>
-                              void handleBugPriorityChange(report.id, priority, report.description.slice(0, 40))
-                            }
-                          />
-                        </div>
-                        <p className="text-xs text-text-secondary mt-2">
-                          {new Date(report.createdAt).toLocaleString()}
-                          {' · '}
-                          {report.email}
-                          {report.username ? ` (@${report.username})` : ''}
-                        </p>
-                      </div>
-                      <select
-                        value={report.status}
-                        disabled={updatingKey === `bug:${report.id}`}
-                        onChange={(e) =>
-                          void handleBugStatusChange(
-                            report.id,
-                            e.target.value as BugReportStatus,
-                            report.description.slice(0, 40),
-                          )
-                        }
-                        className="input-field text-sm py-1.5 px-2 min-w-[120px]"
-                        aria-label="Update report status"
-                      >
-                        <option value="open">Open</option>
-                        <option value="resolved">Resolved</option>
-                        <option value="closed">Closed</option>
-                      </select>
-                    </div>
-
-                    <p className="text-sm whitespace-pre-wrap leading-relaxed">{report.description}</p>
-
-                    {report.steps && (
-                      <div className="mt-4 pt-4 border-t border-border/50">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-2">
-                          Steps to reproduce
-                        </p>
-                        <p className="text-sm text-text-secondary whitespace-pre-wrap">{report.steps}</p>
-                      </div>
-                    )}
-
-                    {report.pageUrl && (
-                      <p className="mt-3 text-xs text-text-secondary truncate">
-                        Page:{' '}
-                        <a href={report.pageUrl} className="text-emerald-400 hover:underline">
-                          {report.pageUrl}
-                        </a>
-                      </p>
-                    )}
-
-                    <AdminNoteField
-                      value={report.adminNote ?? ''}
-                      disabled={updatingKey === `bug-note:${report.id}`}
-                      onSave={(note) => handleBugNoteSave(report.id, note, report.description.slice(0, 40))}
-                      label="Bug report admin note"
-                    />
-                  </article>
-                ))}
               </div>
             )}
           </>

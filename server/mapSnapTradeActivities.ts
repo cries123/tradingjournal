@@ -53,8 +53,48 @@ export interface SnapTradeActivityLike {
   fee?: number;
 }
 
+/**
+ * A stable id for an activity SnapTrade didn't give one.
+ *
+ * This function used to end in `Math.random()`, and that single call is why journals kept
+ * duplicating no matter what else was fixed.
+ *
+ * The id ends up inside the trade's sourceId (`snaptrade:<open>:<close>`), which is the ONLY thing
+ * dedupe compares. A random component means the same real fill gets a different sourceId on every
+ * sync — so "have I already imported this?" is always answered no, and every sync re-imports the
+ * entire history. Removing the automatic sync only reduced how often that happened; it never
+ * touched the cause, because a manual sync duplicates just as thoroughly.
+ *
+ * The replacement is derived purely from the fill's own values, so the same activity always
+ * produces the same id. `seen` disambiguates genuinely identical fills — two 100-share buys of the
+ * same symbol at the same price and time are two real fills, and they need different ids — by
+ * counting occurrences in input order. That stays stable across syncs because it depends on the
+ * data, not on when the sync ran.
+ */
+function fallbackActivityId(a: SnapTradeActivityLike, seen: Map<string, number>): string {
+  const key = [
+    a.trade_date ?? '',
+    a.account?.id ?? '',
+    a.option_symbol?.ticker
+      ?? a.symbol?.symbol
+      ?? a.symbol?.raw_symbol
+      ?? '',
+    (a.type ?? '').toUpperCase(),
+    (a.option_type ?? '').toUpperCase(),
+    a.units ?? '',
+    a.price ?? '',
+    a.fee ?? '',
+  ].join('|');
+
+  const n = seen.get(key) ?? 0;
+  seen.set(key, n + 1);
+  // The occurrence index only appears when it has to, so the common case stays readable in logs.
+  return n === 0 ? `derived:${key}` : `derived:${key}#${n}`;
+}
+
 function normalize(activities: SnapTradeActivityLike[]): RawActivity[] {
   const out: RawActivity[] = [];
+  const seen = new Map<string, number>();
 
   for (const a of activities) {
     const type = (a.type || '').toUpperCase();
@@ -72,7 +112,7 @@ function normalize(activities: SnapTradeActivityLike[]): RawActivity[] {
     }
 
     out.push({
-      id: a.id || `${a.trade_date}-${a.price}-${a.units}-${Math.random().toString(36).slice(2, 8)}`,
+      id: a.id || fallbackActivityId(a, seen),
       tradeDate: a.trade_date,
       units: Math.abs(a.units),
       price: a.price,
