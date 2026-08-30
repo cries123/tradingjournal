@@ -22,6 +22,7 @@ import {
 import { computeTakeaway } from '../utils/takeaway';
 import { useSettings } from '../context/SettingsContext';
 import { AccountSwitcher } from './AccountSwitcher';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { BrokerSyncAnnouncement } from './BrokerSyncAnnouncement';
 import { DuplicateTradesBanner } from './DuplicateTradesBanner';
 import { WeeklyRecapCard } from './WeeklyRecapCard';
@@ -100,6 +101,7 @@ export function DashboardView({
   const { settings } = useSettings();
   const [mode, setMode] = useState<DashboardMode>('month');
   const [showShare, setShowShare] = useState(false);
+  const isCompact = useMediaQuery('(max-width: 767px)');
 
   const monthTrades = useMemo(() => getMonthTrades(trades, year, month), [trades, year, month]);
   const yearTrades = useMemo(() => getYearTrades(trades, year), [trades, year]);
@@ -157,7 +159,11 @@ export function DashboardView({
 
       <BrokerSyncAnnouncement onConnectBroker={onConnectBroker} />
 
-      <AccountSwitcher />
+      {/* Phone only. On desktop the sidebar already carries the journal switcher, and rendering
+          both put the same control on screen twice, a few hundred pixels apart. */}
+      <div className="md:hidden">
+        <AccountSwitcher />
+      </div>
 
       <div className="flex flex-wrap items-center gap-2 shrink-0">
         <div className="flex rounded-lg bg-bg-tertiary/60 p-0.5 border border-border/50">
@@ -262,7 +268,8 @@ export function DashboardView({
               Shaded area = drawdown from your running high
             </span>
           </div>
-          <EquityCurve points={equityPoints} />
+          {/* 200px was over half a phone screen for one line. */}
+          <EquityCurve points={equityPoints} height={isCompact ? 120 : 170} />
         </div>
       )}
 
@@ -337,7 +344,13 @@ export function DashboardView({
       {hasAnyTrades && (sessions || excursion || rMultiple) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
           {sessions && (
-            <div className="panel-card p-3 md:p-4 flex flex-col min-h-[140px]">
+            /* ExecutionPanel renders nothing without MAE/MFE or R data, which left a half-width
+               hole beside this panel. When it has nothing to say, Timing takes the whole row. */
+            <div
+              className={`panel-card p-3 md:p-4 flex flex-col min-h-[140px] ${
+                excursion || rMultiple ? '' : 'md:col-span-2'
+              }`}
+            >
               <div className="mb-1.5 md:mb-3 shrink-0">
                 <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
                   Timing

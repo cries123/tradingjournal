@@ -30,10 +30,17 @@ export function WeekdayChart({ data }: WeekdayChartProps) {
       {data.map((point, i) => {
         const widthPct = (Math.abs(point.pnl) / maxAbs) * 100;
         const isProfit = point.pnl >= 0;
+        // A day with no trades and a day that broke even are different facts. An empty track
+        // reads as "flat", so a day you never traded is dimmed and its rail dropped instead.
+        const traded = point.pnl !== 0;
         return (
-          <div key={point.label} className="flex items-center gap-1.5">
+          <div key={point.label} className={`flex items-center gap-1.5 ${traded ? '' : 'opacity-40'}`}>
             <span className="text-[10px] text-text-secondary w-7 shrink-0">{point.label}</span>
-            <div className="flex-1 h-3 bg-bg-primary rounded-full overflow-hidden relative">
+            <div
+              className={`flex-1 h-3 rounded-full overflow-hidden relative ${
+                traded ? 'bg-bg-primary' : 'border border-dashed border-border/40'
+              }`}
+            >
               {point.pnl !== 0 && (
                 <div
                   className={`h-full rounded-full chart-bar-h ${isProfit ? 'bar-profit-h' : 'bar-loss-h'}`}

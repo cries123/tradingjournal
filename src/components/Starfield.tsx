@@ -29,6 +29,14 @@ const LINES: [number, number, number, number][] = [
 
 interface StarfieldProps {
   /**
+   * Thins the field for screens whose job is reading numbers.
+   *
+   * The full density is right on the landing page, where the backdrop is the point. Behind a
+   * dashboard it competes with the data — specks drifting between a calendar cell and a chart read
+   * as artefacts on the page rather than atmosphere behind it. Same identity, less of it.
+   */
+  subtle?: boolean;
+  /**
    * When true (the default), the nebula glow reads the live theme accent
    * (--color-profit-bright / --color-accent, set on document.documentElement by
    * SettingsContext) and re-reads it whenever those variables change — used throughout the
@@ -50,7 +58,7 @@ interface StarfieldProps {
  * Purely decorative: fixed position, zero layout footprint (doesn't affect any surrounding
  * layout), pointer-events disabled, and freezes to a static frame under prefers-reduced-motion.
  */
-export function Starfield({ reactive = true }: StarfieldProps) {
+export function Starfield({ reactive = true, subtle = false }: StarfieldProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const starsRef = useRef<Star[]>([]);
   const colorsRef = useRef<[string, string]>(['#34d399', '#38bdf8']);
@@ -77,7 +85,7 @@ export function Starfield({ reactive = true }: StarfieldProps) {
     }
 
     function seed(w: number, h: number) {
-      const count = Math.round((w * h) / 4200);
+      const count = Math.round((w * h) / (subtle ? 11000 : 4200));
       const stars: Star[] = [];
       for (let i = 0; i < count; i++) {
         stars.push({
@@ -177,7 +185,7 @@ export function Starfield({ reactive = true }: StarfieldProps) {
       observer?.disconnect();
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [reactive]);
+  }, [reactive, subtle]);
 
   return (
     <canvas

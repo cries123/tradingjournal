@@ -17,11 +17,17 @@ interface DashboardCalendarProps {
   onMonthChange: (year: number, month: number) => void;
 }
 
-const WEEKDAYS_SHORT = ['S', 'M', 'T', 'W', 'T', 'F'];
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-/** Trading days shown per week (Sun–Fri) — Saturday's column is replaced with a week-total
- *  summary cell instead, since it's almost never a trading day. */
-const TRADING_DAYS_PER_WEEK = 6;
+const WEEKDAYS_SHORT = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/**
+ * All seven days are shown.
+ *
+ * Saturday used to be dropped as "almost never a trading day", but the week total is summed over
+ * the full seven — so a Saturday trade counted toward the week and month totals while having no
+ * cell to appear in, and the numbers on screen didn't add up to the ones beside them. A calendar
+ * that can hide a trade is worse than one with a mostly-quiet column.
+ */
+const DAYS_PER_WEEK = 7;
 
 /** True when one of this week's cells is today — that row stays full height even when empty,
  *  since it's the one the trader is most likely to click into to log a session. */
@@ -46,7 +52,7 @@ export function DashboardCalendar({
   const maxDayAbs = useMemo(() => {
     let max = 0;
     for (const week of weeks) {
-      for (const day of week.days.slice(0, TRADING_DAYS_PER_WEEK)) {
+      for (const day of week.days.slice(0, DAYS_PER_WEEK)) {
         if (day.summary && day.summary.tradeCount > 0) {
           max = Math.max(max, Math.abs(day.summary.totalPnl));
         }
@@ -79,7 +85,7 @@ export function DashboardCalendar({
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-0.5 md:gap-2 mb-0.5 md:mb-1">
+      <div className="grid grid-cols-8 gap-0.5 md:gap-2 mb-0.5 md:mb-1">
         {WEEKDAYS.map((day, i) => (
           <div key={`${day}-${i}`} className="text-[8px] md:text-[11px] text-text-secondary text-center py-0.5 md:py-1 font-medium uppercase tracking-wide">
             <span className="md:hidden">{WEEKDAYS_SHORT[i]}</span>
@@ -92,7 +98,7 @@ export function DashboardCalendar({
         </div>
       </div>
 
-      <div key={`${year}-${month}`} className="grid grid-cols-7 gap-0.5 md:gap-2 animate-fade-up motion-safe:animate-fade-up">
+      <div key={`${year}-${month}`} className="grid grid-cols-8 gap-0.5 md:gap-2 animate-fade-up motion-safe:animate-fade-up">
         {weeks.flatMap((week, wi) => {
           // Weeks with nothing in them collapse to a slim row. A month that begins on a Friday
           // otherwise opens with two full-height rows of empty cells, which pushed the actual
@@ -101,7 +107,7 @@ export function DashboardCalendar({
           const compact = week.summary.tradeCount === 0 && !(isCurrentMonth && weekHasToday(week, today));
 
           return [
-            ...week.days.slice(0, TRADING_DAYS_PER_WEEK).map((day, di) => (
+            ...week.days.slice(0, DAYS_PER_WEEK).map((day, di) => (
               <DashboardDayCell
                 key={day.date?.toISOString() ?? `e-${wi}-${di}`}
                 dayNumber={day.date?.getDate() ?? null}

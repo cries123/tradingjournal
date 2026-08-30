@@ -212,7 +212,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
         isDesktop ? 'min-h-dvh' : 'h-full min-h-0 flex-1 flex flex-col overflow-hidden'
       }`}
     >
-      <Starfield />
+      <Starfield subtle />
       {isDesktop && <Sidebar variant="desktop" onHome={onHome} {...sidebarActions} />}
 
       {/* relative: keeps this content painting above the fixed Starfield canvas behind it */}

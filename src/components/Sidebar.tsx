@@ -150,7 +150,10 @@ export function Sidebar({
               type="button"
               onClick={wrap(onShareCard)}
               disabled={!shareCardEnabled}
-              className={`${navItemClass(false)} disabled:opacity-40 disabled:cursor-not-allowed`}
+              /* Separated from the links above it: everything else in this nav is a place you go,
+                 this is a thing you do. Sitting flush in the same list made it read as a fifth
+                 destination, and it already exists as a button in the toolbar. */
+              className={`${navItemClass(false)} mt-2 pt-3 border-t border-border/40 disabled:opacity-40 disabled:cursor-not-allowed`}
             >
               <Share2 size={16} />
               Share month

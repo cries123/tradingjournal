@@ -21,16 +21,41 @@ interface HelpCenterPageProps {
 
 type CategoryFilter = 'all' | HelpArticleCategory;
 
-/** Article body is stored as plain text — blank lines separate paragraphs. */
+/** A short all-caps line on its own is a section heading, not a shouted sentence. */
+function isHeading(block: string): boolean {
+  return (
+    block.length <= 48
+    && !block.includes('\n')
+    && block === block.toUpperCase()
+    && /[A-Z]/.test(block)
+  );
+}
+
+/**
+ * Article body is stored as plain text — blank lines separate paragraphs.
+ *
+ * Longer articles need structure, and the editor is a plain textarea, so the one convention it
+ * supports is a short line in capitals standing alone. Rendering those as headings is what lets a
+ * 3,000-word walkthrough be skimmed instead of read start to finish.
+ */
 function ArticleBody({ body }: { body: string }) {
-  const paragraphs = body.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  const blocks = body.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
   return (
     <div className="px-5 pb-5 space-y-3">
-      {paragraphs.map((p, i) => (
-        <p key={i} className="text-sm text-text-secondary leading-relaxed whitespace-pre-line">
-          {p}
-        </p>
-      ))}
+      {blocks.map((block, i) =>
+        isHeading(block) ? (
+          <h4
+            key={i}
+            className="text-[11px] font-semibold uppercase tracking-wider text-accent/90 pt-2 first:pt-0"
+          >
+            {block}
+          </h4>
+        ) : (
+          <p key={i} className="text-sm text-text-secondary leading-relaxed whitespace-pre-line">
+            {block}
+          </p>
+        ),
+      )}
     </div>
   );
 }

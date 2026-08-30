@@ -335,18 +335,32 @@ body {
   filter: drop-shadow(0 0 24px rgba(248, 113, 113, 0.2));
 }
 
+/* On a phone these six chips wrapped to three rows, each carrying its own pill border and fill —
+   a lot of chrome to deliver six numbers, and it pushed the equity chart below the fold. Below the
+   tablet breakpoint they drop the pill entirely and sit as plain figures in a tighter grid; the
+   full chip treatment returns on desktop where there's room for it on one line. */
 .stat-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.25rem 0.625rem;
-  border-radius: 9999px;
+  gap: 0.25rem;
+  padding: 0.125rem 0;
+  border-radius: 0;
   font-size: 0.6875rem;
   font-weight: 600;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  background: rgba(21, 27, 40, 0.7);
+  border: none;
+  background: none;
   color: var(--color-text-secondary);
   white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .stat-chip {
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(21, 27, 40, 0.7);
+  }
 }
 
 .stat-chip .chip-value {

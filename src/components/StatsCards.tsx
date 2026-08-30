@@ -83,7 +83,7 @@ export function StatsCards({
         </div>
 
         {hasTrades && (
-          <div className="flex flex-wrap items-center gap-1.5 md:gap-2 md:ml-auto md:justify-end md:max-w-[46%]">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1 md:flex md:flex-wrap md:items-center md:gap-2 md:ml-auto md:justify-end md:max-w-[46%]">
             {streakDays >= 2 && (
               <span className="stat-chip border-amber-500/30">
                 <Flame size={11} className="text-amber-400" />

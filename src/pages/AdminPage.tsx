@@ -19,6 +19,7 @@ import {
   Users,
 } from 'lucide-react';
 import { AuthModal } from '../components/AuthModal';
+import { HELP_STARTER_ARTICLES } from '../data/helpStarterArticles';
 import { useEscapeToClose } from '../hooks/useEscapeToClose';
 import { BUILD_SHA, BUILD_TIME, formatBuildStamp } from '../config/build';
 import { AcquisitionFunnel } from '../components/admin/AcquisitionFunnel';
@@ -54,6 +55,10 @@ import { fetchRecentAuditLog, logAdminAction, type AdminAuditEntry } from '../se
 import {
   fetchAllHelpArticles,
   helpCategoryLabel,
+  createHelpArticle,
+  updateHelpArticle,
+  HELP_CATEGORIES,
+  type HelpArticleCategory,
   type HelpArticle,
 } from '../services/adminHelpArticles';
 import type { AdminPriority } from '../services/adminShared';
@@ -641,6 +646,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
   const [userSearch, setUserSearch] = useState('');
   const [userSort, setUserSort] = useState<UserSortKey>('activity');
   const [helpArticles, setHelpArticles] = useState<HelpArticle[]>([]);
+  const [articleBusy, setArticleBusy] = useState<string | null>(null);
   const [articleModal, setArticleModal] = useState<'new' | HelpArticle | null>(null);
 
   const loadAdmin = useCallback(async () => {
@@ -933,6 +939,61 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
     }
     return saved;
   };
+
+  /**
+   * Re-files an article without opening the editor.
+   *
+   * Fixing a mis-categorised Help Center used to mean opening each article, changing a dropdown,
+   * saving, and closing — four steps to change one field. The category is the one property you
+   * change in bulk, so it belongs in the list.
+   */
+  const handleArticleCategoryChange = useCallback(
+    async (article: HelpArticle, category: HelpArticleCategory) => {
+      if (category === article.category || !user) return;
+      setArticleBusy(article.id);
+      // Optimistic: the dropdown should settle immediately, and a failure puts it back.
+      setHelpArticles((prev) => prev.map((a) => (a.id === article.id ? { ...a, category } : a)));
+      try {
+        await updateHelpArticle(article.id, { category }, user.email ?? '');
+      } catch (err) {
+        console.error('[admin] re-categorising article failed:', err);
+        setHelpArticles((prev) =>
+          prev.map((a) => (a.id === article.id ? { ...a, category: article.category } : a)),
+        );
+      } finally {
+        setArticleBusy(null);
+      }
+    },
+    [user],
+  );
+
+  /** Adds any starter article the Help Center doesn't already have. Matched by title so pressing
+   *  it twice does nothing the second time. */
+  const handleAddStarterArticles = useCallback(async () => {
+    if (!user) return;
+    const existing = new Set(helpArticles.map((a) => a.title.trim().toLowerCase()));
+    const missing = HELP_STARTER_ARTICLES.filter((a) => !existing.has(a.title.trim().toLowerCase()));
+    if (missing.length === 0) return;
+
+    setArticleBusy('starter');
+    try {
+      for (const draft of missing) {
+        // Created as a draft, not published: it's your Help Center, so you read it before your
+        // users do.
+        const created = await createHelpArticle({ ...draft, published: false }, user.email ?? '');
+        setHelpArticles((prev) => [created, ...prev]);
+      }
+    } catch (err) {
+      console.error('[admin] adding starter articles failed:', err);
+    } finally {
+      setArticleBusy(null);
+    }
+  }, [user, helpArticles]);
+
+  const missingStarterCount = useMemo(() => {
+    const existing = new Set(helpArticles.map((a) => a.title.trim().toLowerCase()));
+    return HELP_STARTER_ARTICLES.filter((a) => !existing.has(a.title.trim().toLowerCase())).length;
+  }, [helpArticles]);
 
   const ready = state.phase === 'ready' ? state : null;
 
@@ -1714,6 +1775,19 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                     <LifeBuoy size={16} className="text-emerald-400" />
                     <h2 className="text-sm font-semibold text-text-primary">Help Center articles</h2>
                   </div>
+                  {missingStarterCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => void handleAddStarterArticles()}
+                      disabled={articleBusy !== null}
+                      className="btn-secondary text-xs px-3 py-1.5 mr-2 disabled:opacity-50"
+                      title="Adds articles we've written for you, as drafts"
+                    >
+                      {articleBusy === 'starter'
+                        ? 'Adding…'
+                        : `Add ${missingStarterCount} written article${missingStarterCount === 1 ? '' : 's'}`}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setArticleModal('new')}
@@ -1729,8 +1803,21 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                     No articles yet — the public Help Center stays empty until you add one.
                   </p>
                 ) : (
-                  <ul className="space-y-2">
-                    {helpArticles.map((article) => (
+                  /* Grouped by category so what's filed where is visible at a glance — the whole
+                     point of having categories, and previously only inferable by reading each row. */
+                  <div className="space-y-4">
+                    {HELP_CATEGORIES.filter((c) =>
+                      helpArticles.some((a) => a.category === c.key),
+                    ).map((cat) => (
+                      <div key={cat.key}>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-text-secondary mb-1.5">
+                          {helpCategoryLabel(cat.key)}
+                          <span className="ml-1.5 text-text-secondary/60">
+                            {helpArticles.filter((a) => a.category === cat.key).length}
+                          </span>
+                        </p>
+                        <ul className="space-y-2">
+                    {helpArticles.filter((a) => a.category === cat.key).map((article) => (
                       <li
                         key={article.id}
                         className="flex items-center gap-3 rounded-lg border border-border/40 px-3 py-2.5"
@@ -1744,9 +1831,30 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-text-secondary mt-0.5">
-                            {helpCategoryLabel(article.category)} · Updated {formatDateTime(article.updatedAt)}
-                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            {/* Editable in place: category is the field you change in bulk. */}
+                            <select
+                              value={article.category}
+                              disabled={articleBusy !== null}
+                              onChange={(e) =>
+                                void handleArticleCategoryChange(
+                                  article,
+                                  e.target.value as HelpArticleCategory,
+                                )
+                              }
+                              aria-label={`Category for ${article.title}`}
+                              className="rounded border border-border/60 bg-bg-tertiary/50 px-1.5 py-0.5 text-[11px] text-text-primary focus-ring disabled:opacity-50"
+                            >
+                              {HELP_CATEGORIES.map((c) => (
+                                <option key={c.key} value={c.key}>
+                                  {c.label}
+                                </option>
+                              ))}
+                            </select>
+                            <span className="text-xs text-text-secondary truncate">
+                              Updated {formatDateTime(article.updatedAt)}
+                            </span>
+                          </div>
                         </div>
                         <button
                           type="button"
@@ -1757,7 +1865,10 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                         </button>
                       </li>
                     ))}
-                  </ul>
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
