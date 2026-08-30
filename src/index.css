@@ -550,10 +550,14 @@ details.glass-card > p {
   line-height: 1.7;
 }
 
-.prose-legal ul {
+/* :not(.list-none) so a component inside this wrapper can opt out. A descendant selector beats a
+   single Tailwind utility class on specificity, so `list-none` on the element was being ignored
+   and cards rendered with a stray bullet beside them.
+   (`space-y` was also in here — that's a Tailwind class name, not a CSS property, so it never did
+   anything; spacing comes from the element's own space-y-* utility.) */
+.prose-legal ul:not(.list-none) {
   list-style: disc;
   padding-left: 1.25rem;
-  space-y: 0.5rem;
 }
 
 .prose-legal li {

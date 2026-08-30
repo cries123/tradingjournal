@@ -1,5 +1,5 @@
 import { ContentPageLayout } from './ContentPageLayout';
-import { GUIDE_ARTICLES } from '../seo/guides';
+import { TUTORIAL_ARTICLES } from '../seo/guides';
 import type { ExtraNavRoute } from '../hooks/useRoute';
 
 interface GuidesIndexPageProps {
@@ -25,8 +25,8 @@ export function GuidesIndexPage({
 }: GuidesIndexPageProps) {
   return (
     <ContentPageLayout
-      title="Trading journal guides"
-      subtitle="Practical guides on free journaling, P&L calendars, and getting the most out of broker sync."
+      title="Tutorials"
+      subtitle="Step-by-step walkthroughs for getting things done in Trend Chasers."
       onHome={onHome}
       onLaunch={onLaunch}
       onPrivacy={onPrivacy}
@@ -35,8 +35,11 @@ export function GuidesIndexPage({
       onGuides={onGuides}
       onNavigate={onNavigate}
     >
-      <ul className="space-y-4 not-prose">
-        {GUIDE_ARTICLES.map((guide) => (
+      {/* Tutorials only. The marketing landing pages still live under /guides and keep their
+          routes, prerendered HTML and sitemap entries — they're just not what someone who clicked
+          "Tutorials" is asking for. */}
+      <ul className="space-y-4 not-prose list-none pl-0">
+        {TUTORIAL_ARTICLES.map((guide) => (
           <li key={guide.slug}>
             <a
               href={guide.path}
@@ -52,6 +55,12 @@ export function GuidesIndexPage({
           </li>
         ))}
       </ul>
+
+      {TUTORIAL_ARTICLES.length === 0 && (
+        <p className="text-sm text-text-secondary not-prose">
+          No tutorials published yet.
+        </p>
+      )}
     </ContentPageLayout>
   );
 }

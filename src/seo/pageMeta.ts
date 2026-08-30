@@ -27,9 +27,10 @@ const PAGE_SEO: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>, Pa
     path: '/brokers',
   },
   guides: {
-    title: 'Trading Journal Guides — Trend Chasers',
+    // The page's own heading now says Tutorials; the meta should agree with what a searcher lands on.
+    title: 'Tutorials — Trend Chasers',
     description:
-      'Guides on free trading journals, P&L calendars, and tracking performance without connecting your brokerage login.',
+      'Step-by-step walkthroughs for connecting a broker, syncing trades, and getting the most out of your Trend Chasers journal.',
     path: '/guides',
   },
   privacy: {

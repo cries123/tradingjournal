@@ -1,9 +1,21 @@
 import { BROKER_COUNT_PHRASE, BROKER_EXAMPLES } from '../data/brokerCopy';
+/**
+ * What a guide page is for.
+ *
+ * Two different things were living in one list. A tutorial teaches you to do something in the app;
+ * a landing page exists to be found in search and explain why the product is worth using. Both are
+ * real pages worth keeping, but only the first belongs under a nav item called Tutorials — someone
+ * clicking that wants steps, not a pitch.
+ */
+export type GuideKind = 'tutorial' | 'landing';
+
 export interface GuideArticle {
   slug: string;
   title: string;
   description: string;
   path: string;
+  /** Defaults to 'landing' so a new article has to opt in to being called a tutorial. */
+  kind?: GuideKind;
   sections: { heading: string; paragraphs: string[] }[];
 }
 
@@ -77,6 +89,7 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
   },
   {
     slug: 'how-broker-sync-works',
+    kind: 'tutorial',
     title: 'How Broker Sync Works',
     description:
       `Connect any of ${BROKER_COUNT_PHRASE} and pull your trades in whenever you want them — how the connection works, what data it reads, and how to disconnect.`,
@@ -132,3 +145,14 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
 export function getGuideBySlug(slug: string): GuideArticle | undefined {
   return GUIDE_ARTICLES.find((guide) => guide.slug === slug);
 }
+
+/**
+ * The subset shown under Tutorials.
+ *
+ * The landing pages stay in GUIDE_ARTICLES — they keep their routes, their prerendered HTML and
+ * their sitemap entries, so nothing that Google has indexed starts 404ing. They are simply no
+ * longer presented to a reader who asked for tutorials.
+ */
+export const TUTORIAL_ARTICLES: GuideArticle[] = GUIDE_ARTICLES.filter(
+  (guide) => guide.kind === 'tutorial',
+);
