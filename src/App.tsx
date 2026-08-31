@@ -13,6 +13,7 @@ const BrokerGuidePage = lazy(() => import('./pages/BrokerGuidePage').then((m) =>
 const BrokersPage = lazy(() => import('./pages/BrokersPage').then((m) => ({ default: m.BrokersPage })));
 const CoachViewPage = lazy(() => import('./pages/CoachViewPage').then((m) => ({ default: m.CoachViewPage })));
 const ComingSoonPage = lazy(() => import('./pages/ComingSoonPage').then((m) => ({ default: m.ComingSoonPage })));
+const AiAssistantPage = lazy(() => import('./pages/AiAssistantPage').then((m) => ({ default: m.AiAssistantPage })));
 const GuidePage = lazy(() => import('./pages/GuidePage').then((m) => ({ default: m.GuidePage })));
 const GuidesIndexPage = lazy(() => import('./pages/GuidesIndexPage').then((m) => ({ default: m.GuidesIndexPage })));
 const HelpCenterPage = lazy(() => import('./pages/HelpCenterPage').then((m) => ({ default: m.HelpCenterPage })));
@@ -76,18 +77,12 @@ export default function App() {
   };
 
   const COMING_SOON_COPY: Record<
-    'market-simulator' | 'ai-assistant',
+    'market-simulator',
     { feature: string; description: string; eyebrow?: string }
   > = {
     'market-simulator': {
       feature: 'Market Simulator',
       description: "We're building a risk-free way to practice trading strategies before you put real money on the line. Check back soon.",
-    },
-    'ai-assistant': {
-      feature: 'Trading Assistant',
-      eyebrow: 'Now live',
-      description:
-        "Open your journal and ask why a setup keeps losing, what happens when you trade the open, or whether you're cutting winners early. It reads the stats your journal already computed \u2014 so its numbers always match your dashboard \u2014 and it reviews what you actually did rather than telling you what to trade next.",
     },
   };
 
@@ -125,7 +120,11 @@ export default function App() {
     content = <HelpCenterPage {...publicPageProps} />;
   } else if (route === 'pricing') {
     content = <PricingPage {...publicPageProps} />;
-  } else if (route === 'market-simulator' || route === 'ai-assistant') {
+  } else if (route === 'ai-assistant') {
+    // Its own page now. It was the generic ComingSoonPage with the eyebrow overridden to "Now
+    // live", which put a construction barrier above a feature people pay for.
+    content = <AiAssistantPage {...publicPageProps} />;
+  } else if (route === 'market-simulator') {
     content = <ComingSoonPage {...publicPageProps} {...COMING_SOON_COPY[route]} />;
   } else if (route === 'app') {
     content = (

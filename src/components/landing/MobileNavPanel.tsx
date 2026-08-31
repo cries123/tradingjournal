@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { BookOpen, Building2, Gauge, LifeBuoy, LogOut, Megaphone, Sparkles, Tag } from 'lucide-react';
+import {
+  BookOpen,
+  Building2,
+  Gauge,
+  GraduationCap,
+  LifeBuoy,
+  LogOut,
+  Megaphone,
+  Sparkles,
+  Tag,
+} from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
 import { useEscapeToClose } from '../../hooks/useEscapeToClose';
 import { accountDisplayName, accountInitial } from '../../utils/accountName';
@@ -163,6 +173,7 @@ export function MobileNavPanel({
           onClick={goGuides}
           className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
         >
+          <GraduationCap className="h-4 w-4 text-text-secondary shrink-0" aria-hidden />
           <span className="text-sm font-medium text-text-primary">Tutorials</span>
         </button>
         {showBrokersLink && (
