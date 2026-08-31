@@ -55,6 +55,37 @@ export interface HttpErrorDescription {
   url?: string;
 }
 
+/**
+ * Query parameters that must never be shown, logged or pasted into a support thread.
+ *
+ * The SnapTrade SDK signs requests with credentials in the query string, so the `url` on a thrown
+ * error carries the caller's userSecret in plain text. Surfacing that url — which is otherwise the
+ * single most useful part of a failure, because it names the endpoint — published a live secret to
+ * the admin panel, from where it went straight into a screenshot.
+ */
+const SECRET_PARAMS = /^(usersecret|secret|consumerkey|key|token|password|signature|apikey)$/i;
+
+/** Keeps the endpoint and drops the credentials. */
+export function redactUrl(raw: string | undefined): string | undefined {
+  if (!raw) return raw;
+  const [base, query] = raw.split('?');
+  if (!query) return base;
+
+  const safe = query
+    .split('&')
+    .map((pair) => {
+      const [k, ...rest] = pair.split('=');
+      if (SECRET_PARAMS.test(k)) return `${k}=[redacted]`;
+      // userId is not a credential but it is a user identifier, and it has no diagnostic value in
+      // a message that already names the endpoint.
+      if (/^userid$/i.test(k)) return `${k}=[redacted]`;
+      return `${k}=${rest.join('=')}`;
+    })
+    .join('&');
+
+  return `${base}?${safe}`;
+}
+
 export function describeHttpError(err: unknown): HttpErrorDescription {
   const e = err as {
     status?: number;
@@ -68,7 +99,7 @@ export function describeHttpError(err: unknown): HttpErrorDescription {
   const raw = e?.responseBody ?? e?.response?.data;
   const body = typeof raw === 'string' ? raw : raw ? JSON.stringify(raw) : '';
 
-  return { status, body, method: e?.method, url: e?.url };
+  return { status, body, method: e?.method, url: redactUrl(e?.url) };
 }
 
 /**

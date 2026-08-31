@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { describeHttpError, isRejectedCredential, isUpstreamOutage } from '../../server/upstreamErrors';
+import {
+  describeHttpError,
+  isRejectedCredential,
+  isUpstreamOutage,
+  redactUrl,
+} from '../../server/upstreamErrors';
 
 /**
  * This predicate decides whether a user gets their sync back. Too strict and they pay for an
@@ -143,5 +148,58 @@ describe('isRejectedCredential', () => {
   it('does not fire on an unclassifiable error', () => {
     expect(isRejectedCredential(null)).toBe(false);
     expect(isRejectedCredential(sdkError(400, {}))).toBe(false);
+  });
+});
+
+/**
+ * The SnapTrade SDK signs requests with credentials in the query string, so a thrown error's url
+ * carries the caller's userSecret in plain text. The admin detail shows that url — it is the most
+ * useful part of a failure, because it names the endpoint — and shipped a live secret to the panel,
+ * from where it went into a screenshot. Every assertion here is about that not happening again.
+ */
+describe('redactUrl', () => {
+  const real =
+    'https://api.snaptrade.com/authorizations/49b412a9/disable' +
+    '?clientId=TREND-CHASERS-TNNCU&userId=PwLvNDZf0nXkKVvj&userSecret=5ed5993f-85aa-412a&timestamp=1788200287';
+
+  it('removes the userSecret', () => {
+    const out = redactUrl(real)!;
+    expect(out).not.toContain('5ed5993f');
+    expect(out).toContain('userSecret=[redacted]');
+  });
+
+  it('removes the user id', () => {
+    expect(redactUrl(real)!).not.toContain('PwLvNDZf0nXkKVvj');
+  });
+
+  it('keeps everything that makes the message useful', () => {
+    const out = redactUrl(real)!;
+    expect(out).toContain('/authorizations/49b412a9/disable');
+    expect(out).toContain('timestamp=1788200287');
+  });
+
+  it('matches parameter names case-insensitively', () => {
+    expect(redactUrl('https://x/y?USERSECRET=abc')!).toContain('USERSECRET=[redacted]');
+    expect(redactUrl('https://x/y?consumerKey=abc')!).not.toContain('abc');
+  });
+
+  it('leaves a url with no query string alone', () => {
+    expect(redactUrl('https://api.snaptrade.com/brokerages')).toBe('https://api.snaptrade.com/brokerages');
+  });
+
+  it('handles a missing url', () => {
+    expect(redactUrl(undefined)).toBeUndefined();
+  });
+
+  it('redacts through describeHttpError, which is what the panel actually calls', () => {
+    const err = Object.assign(new Error('Request failed with status code 403'), {
+      status: 403,
+      responseBody: { detail: 'Feature is not enabled for this customer or this connection' },
+      method: 'POST',
+      url: real,
+    });
+    const described = describeHttpError(err);
+    expect(described.url).not.toContain('5ed5993f');
+    expect(described.body).toContain('Feature is not enabled');
   });
 });
