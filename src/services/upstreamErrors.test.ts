@@ -49,3 +49,42 @@ describe('isUpstreamOutage', () => {
     expect(isUpstreamOutage({})).toBe(false);
   });
 });
+
+/**
+ * The recovery path this guards deletes a user's stored broker secret and re-registers them, so a
+ * false positive costs someone a working connection. These pin the cases where that must not fire.
+ */
+describe('outage errors must never look like a rejected credential', () => {
+  // Mirrors isRejectedCredential in brokerConnectHandler: outage first, then the auth signals.
+  const rejectedCredential = (err: unknown): boolean => {
+    if (isUpstreamOutage(err)) return false;
+    const status = (err as { status?: number; response?: { status?: number } } | null)?.response
+      ?.status ?? (err as { status?: number } | null)?.status;
+    if (status === 401 || status === 403) return true;
+    const message = err instanceof Error ? err.message.toLowerCase() : '';
+    return (
+      message.includes('signature') ||
+      message.includes('unauthorized') ||
+      message.includes('unable to verify') ||
+      (message.includes('user') && message.includes('not found'))
+    );
+  };
+
+  it('still recognises a genuinely rejected secret', () => {
+    expect(rejectedCredential({ status: 401 })).toBe(true);
+    expect(rejectedCredential(new Error('Unable to verify signature'))).toBe(true);
+    expect(rejectedCredential(new Error('User not found'))).toBe(true);
+  });
+
+  it('does not re-register when the provider is simply unreachable', () => {
+    expect(rejectedCredential(new Error('fetch failed'))).toBe(false);
+    expect(rejectedCredential(Object.assign(new Error('x'), { code: 'ETIMEDOUT' }))).toBe(false);
+    expect(rejectedCredential({ status: 503 })).toBe(false);
+  });
+
+  it('does not re-register on a 401 that arrived with an outage-shaped cause', () => {
+    // A degraded API can answer 401 for reasons that have nothing to do with the caller. Deleting
+    // a working secret over that is exactly the failure this ordering prevents.
+    expect(rejectedCredential(Object.assign(new Error('unauthorized'), { cause: { code: 'ECONNRESET' } }))).toBe(false);
+  });
+});

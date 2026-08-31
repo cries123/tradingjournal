@@ -97,6 +97,12 @@ async function getOrRegisterCreds(uid: string): Promise<SnaptradeCreds> {
  * user would keep hitting auth errors forever with no path back.
  */
 function isRejectedCredential(err: unknown): boolean {
+  // An outage is never evidence that this user's secret is wrong, and the recovery below deletes
+  // it — so a provider having a bad day must not be allowed to look like a bad credential. During
+  // an outage a degraded API can answer 401 or "user not found" for reasons that have nothing to
+  // do with the caller, and re-registering on that would break connections that were working.
+  if (isUpstreamOutage(err)) return false;
+
   const status = (err as { status?: number; response?: { status?: number } } | null)?.response
     ?.status ?? (err as { status?: number } | null)?.status;
   if (status === 401 || status === 403) return true;
@@ -571,6 +577,20 @@ export async function handleBrokerConnectRequest(
           error:
             'Your broker connection can\u2019t be read right now because the database is unavailable \u2014 ' +
             'this is not a problem with your broker, and nothing has been disconnected. Try again shortly.',
+        },
+      };
+    }
+
+    // Same reasoning as the datastore branch above: when the failure is upstream, "please try
+    // again" is advice that cannot work, and it points the user at their own connection when
+    // nothing about it is wrong.
+    if (isUpstreamOutage(err)) {
+      return {
+        statusCode: 503,
+        body: {
+          error:
+            'Your broker data provider (SnapTrade) is not responding right now. Nothing has been ' +
+            'disconnected and none of your syncs have been used — this should clear on its own.',
         },
       };
     }
