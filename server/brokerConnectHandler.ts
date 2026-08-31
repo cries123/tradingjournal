@@ -468,12 +468,31 @@ async function handleDisconnect(uid: string, authorizationId?: string): Promise<
     return { statusCode: 200, body: { ok: true } };
   }
 
+  /*
+   * deleteConnection, not disableBrokerageAuthorization.
+   *
+   * The two read alike and are not. SnapTrade's own docs on disable: "This should only be used for
+   * testing a reconnect flow, and never used on production connections... available on test keys.
+   * If you would like it enabled on production keys as well, please contact support as it is
+   * disabled by default." It forces the connection into a broken state and fires a CONNECTION_BROKEN
+   * webhook — it simulates a failure rather than removing anything.
+   *
+   * It worked here for as long as this app ran on test keys, and started answering 403 code 1141,
+   * "Feature is not enabled for this customer or this connection", the day it moved to production.
+   *
+   * delete is the operation Disconnect means: it removes the connection and the account and holdings
+   * data behind it. It is asynchronous — a 200 says the deletion is queued — so the connection can
+   * still appear in the next status read for a moment, which is why the client refreshes rather
+   * than assuming.
+   */
   const snaptrade = getSnaptrade();
-  await snaptrade.connections.disableBrokerageAuthorization({
-    authorizationId,
-    userId: creds.userId,
-    userSecret: creds.userSecret,
-  });
+  await withCredentialRecovery(uid, creds, (c) =>
+    snaptrade.connections.deleteConnection({
+      connectionId: authorizationId,
+      userId: c.userId,
+      userSecret: c.userSecret,
+    }),
+  );
 
   return { statusCode: 200, body: { ok: true } };
 }

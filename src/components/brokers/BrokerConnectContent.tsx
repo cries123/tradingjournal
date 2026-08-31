@@ -12,6 +12,7 @@ import {
   startBrokerConnect,
   syncBrokerAccount,
   type BrokerAccountSummary,
+  type BrokerStatus,
   type SupportedBroker,
 } from '../../services/brokerConnect';
 import {
@@ -153,15 +154,17 @@ export function BrokerConnectContent({
     setErrorDetail(err instanceof BrokerApiError && err.detail ? err.detail : null);
   };
 
-  const refreshStatus = async () => {
-    if (!canConnect) return;
+  const refreshStatus = async (): Promise<BrokerStatus | null> => {
+    if (!canConnect) return null;
     setStatusLoading(true);
     setError(null);
     try {
       const next = await fetchBrokerStatus();
       setStatus(next);
+      return next;
     } catch (err) {
       reportError(err, 'Could not load broker connections');
+      return null;
     } finally {
       setStatusLoading(false);
     }
@@ -268,9 +271,20 @@ export function BrokerConnectContent({
   const handleDisconnect = async (account: BrokerAccountSummary) => {
     setError(null);
     setErrorDetail(null);
+    setSyncMessage(null);
     try {
       await disconnectBroker(account.authorizationId);
-      await refreshStatus();
+      const next = await refreshStatus();
+
+      // Deletion is queued on SnapTrade's side, not immediate, so the connection can still come
+      // back in the status read a moment later. Saying so beats a Disconnect that visibly does
+      // nothing and invites a second press.
+      const stillListed = next?.accounts.some((a) => a.authorizationId === account.authorizationId);
+      setSyncMessage(
+        stillListed
+          ? `Disconnecting ${account.name ?? account.institutionName} — this can take a moment to clear.`
+          : `Disconnected ${account.name ?? account.institutionName}.`,
+      );
     } catch (err) {
       reportError(err, 'Could not disconnect');
     }
