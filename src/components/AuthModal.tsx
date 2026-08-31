@@ -121,7 +121,7 @@ export function AuthModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-bg-primary/95 backdrop-blur-md p-4 md:p-8 overflow-y-auto animate-backdrop-in motion-safe:animate-backdrop-in">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-bg-primary/95 backdrop-blur-md p-4 md:p-8 overflow-y-auto overflow-x-hidden animate-backdrop-in motion-safe:animate-backdrop-in">
       <Starfield />
       <div className="landing-grid pointer-events-none fixed inset-0 opacity-50" aria-hidden />
 

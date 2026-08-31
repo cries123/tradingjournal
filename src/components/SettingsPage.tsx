@@ -180,7 +180,7 @@ export function SettingsPage({
 
   return (
     <div className="pb-6">
-      <div className="max-w-2xl mx-auto p-4 md:p-6 space-y-6">
+      <div className="max-w-[1400px] mx-auto p-4 md:p-6 space-y-6">
         <button
           type="button"
           onClick={onBack}
@@ -198,6 +198,16 @@ export function SettingsPage({
           )}
         </div>
 
+
+        {/*
+          * Cards flow into columns instead of one long stack.
+          *
+          * These are ten independent panels of very different heights, so column flow packs
+          * them tightly where a 2-up grid would leave a ragged gap beside every short one.
+          * gap-6 matches the vertical rhythm the stack had, and break-inside-avoid stops a
+          * card being split down the middle across a column boundary.
+          */}
+        <div className="columns-1 lg:columns-2 2xl:columns-3 gap-6 [&>section]:mb-6 [&>section]:break-inside-avoid">
         <section className="panel-card p-5 space-y-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Display</h2>
 
@@ -691,6 +701,7 @@ export function SettingsPage({
             </p>
           )}
         </section>
+        </div>
       </div>
 
       {pendingBackup && (

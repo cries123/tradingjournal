@@ -47,7 +47,9 @@ export interface LeaderboardPeriodStats {
 
 export interface LeaderboardEntry {
   uid: string;
-  username: string;
+  /** Absent on anonymous entries — the document is world-readable, so the real name is simply
+   *  never written rather than written and hidden by the UI. */
+  username?: string;
   isAnonymous: boolean;
   /** Deterministic "Trader #1234"-style label derived from uid — stable across reloads/writes,
    *  used in place of `username` whenever isAnonymous is true. */
@@ -146,9 +148,19 @@ export async function upsertLeaderboardEntry(
   isAnonymous: boolean,
   trades: Trade[],
 ): Promise<void> {
+  /*
+   * An anonymous entry must not carry the real username.
+   *
+   * The setting says "hide my username, use a random display name instead", and the leaderboard UI
+   * honoured that — but the username was written to the document anyway, and
+   * leaderboardEntries is world-readable by design so the board can be queried. Anyone could read
+   * the real name straight out of Firestore. The checkbox hid it from the page, not from people.
+   *
+   * Omitted rather than blanked so the field is genuinely absent from the stored document.
+   */
   const entry: LeaderboardEntry = {
     uid,
-    username,
+    ...(isAnonymous ? {} : { username }),
     isAnonymous,
     anonLabel: anonLabelForUid(uid),
     updatedAt: new Date().toISOString(),

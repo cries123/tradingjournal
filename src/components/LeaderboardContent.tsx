@@ -200,7 +200,11 @@ export function LeaderboardContent({ onBack }: LeaderboardContentProps) {
               const rank = i + 1;
               const stat = primaryStat(entry);
               const isYou = entry.uid === user?.uid;
-              const displayName = entry.isAnonymous ? entry.anonLabel : entry.username;
+              // username is absent on anonymous entries, and on older rows written before that
+              // changed it may still be present — anonLabel wins either way.
+              const displayName = entry.isAnonymous
+                ? entry.anonLabel
+                : entry.username || entry.anonLabel;
               return (
                 <div
                   key={entry.uid}

@@ -6,7 +6,7 @@ import { DEFAULT_SETTINGS } from '../types/settings';
 import type { Strategy } from '../types/strategy';
 import { loadSettings, saveSettings } from '../utils/settingsStorage';
 import { stripUndefinedDeep } from '../utils/firestoreData';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { deleteField, doc, getDoc, setDoc } from 'firebase/firestore';
 
 interface SettingsContextValue {
   settings: UserSettings;
@@ -74,13 +74,29 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [settings.themeAccent]);
 
   const persist = useCallback(
-    (next: UserSettings) => {
+    (next: UserSettings, clearedKeys: string[] = []) => {
       setSettings(next);
       saveSettings(next, user?.uid);
       if (user && isFirebaseConfigured()) {
+        /*
+         * Clearing a setting has to actually clear it in the cloud.
+         *
+         * stripUndefinedDeep drops undefined keys and setDoc(merge: true) only writes the keys it
+         * is given — so a field set to undefined was simply left untouched in Firestore and came
+         * back on the next load. That made "Revoke share link" a lie: the token survived, and
+         * because createCoachShare reuses an existing token, pressing Create again re-published
+         * the *same URL* the user had revoked. The same hole silently restored trading-rule limits
+         * a user had cleared.
+         *
+         * deleteField() is the sentinel that removes a key under a merge, so an explicitly
+         * undefined setting is now explicitly deleted.
+         */
         void setDoc(
           doc(getFirebaseDb(), 'users', user.uid, 'settings', 'preferences'),
-          stripUndefinedDeep(next),
+          {
+            ...stripUndefinedDeep(next),
+            ...Object.fromEntries(clearedKeys.map((key) => [key, deleteField()])),
+          },
           { merge: true },
         );
       }
@@ -90,7 +106,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const updateSettings = useCallback(
     (patch: Partial<UserSettings>) => {
-      persist({ ...settings, ...patch });
+      // Keys the caller explicitly set to undefined are being cleared, not left alone — persist
+      // needs to know which, because a merge write cannot express "remove this" on its own.
+      const cleared = Object.keys(patch).filter(
+        (key) => (patch as Record<string, unknown>)[key] === undefined,
+      );
+      persist({ ...settings, ...patch }, cleared);
     },
     [settings, persist],
   );
