@@ -13,6 +13,8 @@ interface TakeawayBannerProps {
    * good news.
    */
   aiText?: string | null;
+  /** True while the model's read of this period is still coming. */
+  aiPending?: boolean;
 }
 
 /**
@@ -22,10 +24,19 @@ interface TakeawayBannerProps {
  * deciding what matters. This states the single most actionable finding for the period, so the
  * page opens with a conclusion rather than a wall of evenly-weighted metrics.
  */
-export function TakeawayBanner({ takeaway, aiText }: TakeawayBannerProps) {
+export function TakeawayBanner({ takeaway, aiText, aiPending = false }: TakeawayBannerProps) {
   if (!takeaway) return null;
 
-  const text = aiText?.trim() || takeaway.text;
+  /*
+   * Hold rather than swap.
+   *
+   * This used to render the computed line immediately and replace it when the model answered,
+   * which put new text under someone who had already started reading — it reads as the app
+   * correcting itself rather than as loading. Waiting is only better than swapping while the wait
+   * is short, so the hook gives up after a few seconds and pending goes false, at which point the
+   * computed line renders and stays.
+   */
+  const text = aiText?.trim() || (aiPending ? null : takeaway.text);
 
   const isWarning = takeaway.tone === 'warning';
 
@@ -48,7 +59,16 @@ export function TakeawayBanner({ takeaway, aiText }: TakeawayBannerProps) {
         >
           {isWarning ? 'Worth fixing' : "What's working"}
         </p>
-        <p className="text-xs md:text-sm text-text-primary leading-snug">{text}</p>
+        {text ? (
+          <p className="text-xs md:text-sm text-text-primary leading-snug">{text}</p>
+        ) : (
+          // Two lines at the real text size, so the banner occupies roughly the space the answer
+          // will and the page below it doesn't jump when it lands.
+          <div className="space-y-1.5 py-0.5" aria-label="Working out what matters this period">
+            <div className="h-2.5 w-full max-w-[46ch] rounded bg-text-secondary/15 animate-pulse motion-reduce:animate-none" />
+            <div className="h-2.5 w-2/3 max-w-[30ch] rounded bg-text-secondary/15 animate-pulse motion-reduce:animate-none" />
+          </div>
+        )}
       </div>
     </div>
   );

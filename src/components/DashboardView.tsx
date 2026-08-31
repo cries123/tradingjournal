@@ -129,7 +129,11 @@ export function DashboardView({
    * mint a second cache entry the moment anything about formatting or locale changed.
    */
   const periodKey = mode === 'month' ? `${year}-${String(month + 1).padStart(2, '0')}` : String(year);
-  const aiTakeaway = useAiTakeaway(analyticsTrades, periodKey, settings.tradingRules);
+  const { text: aiTakeawayText, pending: aiTakeawayPending } = useAiTakeaway(
+    analyticsTrades,
+    periodKey,
+    settings.tradingRules,
+  );
 
   return (
     <div className="flex flex-col gap-2 md:gap-3 pb-2">
@@ -235,7 +239,7 @@ export function DashboardView({
         />
       )}
 
-      {hasAnyTrades && <TakeawayBanner takeaway={takeaway} aiText={aiTakeaway} />}
+      {hasAnyTrades && <TakeawayBanner takeaway={takeaway} aiText={aiTakeawayText} aiPending={aiTakeawayPending} />}
 
       {/* Calendar beside its context, not above it.
           Stacked, the equity curve and the week recap pushed the calendar most of a screen down
