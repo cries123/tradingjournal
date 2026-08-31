@@ -5,7 +5,8 @@ import { getAdminFirestore } from './firebaseAdmin';
 import { mapSnapTradeActivitiesToTrades, type SnapTradeActivityLike } from './mapSnapTradeActivities';
 import { BROKER_REGISTRY, isBrokerRegistryKey } from '../src/data/brokerRegistry';
 import { resolveAccess } from './entitlements';
-import { consumeDaily } from './usage';
+import { consumeDaily, refundDaily } from './usage';
+import { isUpstreamOutage } from './upstreamErrors';
 import { lowestTierWith, TIER_PLANS, type Tier } from '../src/config/tiers';
 
 export type SupportedBroker = string;
@@ -204,9 +205,28 @@ function assertBrokerSyncIncluded(tier: Tier, brokers: number): void {
   if (brokers > 0) return;
   const needed = lowestTierWith('brokerSync');
   throw new BrokerRequestError(
-    `Connecting a broker is part of ${needed ? TIER_PLANS[needed].name : 'a paid plan'}. Upgrade your plan to sync trades automatically.`,
+    `Connecting a broker is part of ${needed ? TIER_PLANS[needed].name : 'a paid plan'}. Upgrade your plan to import trades from your broker.`,
     402,
   );
+}
+
+/**
+ * A sync failure that also reports where the user's allowance actually stands.
+ *
+ * A plain error told the client nothing about the meter, so the badge kept showing the count from
+ * page load while the real one drained — which is how three syncs disappeared behind a single
+ * error message. Carrying the numbers on the failure is what makes the drain visible.
+ */
+export class BrokerSyncError extends BrokerRequestError {
+  syncsRemaining: number;
+  syncsPerDay: number;
+
+  constructor(message: string, statusCode: number, syncsRemaining: number, syncsPerDay: number) {
+    super(message, statusCode);
+    this.name = 'BrokerSyncError';
+    this.syncsRemaining = syncsRemaining;
+    this.syncsPerDay = syncsPerDay;
+  }
 }
 
 /** How many distinct brokerages this user already has authorised. */
@@ -354,6 +374,44 @@ async function handleSync(uid: string, accountId?: string, startDate?: string, e
     );
   }
 
+  try {
+    return await pullActivities(uid, creds, accountId, startDate, endDate, spend.remaining, limits.syncsPerDay, tier);
+  } catch (err) {
+    if (isUpstreamOutage(err)) {
+      // The user paid for a request nobody answered. Give it back before the error goes out, so
+      // the remaining count on the response is the one they actually have.
+      await refundDaily('sync', uid);
+      console.warn(`[broker-connect] refunded a sync for ${uid} — upstream failure, not a rejected call.`);
+      throw new BrokerSyncError(
+        'Your broker could not be reached just now. This did not use one of your syncs — try again shortly.',
+        503,
+        spend.remaining + 1,
+        limits.syncsPerDay,
+      );
+    }
+
+    // SnapTrade answered and said no. The call happened, so the sync is spent — but the meter is
+    // still told the truth, which is the half that was missing.
+    throw new BrokerSyncError(
+      err instanceof Error ? err.message : 'Sync failed',
+      err instanceof BrokerRequestError ? err.statusCode : 502,
+      spend.remaining,
+      limits.syncsPerDay,
+    );
+  }
+}
+
+/** The pull itself, split out so handleSync can own the charge, the refund and the error shape. */
+async function pullActivities(
+  uid: string,
+  creds: SnaptradeCreds,
+  accountId: string,
+  startDate: string | undefined,
+  endDate: string | undefined,
+  syncsRemaining: number,
+  syncsPerDay: number,
+  tier: Tier,
+): Promise<BrokerConnectResult> {
   const snaptrade = getSnaptrade();
   const PAGE_SIZE = 1000;
   // Safety backstop only — not a real limit for anyone's trade history. Prevents a runaway loop if
@@ -408,8 +466,8 @@ async function handleSync(uid: string, accountId?: string, startDate?: string, e
       activityCount: activities.length,
       totalActivityCount: total ?? activities.length,
       truncated,
-      syncsRemaining: spend.remaining,
-      syncsPerDay: limits.syncsPerDay,
+      syncsRemaining,
+      syncsPerDay,
       tier,
     },
   };
@@ -483,6 +541,17 @@ export async function handleBrokerConnectRequest(
         throw new BrokerRequestError('Unknown action', 400);
     }
   } catch (err) {
+    if (err instanceof BrokerSyncError) {
+      return {
+        statusCode: err.statusCode,
+        body: {
+          error: err.message,
+          syncsRemaining: err.syncsRemaining,
+          syncsPerDay: err.syncsPerDay,
+        },
+      };
+    }
+
     if (err instanceof BrokerRequestError) {
       return { statusCode: err.statusCode, body: { error: err.message } };
     }

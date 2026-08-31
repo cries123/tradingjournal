@@ -5,6 +5,7 @@ import { useEntitlement } from '../../context/EntitlementContext';
 import { TIER_PLANS } from '../../config/tiers';
 import { useAuth } from '../../context/AuthContext';
 import {
+  BrokerApiError,
   checkBrokerConnectAvailable,
   disconnectBroker,
   fetchBrokerStatus,
@@ -115,7 +116,7 @@ export function BrokerConnectContent({
   journalReady = true,
 }: BrokerConnectContentProps) {
   const { user, loading, firebaseEnabled } = useAuth();
-  const { noteUsage, limits, tier, usage } = useEntitlement();
+  const { noteUsage, limits, tier, usage, refresh } = useEntitlement();
   const [available, setAvailable] = useState<boolean | null>(null);
   const [status, setStatus] = useState<{ registered: boolean; accounts: BrokerAccountSummary[] } | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -128,6 +129,15 @@ export function BrokerConnectContent({
 
   useEffect(() => {
     void checkBrokerConnectAvailable().then(setAvailable);
+  }, []);
+
+  // The entitlement is fetched once at sign-in and then only patched locally, so a tab left open —
+  // or syncs spent on another device — leaves this screen showing a count that was true hours ago.
+  // This is the one screen where that number decides whether someone presses the button, so it is
+  // re-read on the way in.
+  useEffect(() => {
+    void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const refreshStatus = async () => {
@@ -220,6 +230,16 @@ export function BrokerConnectContent({
             : ''),
       );
     } catch (err) {
+      // A failed sync usually still costs one. The server now says how many are left even when it
+      // fails — and says so after refunding, when the failure was an outage rather than a rejected
+      // call — so the meter tracks reality instead of freezing at whatever it read on page load.
+      if (err instanceof BrokerApiError && typeof err.syncsRemaining === 'number') {
+        const perDay = err.syncsPerDay ?? limits.syncsPerDay;
+        noteUsage({
+          syncsUsed: Math.max(0, perDay - err.syncsRemaining),
+          syncsRemaining: err.syncsRemaining,
+        });
+      }
       setError(err instanceof Error ? err.message : 'Sync failed');
     } finally {
       setSyncingAccountId(null);

@@ -17,6 +17,19 @@ export interface BrokerStatus {
   accounts: BrokerAccountSummary[];
 }
 
+/** An error that also reports where the caller's sync allowance stands, when the server said. */
+export class BrokerApiError extends Error {
+  syncsRemaining?: number;
+  syncsPerDay?: number;
+
+  constructor(message: string, syncsRemaining?: number, syncsPerDay?: number) {
+    super(message);
+    this.name = 'BrokerApiError';
+    this.syncsRemaining = syncsRemaining;
+    this.syncsPerDay = syncsPerDay;
+  }
+}
+
 async function brokerApiPost<T>(payload: Record<string, unknown>): Promise<T> {
   if (!isFirebaseConfigured()) {
     throw new Error('Sign in to connect a broker — broker sync stores your connection securely on your account.');
@@ -37,9 +50,17 @@ async function brokerApiPost<T>(payload: Record<string, unknown>): Promise<T> {
     body: JSON.stringify(payload),
   });
 
-  const data = (await res.json()) as T & { error?: string };
+  const data = (await res.json()) as T & { error?: string; syncsRemaining?: number; syncsPerDay?: number };
   if (!res.ok) {
-    throw new Error((data as { error?: string }).error ?? 'Request failed');
+    // A failed sync still spends the allowance unless the server refunded it, and the badge used
+    // to have no way of learning that — it only updated on success, so a run of failures drained
+    // the meter invisibly and every error still said the user had syncs left. The counts ride
+    // along on the failure so the caller can correct the display either way.
+    throw new BrokerApiError(
+      data.error ?? 'Request failed',
+      data.syncsRemaining,
+      data.syncsPerDay,
+    );
   }
   return data;
 }
