@@ -58,7 +58,7 @@ Performance by Weekday shows which days actually pay. Days you never traded are 
 
 Gross Daily P&L plots every day in the period around a zero line — profits above, losses below. Only the best and worst day are labelled to keep it readable; hover any bar for its exact figure.
 
-Performance by Time of Day splits the session into the open, midday, and the close. For a lot of traders this is the most actionable chart on the page, because the open is where most of the damage tends to happen.
+Long vs Short splits the period by direction: what each side made or lost, how many trades it took, and the win rate for each. A direction you never traded is dimmed with a dashed outline rather than drawn as a flat bar.
 
 FILTERS
 

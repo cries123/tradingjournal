@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Calendar, Grid3X3, Info, RefreshCw, Share2 } from 'lucide-react';
+import { Calendar, Grid3X3, RefreshCw, Share2 } from 'lucide-react';
 import type { Filters, Trade } from '../types';
 import {
   computeStats,
@@ -13,12 +13,6 @@ import {
 } from '../utils/stats';
 import { formatCurrency, formatMonthYear } from '../utils/format';
 import { computeJournalingStreak, computeTradingInsights } from '../utils/insights';
-import {
-  computeExcursionInsights,
-  computeRMultipleInsights,
-  computeSessionPerformance,
-  sessionPhrase,
-} from '../utils/tradeQuality';
 import { computeTakeaway } from '../utils/takeaway';
 import { useSettings } from '../context/SettingsContext';
 import { AccountSwitcher } from './AccountSwitcher';
@@ -35,9 +29,8 @@ import { StatsCards } from './StatsCards';
 import { WeekdayChart } from './WeekdayChart';
 import { YearHeatmap } from './YearHeatmap';
 import { TradingInsightsSection } from './analytics/TradingInsightsSection';
+import { DirectionPanel } from './analytics/DirectionPanel';
 import { EquityCurve } from './analytics/EquityCurve';
-import { ExecutionPanel } from './analytics/ExecutionPanel';
-import { SessionChart } from './analytics/SessionChart';
 import { TakeawayBanner } from './analytics/TakeawayBanner';
 
 type DashboardMode = 'month' | 'year';
@@ -117,40 +110,6 @@ export function DashboardView({
   const streakDays = useMemo(() => computeJournalingStreak(trades), [trades]);
 
   const equityPoints = useMemo(() => getEquityCurve(analyticsTrades), [analyticsTrades]);
-  const sessions = useMemo(() => computeSessionPerformance(analyticsTrades), [analyticsTrades]);
-  const excursion = useMemo(() => computeExcursionInsights(analyticsTrades), [analyticsTrades]);
-  const rMultiple = useMemo(() => computeRMultipleInsights(analyticsTrades), [analyticsTrades]);
-
-  /*
-   * How many analytics panels will actually render.
-   *
-   * Days always does. Timing needs entry times on the trades and Execution needs MAE/MFE or risk
-   * data — neither of which arrives from a broker sync, so a journal filled entirely from Schwab
-   * or Robinhood renders exactly one of the three. The grid below declared three columns
-   * regardless, leaving the Days card alone in a third of the row: 1107px of a 1649px row empty,
-   * measured in the browser rather than guessed at.
-   */
-  const hasExecution = Boolean(excursion || rMultiple);
-  const analyticsPanels = 1 + (sessions ? 1 : 0) + (hasExecution ? 1 : 0);
-
-  // One plain-language read of the timing chart, so the panel answers "so what" rather than
-  // leaving the trader to compare bar lengths themselves.
-  const sessionSummary = useMemo(() => {
-    if (!sessions || sessions.length < 2) return null;
-    const sorted = [...sessions].sort((a, b) => b.pnl - a.pnl);
-    const best = sorted[0];
-    const worst = sorted[sorted.length - 1];
-    if (best.pnl <= 0) return null;
-
-    const money = (n: number) => formatCurrency(Math.abs(n), settings.currency);
-    if (worst.pnl < 0) {
-      return `Your best window is ${sessionPhrase(best.session)} (${money(best.pnl)} across ${best.trades} trades). ${
-        sessionPhrase(worst.session).charAt(0).toUpperCase() + sessionPhrase(worst.session).slice(1)
-      } gives back ${money(worst.pnl)}.`;
-    }
-    return `Your best window is ${sessionPhrase(best.session)} — ${money(best.pnl)} across ${best.trades} trades at a ${best.winRate.toFixed(0)}% win rate.`;
-  }, [sessions, settings.currency]);
-
   const takeaway = useMemo(() => {
     const insights = computeTradingInsights(analyticsTrades);
     if (!insights) return null;
@@ -346,18 +305,14 @@ export function DashboardView({
         <FiltersBar filters={filters} symbols={filterSymbols} setups={filterSetups} onChange={onFiltersChange} />
       )}
 
-      {/* Days, Timing and Execution across one row instead of a 2x2 block, once there is room for
-          three without crowding — Execution carries two lines of prose per row and needs ~480px
-          before it starts stacking into a column of fragments.
+      {/* Days and Direction share one row.
 
-          The column count follows how many panels will actually render, rather than assuming all
-          three always do. Two panels sit in two columns; only the full set earns a third. */}
+          Both render from a plain date/symbol/side/P&L trade, so the row can no longer collapse to
+          a single card stranded in a third of the width — which is what happened when it also
+          carried Timing and Execution, panels that need an entry time and MAE/MFE respectively and
+          get neither from a broker sync. Two panels, two columns, no conditional column count. */}
       {hasAnyTrades && (
-        <div
-          className={`grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 ${
-            analyticsPanels === 3 ? 'wide:grid-cols-3!' : ''
-          }`}
-        >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
           <div className="panel-card p-3 md:p-4 flex flex-col min-h-[160px]">
             <div className="flex items-start justify-between mb-1.5 md:mb-3 shrink-0 gap-2">
               <div>
@@ -380,62 +335,19 @@ export function DashboardView({
             </div>
           </div>
 
-          {sessions && (
-            <div className="panel-card p-3 md:p-4 flex flex-col min-h-[140px]">
-              <div className="mb-1.5 md:mb-3 shrink-0">
-                <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
-                  Timing
-                </p>
-                <h3 className="text-[10px] md:text-sm font-semibold text-text-primary">
-                  Performance by Time of Day
-                </h3>
-              </div>
-              <div className="flex-1 min-h-[80px]">
-                <SessionChart data={sessions} />
-              </div>
-              {sessionSummary && (
-                <p className="text-[10px] md:text-[11px] text-text-secondary mt-2 leading-snug shrink-0">
-                  {sessionSummary}
-                </p>
-              )}
+          <div className="panel-card p-3 md:p-4 flex flex-col min-h-[160px]">
+            <div className="mb-1.5 md:mb-3 shrink-0">
+              <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
+                Direction
+              </p>
+              <h3 className="text-[10px] md:text-sm font-semibold text-text-primary">
+                Long vs Short
+              </h3>
             </div>
-          )}
-          {/* At md the three panels wrap 2 + 1, so the last one takes the whole second row rather
-              than sitting in half of it. The ! is needed because Tailwind v4 emits custom
-              breakpoints ahead of built-in ones, so wide: loses to md: on specificity alone. */}
-          {hasExecution && (
-            <div className="md:col-span-2 wide:col-span-1! min-w-0">
-              <ExecutionPanel excursion={excursion} rMultiple={rMultiple} />
+            <div className="flex-1 min-h-[80px]">
+              <DirectionPanel trades={analyticsTrades} currency={settings.currency} />
             </div>
-          )}
-
-          {/*
-           * Says why the row is short instead of leaving a void.
-           *
-           * Only appears when neither Timing nor Execution has anything to show, which is the
-           * normal state for a journal filled entirely by broker sync: SnapTrade sends a date and
-           * a fill price, not an entry time, a stop, or MAE/MFE. Without this the dashboard just
-           * has a hole in it, and the reasonable reading of a hole is that something is broken.
-           */}
-          {analyticsPanels === 1 && (
-            <div className="panel-card p-3 md:p-4 flex flex-col justify-center min-h-[160px]">
-              <div className="flex items-start gap-3">
-                <span className="mt-0.5 shrink-0 text-text-secondary">
-                  <Info size={16} />
-                </span>
-                <div className="min-w-0">
-                  <h3 className="text-[10px] md:text-sm font-semibold text-text-primary mb-1">
-                    Timing and Execution need a little more per trade
-                  </h3>
-                  <p className="text-[11px] md:text-xs text-text-secondary leading-relaxed">
-                    Time-of-day performance needs an entry time, and execution quality needs your
-                    stop or the highest and lowest the trade went. A broker sync sends neither — add
-                    them when you log a trade or edit an imported one, and both panels appear here.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
       )}
 
