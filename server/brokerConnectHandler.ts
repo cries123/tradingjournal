@@ -103,17 +103,30 @@ function isRejectedCredential(err: unknown): boolean {
   // do with the caller, and re-registering on that would break connections that were working.
   if (isUpstreamOutage(err)) return false;
 
-  const status = (err as { status?: number; response?: { status?: number } } | null)?.response
-    ?.status ?? (err as { status?: number } | null)?.status;
-  if (status === 401 || status === 403) return true;
+  const res = (err as { response?: { status?: number; data?: unknown } } | null)?.response;
+  const status = res?.status ?? (err as { status?: number } | null)?.status;
 
-  const message = err instanceof Error ? err.message.toLowerCase() : '';
-  return (
-    message.includes('signature') ||
-    message.includes('unauthorized') ||
-    message.includes('unable to verify') ||
-    (message.includes('user') && message.includes('not found'))
-  );
+  // 401 is unambiguous: the credentials were not accepted.
+  if (status === 401) return true;
+
+  /*
+   * 403 is not. SnapTrade answers 403 for a rejected signature AND for a request the caller is
+   * simply not entitled to make — a connector their subscription does not cover, for instance.
+   * Treating every 403 as a dead secret means deleting a working credential and forcing a
+   * reconnect because an unrelated entitlement is missing, which is the more damaging mistake of
+   * the two. So a 403 has to say so in the body before it counts.
+   */
+  const body = typeof res?.data === 'string' ? res.data : res?.data ? JSON.stringify(res.data) : '';
+  const haystack = `${err instanceof Error ? err.message : ''} ${body}`.toLowerCase();
+
+  const saysCredential =
+    haystack.includes('signature') ||
+    haystack.includes('unauthorized') ||
+    haystack.includes('unable to verify') ||
+    (haystack.includes('user') && haystack.includes('not found'));
+
+  if (status === 403) return saysCredential;
+  return saysCredential;
 }
 
 /**
@@ -529,6 +542,30 @@ function isDatastoreUnavailable(err: unknown): boolean {
 }
 
 /**
+ * The most informative description of a failure that can be assembled.
+ *
+ * The SnapTrade SDK is axios-based, and an axios error's `message` is "Request failed with status
+ * code 403" followed by a dump of the response HEADERS. The reason is in the response BODY, which
+ * that string never reaches — the first version of this truncated mid-header-dump and showed a
+ * date, a content-type and a server name, which is everything except the answer.
+ */
+function failureDetail(err: unknown, fallback: string): string {
+  const res = (err as { response?: { status?: number; data?: unknown } } | null)?.response;
+  const status = res?.status ?? (err as { status?: number } | null)?.status;
+  const data = res?.data;
+
+  const body =
+    typeof data === 'string'
+      ? data
+      : data
+        ? JSON.stringify(data)
+        : '';
+
+  const parts = [status ? `HTTP ${status}` : '', body].filter(Boolean);
+  return (parts.length ? parts.join(' — ') : fallback).slice(0, 600);
+}
+
+/**
  * Whether this caller is the site admin, read from config/admin — the same document the admin
  * user tools use.
  *
@@ -631,7 +668,7 @@ export async function handleBrokerConnectRequest(
      * secret, but it is internal detail and the person who can act on it is the one running the
      * site. Everyone else keeps the plain sentence.
      */
-    const detail = callerUid && (await isSiteAdmin(callerUid)) ? message.slice(0, 300) : undefined;
+    const detail = callerUid && (await isSiteAdmin(callerUid)) ? failureDetail(err, message) : undefined;
 
     return {
       statusCode: 500,

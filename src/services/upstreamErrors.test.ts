@@ -88,3 +88,52 @@ describe('outage errors must never look like a rejected credential', () => {
     expect(rejectedCredential(Object.assign(new Error('unauthorized'), { cause: { code: 'ECONNRESET' } }))).toBe(false);
   });
 });
+
+/**
+ * A 403 is the dangerous case: SnapTrade returns it both for a rejected signature and for a
+ * request the caller is not entitled to make. The recovery path deletes the user's stored secret,
+ * so reading "not entitled" as "dead credential" costs someone a working connection over an
+ * unrelated subscription gap.
+ */
+describe('a 403 only counts as a rejected credential when it says so', () => {
+  const rejectedCredential = (err: unknown): boolean => {
+    if (isUpstreamOutage(err)) return false;
+    const res = (err as { response?: { status?: number; data?: unknown } } | null)?.response;
+    const status = res?.status ?? (err as { status?: number } | null)?.status;
+    if (status === 401) return true;
+    const body = typeof res?.data === 'string' ? res.data : res?.data ? JSON.stringify(res.data) : '';
+    const haystack = `${err instanceof Error ? err.message : ''} ${body}`.toLowerCase();
+    const saysCredential =
+      haystack.includes('signature') ||
+      haystack.includes('unauthorized') ||
+      haystack.includes('unable to verify') ||
+      (haystack.includes('user') && haystack.includes('not found'));
+    if (status === 403) return saysCredential;
+    return saysCredential;
+  };
+
+  it('treats a 401 as a dead credential without needing the body', () => {
+    expect(rejectedCredential({ response: { status: 401, data: {} } })).toBe(true);
+  });
+
+  it('treats a 403 about a signature as a dead credential', () => {
+    expect(
+      rejectedCredential({ response: { status: 403, data: { detail: 'Unable to verify signature' } } }),
+    ).toBe(true);
+  });
+
+  it('does NOT delete a secret over a 403 about an entitlement', () => {
+    // The Schwab/Akoya case: the keys are fine, the subscription is not. Re-registering here would
+    // destroy a working Robinhood connection to fix nothing.
+    expect(
+      rejectedCredential({ response: { status: 403, data: { detail: 'Subscription unavailable' } } }),
+    ).toBe(false);
+  });
+
+  it('reads the body, not just the axios message, which only carries headers', () => {
+    const axiosish = Object.assign(new Error('Request failed with status code 403'), {
+      response: { status: 403, data: { detail: 'Unable to verify signature.' } },
+    });
+    expect(rejectedCredential(axiosish)).toBe(true);
+  });
+});
