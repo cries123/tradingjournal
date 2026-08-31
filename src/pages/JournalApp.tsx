@@ -23,6 +23,7 @@ import { useSettings } from '../context/SettingsContext';
 import { useIsDesktop } from '../hooks/useMediaQuery';
 import { useJournalReminder } from '../hooks/useJournalReminder';
 import { useLeaderboardSync } from '../hooks/useLeaderboardSync';
+import { useAutoBrokerSync } from '../hooks/useAutoBrokerSync';
 import { useTrades } from '../hooks/useTrades';
 import type { Trade } from '../types';
 import { computeStats, getMonthTrades, getYearTrades } from '../utils/stats';
@@ -91,6 +92,19 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   const showAuthModal = firebaseEnabled && !loading && !user;
   const showUsernameModal = firebaseEnabled && !loading && !profileLoading && needsUsername;
   const isLoading = syncStatus === 'loading';
+
+  /*
+   * Background broker sync, on app open.
+   *
+   * everyTrade for the same reason the manual sync above uses it: `trades` is the filtered view,
+   * and `allTrades` is one journal. Deduping against either would re-import whatever the filter or
+   * the account switch was hiding.
+   *
+   * The journalReady flag is not optional. This runs with nobody watching, and running it before
+   * the journal has loaded compares the broker's history against an empty set — which imports all
+   * of it, again.
+   */
+  const brokerSync = useAutoBrokerSync(everyTrade, addTrades, !isLoading);
 
   const activeJournalName =
     settings.accounts.find((a) => a.id === settings.activeAccountId)?.name ?? 'this journal';
@@ -276,6 +290,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 everyTrade={everyTrade}
                 onRemoveTrades={removeTrades}
                 onSyncBroker={() => setAppView('connect-broker')}
+                brokerSync={brokerSync}
                 hasBrokerTrades={hasBrokerTrades}
                 trades={trades}
                 hasAnyTrades={allTrades.length > 0}

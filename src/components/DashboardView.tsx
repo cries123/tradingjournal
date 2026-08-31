@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Calendar, Grid3X3, RefreshCw, Share2 } from 'lucide-react';
 import type { Filters, Trade } from '../types';
+import type { AutoBrokerSync } from '../hooks/useAutoBrokerSync';
 import {
   computeStats,
   getCumulativePnlSeries,
@@ -32,6 +33,7 @@ import { YearHeatmap } from './YearHeatmap';
 import { TradingInsightsSection } from './analytics/TradingInsightsSection';
 import { DirectionPanel } from './analytics/DirectionPanel';
 import { EquityCurve } from './analytics/EquityCurve';
+import { BrokerSyncStatus } from './BrokerSyncStatus';
 import { TakeawayBanner } from './analytics/TakeawayBanner';
 
 type DashboardMode = 'month' | 'year';
@@ -62,6 +64,8 @@ interface DashboardViewProps {
   onRemoveTrades?: (ids: string[]) => Promise<void>;
   /** Sends the trader to the broker screen, where syncing is done by hand. */
   onSyncBroker?: () => void;
+  /** Live state of the background broker sync, so a failed one is visible rather than silent. */
+  brokerSync?: AutoBrokerSync;
   /** True once a broker is linked — the sync shortcut is noise for everyone else. */
   hasBrokerTrades?: boolean;
 }
@@ -90,6 +94,7 @@ export function DashboardView({
   everyTrade,
   onRemoveTrades,
   onSyncBroker,
+  brokerSync,
   hasBrokerTrades = false,
 }: DashboardViewProps) {
   const { settings } = useSettings();
@@ -171,13 +176,17 @@ export function DashboardView({
           </button>
         </div>
 
-        {/* Syncing is something you do, not something that happens to you — so the affordance is a
-            plain shortcut to the broker screen rather than a status line about a background job. */}
+        {/* Two different jobs, so both are here. The status line answers "is what I'm looking at
+            current", which a background sync has to answer or it may as well not run — and it is
+            the only place a failed sync becomes visible. The button is the way to go manage the
+            connection itself. */}
+        {brokerSync && <div className="ml-auto"><BrokerSyncStatus sync={brokerSync} /></div>}
+
         {hasBrokerTrades && onSyncBroker && (
           <button
             type="button"
             onClick={onSyncBroker}
-            className="ml-auto flex items-center gap-1.5 text-[11px] text-text-secondary hover:text-accent transition-colors focus-ring rounded shrink-0"
+            className="flex items-center gap-1.5 text-[11px] text-text-secondary hover:text-accent transition-colors focus-ring rounded shrink-0"
           >
             <RefreshCw size={11} />
             Sync broker

@@ -25,6 +25,15 @@ export interface AutoBrokerSync {
 export function useAutoBrokerSync(
   existingTrades: Trade[],
   onImportTrades: (trades: Trade[]) => void,
+  /**
+   * Whether the journal has finished loading from Firestore.
+   *
+   * This is load-bearing, not a nicety. Every trade this sync has ever imported is recognised by
+   * comparing against the trades already in the journal — so running before they arrive compares
+   * against an empty set, and the broker's entire history looks new. On the manual path the user
+   * is told to wait a second; here nobody is watching, which is exactly why it has to be enforced.
+   */
+  journalReady: boolean,
 ): AutoBrokerSync {
   const { user, firebaseEnabled } = useAuth();
   const uid = user?.uid ?? null;
@@ -52,8 +61,15 @@ export function useAutoBrokerSync(
   /** Guards against React's double-invoked effects in dev, and against overlapping runs. */
   const runningRef = useRef(false);
 
+  // Read through a ref so a sync already in flight is not cancelled by the flag flipping, while
+  // the effect below still waits for it.
+  const readyRef = useRef(journalReady);
+  useEffect(() => {
+    readyRef.current = journalReady;
+  });
+
   const run = useCallback(async () => {
-    if (!uid || runningRef.current) return;
+    if (!uid || runningRef.current || !readyRef.current) return;
     runningRef.current = true;
     setState('syncing');
 
@@ -78,10 +94,10 @@ export function useAutoBrokerSync(
   }, [uid]);
 
   useEffect(() => {
-    if (!firebaseEnabled || !uid) return;
+    if (!firebaseEnabled || !uid || !journalReady) return;
     if (!isSyncDue(uid)) return;
     void run();
-  }, [firebaseEnabled, uid, run]);
+  }, [firebaseEnabled, uid, journalReady, run]);
 
   const syncNow = useCallback(() => void run(), [run]);
 

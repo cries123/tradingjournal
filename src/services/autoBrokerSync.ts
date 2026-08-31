@@ -1,5 +1,6 @@
 import type { Trade } from '../types';
 import type { BrokerAccountSummary, BrokerStatus } from './brokerConnect';
+import { dedupeIncomingTrades } from '../utils/duplicateTrades';
 
 /**
  * Pulls new broker trades in the background when the journal is opened.
@@ -100,21 +101,26 @@ export async function runAutoSync({
     return null;
   }
 
-  // Built once from the journal as it was before this run, then extended as accounts report in,
-  // so two accounts returning the same round-trip can't both add it.
-  const known = new Set(existingTrades.map((t) => t.sourceId).filter(Boolean) as string[]);
+  // Carried across accounts for the whole run, so two accounts reporting the same round trip
+  // cannot both add it. Built from the journal as it was before this run.
+  const seen = new Set<string>();
   const newTrades: Trade[] = [];
   let syncedAccounts = 0;
   let failedAccounts = 0;
+  let unidentified = 0;
 
   for (const account of status.accounts as BrokerAccountSummary[]) {
     try {
       const { trades } = await doSync(account.id);
       syncedAccounts++;
 
-      for (const [i, trade] of trades.entries()) {
-        if (trade.sourceId && known.has(trade.sourceId)) continue;
-        if (trade.sourceId) known.add(trade.sourceId);
+      // One shared filter with the manual sync. This used to be a local sourceId check that
+      // pushed every row it could not match, including rows with no sourceId at all — which on a
+      // background sync means a fresh copy of that fill on every single app open.
+      const { fresh, unidentified: skipped } = dedupeIncomingTrades(trades, existingTrades, seen);
+      unidentified += skipped;
+
+      for (const [i, trade] of fresh.entries()) {
         newTrades.push({
           ...trade,
           id: `snaptrade_${account.id}_${Date.now()}_${i}`,
@@ -124,6 +130,10 @@ export async function runAutoSync({
       // One broker being down shouldn't cost the user their other accounts' trades.
       failedAccounts++;
     }
+  }
+
+  if (unidentified > 0) {
+    console.warn(`[auto-sync] skipped ${unidentified} trade(s) with no source id.`);
   }
 
   // Only counts as "synced" if at least one account actually answered — otherwise a total outage

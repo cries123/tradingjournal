@@ -167,3 +167,69 @@ export function findDuplicateTrades(trades: Trade[]): DuplicateReport {
 
   return { duplicates, affectedTrades, duplicatedPnl };
 }
+
+export interface DedupeResult {
+  /** Trades not already present in the journal, safe to import. */
+  fresh: Partial<Trade>[];
+  /** Already known — counted so the UI can say "you're up to date" rather than "found nothing". */
+  alreadyKnown: number;
+  /** Dropped because nothing about them could ever be recognised again. */
+  unidentified: number;
+}
+
+/**
+ * Decides which trades off a broker sync are actually new. The only implementation — both the
+ * manual sync and the background sync call this.
+ *
+ * They used to filter separately, and the two filters had drifted: the manual one dropped rows
+ * with no sourceId and cross-checked an execution fingerprint, while the background one did
+ * neither and pushed every row it could not match. Whichever is more careful, having two of these
+ * means the careless one eventually runs.
+ *
+ * Two independent ways to recognise a trade, because one is not enough:
+ *  - sourceId, the broker's id for the round trip. The normal path.
+ *  - the execution fingerprint, for rows imported before the id bug was fixed. Their sourceIds
+ *    carry a random component that will never match again, so a sourceId-only check would
+ *    re-import every one of them on the first sync after the fix.
+ *
+ * A row with no sourceId at all is dropped rather than imported. Nothing about it can be matched
+ * on the next sync, so importing it guarantees a fresh copy every time — which is precisely how a
+ * background sync running unattended turns one unidentifiable fill into a hundred.
+ */
+export function dedupeIncomingTrades(
+  incoming: Partial<Trade>[],
+  existingTrades: Trade[],
+  /** Carried across accounts in one run, so two accounts reporting the same round trip add it once. */
+  seen: Set<string> = new Set(),
+): DedupeResult {
+  for (const t of existingTrades) {
+    if (t.sourceId) {
+      seen.add(`id:${t.sourceId}`);
+      seen.add(`fp:${executionFingerprint(t)}`);
+    }
+  }
+
+  const fresh: Partial<Trade>[] = [];
+  let alreadyKnown = 0;
+  let unidentified = 0;
+
+  for (const trade of incoming) {
+    if (!trade.sourceId) {
+      unidentified++;
+      continue;
+    }
+
+    const idKey = `id:${trade.sourceId}`;
+    const fpKey = `fp:${executionFingerprint(trade as Trade)}`;
+    if (seen.has(idKey) || seen.has(fpKey)) {
+      alreadyKnown++;
+      continue;
+    }
+
+    seen.add(idKey);
+    seen.add(fpKey);
+    fresh.push(trade);
+  }
+
+  return { fresh, alreadyKnown, unidentified };
+}

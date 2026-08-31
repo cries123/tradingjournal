@@ -15,7 +15,7 @@ import {
 } from '../../services/brokerConnect';
 import { BROKER_REGISTRY, matchesBrokerEntry, type BrokerRegistryEntry } from '../../data/brokerRegistry';
 import type { Trade } from '../../types';
-import { executionFingerprint } from '../../utils/duplicateTrades';
+import { dedupeIncomingTrades } from '../../utils/duplicateTrades';
 
 interface BrokerCardCopy {
   key: SupportedBroker;
@@ -179,32 +179,12 @@ export function BrokerConnectContent({
         noteUsage({ syncsUsed: Math.max(0, syncsPerDay - syncsRemaining), syncsRemaining });
       }
 
-      // Two ways to recognise a trade we already have, because one isn't enough.
-      //
-      // sourceId is the broker's id for the round trip and is the normal path. But rows imported
-      // before the id bug was fixed carry sourceIds with a random component, which nothing will
-      // ever match again — so checking only sourceId would re-import every one of them, once, on
-      // the very first sync after the fix. The execution fingerprint (date, symbol, side, size,
-      // both prices, both times, P&L) recognises those rows as the fills they are.
-      const knownSourceIds = new Set(existingTrades.map((t) => t.sourceId).filter(Boolean));
-      const knownExecutions = new Set(
-        existingTrades.filter((t) => t.sourceId).map((t) => executionFingerprint(t)),
+      // One shared filter with the background sync — see dedupeIncomingTrades. Keeping the rules
+      // in one place is the point: these two paths had drifted apart once already.
+      const { fresh: freshTrades, unidentified: skippedUnidentified } = dedupeIncomingTrades(
+        trades,
+        existingTrades,
       );
-
-      let skippedUnidentified = 0;
-      const freshTrades = trades.filter((t) => {
-        // No sourceId means nothing about this row can ever be recognised again, so importing it
-        // guarantees a fresh copy on every future sync. This used to read `!t.sourceId || ...`,
-        // which imported such rows unconditionally — a duplicate generator waiting for the day a
-        // broker returns a fill we can't identify.
-        if (!t.sourceId) {
-          skippedUnidentified++;
-          return false;
-        }
-        if (knownSourceIds.has(t.sourceId)) return false;
-        if (knownExecutions.has(executionFingerprint(t))) return false;
-        return true;
-      });
 
       const label = account.name ?? account.institutionName;
 
@@ -224,10 +204,13 @@ export function BrokerConnectContent({
         );
       }
 
-      const withIds: Trade[] = freshTrades.map((t, i) => ({
-        ...t,
-        id: `snaptrade_${account.id}_${Date.now()}_${i}`,
-      }));
+      const withIds: Trade[] = freshTrades.map(
+        (t, i) =>
+          ({
+            ...t,
+            id: `snaptrade_${account.id}_${Date.now()}_${i}`,
+          }) as Trade,
+      );
       onImportTrades(withIds);
       const skipped = trades.length - freshTrades.length;
       setSyncMessage(

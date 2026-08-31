@@ -86,6 +86,65 @@ async function getOrRegisterCreds(uid: string): Promise<SnaptradeCreds> {
   }
 }
 
+/**
+ * Whether SnapTrade rejected the credentials themselves, as opposed to failing the request.
+ *
+ * A stored userSecret can stop being valid without anything about it changing: rotating the
+ * consumer key, or moving the app between SnapTrade's test and production environments, leaves
+ * every secret in Firestore issued against credentials that no longer recognise it. Nothing in the
+ * old flow noticed — getOrRegisterCreds returns a cached secret without ever validating it, so the
+ * user would keep hitting auth errors forever with no path back.
+ */
+function isRejectedCredential(err: unknown): boolean {
+  const status = (err as { status?: number; response?: { status?: number } } | null)?.response
+    ?.status ?? (err as { status?: number } | null)?.status;
+  if (status === 401 || status === 403) return true;
+
+  const message = err instanceof Error ? err.message.toLowerCase() : '';
+  return (
+    message.includes('signature') ||
+    message.includes('unauthorized') ||
+    message.includes('unable to verify') ||
+    (message.includes('user') && message.includes('not found'))
+  );
+}
+
+/**
+ * Runs an authenticated SnapTrade call, and treats a rejected secret as recoverable exactly once.
+ *
+ * The retry re-registers the user, which mints a working secret but does NOT restore their
+ * brokerage authorizations — those live in the environment the connection was made against. So a
+ * successful retry still means "you are known to us again, now reconnect your broker", and the
+ * caller surfaces that rather than pretending the sync worked.
+ */
+async function withCredentialRecovery<T>(
+  uid: string,
+  creds: SnaptradeCreds,
+  call: (creds: SnaptradeCreds) => Promise<T>,
+): Promise<T> {
+  try {
+    return await call(creds);
+  } catch (err) {
+    if (!isRejectedCredential(err)) throw err;
+
+    console.warn(`[broker-connect] stored secret for ${uid} was rejected — re-registering.`);
+    await privateSnaptradeDoc(uid).delete().catch(() => {});
+
+    const fresh = await getOrRegisterCreds(uid);
+    try {
+      return await call(fresh);
+    } catch (retryErr) {
+      if (!isRejectedCredential(retryErr)) throw retryErr;
+      // The new secret is valid; what is missing is the brokerage connection itself. Say that,
+      // rather than handing the user a SnapTrade signature error to interpret.
+      throw new BrokerRequestError(
+        'Your broker connection needs to be set up again. Open Connect Broker and reconnect your account.',
+        409,
+      );
+    }
+  }
+}
+
 async function getCredsIfRegistered(uid: string): Promise<SnaptradeCreds | null> {
   const snap = await privateSnaptradeDoc(uid).get();
   const existing = (snap.data() ?? null) as SnaptradeCreds | null;
@@ -192,13 +251,17 @@ async function handleConnect(uid: string, broker?: string): Promise<BrokerConnec
   const brokerSlug = await resolveBrokerSlug(broker);
   const siteUrl = (process.env.SITE_URL || 'https://trendchasers.net').replace(/\/$/, '');
 
-  const res = await snaptrade.authentication.loginSnapTradeUser({
-    userId: creds.userId,
-    userSecret: creds.userSecret,
-    broker: brokerSlug,
-    connectionType: 'read',
-    customRedirect: `${siteUrl}/app?brokerConnected=1`,
-  });
+  // Wrapped first and most importantly: this is how a user with a dead secret gets back. If the
+  // connect call itself fails on the stale credential, there is no route out of the broken state.
+  const res = await withCredentialRecovery(uid, creds, (c) =>
+    snaptrade.authentication.loginSnapTradeUser({
+        userId: c.userId,
+        userSecret: c.userSecret,
+      broker: brokerSlug,
+      connectionType: 'read',
+      customRedirect: `${siteUrl}/app?brokerConnected=1`,
+    }),
+  );
 
   const data = res.data;
   if (!('redirectURI' in data) || !data.redirectURI) {
@@ -238,10 +301,12 @@ async function handleStatus(uid: string): Promise<BrokerConnectResult> {
   await recordBrokerConnectionState(uid, [], 0).catch(() => {});
 
   const snaptrade = getSnaptrade();
-  const res = await snaptrade.accountInformation.listUserAccounts({
-    userId: creds.userId,
-    userSecret: creds.userSecret,
-  });
+  const res = await withCredentialRecovery(uid, creds, (c) =>
+    snaptrade.accountInformation.listUserAccounts({
+      userId: c.userId,
+      userSecret: c.userSecret,
+    }),
+  );
 
   const accounts = res.data.map((a) => ({
     id: a.id,
@@ -299,18 +364,25 @@ async function handleSync(uid: string, accountId?: string, startDate?: string, e
   let total: number | undefined;
   let truncated = false;
 
+  // Reassigned if the first page recovers a fresh secret, so the remaining pages use the working
+  // credential rather than the one that was just rejected.
+  let active = creds;
+
   for (let page = 0; page < MAX_PAGES; page++) {
-    const res = await snaptrade.accountInformation.getAccountActivities({
-      userId: creds.userId,
-      userSecret: creds.userSecret,
-      accountId,
-      // Leaving startDate/endDate unset pulls SnapTrade's full known history for the account (its own
-      // default) instead of an arbitrary recent window — syncing exists to backfill the calendar with
-      // everything, not just what happened lately.
-      startDate: startDate || undefined,
-      endDate: endDate || undefined,
-      offset: page * PAGE_SIZE,
-      limit: PAGE_SIZE,
+    const res = await withCredentialRecovery(uid, active, (c) => {
+      active = c;
+      return snaptrade.accountInformation.getAccountActivities({
+        userId: c.userId,
+        userSecret: c.userSecret,
+        accountId,
+        // Leaving startDate/endDate unset pulls SnapTrade's full known history for the account (its
+        // own default) instead of an arbitrary recent window — syncing exists to backfill the
+        // calendar with everything, not just what happened lately.
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        offset: page * PAGE_SIZE,
+        limit: PAGE_SIZE,
+      });
     });
 
     const batch = (res.data.data ?? []) as SnapTradeActivityLike[];
