@@ -161,10 +161,17 @@ service cloud.firestore {
     // user's entry.
     match /leaderboardEntries/{userId} {
       allow read: if true;
+      // The anonymity setting has to hold here, not just in the client. These documents are
+      // world-readable, so an entry that says isAnonymous while carrying a username is a real name
+      // published to anyone who queries the collection — which is exactly what shipped until the
+      // app stopped writing it. Enforcing it in the rule means a stale build, a replayed request
+      // or a hand-rolled client cannot put it back.
       allow write: if request.auth != null
         && request.auth.uid == userId
         && request.resource.data.uid == userId
-        && request.resource.data.stats is map;
+        && request.resource.data.stats is map
+        && (request.resource.data.isAnonymous != true
+            || !('username' in request.resource.data));
       allow delete: if request.auth != null && request.auth.uid == userId
         || (isAdmin() && adminCanDeleteUser(userId));
     }
