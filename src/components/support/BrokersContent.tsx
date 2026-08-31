@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Search, ShieldCheck } from 'lucide-react';
-import { brokerIdFromName, BrokerLogo } from '../brokers/BrokerLogo';
+import { BrokerLogo } from '../brokers/BrokerLogo';
+import { brokerIdFromName } from '../../utils/brokerIds';
 import { fetchBrokersConfig, type BrokerConfig } from '../../services/brokersConfig';
 import { BROKER_GUIDES } from '../../seo/brokerGuides';
 import { SupportLinks } from './SupportLinks';

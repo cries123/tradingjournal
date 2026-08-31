@@ -14,7 +14,7 @@ import {
 import { formatCurrency, formatMonthYear } from '../utils/format';
 import { computeJournalingStreak, computeTradingInsights } from '../utils/insights';
 import { computeTakeaway } from '../utils/takeaway';
-import { useSettings } from '../context/SettingsContext';
+import { useSettings } from '../context/useSettings';
 import { AccountSwitcher } from './AccountSwitcher';
 import { useAiTakeaway } from '../hooks/useAiTakeaway';
 import { useMediaQuery } from '../hooks/useMediaQuery';

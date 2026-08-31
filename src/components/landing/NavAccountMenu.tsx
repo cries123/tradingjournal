@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, LogOut, NotebookPen } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import { useEscapeToClose } from '../../hooks/useEscapeToClose';
 import { accountDisplayName, accountInitial } from '../../utils/accountName';
 

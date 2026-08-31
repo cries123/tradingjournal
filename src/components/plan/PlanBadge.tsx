@@ -1,7 +1,7 @@
 import { Crown, Gem, Medal, Notebook } from 'lucide-react';
 import { TIER_PLANS, type Tier } from '../../config/tiers';
-import { useEntitlement } from '../../context/EntitlementContext';
-import { useAuth } from '../../context/AuthContext';
+import { useEntitlement } from '../../context/useEntitlement';
+import { useAuth } from '../../context/useAuth';
 import { goToPricing } from '../../utils/navigateToPath';
 
 const TIER_ICON: Record<Tier, typeof Notebook> = {

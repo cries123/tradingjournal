@@ -16,7 +16,8 @@ import { DashboardPreview } from '../components/landing/DashboardPreview';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import { FadeIn } from '../components/motion/FadeIn';
 import { Starfield } from '../components/Starfield';
-import { brokerIdFromName, BrokerLogo } from '../components/brokers/BrokerLogo';
+import { BrokerLogo } from '../components/brokers/BrokerLogo';
+import { brokerIdFromName } from '../utils/brokerIds';
 import { COMING_SOON_BROKERS, SUPPORTED_BROKERS } from '../data/brokers';
 import {
   BROKER_COUNT_PHRASE,

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
-import { useSettings } from '../context/SettingsContext';
+import { useSettings } from '../context/useSettings';
 import type { Trade, TradeGrade, TradeSide, AssetClass } from '../types';
 import { compressImage } from '../utils/compressImage';
 import { buildTradingViewReplayUrl } from '../utils/tradingView';

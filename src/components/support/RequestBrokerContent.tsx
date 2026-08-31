@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowLeft, Building2, CheckCircle2 } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import { submitBrokerSupportRequest } from '../../services/brokerSupportRequests';
 
 interface RequestBrokerContentProps {

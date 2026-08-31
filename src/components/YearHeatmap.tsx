@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Trade } from '../types';
-import { useSettings } from '../context/SettingsContext';
+import { useSettings } from '../context/useSettings';
 import { computeStats, getMonthlyPnlForYear, getYearTrades } from '../utils/stats';
 import { formatCurrency } from '../utils/format';
 

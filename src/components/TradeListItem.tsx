@@ -1,21 +1,7 @@
 import type { Trade } from '../types';
 import { formatCurrency } from '../utils/format';
 import { TradeDetails } from './TradeDetails';
-
-export function tradeBasicLabel(trade: Partial<Trade>): string {
-  const parts = [trade.symbol ?? ''];
-  if (trade.optionType) parts.push(trade.optionType.toUpperCase());
-  if (trade.side) parts.push(trade.side.charAt(0).toUpperCase() + trade.side.slice(1));
-  return parts.filter(Boolean).join(' ');
-}
-
-export function tradeBasicSubtitle(trade: Partial<Trade>): string | undefined {
-  if (trade.contract) return trade.contract;
-  if (trade.strike != null && trade.expiration) {
-    return `$${trade.strike} · ${trade.expiration}`;
-  }
-  return trade.notes;
-}
+import { tradeBasicLabel, tradeBasicSubtitle } from '../utils/tradeLabels';
 
 interface TradeListItemProps {
   trade: Partial<Trade>;

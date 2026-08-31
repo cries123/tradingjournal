@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { CalendarCheck } from 'lucide-react';
 import type { Trade } from '../types';
-import { useSettings } from '../context/SettingsContext';
+import { useSettings } from '../context/useSettings';
 import { formatCurrency } from '../utils/format';
 import { computeWeeklyRecap } from '../utils/insights';
 

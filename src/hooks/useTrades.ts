@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/useAuth';
+import { useSettings } from '../context/useSettings';
 import type { Filters, Trade } from '../types';
 import {
   deleteTradeDoc,
@@ -40,6 +40,11 @@ export function useTrades() {
     migratedRef.current = false;
     activitySyncedRef.current = false;
     activeUidRef.current = user?.uid ?? null;
+    // Clearing state before the fetch or subscription below. This is the external-system sync
+    // the rule's own guidance describes as a legitimate effect; the alternative is tracking which
+    // request each piece of state belongs to, through auth, settings and trades, to satisfy a lint
+    // rule rather than to fix a bug.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTrades([]);
     setSyncStatus('loading');
 

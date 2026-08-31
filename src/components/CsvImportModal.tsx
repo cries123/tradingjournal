@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { FileSpreadsheet, X } from 'lucide-react';
 import { TradeListItem } from './TradeListItem';
 import type { Trade } from '../types';
-import { useSettings } from '../context/SettingsContext';
+import { useSettings } from '../context/useSettings';
 import { formatCurrency } from '../utils/format';
 import {
   brokerFormatLabel,

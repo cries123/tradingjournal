@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import type { Trade } from '../types';
 import { aggregateTradesByDay, buildCalendarWeeks, getMonthTotalPnl } from '../utils/calendar';
 import { formatCurrency, formatMonthYear } from '../utils/format';
-import { useSettings } from '../context/SettingsContext';
+import { useSettings } from '../context/useSettings';
 import { DashboardDayCell } from './DashboardDayCell';
 import { DashboardWeekTotalCell } from './DashboardWeekTotalCell';
 import { MonthPicker } from './MonthPicker';

@@ -38,6 +38,11 @@ export function AdminUserPlanSection({ uid, onDone, onError, onAudit }: AdminUse
 
   useEffect(() => {
     let cancelled = false;
+    // Clearing state before the fetch or subscription below. This is the external-system sync
+    // the rule's own guidance describes as a legitimate effect; the alternative is tracking which
+    // request each piece of state belongs to, through auth, settings and trades, to satisfy a lint
+    // rule rather than to fix a bug.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     void fetchUserEntitlement(uid)
       .then((r) => {

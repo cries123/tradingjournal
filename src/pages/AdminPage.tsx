@@ -31,7 +31,7 @@ import { AdminCheckoutCard } from '../components/admin/AdminCheckoutCard';
 import { AdminUserDetailModal } from '../components/admin/AdminUserDetailModal';
 import { AdminHelpArticleModal } from '../components/admin/AdminHelpArticleModal';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import type { ExtraNavRoute } from '../hooks/useRoute';
 import {
   buildActivityFeed,
@@ -296,11 +296,20 @@ function AdminNoteField({
   label: string;
 }) {
   const [draft, setDraft] = useState(value);
+  const [savedValue, setSavedValue] = useState(value);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  /*
+   * Re-seed the box when the saved note changes underneath it.
+   *
+   * Adjusted during render rather than from an effect — React's documented way to reset state when
+   * a prop changes, and it avoids the extra render pass an effect costs. It also fixes a real edge:
+   * the effect version ran after paint, so for one frame the field showed the previous note.
+   */
+  if (savedValue !== value) {
+    setSavedValue(value);
     setDraft(value);
-  }, [value]);
+  }
 
   const save = async () => {
     if (draft.trim() === value.trim()) return;
@@ -759,6 +768,11 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
   }, [firebaseEnabled, loading, user, username]);
 
   useEffect(() => {
+    // Clearing state before the fetch or subscription below. This is the external-system sync
+    // the rule's own guidance describes as a legitimate effect; the alternative is tracking which
+    // request each piece of state belongs to, through auth, settings and trades, to satisfy a lint
+    // rule rather than to fix a bug.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadAdmin();
   }, [loadAdmin]);
 

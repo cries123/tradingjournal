@@ -22,7 +22,8 @@ interface DailyPnlChartProps {
  * outright, and every bar carries its full figure on hover.
  */
 export function DailyPnlChart({ data }: DailyPnlChartProps) {
-  const [animate, setAnimate] = useState(false);
+  const [animatedFor, setAnimatedFor] = useState<typeof data | null>(null);
+  const animate = animatedFor === data;
   const [hovered, setHovered] = useState<number | null>(null);
 
   const { maxAbs, bestIndex, worstIndex, tickEvery } = useMemo(() => {
@@ -43,9 +44,16 @@ export function DailyPnlChart({ data }: DailyPnlChartProps) {
     };
   }, [data]);
 
+  /*
+   * Bars grow from zero whenever the data changes.
+   *
+   * Derived rather than toggled: `animate` is false for any data this component has not yet
+   * animated, so a new period resets the bars during render instead of needing a synchronous
+   * setState inside an effect — which is a second render pass, and the pattern React's own docs
+   * point away from. The frame below marks the data as animated, and the bars grow.
+   */
   useEffect(() => {
-    setAnimate(false);
-    const t = requestAnimationFrame(() => setAnimate(true));
+    const t = requestAnimationFrame(() => setAnimatedFor(data));
     return () => cancelAnimationFrame(t);
   }, [data]);
 

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Lock } from 'lucide-react';
 import { lowestTierWith, TIER_PLANS, type Feature } from '../../config/tiers';
-import { useEntitlement } from '../../context/EntitlementContext';
+import { useEntitlement } from '../../context/useEntitlement';
 import { goToPricing } from '../../utils/navigateToPath';
 
 interface LockedFeatureProps {

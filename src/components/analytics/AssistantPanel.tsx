@@ -4,7 +4,7 @@ import type { Trade } from '../../types';
 import { buildJournalFacts, suggestedQuestions } from '../../utils/journalFacts';
 import { AssistantError, streamAssistant, type AssistantMessage } from '../../services/aiAssistant';
 import { useAssistantThread } from '../../hooks/useAssistantThread';
-import { useEntitlement } from '../../context/EntitlementContext';
+import { useEntitlement } from '../../context/useEntitlement';
 import { AnswerBody } from './AnswerBody';
 
 export type AssistantScope = 'month' | 'year' | 'all';

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BookOpen, Check, Plus, X } from 'lucide-react';
-import { useSettings } from '../context/SettingsContext';
+import { useSettings } from '../context/useSettings';
 
 export function AccountSwitcher() {
   const { settings, setActiveAccount, addAccount } = useSettings();

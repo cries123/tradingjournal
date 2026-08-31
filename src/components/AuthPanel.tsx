@@ -1,4 +1,4 @@
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 
 export function AuthPanel({ compact = false }: { compact?: boolean }) {
   const { user, loading, firebaseEnabled, logout } = useAuth();

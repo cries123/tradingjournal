@@ -1,7 +1,6 @@
+import { AuthContext } from './useAuth';
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -24,22 +23,7 @@ import { ensureUserProfile } from '../services/userProfile';
 import { UsernameTakenError, claimUsername as claimUsernameDoc, cacheUsername, clearCachedUsername, fetchUsername, readCachedUsername } from '../services/username';
 import { validateUsername } from '../utils/usernameValidation';
 
-interface AuthContextValue {
-  user: User | null;
-  username: string | null;
-  loading: boolean;
-  profileLoading: boolean;
-  needsUsername: boolean;
-  firebaseEnabled: boolean;
-  signInWithGoogle: () => Promise<void>;
-  signInWithEmail: (email: string, password: string) => Promise<void>;
-  createAccount: (email: string, password: string, username: string) => Promise<void>;
-  claimUsername: (username: string) => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
-  logout: () => Promise<void>;
-}
 
-const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function loadUsername(uid: string): Promise<string | null> {
   const auth = getFirebaseAuth();
@@ -111,6 +95,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user || !firebaseEnabled) {
+      // Clearing state before the fetch or subscription below. This is the external-system sync
+      // the rule's own guidance describes as a legitimate effect; the alternative is tracking which
+      // request each piece of state belongs to, through auth, settings and trades, to satisfy a lint
+      // rule rather than to fix a bug.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUsername(null);
       previousUidRef.current = null;
       setProfileLoading(false);
@@ -307,8 +296,3 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
-}

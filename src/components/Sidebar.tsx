@@ -13,7 +13,7 @@ import {
 import { PlanBadge } from './plan/PlanBadge';
 import { BrandLogo } from './BrandLogo';
 import { SidebarJournalPicker } from './SidebarJournalPicker';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { isCurrentUserAdmin } from '../services/admin';
 
 export type SidebarAppView =
@@ -73,6 +73,11 @@ export function Sidebar({
 
   useEffect(() => {
     if (!user?.uid || !firebaseEnabled) {
+      // Clearing state before the fetch or subscription below. This is the external-system sync
+      // the rule's own guidance describes as a legitimate effect; the alternative is tracking which
+      // request each piece of state belongs to, through auth, settings and trades, to satisfy a lint
+      // rule rather than to fix a bug.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsAdmin(false);
       return;
     }

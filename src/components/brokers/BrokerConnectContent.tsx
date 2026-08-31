@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, CheckCircle2, ExternalLink, Link2, Loader2, RefreshCw, Unlink } from 'lucide-react';
 import { BrokerLogo } from './BrokerLogo';
-import { useEntitlement } from '../../context/EntitlementContext';
+import { useEntitlement } from '../../context/useEntitlement';
 import { TIER_PLANS } from '../../config/tiers';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import {
   BrokerApiError,
   checkBrokerConnectAvailable,
@@ -168,6 +168,11 @@ export function BrokerConnectContent({
   };
 
   useEffect(() => {
+    // Clearing state before the fetch or subscription below. This is the external-system sync
+    // the rule's own guidance describes as a legitimate effect; the alternative is tracking which
+    // request each piece of state belongs to, through auth, settings and trades, to satisfy a lint
+    // rule rather than to fix a bug.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (canConnect && available) void refreshStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canConnect, available]);

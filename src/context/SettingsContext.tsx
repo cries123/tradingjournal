@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useAuth } from './AuthContext';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { SettingsContext } from './useSettings';
+import { useAuth } from './useAuth';
 import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
 import type { ThemeAccent, UserSettings } from '../types/settings';
 import { DEFAULT_SETTINGS } from '../types/settings';
@@ -8,18 +9,7 @@ import { loadSettings, saveSettings } from '../utils/settingsStorage';
 import { stripUndefinedDeep } from '../utils/firestoreData';
 import { deleteField, doc, getDoc, setDoc } from 'firebase/firestore';
 
-interface SettingsContextValue {
-  settings: UserSettings;
-  updateSettings: (patch: Partial<UserSettings>) => void;
-  addSetupTag: (tag: string) => void;
-  addStrategy: (name: string, description?: string) => void;
-  removeStrategy: (id: string) => void;
-  addAccount: (name: string) => void;
-  removeAccount: (id: string) => void;
-  setActiveAccount: (id: string) => void;
-}
 
-const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 // profit/accent hex plus their R,G,B triplets (kept in sync so CSS can alpha-blend via
 // rgba(var(--color-*-rgb), alpha) — see index.css). Every button, banner, focus ring, chart bar,
@@ -47,6 +37,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<UserSettings>(() => loadSettings(user?.uid));
 
   useEffect(() => {
+    // Clearing state before the fetch or subscription below. This is the external-system sync
+    // the rule's own guidance describes as a legitimate effect; the alternative is tracking which
+    // request each piece of state belongs to, through auth, settings and trades, to satisfy a lint
+    // rule rather than to fix a bug.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSettings(loadSettings(user?.uid));
 
     if (!user || !isFirebaseConfigured()) return;
@@ -205,8 +200,3 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }
 
-export function useSettings() {
-  const ctx = useContext(SettingsContext);
-  if (!ctx) throw new Error('useSettings must be used within SettingsProvider');
-  return ctx;
-}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { BookOpen, Building2, Gauge, LifeBuoy, LogOut, Megaphone, Sparkles, Tag } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import { useEscapeToClose } from '../../hooks/useEscapeToClose';
 import { accountDisplayName, accountInitial } from '../../utils/accountName';
 import type { ExtraNavRoute } from '../../hooks/useRoute';

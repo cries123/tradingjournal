@@ -1,5 +1,5 @@
 import type { WeekSummary } from '../types';
-import { useSettings } from '../context/SettingsContext';
+import { useSettings } from '../context/useSettings';
 import { formatCurrency, formatCurrencyCompact } from '../utils/format';
 
 interface DashboardWeekTotalCellProps {

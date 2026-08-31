@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Menu, X } from 'lucide-react';
 import { BrandLogo } from '../BrandLogo';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import { NavAccountMenu } from './NavAccountMenu';
 import { ProductsDropdown } from './ProductsDropdown';
 import { MobileNavPanel } from './MobileNavPanel';

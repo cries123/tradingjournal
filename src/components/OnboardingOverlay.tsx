@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { BarChart3, Calendar, Link2, X } from 'lucide-react';
 import { useEscapeToClose } from '../hooks/useEscapeToClose';
-
-const STORAGE_KEY = 'trend-chasers-onboarding-done';
+import { markOnboardingDone } from '../utils/onboarding';
 
 const STEPS = [
   {
@@ -21,14 +20,6 @@ const STEPS = [
     body: 'Filter by setup tag, check win rate and profit factor, and switch between month and year views.',
   },
 ];
-
-export function hasCompletedOnboarding(): boolean {
-  return localStorage.getItem(STORAGE_KEY) === '1';
-}
-
-export function markOnboardingDone(): void {
-  localStorage.setItem(STORAGE_KEY, '1');
-}
 
 interface OnboardingOverlayProps {
   onDone: () => void;

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/useAuth';
+import { useSettings } from '../context/useSettings';
 import type { Trade } from '../types';
 import { removeLeaderboardEntry, upsertLeaderboardEntry } from '../services/leaderboard';
 

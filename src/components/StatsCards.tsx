@@ -1,5 +1,5 @@
 import { Flame, Target } from 'lucide-react';
-import { useSettings } from '../context/SettingsContext';
+import { useSettings } from '../context/useSettings';
 import { useBenchmark } from '../hooks/useBenchmark';
 import type { TradingStats } from '../utils/stats';
 import { formatCurrency } from '../utils/format';

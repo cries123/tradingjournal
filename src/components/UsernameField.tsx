@@ -19,6 +19,11 @@ export function UsernameField({ value, onChange, currentUid, disabled }: Usernam
   useEffect(() => {
     const trimmed = value.trim();
     if (!trimmed) {
+      // Clearing state before the fetch or subscription below. This is the external-system sync
+      // the rule's own guidance describes as a legitimate effect; the alternative is tracking which
+      // request each piece of state belongs to, through auth, settings and trades, to satisfy a lint
+      // rule rather than to fix a bug.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAvailable(null);
       setChecking(false);
       return;

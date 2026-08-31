@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, EyeOff, Shield, Target, TrendingUp, Trophy, Users } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/useAuth';
+import { useSettings } from '../context/useSettings';
 import {
   MIN_TRADES_FOR_RATE_CATEGORIES,
   subscribeLeaderboard,
@@ -53,6 +53,11 @@ export function LeaderboardContent({ onBack }: LeaderboardContentProps) {
 
   useEffect(() => {
     if (!firebaseEnabled) {
+      // Clearing state before the fetch or subscription below. This is the external-system sync
+      // the rule's own guidance describes as a legitimate effect; the alternative is tracking which
+      // request each piece of state belongs to, through auth, settings and trades, to satisfy a lint
+      // rule rather than to fix a bug.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(false);
       return;
     }

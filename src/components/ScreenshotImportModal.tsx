@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Bot, Camera } from 'lucide-react';
 import { TradeListItem } from './TradeListItem';
 import type { ParsedTradeInput, Trade, TradeSide } from '../types';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { checkParseServer, loadApiKey, parseScreenshot, saveApiKey } from '../utils/parseScreenshot';
 import { useEscapeToClose } from '../hooks/useEscapeToClose';
 

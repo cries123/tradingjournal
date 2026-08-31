@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Trade } from '../../types';
-import { directionRows } from './DirectionPanel';
+import type { Trade } from '../types';
+import { directionRows } from './directionRows';
 
 const trade = (side: 'long' | 'short' | undefined, pnl: number, over: Partial<Trade> = {}): Trade =>
   ({ id: `${side}-${pnl}`, date: '2026-08-03', symbol: 'SPY', side, pnl, ...over }) as Trade;

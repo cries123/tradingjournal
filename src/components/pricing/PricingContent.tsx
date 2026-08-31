@@ -3,8 +3,8 @@ import { AlertTriangle, ArrowLeft, BadgeCheck, Check, Clock, Crown, Gem, Medal, 
 import { featureLines, TIER_ORDER, TIER_PLANS, type Tier } from '../../config/tiers';
 import { REFUND_WINDOW_DAYS } from '../../config/legal';
 import { BROKER_COUNT_PHRASE } from '../../data/brokerCopy';
-import { useAuth } from '../../context/AuthContext';
-import { useEntitlement } from '../../context/EntitlementContext';
+import { useAuth } from '../../context/useAuth';
+import { useEntitlement } from '../../context/useEntitlement';
 import {
   CheckoutError,
   choosePlan,

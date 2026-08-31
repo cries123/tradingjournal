@@ -3,7 +3,7 @@ import type { Trade } from '../types';
 import type { JournalFactsOptions } from '../utils/journalFacts';
 import { buildJournalFacts } from '../utils/journalFacts';
 import { fetchAiTakeaway, hashTrades } from '../services/aiTakeaway';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { isFirebaseConfigured } from '../lib/firebase';
 
 /** Below this, any "pattern" is noise and the computed banner is the more honest one. */

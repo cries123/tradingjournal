@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { AppRoute } from './useRoute';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { recordAnonymousVisit } from '../services/visitorAnalytics';
 
 const ROUTE_PATHS: Partial<Record<AppRoute, string>> = {

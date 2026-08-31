@@ -1,5 +1,5 @@
 import { Landmark } from 'lucide-react';
-import { findBrokerEntryByName, normalizeBrokerName } from '../../data/brokerRegistry';
+import { resolveBroker } from '../../utils/brokerIds';
 
 interface BrokerLogoProps {
   broker: string;
@@ -41,17 +41,6 @@ const LOGOS: Record<string, { src: string; name: string }> = {
   pnc: { src: '/broker-logos/pnc.png', name: 'PNC Wealth Management' },
 };
 
-function resolveBroker(input: string): { brokerId: string; name: string } | null {
-  const norm = normalizeBrokerName(input);
-  if (norm.includes('thinkorswim') || norm === 'tos') {
-    return { brokerId: 'thinkorswim', name: 'thinkorswim' };
-  }
-
-  const entry = findBrokerEntryByName(input);
-  if (entry) return { brokerId: entry.brokerId, name: entry.name };
-  return null;
-}
-
 export function BrokerLogo({ broker, className = '', compact = false }: BrokerLogoProps) {
   const resolved = resolveBroker(broker);
 
@@ -83,8 +72,4 @@ export function BrokerLogo({ broker, className = '', compact = false }: BrokerLo
       </span>
     </div>
   );
-}
-
-export function brokerIdFromName(name: string): string {
-  return resolveBroker(name)?.brokerId ?? name;
 }

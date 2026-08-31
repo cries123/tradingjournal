@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Copy, Download, Plus, Share2, Sparkles, Trash2, X } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/useAuth';
+import { useSettings } from '../context/useSettings';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useEscapeToClose } from '../hooks/useEscapeToClose';
 import { MAX_SHARE_CARD_BACKGROUNDS, deleteShareCardBackground, uploadShareCardBackground } from '../services/shareCardBackgrounds';

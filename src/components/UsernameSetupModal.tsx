@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { BrandLogo } from './BrandLogo';
 import { Starfield } from './Starfield';
 import { UsernameField } from './UsernameField';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { UsernameTakenError } from '../services/username';
 import { validateUsername } from '../utils/usernameValidation';
 

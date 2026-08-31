@@ -1,40 +1,21 @@
+import { EntitlementContext, type EntitlementContextValue } from './useEntitlement';
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
   type ReactNode,
 } from 'react';
-import { useAuth } from './AuthContext';
+import { useAuth } from './useAuth';
 import {
   fetchEntitlement,
   FREE_SNAPSHOT,
   type EntitlementSnapshot,
 } from '../services/entitlement';
-import { MARKET_REPLAY_LIVE, tierHas, type Feature, type Tier, type TierLimits } from '../config/tiers';
+import { MARKET_REPLAY_LIVE, tierHas, type Feature } from '../config/tiers';
 
-interface EntitlementContextValue {
-  tier: Tier;
-  limits: TierLimits;
-  status: EntitlementSnapshot['status'];
-  /** 'admin' means grandfathered — no subscription to manage, so don't offer to cancel one. */
-  source: EntitlementSnapshot['source'];
-  currentPeriodEnd: string | null;
-  usage: EntitlementSnapshot['usage'];
-  loading: boolean;
-  /** True only once a real answer has come back, so the UI can avoid flashing a locked state. */
-  loaded: boolean;
-  marketReplayLive: boolean;
-  has: (feature: Feature) => boolean;
-  refresh: () => Promise<void>;
-  /** Adjusts the local counters after a request the server has already counted. */
-  noteUsage: (patch: Partial<EntitlementSnapshot['usage']>) => void;
-}
 
-const EntitlementContext = createContext<EntitlementContextValue | null>(null);
 
 /**
  * The signed-in user's plan, loaded once per session and refreshed on demand.
@@ -82,6 +63,11 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (authLoading) return;
+    // Clearing state before the fetch or subscription below. This is the external-system sync
+    // the rule's own guidance describes as a legitimate effect; the alternative is tracking which
+    // request each piece of state belongs to, through auth, settings and trades, to satisfy a lint
+    // rule rather than to fix a bug.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load(user?.uid ?? null);
   }, [authLoading, user?.uid, load]);
 
@@ -114,8 +100,3 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
   return <EntitlementContext.Provider value={value}>{children}</EntitlementContext.Provider>;
 }
 
-export function useEntitlement(): EntitlementContextValue {
-  const ctx = useContext(EntitlementContext);
-  if (!ctx) throw new Error('useEntitlement must be used inside EntitlementProvider');
-  return ctx;
-}

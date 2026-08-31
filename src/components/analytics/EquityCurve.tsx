@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useSettings } from '../../context/SettingsContext';
+import { useSettings } from '../../context/useSettings';
 import { formatCurrency } from '../../utils/format';
 
 interface EquityCurvePoint {

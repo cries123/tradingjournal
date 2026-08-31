@@ -1,39 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Trade } from '../../types';
 import { formatCurrency } from '../../utils/format';
-import { effectivePnl } from '../../utils/tradeHelpers';
+import { directionRows } from '../../utils/directionRows';
 
 type Currency = Parameters<typeof formatCurrency>[1];
-
-export interface DirectionRow {
-  side: 'long' | 'short';
-  label: string;
-  pnl: number;
-  trades: number;
-  winRate: number;
-}
-
-/**
- * Long/short split for the dashboard.
- *
- * Deliberately not computeDirectionSplit from behaviourFacts: that one returns null unless BOTH
- * directions clear a four-trade sample, which is the right bar for asserting a pattern in prose
- * and the wrong one for a panel that just reports what happened. A month of nothing but longs is
- * a fact worth showing, not a reason to blank the card.
- */
-export function directionRows(trades: Trade[]): DirectionRow[] {
-  return (['long', 'short'] as const).map((side) => {
-    const xs = trades.filter((t) => t.side === side);
-    const wins = xs.filter((t) => effectivePnl(t) > 0).length;
-    return {
-      side,
-      label: side === 'long' ? 'Long' : 'Short',
-      pnl: xs.reduce((sum, t) => sum + effectivePnl(t), 0),
-      trades: xs.length,
-      winRate: xs.length ? (wins / xs.length) * 100 : 0,
-    };
-  });
-}
 
 interface DirectionPanelProps {
   trades: Trade[];
@@ -42,14 +12,22 @@ interface DirectionPanelProps {
 
 export function DirectionPanel({ trades, currency }: DirectionPanelProps) {
   const rows = useMemo(() => directionRows(trades), [trades]);
-  const [animate, setAnimate] = useState(false);
+  const [animatedFor, setAnimatedFor] = useState<typeof trades | null>(null);
+  const animate = animatedFor === trades;
 
   const maxAbs = Math.max(...rows.map((r) => Math.abs(r.pnl)), 1);
   const sidedTrades = rows.reduce((sum, r) => sum + r.trades, 0);
 
+  /*
+   * Bars grow from zero whenever the data changes.
+   *
+   * Derived rather than toggled: `animate` is false for any data this component has not yet
+   * animated, so a new period resets the bars during render instead of needing a synchronous
+   * setState inside an effect — which is a second render pass, and the pattern React's own docs
+   * point away from. The frame below marks the data as animated, and the bars grow.
+   */
   useEffect(() => {
-    setAnimate(false);
-    const frame = requestAnimationFrame(() => setAnimate(true));
+    const frame = requestAnimationFrame(() => setAnimatedFor(trades));
     return () => cancelAnimationFrame(frame);
   }, [trades]);
 

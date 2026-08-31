@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { ArrowLeft, Copy, Download, EyeOff, FileText, Plus, Share2, Trash2, Trophy, Upload } from 'lucide-react';
-import { useSettings } from '../context/SettingsContext';
-import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/useSettings';
+import { useAuth } from '../context/useAuth';
 import type { CurrencyCode, ThemeAccent } from '../types/settings';
 import type { Trade } from '../types';
 import { computeStats, type TradingStats } from '../utils/stats';
