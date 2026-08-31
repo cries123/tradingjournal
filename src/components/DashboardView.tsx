@@ -16,6 +16,7 @@ import { computeJournalingStreak, computeTradingInsights } from '../utils/insigh
 import { computeTakeaway } from '../utils/takeaway';
 import { useSettings } from '../context/SettingsContext';
 import { AccountSwitcher } from './AccountSwitcher';
+import { useAiTakeaway } from '../hooks/useAiTakeaway';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { SiteAnnouncement } from './SiteAnnouncement';
 import { DuplicateTradesBanner } from './DuplicateTradesBanner';
@@ -120,6 +121,16 @@ export function DashboardView({
     });
   }, [analyticsTrades, settings.currency]);
 
+  /*
+   * The AI read of the same period, which replaces the computed text above once it arrives.
+   *
+   * The period key is what the server caches on, so it has to identify the period and nothing else
+   * — a month is "2026-07", a year is "2026". Deliberately not the display label: "July 2026" would
+   * mint a second cache entry the moment anything about formatting or locale changed.
+   */
+  const periodKey = mode === 'month' ? `${year}-${String(month + 1).padStart(2, '0')}` : String(year);
+  const aiTakeaway = useAiTakeaway(analyticsTrades, periodKey, settings.tradingRules);
+
   return (
     <div className="flex flex-col gap-2 md:gap-3 pb-2">
       {/* Above everything else: if the numbers below are inflated by a double import, that's the
@@ -222,7 +233,7 @@ export function DashboardView({
         />
       )}
 
-      {hasAnyTrades && <TakeawayBanner takeaway={takeaway} />}
+      {hasAnyTrades && <TakeawayBanner takeaway={takeaway} aiText={aiTakeaway} />}
 
       {/* Calendar beside its context, not above it.
           Stacked, the equity curve and the week recap pushed the calendar most of a screen down

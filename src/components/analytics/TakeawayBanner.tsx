@@ -3,6 +3,16 @@ import type { Takeaway } from '../../utils/takeaway';
 
 interface TakeawayBannerProps {
   takeaway: Takeaway | null;
+  /**
+   * The AI read of the period, when one has arrived.
+   *
+   * Overrides the computed text rather than replacing the component, so the banner is on screen
+   * with something true from first paint and simply gets sharper a moment later. Tone still comes
+   * from the computed takeaway: it is what decides whether this is a warning or a win, and letting
+   * the model pick the colour of its own message is a needless way to get an amber banner over
+   * good news.
+   */
+  aiText?: string | null;
 }
 
 /**
@@ -12,8 +22,10 @@ interface TakeawayBannerProps {
  * deciding what matters. This states the single most actionable finding for the period, so the
  * page opens with a conclusion rather than a wall of evenly-weighted metrics.
  */
-export function TakeawayBanner({ takeaway }: TakeawayBannerProps) {
+export function TakeawayBanner({ takeaway, aiText }: TakeawayBannerProps) {
   if (!takeaway) return null;
+
+  const text = aiText?.trim() || takeaway.text;
 
   const isWarning = takeaway.tone === 'warning';
 
@@ -36,7 +48,7 @@ export function TakeawayBanner({ takeaway }: TakeawayBannerProps) {
         >
           {isWarning ? 'Worth fixing' : "What's working"}
         </p>
-        <p className="text-xs md:text-sm text-text-primary leading-snug">{takeaway.text}</p>
+        <p className="text-xs md:text-sm text-text-primary leading-snug">{text}</p>
       </div>
     </div>
   );

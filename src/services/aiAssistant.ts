@@ -118,7 +118,7 @@ export async function streamAssistant(
   return { answer, remaining };
 }
 
-async function requireIdToken(): Promise<string> {
+export async function requireIdToken(): Promise<string> {
   if (!isFirebaseConfigured()) throw new AssistantError('Sign in to use the assistant.');
   const user = getFirebaseAuth().currentUser;
   if (!user) throw new AssistantError('Sign in to use the assistant.');

@@ -8,11 +8,16 @@ import { getAdminFirestore } from './firebaseAdmin';
  * market day so it resets on its own with no cleanup job to forget about.
  */
 
-export type UsageKind = 'ai' | 'sync';
+export type UsageKind = 'ai' | 'sync' | 'takeaway';
 
 const COLLECTION: Record<UsageKind, string> = {
   ai: 'aiUsage',
   sync: 'syncUsage',
+  // The dashboard takeaway is deliberately NOT counted against 'ai'. It is generated for everyone,
+  // free tiers included, because one sharp read of their own month is the best argument for the
+  // assistant there is — and because charging a paid user chat messages for a banner they never
+  // asked for would be a strange way to spend their allowance. Its own counter, its own cap.
+  takeaway: 'takeawayUsage',
 };
 
 /**

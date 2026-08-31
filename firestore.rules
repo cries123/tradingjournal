@@ -117,6 +117,18 @@ service cloud.firestore {
       allow delete: if adminCanDeleteUser(userId);
     }
 
+    // Cached AI dashboard takeaways, one doc per period. Written only by the Admin SDK from
+    // netlify/functions/ai-takeaway.ts — the client never writes here, because a client that could
+    // write its own cache entry could also write one for a period it never paid a generation for,
+    // and the cache is checked before the daily counter is charged. Read is allowed so a future
+    // client can render a cached takeaway without a round trip; the delete rule keeps account
+    // deletion complete.
+    match /users/{userId}/takeaways/{periodKey} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false;
+      allow delete: if adminCanDeleteUser(userId);
+    }
+
     // Broker-connect secrets (SnapTrade userSecret). Written only by the admin SDK from
     // netlify/functions/broker-connect.ts, which bypasses these rules entirely — this block just
     // makes explicit that the client SDK can never read or write it, even by accident.
