@@ -76,22 +76,6 @@ export function ProductsDropdown({ onLaunch, onNavigate }: ProductsDropdownProps
           <button
             type="button"
             role="menuitem"
-            onClick={() => go('market-simulator')}
-            className="w-full flex items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-bg-primary transition-colors"
-          >
-            <Gauge className="h-4 w-4 mt-0.5 text-text-secondary shrink-0" aria-hidden />
-            <span className="flex-1 min-w-0">
-              <span className="flex items-center gap-2">
-                <span className="block text-sm font-medium text-text-primary">Market Simulator</span>
-                <ComingSoonBadge />
-              </span>
-              <span className="block text-xs text-text-secondary">Practice trading risk-free</span>
-            </span>
-          </button>
-
-          <button
-            type="button"
-            role="menuitem"
             onClick={() => go('ai-assistant')}
             className="w-full flex items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-bg-primary transition-colors"
           >
@@ -124,6 +108,22 @@ export function ProductsDropdown({ onLaunch, onNavigate }: ProductsDropdownProps
           >
             <Megaphone className="h-4 w-4 text-text-secondary shrink-0" aria-hidden />
             <span className="text-sm font-medium text-text-primary">What&apos;s New</span>
+          </button>
+
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => go('market-simulator')}
+            className="w-full flex items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-bg-primary transition-colors"
+          >
+            <Gauge className="h-4 w-4 mt-0.5 text-text-secondary shrink-0" aria-hidden />
+            <span className="flex-1 min-w-0">
+              <span className="flex items-center gap-2">
+                <span className="block text-sm font-medium text-text-primary">Market Simulator</span>
+                <ComingSoonBadge />
+              </span>
+              <span className="block text-xs text-text-secondary">Practice trading risk-free</span>
+            </span>
           </button>
         </div>
       )}

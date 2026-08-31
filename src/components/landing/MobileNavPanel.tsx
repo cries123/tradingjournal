@@ -134,15 +134,6 @@ export function MobileNavPanel({
         </button>
         <button
           type="button"
-          onClick={() => go('market-simulator')}
-          className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
-        >
-          <Gauge className="h-4 w-4 text-text-secondary shrink-0" aria-hidden />
-          <span className="text-sm font-medium text-text-primary">Market Simulator</span>
-          <SoonBadge />
-        </button>
-        <button
-          type="button"
           onClick={() => go('ai-assistant')}
           className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
         >
@@ -164,6 +155,15 @@ export function MobileNavPanel({
         >
           <Megaphone className="h-4 w-4 text-text-secondary shrink-0" aria-hidden />
           <span className="text-sm font-medium text-text-primary">What&apos;s New</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => go('market-simulator')}
+          className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
+        >
+          <Gauge className="h-4 w-4 text-text-secondary shrink-0" aria-hidden />
+          <span className="text-sm font-medium text-text-primary">Market Simulator</span>
+          <SoonBadge />
         </button>
 
         <div className="my-3 border-t border-border/50" />
