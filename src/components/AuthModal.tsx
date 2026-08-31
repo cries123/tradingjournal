@@ -4,31 +4,19 @@ import { Starfield } from './Starfield';
 import { UsernameField } from './UsernameField';
 import { useAuth } from '../context/AuthContext';
 import { UsernameTakenError } from '../services/username';
+import {
+  isGoogleSignInAvailable,
+  recordGoogleConfigFailure,
+} from '../services/googleSignIn';
+import {
+  authErrorCode,
+  authErrorMessage,
+  isGoogleConfigError,
+  isUserCancellation,
+} from '../utils/authErrors';
 import { validateUsername } from '../utils/usernameValidation';
 
 type Mode = 'login' | 'signup' | 'reset';
-
-function authErrorMessage(code: string): string {
-  switch (code) {
-    case 'auth/email-already-in-use':
-      return 'An account with this email already exists. Try signing in.';
-    case 'auth/invalid-email':
-      return 'Please enter a valid email address.';
-    case 'auth/weak-password':
-      return 'Password must be at least 6 characters.';
-    case 'auth/user-not-found':
-    case 'auth/wrong-password':
-    case 'auth/invalid-credential':
-      return 'Invalid email or password.';
-    case 'auth/too-many-requests':
-      return 'Too many attempts. Please wait and try again.';
-    case 'auth/popup-closed-by-user':
-      return 'Sign-in popup was closed.';
-    default:
-      if (code.includes('username')) return code;
-      return 'Authentication failed. Please try again.';
-  }
-}
 
 // Only things a free account actually gets. Broker sync moved behind a plan, and listing it as a
 // signup benefit would be selling something the account they're creating doesn't include.
@@ -48,6 +36,9 @@ export function AuthModal() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resetSent, setResetSent] = useState(false);
+  /* Read once on mount rather than on every render: it consults localStorage, and the value can
+     only change as a result of an attempt made from this very component. */
+  const [googleAvailable, setGoogleAvailable] = useState(() => isGoogleSignInAvailable());
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,7 +94,26 @@ export function AuthModal() {
     try {
       await signInWithGoogle();
     } catch (err) {
-      const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
+      const code = authErrorCode(err);
+
+      // Closing the popup is a decision, not a failure. Reporting it as an error is what makes a
+      // working sign-in flow look broken to anyone who changes their mind halfway through.
+      if (isUserCancellation(code)) {
+        return;
+      }
+
+      if (isGoogleConfigError(code)) {
+        // This will fail identically every time until someone changes a Firebase console setting,
+        // so stop offering the button rather than handing the next visitor the same dead end.
+        console.error(`[auth] Google sign-in is misconfigured for this domain: ${code}`);
+        recordGoogleConfigFailure(code);
+        setGoogleAvailable(false);
+        setError(authErrorMessage(code));
+        return;
+      }
+
+      // Everything else can genuinely succeed on a retry, so the button stays.
+      console.error('[auth] Google sign-in failed:', code || err);
       setError(authErrorMessage(code));
     } finally {
       setBusy(false);
@@ -261,7 +271,10 @@ export function AuthModal() {
           </form>
           )}
 
-          {mode !== 'reset' && (
+          {/* The whole Google block, divider included, is gated on availability. A button that
+              cannot work is worse than no button: it looks like the product is broken, and it
+              sends people away rather than to the email form directly beneath it. */}
+          {mode !== 'reset' && googleAvailable && (
           <>
           <div className="flex items-center gap-3 my-6">
             <div className="flex-1 h-px bg-border/60" />

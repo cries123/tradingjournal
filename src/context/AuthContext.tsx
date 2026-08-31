@@ -159,32 +159,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user],
   );
 
+  /**
+   * Everything that happens after the credential is accepted.
+   *
+   * Split out and made non-fatal because it is *not* authentication. Once Firebase has accepted
+   * the credential the person is signed in — the auth state has already changed and the app will
+   * proceed. If a Firestore read then fails (a blocked rule, a network blip, an exhausted read
+   * quota — all of which this project has actually seen), letting it throw meant the sign-in
+   * screen announced "Authentication failed" over a session that had authenticated perfectly.
+   * That is the wrong message, and it made a working Google sign-in look broken.
+   *
+   * The onAuthStateChanged listener above already guards the same call for the same reason. These
+   * two direct paths were simply never given the same treatment.
+   *
+   * The deleted-account check is the one exception that must still stop the session: it is a real
+   * authorisation decision, not bookkeeping. But it only signs the user out when the document says
+   * so — never when the lookup itself failed.
+   */
+  const completeSignIn = useCallback(async (user: User, isNew: boolean) => {
+    const auth = getFirebaseAuth();
+
+    let deleted = false;
+    try {
+      deleted = await isAccountDeleted(user.uid);
+    } catch {
+      // Unreadable means unknown, and unknown is not grounds for refusing someone their account.
+      // The same check runs again on every auth state change, so a genuinely deleted account is
+      // caught the moment the lookup works.
+    }
+    if (deleted) {
+      await signOut(auth);
+      throw new Error('This account has been removed.');
+    }
+
+    try {
+      await ensureUserProfile(user, isNew);
+    } catch (err) {
+      // A profile document that failed to write is worth knowing about, but it is not a reason to
+      // tell someone their sign-in failed when it did not.
+      console.error('[auth] could not write the user profile after sign-in:', err);
+    }
+
+    const name = await loadUsername(user.uid);
+    if (name) setUsername(name);
+  }, []);
+
   const signInWithGoogle = useCallback(async () => {
     const auth = getFirebaseAuth();
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
-    if (await isAccountDeleted(result.user.uid)) {
-      await signOut(auth);
-      throw new Error('This account has been removed.');
-    }
-    const isNew =
-      result.user.metadata.creationTime === result.user.metadata.lastSignInTime;
-    await ensureUserProfile(result.user, isNew);
-    const name = await loadUsername(result.user.uid);
-    if (name) setUsername(name);
-  }, []);
+    const isNew = result.user.metadata.creationTime === result.user.metadata.lastSignInTime;
+    await completeSignIn(result.user, isNew);
+  }, [completeSignIn]);
 
-  const signInWithEmail = useCallback(async (email: string, password: string) => {
-    const auth = getFirebaseAuth();
-    const result = await signInWithEmailAndPassword(auth, email, password);
-    if (await isAccountDeleted(result.user.uid)) {
-      await signOut(auth);
-      throw new Error('This account has been removed.');
-    }
-    await ensureUserProfile(result.user, false);
-    const name = await loadUsername(result.user.uid);
-    if (name) setUsername(name);
-  }, []);
+  const signInWithEmail = useCallback(
+    async (email: string, password: string) => {
+      const auth = getFirebaseAuth();
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      await completeSignIn(result.user, false);
+    },
+    [completeSignIn],
+  );
 
   const createAccount = useCallback(
     async (email: string, password: string, rawUsername: string) => {
