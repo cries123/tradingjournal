@@ -104,7 +104,8 @@ export function TermsOfServicePage({ onHome, onLaunch, onPrivacy, onTerms, onBro
       <section>
         <h2>Broker support</h2>
         <p>
-          Automatic sync is supported today for Schwab (including thinkorswim accounts) and Robinhood;
+          Broker import is supported today for Schwab (including thinkorswim accounts) and Robinhood, and runs
+          only when you request a sync;
           additional brokers may be added over time. Manual entry works for any broker. Custom broker
           support may be configured upon request at our discretion.
         </p>

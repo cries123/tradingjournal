@@ -55,7 +55,7 @@ const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
     // Deliberately does not repeat the broker count or the read-only promise — the Brokers section
     // above makes both, and this page was making each of them eight and seven times respectively.
     description:
-      'Round-trip trades come in from your broker on their own, matched open to close, so you are not copying rows out of a statement every evening.',
+      'Press Sync and your round-trip trades import from your broker, matched open to close, so you are not copying rows out of a statement every evening.',
   },
   {
     icon: Pencil,
@@ -148,7 +148,7 @@ export function LandingPage({
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs font-medium mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              {BROKER_COUNT_PHRASE} now sync automatically
+              One-tap import from {BROKER_COUNT_PHRASE}
             </div>
             {/*
              * One gradient, on the payoff.
@@ -168,8 +168,9 @@ export function LandingPage({
             </h1>
             <p className="mt-5 text-base md:text-lg text-text-secondary leading-relaxed max-w-xl">
               Trend Chasers is a trading journal for active traders. Track daily P&L on a visual
-              calendar, connect {BROKER_COUNT_PHRASE} — {SHORT_BROKER_EXAMPLES} and more — for
-              automatic sync, or log trades manually. Nothing is forced, and you can switch anytime.
+              calendar, connect {BROKER_COUNT_PHRASE} — {SHORT_BROKER_EXAMPLES} and more — and import
+              your fills whenever you want them, or log trades manually. Nothing is forced, and you
+              can switch anytime.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <button type="button" onClick={onLaunch} className="btn-primary text-base px-7 py-3.5">
@@ -225,12 +226,13 @@ export function LandingPage({
               <div className="lg:sticky lg:top-24">
                 <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Brokers</p>
                 <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-                  Connect once. Trades sync automatically.
+                  Connect once. Import whenever you want.
                 </h2>
                 <p className="text-text-secondary leading-relaxed mb-6 max-w-md">
-                  Link {BROKER_COUNT_PHRASE} — {BROKER_EXAMPLES} and more — through SnapTrade, and your
-                  round-trip trades land on the calendar on their own. Entirely optional: manual entry
-                  works just as well, and thinkorswim comes in through your Schwab connection.
+                  Link {BROKER_COUNT_PHRASE} — {BROKER_EXAMPLES} and more — through SnapTrade, then press
+                  Sync and your round-trip trades land on the calendar. Your broker is only ever
+                  contacted when you ask for it. Entirely optional: manual entry works just as well,
+                  and thinkorswim comes in through your Schwab connection.
                 </p>
 
                 <div
@@ -314,7 +316,7 @@ export function LandingPage({
                     {[
                       { step: '1', text: 'Pick your broker and approve a read-only connection on their own site' },
                       { step: '2', text: 'Trend Chasers pulls your recent activity and matches opens to closes' },
-                      { step: '3', text: 'Open the journal and it refreshes itself — new trades appear on your calendar, ready to tag' },
+                      { step: '3', text: 'Press Sync whenever you want your latest fills — they appear on your calendar, ready to tag' },
                     ].map((s) => (
                       <li key={s.step} className="flex gap-4">
                         <span className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0">

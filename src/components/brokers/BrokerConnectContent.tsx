@@ -179,8 +179,7 @@ export function BrokerConnectContent({
         noteUsage({ syncsUsed: Math.max(0, syncsPerDay - syncsRemaining), syncsRemaining });
       }
 
-      // One shared filter with the background sync — see dedupeIncomingTrades. Keeping the rules
-      // in one place is the point: these two paths had drifted apart once already.
+      // See dedupeIncomingTrades for why the rules live in one place rather than here.
       const { fresh: freshTrades, unidentified: skippedUnidentified } = dedupeIncomingTrades(
         trades,
         existingTrades,

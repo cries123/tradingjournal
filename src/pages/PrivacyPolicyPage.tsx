@@ -27,8 +27,8 @@ export function PrivacyPolicyPage({ onHome, onLaunch, onPrivacy, onTerms, onBrok
         <h2>Connecting a broker is optional</h2>
         <p>
           You never have to connect a brokerage account to use Trend Chasers — manual trade entry is always
-          available and requires no connection at all. If you choose to connect Schwab or Robinhood for
-          automatic sync, we use SnapTrade, a third-party broker-data connection provider, to broker that
+          available and requires no connection at all. If you choose to connect Schwab or Robinhood to import
+          your trades, we use SnapTrade, a third-party broker-data connection provider, to broker that
           connection. Your brokerage credentials are entered on your broker&apos;s own site or SnapTrade&apos;s
           secure connection portal — Trend Chasers never receives or stores your brokerage password.
           Connections are read-only by default: they can retrieve your trade history, but cannot place trades

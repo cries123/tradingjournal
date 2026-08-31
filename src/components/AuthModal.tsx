@@ -142,7 +142,7 @@ export function AuthModal() {
               {mode === 'login'
                 ? 'Sign in to sync your journal to the cloud and access it from any device.'
                 : mode === 'signup'
-                  ? 'Free to start. Connect a broker for automatic syncing, or log trades by hand — switch anytime.'
+                  ? 'Free to start. Connect a broker to import your fills, or log trades by hand — switch anytime.'
                   : 'Enter your email and we\'ll send a link to reset your password.'}
             </p>
           </div>

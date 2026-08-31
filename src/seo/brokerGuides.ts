@@ -13,7 +13,7 @@ export const BROKER_GUIDES: BrokerGuide[] = [
   {
     slug: 'thinkorswim',
     brokerName: 'Thinkorswim',
-    title: 'Thinkorswim Trading Journal — Automatic Sync or Manual Entry',
+    title: 'Thinkorswim Trading Journal — Broker Sync or Manual Entry',
     description:
       'Journal Thinkorswim trades with a P&L calendar. Connect your Schwab account and import trades in one tap, or log them manually.',
     path: '/brokers/thinkorswim',
@@ -21,7 +21,7 @@ export const BROKER_GUIDES: BrokerGuide[] = [
       'Track your Thinkorswim trades on a visual P&L calendar. Thinkorswim accounts are Schwab accounts, so connecting Schwab through Trend Chasers syncs your Thinkorswim activity too — or log sessions manually if you\'d rather not connect anything.',
     sections: [
       {
-        heading: 'Sync Thinkorswim trades automatically',
+        heading: 'Sync Thinkorswim trades in one tap',
         paragraphs: [
           'From Connect broker in the sidebar, choose Charles Schwab and approve a read-only connection through SnapTrade, a broker-data connection provider. Because thinkorswim runs on Schwab\'s infrastructure, this covers both.',
           'Round-trip trades are matched automatically — opens paired with closes, P&L computed per trade — and land on your calendar ready to review, tag, and annotate.',
@@ -31,7 +31,7 @@ export const BROKER_GUIDES: BrokerGuide[] = [
         heading: 'Or log sessions manually',
         paragraphs: [
           'Prefer not to connect anything? Log trade lets you enter symbol, P&L, side, and setup tags in seconds. Many traders log end-of-day from memory or a quick glance at their P/L screen.',
-          'You can mix both: sync one account automatically and log a paper account or a second broker by hand.',
+          'You can mix both: sync one account from your broker and log a paper account or a second broker by hand.',
         ],
       },
       {
@@ -46,7 +46,7 @@ export const BROKER_GUIDES: BrokerGuide[] = [
       {
         question: 'Do I need to connect my Schwab or Thinkorswim account?',
         answer:
-          'No. Connecting is optional — Connect broker in the sidebar syncs trades automatically if you want it, but manual entry works just as well if you\'d rather not link anything.',
+          'No. Connecting is optional — Connect broker in the sidebar pulls your trades in whenever you press Sync, but manual entry works just as well if you\'d rather not link anything.',
       },
       {
         question: 'Does broker sync handle options trades?',
@@ -63,7 +63,7 @@ export const BROKER_GUIDES: BrokerGuide[] = [
   {
     slug: 'charles-schwab',
     brokerName: 'Charles Schwab',
-    title: 'Charles Schwab Trading Journal — Automatic Sync or Manual Entry',
+    title: 'Charles Schwab Trading Journal — Broker Sync or Manual Entry',
     description:
       'Journal Charles Schwab trades on a P&L calendar. Import through a secure, read-only connection, or log trades manually.',
     path: '/brokers/charles-schwab',
@@ -112,7 +112,7 @@ export const BROKER_GUIDES: BrokerGuide[] = [
   {
     slug: 'robinhood',
     brokerName: 'Robinhood',
-    title: 'Robinhood Trading Journal — Automatic Sync or Manual Entry',
+    title: 'Robinhood Trading Journal — Broker Sync or Manual Entry',
     description:
       'Journal Robinhood trades on a visual P&L calendar. Import through a read-only connection, or log trades manually.',
     path: '/brokers/robinhood',

@@ -12,7 +12,7 @@ const ORGANIZATION = {
   url: SITE_ORIGIN,
   logo: `${SITE_ORIGIN}/logo-mark.svg`,
   description:
-    `Free trading journal with a visual P&L calendar, performance analytics, and automatic sync with ${BROKER_COUNT_PHRASE}.`,
+    `Free trading journal with a visual P&L calendar, performance analytics, and one-tap trade import from ${BROKER_COUNT_PHRASE}.`,
   contactPoint: {
     '@type': 'ContactPoint',
     email: 'support@trendchasers.net',
@@ -44,7 +44,7 @@ const SOFTWARE_APP = {
     priceCurrency: 'USD',
   },
   description:
-    `Free trading journal with P&L calendar, automatic sync with ${BROKER_COUNT_PHRASE}, manual entry, and performance analytics.`,
+    `Free trading journal with P&L calendar, one-tap trade import from ${BROKER_COUNT_PHRASE}, manual entry, and performance analytics.`,
 };
 
 const NAV_LINKS = [

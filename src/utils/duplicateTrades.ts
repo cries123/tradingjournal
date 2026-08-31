@@ -178,12 +178,12 @@ export interface DedupeResult {
 }
 
 /**
- * Decides which trades off a broker sync are actually new. The only implementation — both the
- * manual sync and the background sync call this.
+ * Decides which trades off a broker sync are actually new.
  *
- * They used to filter separately, and the two filters had drifted: the manual one dropped rows
- * with no sourceId and cross-checked an execution fingerprint, while the background one did
- * neither and pushed every row it could not match. Whichever is more careful, having two of these
+ * The rules live here, in one place, deliberately. This app has shipped two copies of them before
+ * — one that dropped rows with no sourceId and cross-checked an execution fingerprint, and one
+ * that did neither and imported every row it could not match. Both ran against the same journal,
+ * and a duplicated month of history is what that cost. Whichever copy is more careful, having two
  * means the careless one eventually runs.
  *
  * Two independent ways to recognise a trade, because one is not enough:
@@ -193,8 +193,8 @@ export interface DedupeResult {
  *    re-import every one of them on the first sync after the fix.
  *
  * A row with no sourceId at all is dropped rather than imported. Nothing about it can be matched
- * on the next sync, so importing it guarantees a fresh copy every time — which is precisely how a
- * background sync running unattended turns one unidentifiable fill into a hundred.
+ * on the next sync, so importing it guarantees a fresh copy of that fill every time anyone presses
+ * Sync — a duplicate for each attempt, indefinitely.
  */
 export function dedupeIncomingTrades(
   incoming: Partial<Trade>[],
