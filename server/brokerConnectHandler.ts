@@ -6,7 +6,7 @@ import { mapSnapTradeActivitiesToTrades, type SnapTradeActivityLike } from './ma
 import { BROKER_REGISTRY, brokerRegistryEntry, isBrokerRegistryKey } from '../src/data/brokerRegistry';
 import { resolveAccess } from './entitlements';
 import { consumeDaily, refundDaily } from './usage';
-import { describeHttpError, isUpstreamOutage } from './upstreamErrors';
+import { describeHttpError, isRejectedCredential, isUpstreamOutage } from './upstreamErrors';
 import { lowestTierWith, TIER_PLANS, type Tier } from '../src/config/tiers';
 
 export type SupportedBroker = string;
@@ -85,46 +85,6 @@ async function getOrRegisterCreds(uid: string): Promise<SnaptradeCreds> {
     await ref.set(creds);
     return creds;
   }
-}
-
-/**
- * Whether SnapTrade rejected the credentials themselves, as opposed to failing the request.
- *
- * A stored userSecret can stop being valid without anything about it changing: rotating the
- * consumer key, or moving the app between SnapTrade's test and production environments, leaves
- * every secret in Firestore issued against credentials that no longer recognise it. Nothing in the
- * old flow noticed — getOrRegisterCreds returns a cached secret without ever validating it, so the
- * user would keep hitting auth errors forever with no path back.
- */
-function isRejectedCredential(err: unknown): boolean {
-  // An outage is never evidence that this user's secret is wrong, and the recovery below deletes
-  // it — so a provider having a bad day must not be allowed to look like a bad credential. During
-  // an outage a degraded API can answer 401 or "user not found" for reasons that have nothing to
-  // do with the caller, and re-registering on that would break connections that were working.
-  if (isUpstreamOutage(err)) return false;
-
-  const { status, body } = describeHttpError(err);
-
-  // 401 is unambiguous: the credentials were not accepted.
-  if (status === 401) return true;
-
-  /*
-   * 403 is not. SnapTrade answers 403 for a rejected signature AND for a request the caller is
-   * simply not entitled to make — a connector their subscription does not cover, for instance.
-   * Treating every 403 as a dead secret means deleting a working credential and forcing a
-   * reconnect because an unrelated entitlement is missing, which is the more damaging mistake of
-   * the two. So a 403 has to say so in the body before it counts.
-   */
-  const haystack = `${err instanceof Error ? err.message : ''} ${body}`.toLowerCase();
-
-  const saysCredential =
-    haystack.includes('signature') ||
-    haystack.includes('unauthorized') ||
-    haystack.includes('unable to verify') ||
-    (haystack.includes('user') && haystack.includes('not found'));
-
-  if (status === 403) return saysCredential;
-  return saysCredential;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeHttpError, isUpstreamOutage } from '../../server/upstreamErrors';
+import { describeHttpError, isRejectedCredential, isUpstreamOutage } from '../../server/upstreamErrors';
 
 /**
  * This predicate decides whether a user gets their sync back. Too strict and they pay for an
@@ -50,93 +50,7 @@ describe('isUpstreamOutage', () => {
   });
 });
 
-/**
- * The recovery path this guards deletes a user's stored broker secret and re-registers them, so a
- * false positive costs someone a working connection. These pin the cases where that must not fire.
- */
-describe('outage errors must never look like a rejected credential', () => {
-  // Mirrors isRejectedCredential in brokerConnectHandler: outage first, then the auth signals.
-  const rejectedCredential = (err: unknown): boolean => {
-    if (isUpstreamOutage(err)) return false;
-    const status = (err as { status?: number; response?: { status?: number } } | null)?.response
-      ?.status ?? (err as { status?: number } | null)?.status;
-    if (status === 401 || status === 403) return true;
-    const message = err instanceof Error ? err.message.toLowerCase() : '';
-    return (
-      message.includes('signature') ||
-      message.includes('unauthorized') ||
-      message.includes('unable to verify') ||
-      (message.includes('user') && message.includes('not found'))
-    );
-  };
 
-  it('still recognises a genuinely rejected secret', () => {
-    expect(rejectedCredential({ status: 401 })).toBe(true);
-    expect(rejectedCredential(new Error('Unable to verify signature'))).toBe(true);
-    expect(rejectedCredential(new Error('User not found'))).toBe(true);
-  });
-
-  it('does not re-register when the provider is simply unreachable', () => {
-    expect(rejectedCredential(new Error('fetch failed'))).toBe(false);
-    expect(rejectedCredential(Object.assign(new Error('x'), { code: 'ETIMEDOUT' }))).toBe(false);
-    expect(rejectedCredential({ status: 503 })).toBe(false);
-  });
-
-  it('does not re-register on a 401 that arrived with an outage-shaped cause', () => {
-    // A degraded API can answer 401 for reasons that have nothing to do with the caller. Deleting
-    // a working secret over that is exactly the failure this ordering prevents.
-    expect(rejectedCredential(Object.assign(new Error('unauthorized'), { cause: { code: 'ECONNRESET' } }))).toBe(false);
-  });
-});
-
-/**
- * A 403 is the dangerous case: SnapTrade returns it both for a rejected signature and for a
- * request the caller is not entitled to make. The recovery path deletes the user's stored secret,
- * so reading "not entitled" as "dead credential" costs someone a working connection over an
- * unrelated subscription gap.
- */
-describe('a 403 only counts as a rejected credential when it says so', () => {
-  const rejectedCredential = (err: unknown): boolean => {
-    if (isUpstreamOutage(err)) return false;
-    const res = (err as { response?: { status?: number; data?: unknown } } | null)?.response;
-    const status = res?.status ?? (err as { status?: number } | null)?.status;
-    if (status === 401) return true;
-    const body = typeof res?.data === 'string' ? res.data : res?.data ? JSON.stringify(res.data) : '';
-    const haystack = `${err instanceof Error ? err.message : ''} ${body}`.toLowerCase();
-    const saysCredential =
-      haystack.includes('signature') ||
-      haystack.includes('unauthorized') ||
-      haystack.includes('unable to verify') ||
-      (haystack.includes('user') && haystack.includes('not found'));
-    if (status === 403) return saysCredential;
-    return saysCredential;
-  };
-
-  it('treats a 401 as a dead credential without needing the body', () => {
-    expect(rejectedCredential({ response: { status: 401, data: {} } })).toBe(true);
-  });
-
-  it('treats a 403 about a signature as a dead credential', () => {
-    expect(
-      rejectedCredential({ response: { status: 403, data: { detail: 'Unable to verify signature' } } }),
-    ).toBe(true);
-  });
-
-  it('does NOT delete a secret over a 403 about an entitlement', () => {
-    // The Schwab/Akoya case: the keys are fine, the subscription is not. Re-registering here would
-    // destroy a working Robinhood connection to fix nothing.
-    expect(
-      rejectedCredential({ response: { status: 403, data: { detail: 'Subscription unavailable' } } }),
-    ).toBe(false);
-  });
-
-  it('reads the body, not just the axios message, which only carries headers', () => {
-    const axiosish = Object.assign(new Error('Request failed with status code 403'), {
-      response: { status: 403, data: { detail: 'Unable to verify signature.' } },
-    });
-    expect(rejectedCredential(axiosish)).toBe(true);
-  });
-});
 
 /**
  * The SnapTrade SDK throws its own error type, not an axios one. Reading err.response.data — the
@@ -175,5 +89,59 @@ describe('describeHttpError', () => {
 
   it('does not lose a string body that happens to be falsy-ish', () => {
     expect(describeHttpError({ status: 400, responseBody: '0' }).body).toBe('0');
+  });
+});
+
+/**
+ * The real function, not a copy of it.
+ *
+ * These previously reimplemented isRejectedCredential because it lived in a module that pulls in
+ * firebase-admin and the SnapTrade SDK. A test that mirrors the logic it is checking passes while
+ * production breaks — so the function moved here instead.
+ *
+ * What it guards matters: a true answer makes the server delete the user's stored broker secret
+ * and re-register them, which costs them every connection they had.
+ */
+describe('isRejectedCredential', () => {
+  /** The shape the SDK genuinely throws — verified against the live API. */
+  const sdkError = (status: number, responseBody: unknown) =>
+    Object.assign(new Error(`Request failed with status code ${status}\nRESPONSE HEADERS:\n{}`), {
+      name: 'SnaptradeError',
+      status,
+      responseBody,
+      method: 'POST',
+      url: '/api/v1/snapTrade/login',
+    });
+
+  it('treats a 401 as a dead credential on its own', () => {
+    expect(isRejectedCredential(sdkError(401, { detail: 'anything' }))).toBe(true);
+  });
+
+  it('treats a 403 that names a signature problem as a dead credential', () => {
+    expect(isRejectedCredential(sdkError(403, { detail: 'Unable to verify signature' }))).toBe(true);
+  });
+
+  it('does NOT re-register over a 403 about an entitlement', () => {
+    // The Schwab case. The keys are fine and the subscription is not; deleting the secret here
+    // would destroy a working Robinhood connection to fix nothing.
+    expect(isRejectedCredential(sdkError(403, { detail: 'Subscription unavailable' }))).toBe(false);
+  });
+
+  it('reads the body, which is the only place the reason appears', () => {
+    // err.response is undefined on every SnapTrade error — confirmed against the live API — so a
+    // check reading err.response.data matches an empty string and silently never fires.
+    const err = sdkError(403, { detail: 'Unable to verify signature.' });
+    expect((err as { response?: unknown }).response).toBeUndefined();
+    expect(isRejectedCredential(err)).toBe(true);
+  });
+
+  it('never fires when the provider is simply unreachable', () => {
+    expect(isRejectedCredential(Object.assign(new Error('fetch failed'), { code: 'ECONNRESET' }))).toBe(false);
+    expect(isRejectedCredential(sdkError(503, 'gateway down'))).toBe(false);
+  });
+
+  it('does not fire on an unclassifiable error', () => {
+    expect(isRejectedCredential(null)).toBe(false);
+    expect(isRejectedCredential(sdkError(400, {}))).toBe(false);
   });
 });
