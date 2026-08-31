@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  /* The app config's "types": ["vite/client"] is inherited deliberately — overriding it drops
+     import.meta.env and every module that reads config stops compiling. The tests import describe,
+     it and expect from "vitest" by name rather than relying on globals, so nothing extra is needed. */
+  "include": ["src"],
+  "exclude": []
+}

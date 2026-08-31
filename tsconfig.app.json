@@ -21,5 +21,13 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+
+  /* Tests are excluded from the production typecheck on purpose. `npm run build` runs `tsc -b`,
+     and the test files import from "vitest" — a devDependency. Netlify installs devDependencies
+     today, so this builds either way, but that makes a deploy depend on a dev-only package being
+     present: set NODE_ENV=production or install with --omit=dev and the build dies on
+     "Cannot find module 'vitest'", a long way from anything that looks like the cause.
+     Typecheck them with `npm run typecheck:tests`. */
+  "exclude": ["**/*.test.ts", "**/*.test.tsx"]
 }
