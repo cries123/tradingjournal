@@ -31,13 +31,29 @@ export function useLeaderboardSync(trades: Trade[]): void {
     if (!firebaseEnabled || !user) return;
     const uid = user.uid;
 
+    /*
+     * Both calls are fire-and-forget by design — nobody is waiting on the leaderboard and a failed
+     * write must not interrupt what the trader is doing. But `void` on its own discards the
+     * rejection too, so a write that keeps failing produced an unhandled rejection in the console
+     * and nothing else: the entry silently stopped updating and the user had no way to know.
+     *
+     * That stops being hypothetical the moment the rules enforce the anonymity invariant, because
+     * a stale client writing a username onto an anonymous entry is then rejected outright — the
+     * exact case where a silent failure looks like the leaderboard quietly forgetting someone.
+     */
     if (!settings.leaderboardOptIn) {
-      void removeLeaderboardEntry(uid);
+      void removeLeaderboardEntry(uid).catch((err) => {
+        console.error('[leaderboard] failed to remove entry:', err);
+      });
       return;
     }
 
     timerRef.current = setTimeout(() => {
-      void upsertLeaderboardEntry(uid, username || 'Trader', settings.leaderboardAnonymous, trades);
+      void upsertLeaderboardEntry(uid, username || 'Trader', settings.leaderboardAnonymous, trades).catch(
+        (err) => {
+          console.error('[leaderboard] failed to update entry:', err);
+        },
+      );
     }, SYNC_DEBOUNCE_MS);
 
     return () => {

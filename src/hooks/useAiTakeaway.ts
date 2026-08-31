@@ -27,7 +27,17 @@ export function useAiTakeaway(
   rules?: JournalFactsOptions['rules'],
 ): string | null {
   const { user } = useAuth();
-  const [text, setText] = useState<string | null>(null);
+  /*
+   * Stored with the request it answered rather than on its own.
+   *
+   * The previous version kept a bare string and cleared it from the effect on every key change, to
+   * stop a takeaway written about one period being shown beside another period's numbers. That
+   * worked, but clearing state synchronously inside an effect is a cascading render — and it is
+   * unnecessary, because "is this text about what I am looking at" is answerable by comparing the
+   * key it arrived with. Now nothing is set from the effect body at all; the only setState is in
+   * the fetch callback, and a mismatched key simply renders as nothing.
+   */
+  const [answer, setAnswer] = useState<{ key: string; text: string | null }>({ key: '', text: null });
   const requestedRef = useRef<string>('');
 
   const uid = user?.uid ?? '';
@@ -36,14 +46,7 @@ export function useAiTakeaway(
   const requestKey = `${uid}:${periodKey}:${factsHash}`;
 
   useEffect(() => {
-    if (!enabled) {
-      setText(null);
-      return;
-    }
-
-    // The trade set this text was written about has changed; showing it beside different numbers
-    // would be worse than falling back to the computed line.
-    setText(null);
+    if (!enabled) return;
     if (requestedRef.current === requestKey) return;
     requestedRef.current = requestKey;
 
@@ -52,7 +55,7 @@ export function useAiTakeaway(
 
     const controller = new AbortController();
     void fetchAiTakeaway(facts, periodKey, factsHash, controller.signal).then((result) => {
-      if (!controller.signal.aborted) setText(result);
+      if (!controller.signal.aborted) setAnswer({ key: requestKey, text: result });
     });
 
     return () => controller.abort();
@@ -61,5 +64,7 @@ export function useAiTakeaway(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestKey, enabled, periodKey]);
 
-  return text;
+  // Only shown when it answers the request currently on screen, so a takeaway about last month can
+  // never appear beside this month's numbers while a new one is in flight.
+  return enabled && answer.key === requestKey ? answer.text : null;
 }

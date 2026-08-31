@@ -207,7 +207,7 @@ async function recordBrokerConnectionState(
  * one standing between the free tier and an unbounded bill. It runs on the server because the
  * client-side lock is a courtesy, not a control.
  */
-function assertBrokerSyncIncluded(tier: Tier, brokers: number): void {
+function assertBrokerSyncIncluded(_tier: Tier, brokers: number): void {
   if (brokers > 0) return;
   const needed = lowestTierWith('brokerSync');
   throw new BrokerRequestError(

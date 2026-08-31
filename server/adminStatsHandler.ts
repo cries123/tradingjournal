@@ -94,6 +94,30 @@ export function aggregateBrokerStates(
     institutions: [...institutionUsers.entries()]
       .map(([name, users]) => ({ name, users }))
       .sort((a, b) => b.users - a.users),
+    /*
+     * The rows behind the totals.
+     *
+     * This function's return type has always promised them and the loop above has always had them
+     * in hand — they were counted and dropped. Nothing caught the mismatch because server code is
+     * not typechecked by the build, so the panel shipped able to say "2 connected" and unable to
+     * say which two: brokerUsers arrived undefined, the client coerced it to [], and the Users tab
+     * showed nothing with no error anywhere.
+     *
+     * Connected users first, then by how many accounts they linked, so the interesting rows are at
+     * the top of a list that grows with signups. Users who never started the connect flow are left
+     * out — they are trivially not connected, and including them would make this the user table.
+     */
+    users: registeredUids
+      .map((uid) => {
+        const state = states.get(uid);
+        return {
+          uid,
+          connected: Boolean(state?.connected),
+          accountCount: state?.accountCount ?? 0,
+          institutions: [...new Set(state?.institutions ?? [])],
+        };
+      })
+      .sort((a, b) => Number(b.connected) - Number(a.connected) || b.accountCount - a.accountCount),
   };
 }
 
@@ -338,6 +362,10 @@ export async function handleAdminStatsRequest(
             connected: 0,
             accounts: 0,
             institutions: [] as BrokerInstitutionCount[],
+            // Empty rather than absent: the panel distinguishes "nobody is connected" from "we
+            // could not find out" using partial, and an undefined list here is what made
+            // brokerUsers undefined on the happy path too.
+            users: [] as AdminBrokerUser[],
             partial: true,
           };
         }),

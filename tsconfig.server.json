@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["ES2023"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    /* vite/client alongside node because server files import from src/config and src/data, and
+       those pull in modules that read import.meta.env. Without it this config reports errors in
+       browser code that the app build already checks correctly. */
+    "types": ["node", "vite/client"],
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "verbatimModuleSyntax": true
+  },
+  /* Deliberately not referenced from tsconfig.json and not part of `npm run build`.
+     Netlify bundles these with esbuild, which does not typecheck, so nothing here has ever been
+     checked — which is how aggregateBrokerStates shipped declaring a field it never returned, and
+     how the admin Users tab ended up permanently empty with no error anywhere.
+     Kept off the deploy path on purpose: a typecheck that can fail a production deploy over
+     server code esbuild will happily bundle is a worse trade than one someone runs. */
+  "include": ["server/**/*.ts", "netlify/functions/**/*.ts", "src/config/**/*.ts", "src/data/**/*.ts"]
+}

@@ -67,6 +67,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     };
 
     void loadCloud();
+    // Keyed on the uid on purpose: `user` is a new object on every token refresh, and depending on
+    // it would refetch settings from Firestore each time one happened. The uid is the only part of
+    // it this effect actually reads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
 
   useEffect(() => {

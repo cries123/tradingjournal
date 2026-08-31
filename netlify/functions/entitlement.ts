@@ -1,4 +1,4 @@
-import type { Handler } from '@netlify/functions';
+import type { Handler, HandlerResponse } from '@netlify/functions';
 import { assertCallerUid, BrokerRequestError } from '../../server/snaptradeAuth';
 import { readEntitlement, effectiveTier } from '../../server/entitlements';
 import { readUsed, usageResetsAt } from '../../server/usage';
@@ -12,7 +12,7 @@ import { limitsFor, MARKET_REPLAY_LIVE } from '../../src/config/tiers';
  * edit is decoration. It also keeps the tier badge to a single request instead of a live listener,
  * which matters on a project that has already been knocked over once by Firestore read quota.
  */
-export const handler: Handler = async (event) => {
+export const handler: Handler = async (event): Promise<HandlerResponse> => {
   let uid: string;
   try {
     uid = await assertCallerUid(event.headers);

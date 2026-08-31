@@ -1,4 +1,4 @@
-import type { Handler } from '@netlify/functions';
+import type { Handler, HandlerResponse } from '@netlify/functions';
 import { assertCallerUid, BrokerRequestError } from '../../server/snaptradeAuth';
 import { getAdminAuth, getAdminFirestore } from '../../server/firebaseAdmin';
 import {
@@ -31,7 +31,7 @@ async function isSiteAdmin(uid: string): Promise<boolean> {
  * webhook later uses to decide whose account to upgrade, so letting the client name it would let
  * anyone buy Diamond for someone else's account, or worse, claim someone else's payment.
  */
-export const handler: Handler = async (event) => {
+export const handler: Handler = async (event): Promise<HandlerResponse> => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }

@@ -1,4 +1,4 @@
-import type { Handler } from '@netlify/functions';
+import type { Handler, HandlerResponse } from '@netlify/functions';
 import { assertCallerUid, BrokerRequestError } from '../../server/snaptradeAuth';
 import { createBillingPortalLink, CreemError, CREEM_CONFIGURED } from '../../server/creemClient';
 import { readEntitlement } from '../../server/entitlements';
@@ -14,7 +14,7 @@ import { readEntitlement } from '../../server/entitlements';
  * The customer id comes from their own entitlement record, never from the request, so nobody can
  * open a portal session for somebody else's billing account.
  */
-export const handler: Handler = async (event) => {
+export const handler: Handler = async (event): Promise<HandlerResponse> => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
