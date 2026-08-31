@@ -24,6 +24,8 @@ export interface AdminServerStats {
   brokerAbandonedCount: number;
   brokerInstitutions: BrokerInstitutionCount[];
   brokerStatsPartial: boolean;
+  /** Users whose stored secret the current SnapTrade credentials rejected — they must reconnect. */
+  brokerNeedsReconnectCount: number;
   /** Per-user connection state. Only users who ever started the connect flow appear here. */
   brokerUsers: AdminBrokerUser[];
 }
@@ -33,6 +35,8 @@ export interface AdminBrokerUser {
   connected: boolean;
   accountCount: number;
   institutions: string[];
+  /** SnapTrade rejected this user's stored secret under the credentials now in use. */
+  needsReconnect?: boolean;
 }
 
 export interface AdminServerStatsResult {
@@ -93,6 +97,7 @@ export async function fetchAdminServerStats(): Promise<AdminServerStatsResult> {
         brokerAbandonedCount: num(data.brokerAbandonedCount),
         brokerInstitutions: Array.isArray(data.brokerInstitutions) ? data.brokerInstitutions : [],
         brokerStatsPartial: data.brokerStatsPartial === true,
+        brokerNeedsReconnectCount: num(data.brokerNeedsReconnectCount),
         // An older deploy of the function won't send this. An empty list means the Users tab shows
         // "unknown" rather than confidently claiming nobody is connected.
         brokerUsers: Array.isArray(data.brokerUsers)

@@ -1,6 +1,15 @@
 import { Snaptrade, SnaptradeAuth } from 'snaptrade-typescript-sdk';
 import { brokerRegistryEntry, matchesBrokerEntry } from '../src/data/brokerRegistry';
 
+/**
+ * Which SnapTrade credentials this deploy is running on.
+ *
+ * Exported because a user secret is only meaningful under the client that issued it: moving from
+ * test to production keys invalidates every stored secret, and anything cached about a user's
+ * connections while on the old client is describing a world that no longer exists.
+ */
+export const SNAPTRADE_CLIENT_ID = process.env.SNAPTRADE_CLIENT_ID?.trim() ?? '';
+
 export const SNAPTRADE_CONFIGURED = Boolean(
   process.env.SNAPTRADE_CLIENT_ID?.trim() && process.env.SNAPTRADE_CONSUMER_KEY?.trim(),
 );

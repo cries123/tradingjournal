@@ -2,7 +2,8 @@ import type { IncomingHttpHeaders } from 'http';
 import type { Firestore } from 'firebase-admin/firestore';
 import { AdminRequestError, assertCallerIsAdmin, getBearerToken } from './adminAuth';
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin';
-import { getSnaptrade, SNAPTRADE_CONFIGURED } from './snaptradeClient';
+import { getSnaptrade, SNAPTRADE_CLIENT_ID, SNAPTRADE_CONFIGURED } from './snaptradeClient';
+import { isRejectedCredential } from './upstreamErrors';
 
 export interface BrokerInstitutionCount {
   name: string;
@@ -37,6 +38,8 @@ export interface AdminStatsResponse {
   /** True when the live SnapTrade check couldn't cover every registered user (timed out, or
    *  SnapTrade isn't configured) and some rows fell back to the last cached status. */
   brokerStatsPartial: boolean;
+  /** Users whose stored secret the current SnapTrade credentials rejected. */
+  brokerNeedsReconnectCount: number;
   /**
    * Per-user connection state, so the Users tab can show who is actually linked.
    *
@@ -52,12 +55,16 @@ export interface AdminBrokerUser {
   connected: boolean;
   accountCount: number;
   institutions: string[];
+  /** True when SnapTrade rejected this user's stored secret — they have to reconnect. */
+  needsReconnect?: boolean;
 }
 
 export interface BrokerConnectionState {
   connected: boolean;
   accountCount: number;
   institutions: string[];
+  /** Checked, and this user's stored secret is not valid for the credentials now in use. */
+  needsReconnect?: boolean;
 }
 
 /**
@@ -70,7 +77,7 @@ export interface BrokerConnectionState {
 export function aggregateBrokerStates(
   registeredUids: string[],
   states: Map<string, BrokerConnectionState>,
-): Omit<BrokerStats, 'partial'> {
+): Omit<BrokerStats, 'partial' | 'needsReconnect'> {
   let connected = 0;
   let accounts = 0;
   const institutionUsers = new Map<string, number>();
@@ -115,6 +122,7 @@ export function aggregateBrokerStates(
           connected: Boolean(state?.connected),
           accountCount: state?.accountCount ?? 0,
           institutions: [...new Set(state?.institutions ?? [])],
+          needsReconnect: Boolean(state?.needsReconnect),
         };
       })
       .sort((a, b) => Number(b.connected) - Number(a.connected) || b.accountCount - a.accountCount),
@@ -123,6 +131,8 @@ export function aggregateBrokerStates(
 
 interface BrokerStats {
   registered: number;
+  /** Users whose stored secret was rejected by the credentials now in use. */
+  needsReconnect: number;
   connected: number;
   accounts: number;
   institutions: BrokerInstitutionCount[];
@@ -165,11 +175,30 @@ async function collectBrokerStats(db: Firestore): Promise<BrokerStats> {
 
   const cachedSnap = await db.collection('brokerConnections').get();
   const cached = new Map<string, { connected?: boolean; accountCount?: number; institutions?: string[] }>();
+  let staleEnvironmentRows = 0;
   for (const docSnap of cachedSnap.docs) {
+    const data = docSnap.data() as { clientId?: string };
+    /*
+     * A cached row describes a connection under one set of credentials. A row written on the test
+     * client says nothing about production, so it is discarded rather than trusted — otherwise the
+     * first load after a key change reports the old world as though it were still here.
+     *
+     * Rows with no clientId at all pre-date this field, which means they were written before the
+     * switch, which is exactly the case worth distrusting.
+     */
+    if (data.clientId !== SNAPTRADE_CLIENT_ID) {
+      staleEnvironmentRows++;
+      continue;
+    }
     cached.set(docSnap.id, docSnap.data());
   }
+  if (staleEnvironmentRows > 0) {
+    console.warn(
+      `[admin-stats] ignored ${staleEnvironmentRows} cached broker row(s) from different SnapTrade credentials.`,
+    );
+  }
 
-  const results = new Map<string, { connected: boolean; accountCount: number; institutions: string[] }>();
+  const results = new Map<string, BrokerConnectionState>();
   let partial = false;
 
   if (!SNAPTRADE_CONFIGURED) {
@@ -205,9 +234,32 @@ async function collectBrokerStats(db: Firestore): Promise<BrokerStats> {
             accountCount: res.data.length,
             institutions,
           });
-        } catch {
-          // One user's lookup failing (revoked auth, a SnapTrade hiccup) shouldn't cost us the
-          // other 18 — fall through to their cached row below.
+        } catch (err) {
+          /*
+           * A rejected credential is an answer, not a failed check.
+           *
+           * Every stored userSecret was issued by one SnapTrade client. Rotating to production
+           * keys invalidates all of them at once, and this lookup then throws for every user —
+           * which used to fall through to their cached row, and those rows said "connected"
+           * because they were written while the old keys still worked. The panel went on
+           * reporting connections that had ceased to exist, and the only hint was a warning
+           * saying the totals might be LOW.
+           *
+           * So this case records what is actually true now: not connected under these
+           * credentials, and needing the user to reconnect.
+           */
+          if (isRejectedCredential(err)) {
+            results.set(next.uid, {
+              connected: false,
+              accountCount: 0,
+              institutions: [],
+              needsReconnect: true,
+            });
+            continue;
+          }
+
+          // A genuine hiccup — an outage, a timeout. One user's lookup failing shouldn't cost us
+          // the other 18, so fall through to their cached row below.
           partial = true;
         }
       }
@@ -248,6 +300,9 @@ async function collectBrokerStats(db: Firestore): Promise<BrokerStats> {
               connected: live.connected,
               accountCount: live.accountCount,
               institutions: live.institutions,
+              // So a later run can tell whether this row is about the credentials it is running on.
+              clientId: SNAPTRADE_CLIENT_ID,
+              needsReconnect: Boolean(live.needsReconnect),
               lastCheckedAt: now,
               ...(live.connected && !fallback?.connected ? { firstConnectedAt: now } : {}),
             },
@@ -260,12 +315,15 @@ async function collectBrokerStats(db: Firestore): Promise<BrokerStats> {
 
   await Promise.all(writes);
 
+  const needsReconnect = [...effective.values()].filter((v) => v.needsReconnect).length;
+
   return {
     ...aggregateBrokerStates(
       registeredUsers.map((u) => u.uid),
       effective,
     ),
     partial,
+    needsReconnect,
     users: registeredUsers.map((u) => {
       const state = effective.get(u.uid);
       return {
@@ -273,6 +331,7 @@ async function collectBrokerStats(db: Firestore): Promise<BrokerStats> {
         connected: Boolean(state?.connected),
         accountCount: state?.accountCount ?? 0,
         institutions: state?.institutions ?? [],
+        needsReconnect: Boolean(state?.needsReconnect),
       };
     }),
   };
@@ -366,6 +425,7 @@ export async function handleAdminStatsRequest(
             // could not find out" using partial, and an undefined list here is what made
             // brokerUsers undefined on the happy path too.
             users: [] as AdminBrokerUser[],
+            needsReconnect: 0,
             partial: true,
           };
         }),
@@ -393,9 +453,19 @@ export async function handleAdminStatsRequest(
       brokerRegisteredCount: brokerStats.registered,
       brokerConnectedCount: brokerStats.connected,
       brokerAccountCount: brokerStats.accounts,
-      brokerAbandonedCount: Math.max(0, brokerStats.registered - brokerStats.connected),
+      /*
+       * Dropped off means started the connect flow and never linked anything. A user whose stored
+       * secret the current keys reject did link — their credentials were invalidated underneath
+       * them — so counting them here would report a drop-off that never happened, and blame the
+       * user for a key rotation.
+       */
+      brokerAbandonedCount: Math.max(
+        0,
+        brokerStats.registered - brokerStats.connected - brokerStats.needsReconnect,
+      ),
       brokerInstitutions: brokerStats.institutions,
       brokerStatsPartial: brokerStats.partial,
+      brokerNeedsReconnectCount: brokerStats.needsReconnect,
       brokerUsers: brokerStats.users,
     };
 

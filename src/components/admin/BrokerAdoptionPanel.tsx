@@ -92,6 +92,17 @@ export function BrokerAdoptionPanel({ serverStats, serverError }: BrokerAdoption
           </p>
           <p className="text-[10px] text-text-secondary mt-0.5">Started, never linked</p>
         </div>
+        {serverStats.brokerNeedsReconnectCount > 0 && (
+          // Only rendered when it is non-zero: it is a migration state, not a permanent metric, and
+          // a tile reading 0 forever would just be clutter once everyone has reconnected.
+          <div className="rounded-lg bg-bg-tertiary/50 border border-amber-500/30 px-3 py-2.5">
+            <p className="text-[9px] uppercase tracking-wide text-text-secondary">Needs reconnect</p>
+            <p className="text-xl font-bold tabular-nums mt-0.5 text-amber-400">
+              {serverStats.brokerNeedsReconnectCount.toLocaleString()}
+            </p>
+            <p className="text-[10px] text-text-secondary mt-0.5">Linked before, keys changed</p>
+          </div>
+        )}
       </div>
 
       {brokerInstitutions.length > 0 ? (
@@ -126,11 +137,20 @@ export function BrokerAdoptionPanel({ serverStats, serverError }: BrokerAdoption
         </p>
       )}
 
+      {serverStats.brokerNeedsReconnectCount > 0 && (
+        <p className="text-[11px] text-amber-400/90 mt-3">
+          SnapTrade rejected the stored credentials for {serverStats.brokerNeedsReconnectCount}{' '}
+          {serverStats.brokerNeedsReconnectCount === 1 ? 'user' : 'users'}, so they are counted as
+          not connected. That is what a change of SnapTrade keys looks like — every secret issued by
+          the old client stops working at once, and those users have to reconnect their broker.
+        </p>
+      )}
+
       {serverStats.brokerStatsPartial && (
         <p className="text-[11px] text-amber-400/90 mt-3">
           Some users couldn&apos;t be checked against SnapTrade on this load (it timed out, or
           isn&apos;t configured) — those rows show their last known status, so the totals may be
-          low. Refresh to try again.
+          off in either direction. Refresh to try again.
         </p>
       )}
     </div>

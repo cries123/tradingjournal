@@ -203,3 +203,34 @@ describe('redactUrl', () => {
     expect(described.body).toContain('Feature is not enabled');
   });
 });
+
+/**
+ * The admin panel reported three connected users after a move from test to production SnapTrade
+ * keys, and it was not clear whether those were live connections or the remains of test ones.
+ *
+ * Both halves could be wrong: every stored userSecret is issued by one client, so changing keys
+ * invalidates all of them at once — and the panel fell back to cached rows when the live check
+ * failed, rows written while the old keys still worked. isRejectedCredential is what now separates
+ * "we could not ask" from "we asked and this secret is dead", so the count stops inheriting the
+ * previous environment.
+ */
+describe('a stale-environment secret is recognised, not treated as a failed check', () => {
+  const sdkError = (status: number, responseBody: unknown) =>
+    Object.assign(new Error(`Request failed with status code ${status}`), {
+      name: 'SnaptradeError',
+      status,
+      responseBody,
+    });
+
+  it('recognises a secret issued by different credentials', () => {
+    // What listUserAccounts returns for every user after a key change.
+    expect(isRejectedCredential(sdkError(401, { detail: 'Unable to verify signature' }))).toBe(true);
+    expect(isRejectedCredential(sdkError(404, { detail: 'User not found' }))).toBe(true);
+  });
+
+  it('still lets a real outage fall back to the cached row', () => {
+    // Here the cache is the best information available and keeping it is correct.
+    expect(isRejectedCredential(sdkError(503, 'upstream unavailable'))).toBe(false);
+    expect(isRejectedCredential(Object.assign(new Error('fetch failed'), { code: 'ETIMEDOUT' }))).toBe(false);
+  });
+});
