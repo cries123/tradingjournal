@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Menu, X } from 'lucide-react';
 import { BrandLogo } from '../BrandLogo';
+import { useAuth } from '../../context/AuthContext';
+import { NavAccountMenu } from './NavAccountMenu';
 import { ProductsDropdown } from './ProductsDropdown';
 import { MobileNavPanel } from './MobileNavPanel';
 import { BROKER_GUIDES } from '../../seo/brokerGuides';
@@ -293,9 +295,15 @@ interface LandingNavProps {
 }
 
 function NavBrand({ onHome }: { onHome?: () => void }) {
-  const logo = (
-    <img src="/nav-logo.png" alt="Trend Chasers" className="h-14 sm:h-24 w-auto object-contain" />
-  );
+  /*
+   * The one-line lockup rather than nav-logo.png.
+   *
+   * That PNG is a 735×249 stacked lockup — mark over wordmark over tagline — so keeping the
+   * tagline readable forced the image to 96px tall and dragged the header to 128px with it. This
+   * bar is sticky, so that was 13% of every screen given up for the length of the page. Same
+   * brand, set on one line, at a third of the height.
+   */
+  const logo = <BrandLogo size="md" variant="row" />;
   const shellClass =
     'inline-flex items-center justify-start shrink-0 w-fit max-w-none p-0 m-0 border-0 bg-transparent text-left hover:opacity-90 transition-opacity focus-ring rounded';
 
@@ -330,12 +338,20 @@ export function LandingNav({
   showBrokersLink = true,
 }: LandingNavProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, loading: authLoading } = useAuth();
+  /*
+   * While Firebase is still resolving we deliberately show the signed-out CTA rather than a
+   * skeleton. The prerendered HTML contains that CTA, so it is what every crawler and every
+   * first-time visitor sees with no flash — and a returning user's session resolves in a few
+   * hundred milliseconds. A skeleton would trade a rare swap for a guaranteed flicker.
+   */
+  const signedIn = !authLoading && Boolean(user);
 
   return (
     <header className="relative z-30 border-b border-border/50 backdrop-blur-md bg-bg-primary/70 sticky top-0">
-      <div className="max-w-[1680px] mx-auto px-4 md:px-8 h-24 sm:h-32 flex items-center gap-3 sm:gap-6 md:gap-10">
+      <div className="max-w-[1680px] mx-auto px-4 md:px-8 h-16 sm:h-[72px] flex items-center gap-3 sm:gap-6 md:gap-9">
         <NavBrand onHome={onHome} />
-        <nav className="hidden sm:flex items-center gap-6 sm:gap-8" aria-label="Main">
+        <nav className="hidden sm:flex items-center gap-6 sm:gap-7" aria-label="Main">
           <ProductsDropdown onLaunch={onLaunch} onNavigate={onNavigate} />
           <a
             href="/guides"
@@ -387,18 +403,33 @@ export function LandingNav({
           >
             {mobileOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
+
+          {signedIn && <NavAccountMenu onLaunch={onLaunch} />}
+
           <a
             href="/app"
             onClick={(e) => {
               e.preventDefault();
               onLaunch();
             }}
-            className="btn-primary text-sm px-4 sm:px-5 py-2.5 shrink-0"
+            className="btn-primary text-sm px-4 sm:px-5 py-2 shrink-0"
           >
-            {/* Shorter on narrow phones so it doesn't crowd the logo + menu button off the edge —
-                the auth modal it opens lets you switch between signing up and signing in either way. */}
-            <span className="sm:hidden">Sign in</span>
-            <span className="hidden sm:inline">Sign up / Sign in</span>
+            {signedIn ? (
+              <>
+                {/* "Journal" on phones: the account chip is already taking the space the longer
+                    label used to have. */}
+                <span className="sm:hidden">Journal</span>
+                <span className="hidden sm:inline">Open journal</span>
+              </>
+            ) : (
+              <>
+                {/* Shorter on narrow phones so it doesn't crowd the logo + menu button off the
+                    edge — the auth modal it opens lets you switch between signing up and signing
+                    in either way. */}
+                <span className="sm:hidden">Sign in</span>
+                <span className="hidden sm:inline">Sign up / Sign in</span>
+              </>
+            )}
           </a>
         </div>
       </div>

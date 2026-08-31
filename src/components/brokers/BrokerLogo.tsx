@@ -4,6 +4,8 @@ import { findBrokerEntryByName, normalizeBrokerName } from '../../data/brokerReg
 interface BrokerLogoProps {
   broker: string;
   className?: string;
+  /** Smaller badge and name, for dense grids where a 64px badge leaves no room for the label. */
+  compact?: boolean;
 }
 
 // Official broker logos (transparent PNGs), used to indicate a supported integration only —
@@ -50,7 +52,7 @@ function resolveBroker(input: string): { brokerId: string; name: string } | null
   return null;
 }
 
-export function BrokerLogo({ broker, className = '' }: BrokerLogoProps) {
+export function BrokerLogo({ broker, className = '', compact = false }: BrokerLogoProps) {
   const resolved = resolveBroker(broker);
 
   if (!resolved) {
@@ -60,15 +62,25 @@ export function BrokerLogo({ broker, className = '' }: BrokerLogoProps) {
   const logo = LOGOS[resolved.brokerId];
 
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
-      <span className="h-16 w-16 rounded-xl bg-white border border-border/60 flex items-center justify-center shrink-0 p-2">
+    /*
+     * min-w-0 on both the row and the label: without it a flex item refuses to shrink below the
+     * width of its longest unbreakable word, so "thinkorswim" simply ran out past the right edge
+     * of its own tile instead of wrapping. That was invisible at three columns and obvious at
+     * four — the kind of bug that only shows up once the grid gets denser.
+     */
+    <div className={`flex items-center ${compact ? 'gap-2.5' : 'gap-3'} min-w-0 ${className}`}>
+      <span
+        className={`${compact ? 'h-11 w-11 rounded-lg p-1.5' : 'h-16 w-16 rounded-xl p-2'} bg-white border border-border/60 flex items-center justify-center shrink-0`}
+      >
         {logo ? (
           <img src={logo.src} alt="" aria-hidden className="h-full w-full object-contain" />
         ) : (
-          <Landmark className="h-7 w-7 text-slate-500" aria-hidden />
+          <Landmark className={`${compact ? 'h-5 w-5' : 'h-7 w-7'} text-slate-500`} aria-hidden />
         )}
       </span>
-      <span className="font-semibold text-xl">{resolved.name}</span>
+      <span className={`font-semibold min-w-0 break-words ${compact ? 'text-sm' : 'text-xl'}`}>
+        {resolved.name}
+      </span>
     </div>
   );
 }

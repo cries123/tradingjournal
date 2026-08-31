@@ -28,6 +28,27 @@ function gitSha(): string {
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    rollupOptions: {
+      output: {
+        /*
+         * Keep the Firebase SDK in a chunk of its own.
+         *
+         * It is ~676 kB and only changes when the dependency is upgraded, so it wants a long cache
+         * life. Left to automatic chunking it gets folded in with whichever shared UI module
+         * happens to sit beside it in the import graph — which is exactly what happened the moment
+         * the public nav started reading auth state: Firebase landed inside the shared BrandLogo
+         * chunk, so every future logo tweak would have invalidated 688 kB instead of 11.
+         */
+        manualChunks(id: string) {
+          if (id.includes('node_modules/firebase') || id.includes('node_modules/@firebase')) {
+            return 'firebase'
+          }
+          return undefined
+        },
+      },
+    },
+  },
   define: {
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
     __BUILD_SHA__: JSON.stringify(gitSha()),

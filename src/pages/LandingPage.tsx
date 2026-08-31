@@ -52,8 +52,10 @@ const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
   {
     icon: Link2,
     title: 'Broker Sync',
+    // Deliberately does not repeat the broker count or the read-only promise — the Brokers section
+    // above makes both, and this page was making each of them eight and seven times respectively.
     description:
-      `Connect any of ${BROKER_COUNT_PHRASE} and let round-trip trades sync in automatically — read-only, disconnect anytime.`,
+      'Round-trip trades come in from your broker on their own, matched open to close, so you are not copying rows out of a statement every evening.',
   },
   {
     icon: Pencil,
@@ -84,10 +86,25 @@ const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
 const FAQ = LANDING_FAQ.map((item) => ({ q: item.question, a: item.answer }));
 
 const STEPS = [
-  { n: '01', title: 'Connect or log', body: `Sync ${BROKER_COUNT_PHRASE} automatically, or enter trades manually — get your data into the journal in seconds.` },
+  { n: '01', title: 'Connect or log', body: 'Sync from your broker automatically, or enter trades manually — get your data into the journal in seconds.' },
   { n: '02', title: 'Review on calendar', body: 'Daily P&L colors show winning and losing sessions at a glance.' },
   { n: '03', title: 'Analyze your edge', body: 'See which setups pay and which bleed — streaks, expectancy, and your best and worst days.' },
 ];
+
+/**
+ * Three section weights instead of one.
+ *
+ * Every section on this page was py-16 md:py-24. That sounds tidy and reads as flat — if everything
+ * carries identical emphasis then nothing is emphasised, and the page feels longer than it is
+ * because no rhythm is telling you what matters. Major beats keep the full measure, supporting
+ * sections tighten, and the closing pair sits between the two.
+ *
+ * Written as whole literal strings so Tailwind's source scanner still sees every class. Assembled
+ * from fragments they would be invisible to it and would silently produce no CSS at all.
+ */
+const SECTION_MAJOR = 'py-16 md:py-24';
+const SECTION_SUPPORTING = 'py-12 md:py-16';
+const SECTION_CLOSING = 'py-14 md:py-20';
 
 export function LandingPage({
   onLaunch,
@@ -133,15 +150,26 @@ export function LandingPage({
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               {BROKER_COUNT_PHRASE} now sync automatically
             </div>
+            {/*
+             * One gradient, on the payoff.
+             *
+             * The old headline led with the product name and coloured two separate phrases, which
+             * split the emphasis three ways and ran to three lines — while the logo directly above
+             * was already saying the name. Leading with the problem instead frees the sentence to
+             * be short and lets the single gradient land where the promise is.
+             *
+             * "Trading journal" moves down into the paragraph on purpose rather than being lost:
+             * the h1 is the strongest on-page signal, so dropping the phrase from it is a real
+             * trade, made knowingly, and the first sentence below carries it instead.
+             */}
             <h1 className="text-4xl md:text-5xl lg:text-[3.25rem] font-bold leading-[1.1] tracking-tight">
-              <span className="text-gradient-brand">Trend Chasers</span>
-              {' — '}the trading journal built for{' '}
-              <span className="text-gradient-brand">how you actually trade</span>
+              Stop guessing what’s{' '}
+              <span className="text-gradient-brand">costing you money</span>
             </h1>
             <p className="mt-5 text-base md:text-lg text-text-secondary leading-relaxed max-w-xl">
-              Track daily P&L on a visual calendar. Connect {BROKER_COUNT_PHRASE} — {SHORT_BROKER_EXAMPLES}{' '}
-              and more — for automatic sync, or log trades manually. Nothing is forced, and you can
-              switch anytime.
+              Trend Chasers is a trading journal for active traders. Track daily P&L on a visual
+              calendar, connect {BROKER_COUNT_PHRASE} — {SHORT_BROKER_EXAMPLES} and more — for
+              automatic sync, or log trades manually. Nothing is forced, and you can switch anytime.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <button type="button" onClick={onLaunch} className="btn-primary text-base px-7 py-3.5">
@@ -176,103 +204,53 @@ export function LandingPage({
         </div>
       </section>
 
-      {/* Security callout */}
-      <section id="security" className="relative z-10 border-y border-border/50 bg-emerald-500/5 py-10 md:py-12">
-        <FadeIn className="max-w-[1680px] mx-auto px-4 md:px-6">
-          <div className="glass-card rounded-2xl p-6 md:p-8 flex flex-col md:flex-row gap-6 md:gap-10 items-start md:items-center">
-            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
-              <Lock size={22} className="text-emerald-400" />
-            </div>
-            <div className="flex-1">
-              <h2 className="text-xl md:text-2xl font-bold mb-2">Connecting is optional, and never held by us</h2>
-              <p className="text-text-secondary leading-relaxed">
-                Broker sync is entirely opt-in — plenty of traders just log trades manually and never connect
-                anything. If you do connect one of the {BROKER_COUNT_PHRASE} we support, your credentials go
-                to your broker or to SnapTrade&apos;s secure connection portal, never to Trend Chasers&apos;
-                servers. Connections are read-only by default, and you can disconnect at any time from
-                the app.
-              </p>
-            </div>
-          </div>
-        </FadeIn>
-      </section>
-
-      {/* Broker Sync */}
-      <section className="relative z-10 py-16 md:py-24">
+      {/*
+       * Brokers — one section, not three.
+       *
+       * This used to be a Security callout, then a "Broker Sync" section, then a "Brokers" teaser,
+       * back to back. Between them the page claimed "read-only, your credentials never touch us,
+       * disconnect anytime" seven separate times and named the broker count eight. That repetition
+       * is what made the page feel long — not the number of sections. Said once, in one place, it
+       * lands harder and costs a screen less.
+       *
+       * The #security id moves onto the safety block rather than disappearing: the footer's
+       * "Security" link and the in-page scroll handler both target it.
+       */}
+      <section id="brokers" className={`relative z-10 scroll-mt-24 border-y border-border/50 bg-bg-secondary/30 ${SECTION_MAJOR}`}>
         <div className="max-w-[1680px] mx-auto px-4 md:px-6">
-          <div className="grid lg:grid-cols-2 gap-10 items-center">
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-start">
+            {/* items-start, not items-center: the right column is a 20-tile grid and the left is
+                copy. Centering the short column against the tall one opened a ~330px hole. */}
             <FadeIn>
-            <div>
-              <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">Broker Sync</p>
-              <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-                Connect once. Trades sync automatically.
-              </h2>
-              <p className="text-text-secondary leading-relaxed mb-6">
-                Link any of {BROKER_COUNT_PHRASE} — {BROKER_EXAMPLES} and more — through SnapTrade, a
-                broker-data connection provider, and your round-trip trades sync straight to your
-                calendar. It&apos;s entirely optional — manual entry works just as well if you&apos;d rather
-                keep everything separate.
-              </p>
-              <ul className="space-y-3 text-sm text-text-secondary">
-                {[
-                  'Read-only by default — nothing can place trades on your behalf',
-                  'Your login goes to your broker or SnapTrade, never to Trend Chasers',
-                  'Disconnect anytime from Settings — sync stops immediately',
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-2">
-                    <span className="text-emerald-400 mt-0.5">→</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <button
-                type="button"
-                onClick={onConnectBroker ?? onLaunch}
-                className="btn-primary text-sm px-6 py-2.5 mt-6"
-              >
-                Connect a broker
-              </button>
-            </div>
-            </FadeIn>
-            <FadeIn delay={100}>
-            <div className="glass-card rounded-2xl p-6 md:p-8 glow-border-brand">
-              <p className="text-xs uppercase tracking-widest text-text-secondary mb-4">How broker sync works</p>
-              <ol className="space-y-4">
-                {[
-                  { step: '1', text: `Pick your broker from ${BROKER_COUNT_PHRASE} and approve a read-only connection on their site` },
-                  { step: '2', text: 'Trend Chasers pulls your recent activity and matches opens to closes' },
-                  { step: '3', text: 'Open the journal and it refreshes itself — new trades appear on your calendar, ready to tag' },
-                ].map((s) => (
-                  <li key={s.step} className="flex gap-4">
-                    <span className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0">
-                      {s.step}
-                    </span>
-                    <p className="text-sm text-text-secondary pt-1">{s.text}</p>
-                  </li>
-                ))}
-              </ol>
-            </div>
-            </FadeIn>
-          </div>
-        </div>
-      </section>
-
-      {/* Brokers teaser */}
-      <section id="brokers" className="relative z-10 border-t border-border/50 bg-bg-secondary/30 py-16 md:py-24">
-        <div className="max-w-[1680px] mx-auto px-4 md:px-6">
-          <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
-            <FadeIn>
-              <div>
+              <div className="lg:sticky lg:top-24">
                 <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Brokers</p>
                 <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-                  Connect your broker, sync in seconds
+                  Connect once. Trades sync automatically.
                 </h2>
                 <p className="text-text-secondary leading-relaxed mb-6 max-w-md">
-                  {BROKER_COUNT_PHRASE} sync automatically today, with thinkorswim covered through your
-                  Schwab connection. More are on the way — and manual entry works for any broker in the
-                  meantime.
+                  Link {BROKER_COUNT_PHRASE} — {BROKER_EXAMPLES} and more — through SnapTrade, and your
+                  round-trip trades land on the calendar on their own. Entirely optional: manual entry
+                  works just as well, and thinkorswim comes in through your Schwab connection.
                 </p>
-                <div className="flex flex-wrap gap-x-6 gap-y-2 mb-8 text-sm">
+
+                <div
+                  id="security"
+                  className="glass-card rounded-xl p-5 md:p-6 mb-6 flex gap-4 scroll-mt-24"
+                >
+                  <span className="w-10 h-10 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                    <Lock size={18} className="text-emerald-400" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="font-semibold mb-1.5">Read-only, and never held by us</h3>
+                    <p className="text-sm text-text-secondary leading-relaxed">
+                      Your login goes to your broker or to SnapTrade&apos;s secure portal, never to Trend
+                      Chasers&apos; servers. Nothing can place a trade on your behalf, and disconnecting
+                      from Settings stops the sync immediately.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-x-6 gap-y-2 mb-6 text-sm">
                   {[
                     { name: 'Thinkorswim journal guide', path: '/brokers/thinkorswim' },
                     { name: 'Schwab journal guide', path: '/brokers/charles-schwab' },
@@ -283,27 +261,41 @@ export function LandingPage({
                     </a>
                   ))}
                 </div>
-                <button type="button" onClick={onBrokers} className="btn-secondary px-8 py-3">
-                  View all supported brokers →
-                </button>
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    type="button"
+                    onClick={onConnectBroker ?? onLaunch}
+                    className="btn-primary text-sm px-6 py-2.5"
+                  >
+                    Connect a broker
+                  </button>
+                  <button type="button" onClick={onBrokers} className="btn-secondary text-sm px-6 py-2.5">
+                    View all supported brokers →
+                  </button>
+                </div>
               </div>
             </FadeIn>
+
             <FadeIn delay={100}>
               <div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 md:gap-2.5 mb-6">
+                {/* Four across from lg: 20 brokers at three columns is seven rows, which is what
+                    made this the tallest section on the page. */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-2.5 mb-6">
                   {brokers.supported.map((b) => (
                     <div
                       key={b.name}
                       className="rounded-lg border border-border/60 bg-bg-primary/60 px-3 py-2.5 flex items-center hover:border-emerald-500/40 transition-colors min-w-0"
                     >
-                      <BrokerLogo broker={brokerIdFromName(b.name)} />
+                      <BrokerLogo broker={brokerIdFromName(b.name)} compact />
                     </div>
                   ))}
                 </div>
+
                 {brokers.comingSoon.length > 0 && (
                   <>
                     <p className="text-xs uppercase tracking-widest text-text-secondary mb-3">Coming soon</p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 mb-8">
                       {brokers.comingSoon.map((name) => (
                         <span
                           key={name}
@@ -315,6 +307,24 @@ export function LandingPage({
                     </div>
                   </>
                 )}
+
+                <div className="glass-card rounded-2xl p-5 md:p-6 glow-border-brand">
+                  <p className="text-xs uppercase tracking-widest text-text-secondary mb-4">How broker sync works</p>
+                  <ol className="space-y-4">
+                    {[
+                      { step: '1', text: 'Pick your broker and approve a read-only connection on their own site' },
+                      { step: '2', text: 'Trend Chasers pulls your recent activity and matches opens to closes' },
+                      { step: '3', text: 'Open the journal and it refreshes itself — new trades appear on your calendar, ready to tag' },
+                    ].map((s) => (
+                      <li key={s.step} className="flex gap-4">
+                        <span className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0">
+                          {s.step}
+                        </span>
+                        <p className="text-sm text-text-secondary pt-1">{s.text}</p>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
               </div>
             </FadeIn>
           </div>
@@ -322,7 +332,7 @@ export function LandingPage({
       </section>
 
       {/* Trading assistant */}
-      <section id="assistant" className="relative z-10 border-t border-border/50 py-16 md:py-24">
+      <section id="assistant" className={`relative z-10 scroll-mt-24 border-t border-border/50 ${SECTION_SUPPORTING}`}>
         <div className="max-w-[1680px] mx-auto px-4 md:px-6">
           <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
             <FadeIn>
@@ -387,7 +397,7 @@ export function LandingPage({
       </section>
 
       {/* Features */}
-      <section id="features" className="relative z-10 py-16 md:py-24">
+      <section id="features" className={`relative z-10 scroll-mt-24 ${SECTION_MAJOR}`}>
         <div className="max-w-[1680px] mx-auto px-4 md:px-6">
           <FadeIn className="text-center max-w-2xl mx-auto mb-12 md:mb-16">
             <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Features</p>
@@ -418,7 +428,7 @@ export function LandingPage({
       </section>
 
       {/* Workflow */}
-      <section className="relative z-10 border-t border-border/50 bg-bg-secondary/20 py-16 md:py-24">
+      <section className={`relative z-10 border-t border-border/50 bg-bg-secondary/20 ${SECTION_SUPPORTING}`}>
         <div className="max-w-[1680px] mx-auto px-4 md:px-6">
           <FadeIn className="text-center max-w-2xl mx-auto mb-12">
             <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">Workflow</p>
@@ -439,7 +449,7 @@ export function LandingPage({
       </section>
 
       {/* Guides */}
-      <section id="guides" className="relative z-10 border-t border-border/50 bg-bg-secondary/20 py-16 md:py-24">
+      <section id="guides" className={`relative z-10 scroll-mt-24 border-t border-border/50 bg-bg-secondary/20 ${SECTION_SUPPORTING}`}>
         <div className="max-w-[1680px] mx-auto px-4 md:px-6">
           <FadeIn className="text-center max-w-2xl mx-auto mb-10">
             <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">Guides</p>
@@ -478,7 +488,7 @@ export function LandingPage({
       </section>
 
       {/* FAQ */}
-      <section id="faq" className="relative z-10 py-16 md:py-24">
+      <section id="faq" className={`relative z-10 scroll-mt-24 ${SECTION_CLOSING}`}>
         <div className="max-w-3xl mx-auto px-4 md:px-6">
           <FadeIn className="text-center mb-12">
             <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">FAQ</p>
@@ -501,7 +511,7 @@ export function LandingPage({
       </section>
 
       {/* CTA */}
-      <section className="relative z-10 border-t border-border/50 py-16 md:py-24">
+      <section className={`relative z-10 border-t border-border/50 ${SECTION_CLOSING}`}>
         <FadeIn className="max-w-3xl mx-auto px-4 md:px-6 text-center">
           <div className="sm:hidden flex justify-center mb-6">
             <BrandLogo size="md" variant="compact" />

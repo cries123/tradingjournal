@@ -114,7 +114,6 @@ export function ProductsDropdown({ onLaunch, onNavigate }: ProductsDropdownProps
           >
             <Tag className="h-4 w-4 text-text-secondary shrink-0" aria-hidden />
             <span className="text-sm font-medium text-text-primary">Pricing</span>
-            <ComingSoonBadge />
           </button>
 
           <button
