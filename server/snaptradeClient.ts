@@ -44,9 +44,21 @@ export async function resolveBrokerSlug(broker: string): Promise<string> {
   const now = Date.now();
 
   if (!brokerageCache || now - brokerageCacheAt > BROKERAGE_CACHE_TTL_MS) {
-    const res = await snaptrade.referenceData.listAllBrokerages();
-    brokerageCache = res.data;
-    brokerageCacheAt = now;
+    try {
+      const res = await snaptrade.referenceData.listAllBrokerages();
+      brokerageCache = res.data;
+      brokerageCacheAt = now;
+    } catch (err) {
+      // The lookup only turns our registry key into SnapTrade's slug, and entry.key is already the
+      // fallback when no brokerage matches. Letting this throw made a reference-data hiccup fail
+      // the connect itself — the user is told their broker could not be connected because a list
+      // of every brokerage in the world could not be fetched, which is not a reason they can act
+      // on. Better to attempt the connection with the key we have and let THAT be the answer.
+      console.warn(
+        '[snaptrade] brokerage list unavailable, falling back to the registry key:',
+        err instanceof Error ? err.message : err,
+      );
+    }
   }
 
   const match = brokerageCache?.find((b) => matchesBrokerEntry(`${b.name ?? ''} ${b.display_name ?? ''}`, entry));
