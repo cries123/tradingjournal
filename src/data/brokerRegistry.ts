@@ -65,16 +65,18 @@ export const BROKER_REGISTRY: BrokerRegistryEntry[] = [
     matchNeedles: ['schwab'],
     access: 'Read & sync',
     hasLogo: true,
-    // Akoya — the network Schwab connections run through beneath SnapTrade — is returning
-    // "Subscription unavailable" before the Schwab login is ever reached, so a new connection
-    // cannot be established from our side at all. Existing connections and already-imported
-    // trades are untouched. Remove this once SnapTrade confirms the connector is restored.
+    // Not an outage. Each brokerage approves a production API key separately, and Schwab's review
+    // takes about a week — Robinhood and Fidelity clear in a day or two, which is why they worked
+    // immediately and this did not. Until Schwab approves, Akoya answers "Subscription
+    // unavailable" before their login is ever reached. Production key approved 2026-08-31, so
+    // expect this to clear in the week after. Delete this status block once it does.
     status: {
       kind: 'down',
       message:
-        'New Schwab connections are unavailable while our data provider resolves an issue with ' +
-        'Schwab’s connection network. Trades you have already imported are unaffected, and ' +
-        'existing connections keep working. Robinhood and manual entry are unaffected.',
+        'Schwab is finishing its review of our connection — brokerages approve each app ' +
+        'individually, and Schwab’s takes about a week. Connections will open as soon as they ' +
+        'approve it. Trades you have already imported are unaffected, and Robinhood and manual ' +
+        'entry work as normal in the meantime.',
       since: '2026-08-31',
     },
   },
