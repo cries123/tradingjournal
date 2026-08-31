@@ -6,7 +6,7 @@ import { mapSnapTradeActivitiesToTrades, type SnapTradeActivityLike } from './ma
 import { BROKER_REGISTRY, brokerRegistryEntry, isBrokerRegistryKey } from '../src/data/brokerRegistry';
 import { resolveAccess } from './entitlements';
 import { consumeDaily, refundDaily } from './usage';
-import { isUpstreamOutage } from './upstreamErrors';
+import { describeHttpError, isUpstreamOutage } from './upstreamErrors';
 import { lowestTierWith, TIER_PLANS, type Tier } from '../src/config/tiers';
 
 export type SupportedBroker = string;
@@ -103,8 +103,7 @@ function isRejectedCredential(err: unknown): boolean {
   // do with the caller, and re-registering on that would break connections that were working.
   if (isUpstreamOutage(err)) return false;
 
-  const res = (err as { response?: { status?: number; data?: unknown } } | null)?.response;
-  const status = res?.status ?? (err as { status?: number } | null)?.status;
+  const { status, body } = describeHttpError(err);
 
   // 401 is unambiguous: the credentials were not accepted.
   if (status === 401) return true;
@@ -116,7 +115,6 @@ function isRejectedCredential(err: unknown): boolean {
    * reconnect because an unrelated entitlement is missing, which is the more damaging mistake of
    * the two. So a 403 has to say so in the body before it counts.
    */
-  const body = typeof res?.data === 'string' ? res.data : res?.data ? JSON.stringify(res.data) : '';
   const haystack = `${err instanceof Error ? err.message : ''} ${body}`.toLowerCase();
 
   const saysCredential =
@@ -550,18 +548,9 @@ function isDatastoreUnavailable(err: unknown): boolean {
  * date, a content-type and a server name, which is everything except the answer.
  */
 function failureDetail(err: unknown, fallback: string): string {
-  const res = (err as { response?: { status?: number; data?: unknown } } | null)?.response;
-  const status = res?.status ?? (err as { status?: number } | null)?.status;
-  const data = res?.data;
-
-  const body =
-    typeof data === 'string'
-      ? data
-      : data
-        ? JSON.stringify(data)
-        : '';
-
-  const parts = [status ? `HTTP ${status}` : '', body].filter(Boolean);
+  const { status, body, method, url } = describeHttpError(err);
+  const where = method && url ? `${method} ${url}` : '';
+  const parts = [status ? `HTTP ${status}` : '', where, body].filter(Boolean);
   return (parts.length ? parts.join(' — ') : fallback).slice(0, 600);
 }
 

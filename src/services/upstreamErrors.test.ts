@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isUpstreamOutage } from '../../server/upstreamErrors';
+import { describeHttpError, isUpstreamOutage } from '../../server/upstreamErrors';
 
 /**
  * This predicate decides whether a user gets their sync back. Too strict and they pay for an
@@ -135,5 +135,45 @@ describe('a 403 only counts as a rejected credential when it says so', () => {
       response: { status: 403, data: { detail: 'Unable to verify signature.' } },
     });
     expect(rejectedCredential(axiosish)).toBe(true);
+  });
+});
+
+/**
+ * The SnapTrade SDK throws its own error type, not an axios one. Reading err.response.data — the
+ * obvious thing to write — finds nothing on every SnapTrade failure, which is how the admin panel
+ * ended up reporting a bare "HTTP 403" with the explanation sitting one property away.
+ */
+describe('describeHttpError', () => {
+  /** Shaped exactly like SnaptradeError: status at the top level, body on responseBody. */
+  const snaptradeError = (status: number, responseBody: unknown) =>
+    Object.assign(new Error(`Request failed with status code ${status}\nRESPONSE HEADERS:\n{}`), {
+      name: 'SnaptradeError',
+      status,
+      responseBody,
+      method: 'POST',
+      url: '/api/v1/snapTrade/login',
+    });
+
+  it('finds the body the SDK actually carries', () => {
+    const d = describeHttpError(snaptradeError(403, { detail: 'Subscription unavailable' }));
+    expect(d.status).toBe(403);
+    expect(d.body).toContain('Subscription unavailable');
+    expect(d.method).toBe('POST');
+  });
+
+  it('still handles an ordinary axios error', () => {
+    const d = describeHttpError({ response: { status: 500, data: 'boom' } });
+    expect(d.status).toBe(500);
+    expect(d.body).toBe('boom');
+  });
+
+  it('returns an empty body rather than "undefined" when there was none', () => {
+    // This string is shown to the admin; the word "undefined" in it is worse than nothing.
+    expect(describeHttpError({ status: 404 }).body).toBe('');
+    expect(describeHttpError(null).body).toBe('');
+  });
+
+  it('does not lose a string body that happens to be falsy-ish', () => {
+    expect(describeHttpError({ status: 400, responseBody: '0' }).body).toBe('0');
   });
 });

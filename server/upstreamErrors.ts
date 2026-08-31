@@ -12,8 +12,8 @@
  * capped for was spent, and refunding those is what turns the cap into a suggestion.
  */
 export function isUpstreamOutage(err: unknown): boolean {
-  const status = (err as { status?: number; response?: { status?: number } } | null)?.response
-    ?.status ?? (err as { status?: number } | null)?.status;
+  const status = (err as { status?: number; response?: { status?: number } } | null)?.status
+    ?? (err as { response?: { status?: number } } | null)?.response?.status;
   if (typeof status === 'number') return status >= 500;
 
   // No status at all: the request never got an answer. Fetch and undici surface this as a
@@ -31,4 +31,42 @@ export function isUpstreamOutage(err: unknown): boolean {
     message.includes('timeout') ||
     message.includes('socket hang up')
   );
+}
+
+/**
+ * Normalises the two error shapes this server sees into a status and a body.
+ *
+ * The SnapTrade SDK does not throw axios errors. It wraps them in its own SnaptradeError, which
+ * puts the status at the top level and the response body on `responseBody` — and builds its
+ * `message` as the axios message plus a dump of the response HEADERS. So code reading
+ * `err.response.data`, which is the obvious thing to write, finds nothing on every SnapTrade
+ * failure: the admin panel reported a bare "HTTP 403" while the 104-byte body explaining it sat
+ * one property away, and the check deciding whether a stored credential is dead was reading an
+ * empty string.
+ *
+ * Both shapes are handled because netlify functions and fetch calls elsewhere still throw the
+ * ordinary axios/undici kind.
+ */
+export interface HttpErrorDescription {
+  status?: number;
+  /** Response body as text, whatever form it arrived in. Empty string when there was none. */
+  body: string;
+  method?: string;
+  url?: string;
+}
+
+export function describeHttpError(err: unknown): HttpErrorDescription {
+  const e = err as {
+    status?: number;
+    responseBody?: unknown;
+    method?: string;
+    url?: string;
+    response?: { status?: number; data?: unknown };
+  } | null;
+
+  const status = e?.status ?? e?.response?.status;
+  const raw = e?.responseBody ?? e?.response?.data;
+  const body = typeof raw === 'string' ? raw : raw ? JSON.stringify(raw) : '';
+
+  return { status, body, method: e?.method, url: e?.url };
 }
