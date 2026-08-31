@@ -19,7 +19,7 @@ import { tradeTags } from '../utils/tradeHelpers';
 export type SyncStatus = 'loading' | 'local' | 'cloud' | 'syncing';
 
 export function useTrades() {
-  const { user, firebaseEnabled } = useAuth();
+  const { user, firebaseEnabled, loading: authLoading } = useAuth();
   const { settings } = useSettings();
   const [trades, setTrades] = useState<Trade[]>([]);
   /** Example trades shown in the UI only — never persisted or synced. */
@@ -43,6 +43,18 @@ export function useTrades() {
     setTrades([]);
     setSyncStatus('loading');
 
+    /*
+     * "Not signed in" is only true once Firebase has said so.
+     *
+     * While auth resolves, user is null — which is indistinguishable from a signed-out visitor if
+     * you only look at the value. Falling through to the local branch here set the status to
+     * 'local', which is a settled state, so the dashboard stopped waiting and rendered the empty
+     * "Start your journal" screen at a signed-in user with a full journal. A second later the
+     * listener arrived and replaced it. Staying in 'loading' until auth has actually decided is
+     * the whole fix: the skeleton is already there, it was just never given the chance to show.
+     */
+    if (authLoading) return;
+
     if (!firebaseEnabled || !user) {
       setTrades(loadTrades(null));
       setSyncStatus('local');
@@ -64,9 +76,11 @@ export function useTrades() {
           clearTrades(null);
         }
         if (cancelled || activeUidRef.current !== uid) return;
-        if (migrated > 0) {
-          setSyncStatus('syncing');
-        }
+        // Deliberately stays 'loading' rather than moving to 'syncing' here. Both mean work is in
+        // progress, but 'syncing' is a settled state everywhere else — it is what a save looks
+        // like, over a journal that is already on screen — so the dashboard stops waiting on it
+        // and renders whatever it has, which at this point is nothing. The first snapshot below
+        // is the moment there is something true to show.
       }
 
       unsubscribe = subscribeTrades(uid, (cloudTrades) => {
@@ -86,7 +100,7 @@ export function useTrades() {
       cancelled = true;
       unsubscribe?.();
     };
-  }, [user, firebaseEnabled]);
+  }, [user, firebaseEnabled, authLoading]);
 
   useEffect(() => {
     if (syncStatus === 'local') {
