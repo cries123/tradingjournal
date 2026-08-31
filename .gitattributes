@@ -1,0 +1,21 @@
+# Line endings are normalised at the repo boundary, not left to whoever's editor touched the file
+# last. Without this, a Windows checkout writes CRLF, a WSL/container checkout writes LF, and every
+# file either side touches shows up as a whole-file rewrite — six files in this repo were sitting
+# permanently "modified" with ~1,300 lines of phantom diff that hid the real changes among them.
+#
+# eol=lf rather than plain text=auto: this tree gets edited from Windows and from Linux containers,
+# and forcing one ending in the working tree as well as in the repo is what stops the two disagreeing.
+# Every toolchain here (node, vite, eslint, prettier) is fine with LF on Windows.
+* text=auto eol=lf
+
+# Binary — never touch these, and never try to diff them as text.
+*.png binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+
+# Generated; keeping it out of diffs makes review of a dependency bump readable.
+package-lock.json -diff linguist-generated
