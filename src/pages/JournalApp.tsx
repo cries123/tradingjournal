@@ -227,7 +227,10 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
               : 'min-h-0 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]'
           }`}
         >
-          <div className="max-w-6xl mx-auto w-full pb-6 md:pb-10">
+          {/* 1680, not 1152. At 1900px the old cap threw away 538px — a third of the space beside
+              the sidebar — and forced everything into one tall column. Same cap the Brokers,
+              Tutorials and Help Center pages already use, so the app and the site line up. */}
+          <div className="max-w-[1680px] mx-auto w-full pb-6 md:pb-10">
             {appView === 'settings' ? (
               <SettingsPage
                 trades={allTrades}

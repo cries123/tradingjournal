@@ -24,7 +24,7 @@ export function SidebarJournalPicker({ onNavigate }: SidebarJournalPickerProps) 
     <div className="rounded-lg border border-border/50 bg-bg-tertiary/30 p-2.5">
       <div className="flex items-center gap-1.5 px-1 mb-2">
         <BookOpen size={13} className="text-accent shrink-0" />
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-text-secondary">Journal</p>
+        <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-text-secondary/60">Journal</p>
       </div>
 
       <div className="space-y-1">

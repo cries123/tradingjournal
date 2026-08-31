@@ -253,70 +253,92 @@ export function DashboardView({
 
       {hasAnyTrades && <TakeawayBanner takeaway={takeaway} />}
 
-      {hasAnyTrades && equityPoints.length >= 2 && (
-        <div className="panel-card p-3 md:p-4">
-          <div className="flex items-start justify-between gap-2 mb-1 md:mb-2">
-            <div>
-              <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
-                Equity
-              </p>
-              <h3 className="text-[10px] md:text-sm font-semibold text-text-primary">
-                Cumulative P&amp;L {mode === 'month' ? formatMonthYear(year, month) : year}
-              </h3>
-            </div>
-            <span className="text-[9px] md:text-[10px] text-text-secondary shrink-0 pt-0.5 hidden sm:block">
-              Shaded area = drawdown from your running high
-            </span>
-          </div>
-          {/* 200px was over half a phone screen for one line. */}
-          <EquityCurve points={equityPoints} height={isCompact ? 120 : 170} />
+      {/* Calendar beside its context, not above it.
+          Stacked, the equity curve and the week recap pushed the calendar most of a screen down
+          and left ~540px of empty gutter either side of everything. Side by side they occupy space
+          that was already being paid for, and the page loses roughly a screen of scrolling.
+          The breakpoint is 1800px, not xl. The calendar needs about 950px before its day cells
+          start truncating dollar amounts — at 1280 the split left it 620px and "$162.00" became
+          "$162…", which is worse than scrolling. Below that it stays full width. */}
+      <div className="grid gap-2 md:gap-3 ultra:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] ultra:items-start">
+        <div className="min-w-0 ultra:order-1">
+        {mode === 'month' ? (
+          <DashboardCalendar
+            year={year}
+            month={month}
+            trades={trades}
+            onDayClick={onDayClick}
+            onPrevMonth={onPrevMonth}
+            onNextMonth={onNextMonth}
+            onMonthChange={onMonthChange}
+          />
+        ) : (
+          <YearHeatmap
+            trades={trades}
+            year={year}
+            onPrevYear={onPrevYear}
+            onNextYear={onNextYear}
+            onSelectMonth={(m) => {
+              onSelectMonth(m);
+              setMode('month');
+            }}
+          />
+        )}
         </div>
-      )}
 
-      {hasAnyTrades && <WeeklyRecapCard trades={trades} />}
+        <div className="flex flex-col gap-2 md:gap-3 min-w-0 ultra:order-2">
+          {hasAnyTrades && equityPoints.length >= 2 && (
+          <div className="panel-card p-3 md:p-4">
+            <div className="flex items-start justify-between gap-2 mb-1 md:mb-2">
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
+                  Equity
+                </p>
+                <h3 className="text-[10px] md:text-sm font-semibold text-text-primary">
+                  Cumulative P&amp;L {mode === 'month' ? formatMonthYear(year, month) : year}
+                </h3>
+              </div>
+              <span className="text-[9px] md:text-[10px] text-text-secondary shrink-0 pt-0.5 hidden sm:block">
+                Shaded area = drawdown from your running high
+              </span>
+            </div>
+            {/* 200px was over half a phone screen for one line. */}
+            <EquityCurve points={equityPoints} height={isCompact ? 120 : 170} />
+          </div>
+          )}
 
-      {mode === 'month' ? (
-        <DashboardCalendar
-          year={year}
-          month={month}
-          trades={trades}
-          onDayClick={onDayClick}
-          onPrevMonth={onPrevMonth}
-          onNextMonth={onNextMonth}
-          onMonthChange={onMonthChange}
-        />
-      ) : (
-        <YearHeatmap
-          trades={trades}
-          year={year}
-          onPrevYear={onPrevYear}
-          onNextYear={onNextYear}
-          onSelectMonth={(m) => {
-            onSelectMonth(m);
-            setMode('month');
-          }}
-        />
-      )}
+          {hasAnyTrades && <WeeklyRecapCard trades={trades} />}
+
+          {/* Weekday sits here rather than in the row below because it is a short list of bars in
+              a tall card — exactly the shape that fills the space the calendar leaves beside it,
+              and exactly the shape that looked stretched at full width. */}
+          {hasAnyTrades && (
+            <div className="panel-card p-3 md:p-4 flex flex-col flex-1 min-h-[140px]">
+              <div className="mb-1.5 md:mb-3 shrink-0">
+                <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
+                  Rhythm
+                </p>
+                <h3 className="text-[10px] md:text-sm font-semibold text-text-primary">
+                  Performance by Weekday
+                </h3>
+              </div>
+              <div className="flex-1 min-h-[80px]">
+                <WeekdayChart data={weekdayPnl} />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {(hasAnyTrades || hasFilters) && (
         <FiltersBar filters={filters} symbols={filterSymbols} setups={filterSetups} onChange={onFiltersChange} />
       )}
 
+      {/* Days, Timing and Execution across one row instead of a 2x2 block, once there is room for
+          three without crowding — Execution carries two lines of prose per row and needs ~480px
+          before it starts stacking into a column of fragments. */}
       {hasAnyTrades && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
-          <div className="panel-card p-3 md:p-4 flex flex-col min-h-[140px]">
-            <div className="mb-1.5 md:mb-3 shrink-0">
-              <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
-                Rhythm
-              </p>
-              <h3 className="text-[10px] md:text-sm font-semibold text-text-primary">
-                Performance by Weekday
-              </h3>
-            </div>
-            <div className="flex-1 min-h-[80px]">
-              <WeekdayChart data={weekdayPnl} />
-            </div>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 wide:grid-cols-3! gap-2 md:gap-3">
           <div className="panel-card p-3 md:p-4 flex flex-col min-h-[160px]">
             <div className="flex items-start justify-between mb-1.5 md:mb-3 shrink-0 gap-2">
               <div>
@@ -338,17 +360,13 @@ export function DashboardView({
               <DailyPnlChart data={dailyPnl} />
             </div>
           </div>
-        </div>
-      )}
 
-      {hasAnyTrades && (sessions || excursion || rMultiple) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
           {sessions && (
-            /* ExecutionPanel renders nothing without MAE/MFE or R data, which left a half-width
-               hole beside this panel. When it has nothing to say, Timing takes the whole row. */
+            /* ExecutionPanel renders nothing without MAE/MFE or R data, which left a hole beside
+               this panel. When it has nothing to say, Timing takes the space instead. */
             <div
               className={`panel-card p-3 md:p-4 flex flex-col min-h-[140px] ${
-                excursion || rMultiple ? '' : 'md:col-span-2'
+                excursion || rMultiple ? '' : 'md:col-span-2 wide:col-span-2'
               }`}
             >
               <div className="mb-1.5 md:mb-3 shrink-0">

@@ -1,6 +1,15 @@
 @import "tailwindcss";
 
 @theme {
+  /* Named breakpoints, not min-[1500px] arbitrary variants.
+     Tailwind emits custom breakpoints BEFORE the built-in ones in the stylesheet, so at 1900px
+     both `wide:grid-cols-3` and `md:grid-cols-2` match and the later rule — md — wins. Naming them
+     here does not change that ordering, so anywhere a custom breakpoint has to beat a built-in one
+     the utility carries `!`. Worth knowing before adding a `wide:` class that silently does
+     nothing. */
+  --breakpoint-wide: 1500px;
+  --breakpoint-ultra: 1800px;
+
   --color-bg-primary: #07090f;
   --color-bg-secondary: #0d111a;
   --color-bg-tertiary: #151b28;

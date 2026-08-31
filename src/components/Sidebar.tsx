@@ -46,8 +46,8 @@ interface SidebarProps {
 
 function navItemClass(active: boolean): string {
   return active
-    ? 'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-accent/10 text-accent border border-accent/20 font-medium focus-ring'
-    : 'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60 transition-colors focus-ring';
+    ? 'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm bg-accent/10 text-accent border border-accent/20 font-medium focus-ring'
+    : 'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60 transition-colors focus-ring';
 }
 
 export function Sidebar({
@@ -97,7 +97,9 @@ export function Sidebar({
 
   return (
     <aside className={`${shellClass} overflow-hidden`}>
-      <div className="px-4 py-3.5 border-b border-border/60 shrink-0">
+      {/* md, not lg: at 224px wide the large mark forced the wordmark to wrap and ate the top of
+          the panel. The brand still reads first, it just stops being the loudest thing here. */}
+      <div className="px-4 py-3 border-b border-border/60 shrink-0">
         {onHome ? (
           <button
             type="button"
@@ -105,10 +107,10 @@ export function Sidebar({
             className="text-left hover:opacity-90 transition-opacity focus-ring rounded"
             title="Back to home"
           >
-            <BrandLogo size="lg" variant="compact" />
+            <BrandLogo size="md" variant="compact" />
           </button>
         ) : (
-          <BrandLogo size="lg" variant="compact" />
+          <BrandLogo size="md" variant="compact" />
         )}
       </div>
 
@@ -166,8 +168,8 @@ export function Sidebar({
           <SidebarJournalPicker onNavigate={onNavigate} />
         </div>
 
-        <div className="px-3 pt-4 pb-3">
-          <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-text-secondary/80">
+        <div className="px-3 pt-4 pb-3 mt-1 border-t border-border/40">
+          <p className="px-3 pb-1.5 pt-1 text-[10px] font-medium uppercase tracking-[0.12em] text-text-secondary/60">
             Help
           </p>
           <div className="space-y-0.5">
