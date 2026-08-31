@@ -541,6 +541,7 @@ function NeedsAttention({
     if (!health.brokerSync.ok) down.push('Broker sync');
     if (!health.benchmark.ok) down.push('SPY benchmark');
     if (!health.firebase.ok) down.push('Firebase');
+    // A paused checkout is the owner's own doing and belongs nowhere near an outage banner.
     if (!health.payments.ok) down.push('Payments');
   }
 
@@ -1298,13 +1299,15 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                       <span className="text-text-secondary text-xs ml-auto">
                         {ready.health.payments.error
                           ? 'Down'
-                          : ready.health.payments.ok
-                            ? ready.health.payments.testMode
-                              ? 'Test mode'
-                              : 'Ready'
-                            : ready.health.payments.checkoutReady
-                              ? 'No webhook'
-                              : 'Not set up'}
+                          : ready.health.payments.checkoutEnabled === false
+                            ? 'Paused'
+                            : ready.health.payments.ok
+                              ? ready.health.payments.testMode
+                                ? 'Test mode'
+                                : 'Ready'
+                              : ready.health.payments.checkoutReady
+                                ? 'No webhook'
+                                : 'Not set up'}
                       </span>
                     </div>
                   </div>

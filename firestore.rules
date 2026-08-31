@@ -125,9 +125,31 @@ service cloud.firestore {
     }
 
     match /coachShares/{shareToken} {
-      allow read: if true;
+      /*
+       * `get`, NOT `read`.
+       *
+       * `allow read` grants get AND list, and rules are OR'd — there is no deny — so the
+       * `allow list: if isAdmin()` below did not narrow anything. Effective list permission was
+       * `true || isAdmin()`, i.e. public: anyone could enumerate the whole collection straight off
+       * the Firestore REST endpoint, with no token and no share link, and read every user's
+       * trades, P&L and private notes. The project id is in the shipped bundle, so nothing needed
+       * guessing. `get` is what this feature actually needs — you follow a link you were given.
+       */
+      allow get: if true;
       allow list: if isAdmin();
-      allow create, update: if request.auth != null && request.auth.uid == request.resource.data.ownerUid;
+
+      /*
+       * Update must check the EXISTING owner, not just the incoming one.
+       *
+       * `request.resource.data` is the document after the write, so checking only that field let
+       * any signed-in user overwrite any share token with themselves as ownerUid — taking over,
+       * defacing, or deleting (by first seizing ownership) somebody else's share. The second
+       * clause pins ownership so it can never be transferred by a write.
+       */
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.ownerUid;
+      allow update: if request.auth != null
+        && request.auth.uid == resource.data.ownerUid
+        && request.resource.data.ownerUid == resource.data.ownerUid;
       allow delete: if request.auth != null && request.auth.uid == resource.data.ownerUid
         || (isAdmin() && adminCanDeleteUser(resource.data.ownerUid));
     }

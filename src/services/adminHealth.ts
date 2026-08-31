@@ -8,6 +8,13 @@ export interface PaymentsHealth {
   /** The webhook secret. Without it payments succeed and nobody is ever upgraded. */
   webhookReady: boolean;
   testMode: boolean;
+  /**
+   * False when the owner has paused purchases from the admin panel.
+   *
+   * Kept apart from `ok` on purpose: a pause is a deliberate choice, not an outage, and reporting
+   * it as one trains the owner to ignore the health panel.
+   */
+  checkoutEnabled?: boolean;
   /** The Creem host the server will actually call — the half of a 401 you can't otherwise see. */
   baseUrl?: string;
   /** A test-looking key with CREEM_TEST_MODE explicitly false. Guaranteed "Invalid API Key". */

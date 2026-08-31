@@ -77,7 +77,9 @@ export function authErrorMessage(code: string): string {
     case 'auth/invalid-api-key':
     case 'auth/api-key-not-valid':
     case 'auth/configuration-not-found':
-      return 'Google sign-in is not available right now. Please sign in with an email address below — we have been notified.';
+      // No "we have been notified" — nothing notifies anyone, and a message that claims someone is
+      // already on it stops the one person who would have reported it from bothering.
+      return 'Google sign-in is not available on this site. Please sign in with an email address below.';
     case 'auth/account-exists-with-different-credential':
       return 'You already have an account with this email using a password. Sign in with your email and password instead.';
     case 'auth/network-request-failed':

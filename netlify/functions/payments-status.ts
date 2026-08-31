@@ -42,9 +42,13 @@ export const handler: Handler = async () => {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
     body: JSON.stringify({
-      ok: missing.length === 0 && !CREEM_MODE_MISMATCH && checkout.enabled,
-      // The maintenance switch. Separate from `ok` above being false for a config reason: one is
-      // "this site cannot sell", the other is "the owner has paused selling on purpose".
+      // Deliberately NOT gated on the maintenance switch. `ok` answers "is payments configured
+      // and healthy", which a pause does not change — the keys are fine, the host is fine, and
+      // flipping the switch back resumes selling instantly. Folding the pause in here made the
+      // admin panel shout "Payments is down" at an owner who had just paused checkout himself,
+      // which is a false alarm on the one indicator that has to stay trustworthy.
+      ok: missing.length === 0 && !CREEM_MODE_MISMATCH,
+      // The owner's choice, reported separately so the panel can say "Paused" rather than "Down".
       checkoutEnabled: checkout.enabled,
       maintenanceMessage: checkout.enabled ? '' : maintenanceMessage(checkout),
       // Checkout works without the webhook secret — it just never grants anything afterwards,

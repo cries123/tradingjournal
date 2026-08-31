@@ -229,15 +229,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const auth = getFirebaseAuth();
       const result = await createUserWithEmailAndPassword(auth, email, password);
 
+      /*
+       * Past this line the account EXISTS and the person is signed in. Everything below is
+       * bookkeeping, and the old code let all of it throw into the sign-up form's catch — which
+       * printed "Authentication failed. Please try again." over an account that had just been
+       * created successfully. Retrying then produced "An account with this email already exists",
+       * so the dead end was complete: told it failed, then told it already worked.
+       *
+       * (The previous try/catch here was also a no-op — both branches were `throw err`.)
+       */
       try {
         const claimed = await claimUsernameDoc(result.user.uid, validation.normalized);
         setUsername(claimed);
+      } catch (err) {
+        // A taken username is a real, actionable answer and must reach the form. Anything else is
+        // infrastructure: the account is fine, and `needsUsername` will prompt for a name on the
+        // next load rather than stranding them here.
+        if (err instanceof UsernameTakenError) throw err;
+        console.error('[auth] could not claim the username after sign-up:', err);
+      }
+
+      try {
         await ensureUserProfile(result.user, true);
       } catch (err) {
-        if (err instanceof UsernameTakenError) {
-          throw err;
-        }
-        throw err;
+        console.error('[auth] could not write the user profile after sign-up:', err);
       }
     },
     [],
