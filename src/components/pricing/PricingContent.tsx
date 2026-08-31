@@ -1,16 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  ArrowLeft,
-  BadgeCheck,
-  Check,
-  Clock,
-  Crown,
-  Gem,
-  Medal,
-  Notebook,
-  ShieldCheck,
-  Sparkles,
-} from 'lucide-react';
+import { AlertTriangle, ArrowLeft, BadgeCheck, Check, Clock, Crown, Gem, Medal, Notebook, ShieldCheck, Sparkles } from 'lucide-react';
 import { featureLines, TIER_ORDER, TIER_PLANS, type Tier } from '../../config/tiers';
 import { REFUND_WINDOW_DAYS } from '../../config/legal';
 import { BROKER_COUNT_PHRASE } from '../../data/brokerCopy';
@@ -123,6 +112,10 @@ export function PricingContent({
   }, []);
 
   const currentIndex = useMemo(() => TIER_ORDER.indexOf(currentTier), [currentTier]);
+
+  /* Only ever true once the status has actually loaded. Treating "not loaded yet" as paused would
+     flash "temporarily unavailable" across every plan on a normal page load. */
+  const checkoutPaused = payments?.checkoutEnabled === false;
   /** Paying customer with a real subscription — as opposed to free, or a hand-granted tier. */
   const subscribed = Boolean(user) && loaded && source === 'purchase' && currentTier !== 'free';
 
@@ -192,6 +185,22 @@ export function PricingContent({
         <div className="mt-8 rounded-xl border border-emerald-400/40 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200 flex items-center gap-2">
           <BadgeCheck className="w-4 h-4 shrink-0" aria-hidden />
           Payment received. Your plan updates here within a few seconds.
+        </div>
+      )}
+
+      {/*
+        The maintenance switch, set from the admin panel.
+        Shown above the test-mode notice because it is the more actionable of the two: nothing on
+        this page can be bought right now, and saying so beats a button that errors on click. The
+        server refuses these requests regardless — this is the courtesy, not the enforcement.
+      */}
+      {payments && payments.checkoutEnabled === false && (
+        <div className="mt-8 rounded-xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-200 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
+          <span>
+            <span className="font-semibold">Purchases are paused.</span>{' '}
+            {payments.maintenanceMessage || 'Please check back shortly.'}
+          </span>
         </div>
       )}
 
@@ -308,6 +317,12 @@ export function PricingContent({
                 ) : isCurrent ? (
                   <div className="w-full rounded-lg border border-emerald-400/40 bg-emerald-400/10 px-4 py-2.5 text-center text-sm font-medium text-emerald-300">
                     {source === 'admin' ? 'Granted to your account' : 'Current plan'}
+                  </div>
+                ) : checkoutPaused ? (
+                  /* Not a disabled buy button: a disabled control invites clicking to find out
+                     why. This says the reason where the button would have been. */
+                  <div className="w-full rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-center text-sm font-medium text-amber-200">
+                    Temporarily unavailable
                   </div>
                 ) : (
                   <button

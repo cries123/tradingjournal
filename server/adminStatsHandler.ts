@@ -37,6 +37,21 @@ export interface AdminStatsResponse {
   /** True when the live SnapTrade check couldn't cover every registered user (timed out, or
    *  SnapTrade isn't configured) and some rows fell back to the last cached status. */
   brokerStatsPartial: boolean;
+  /**
+   * Per-user connection state, so the Users tab can show who is actually linked.
+   *
+   * These states were already computed to produce the totals above and then thrown away, which
+   * left the panel able to say "2 connected" without being able to say which two. Only users who
+   * ever started the connect flow appear — everyone else is trivially not connected.
+   */
+  brokerUsers: AdminBrokerUser[];
+}
+
+export interface AdminBrokerUser {
+  uid: string;
+  connected: boolean;
+  accountCount: number;
+  institutions: string[];
 }
 
 export interface BrokerConnectionState {
@@ -88,6 +103,7 @@ interface BrokerStats {
   accounts: number;
   institutions: BrokerInstitutionCount[];
   partial: boolean;
+  users: AdminBrokerUser[];
 }
 
 /** Leaves headroom inside a Netlify function's execution limit for the Auth paging above. */
@@ -226,6 +242,15 @@ async function collectBrokerStats(db: Firestore): Promise<BrokerStats> {
       effective,
     ),
     partial,
+    users: registeredUsers.map((u) => {
+      const state = effective.get(u.uid);
+      return {
+        uid: u.uid,
+        connected: Boolean(state?.connected),
+        accountCount: state?.accountCount ?? 0,
+        institutions: state?.institutions ?? [],
+      };
+    }),
   };
 }
 
@@ -343,6 +368,7 @@ export async function handleAdminStatsRequest(
       brokerAbandonedCount: Math.max(0, brokerStats.registered - brokerStats.connected),
       brokerInstitutions: brokerStats.institutions,
       brokerStatsPartial: brokerStats.partial,
+      brokerUsers: brokerStats.users,
     };
 
     return { statusCode: 200, body: { ok: true, ...stats } };

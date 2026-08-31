@@ -10,6 +10,8 @@ import {
 } from '../../server/creemClient';
 import { readEntitlement, writeEntitlement } from '../../server/entitlements';
 import { planChangeRoute } from '../../server/planChangeRoute';
+import { readCheckoutStatus } from '../../server/checkoutStatus';
+import { maintenanceMessage } from '../../src/config/checkoutStatus';
 import { isTier, PAID_TIERS, TIER_PLANS } from '../../src/config/tiers';
 
 /** Whether this uid is the single site admin. Never throws — a failed check just means "no". */
@@ -39,6 +41,31 @@ export const handler: Handler = async (event) => {
       statusCode: 503,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ error: 'Checkout is not set up yet. Please try again later.' }),
+    };
+  }
+
+  /*
+   * The maintenance switch, checked before anything that can take money.
+   *
+   * Deliberately ahead of the auth check: whether the store is open is not a per-user fact, and a
+   * signed-out visitor who somehow reaches this endpoint should get the same honest answer rather
+   * than "sign in first" followed by "we're closed".
+   *
+   * This covers plan changes as well as new checkouts, because the branch below charges a
+   * proration difference immediately — an upgrade during a maintenance window is a real card
+   * charge, and "no purchases right now" has to mean all of them. Cancelling is untouched: it
+   * lives in /api/creem-portal, which is deliberately never gated. Locking someone out of
+   * cancelling while their subscription keeps billing is how a small merchant collects chargebacks.
+   */
+  const checkoutStatus = await readCheckoutStatus();
+  if (!checkoutStatus.enabled) {
+    return {
+      statusCode: 503,
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+      body: JSON.stringify({
+        error: maintenanceMessage(checkoutStatus),
+        maintenance: true,
+      }),
     };
   }
 

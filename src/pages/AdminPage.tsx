@@ -10,6 +10,7 @@ import {
   Flag,
   History,
   LifeBuoy,
+  Link2,
   Lock,
   Plus,
   RefreshCw,
@@ -26,6 +27,7 @@ import { AcquisitionFunnel } from '../components/admin/AcquisitionFunnel';
 import { BrokerAdoptionPanel } from '../components/admin/BrokerAdoptionPanel';
 import { SignupTrendPanel } from '../components/admin/SignupTrendPanel';
 import { AdminAnnouncementCard } from '../components/admin/AdminAnnouncementCard';
+import { AdminCheckoutCard } from '../components/admin/AdminCheckoutCard';
 import { AdminUserDetailModal } from '../components/admin/AdminUserDetailModal';
 import { AdminHelpArticleModal } from '../components/admin/AdminHelpArticleModal';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
@@ -84,7 +86,11 @@ import {
   fetchVisitorStats,
   type VisitorStats,
 } from '../services/visitorAnalytics';
-import { fetchAdminServerStats, type AdminServerStats } from '../services/adminStats';
+import {
+  fetchAdminServerStats,
+  type AdminBrokerUser,
+  type AdminServerStats,
+} from '../services/adminStats';
 
 interface AdminPageProps {
   onHome: () => void;
@@ -368,6 +374,7 @@ const AUDIT_ACTION_LABELS: Record<AdminAuditEntry['action'], string> = {
   'user.password-reset-sent': 'Sent password reset to',
   'user.deleted': 'Deleted user',
   'announcement.published': 'Updated the site announcement',
+  'checkout.toggled': 'Changed plan checkout availability',
   'user.tier-granted': 'Granted a plan to',
   'user.tier-grant-cleared': 'Removed the granted plan from',
   'user.note-saved': 'Updated internal note for',
@@ -649,6 +656,8 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
   const [brokerFilter, setBrokerFilter] = useState<StatusFilter>('all');
   const [selectedUser, setSelectedUser] = useState<AdminUserSummary | null>(null);
   const [userSearch, setUserSearch] = useState('');
+  /** Narrows the list to people who actually have a brokerage linked. */
+  const [brokerOnly, setBrokerOnly] = useState(false);
   const [userSort, setUserSort] = useState<UserSortKey>('activity');
   const [helpArticles, setHelpArticles] = useState<HelpArticle[]>([]);
   const [articleBusy, setArticleBusy] = useState<string | null>(null);
@@ -1012,6 +1021,25 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
     [ready],
   );
 
+  /*
+   * Who actually has a brokerage linked, keyed by uid.
+   *
+   * The stats endpoint already asks SnapTrade this to produce the "Connected a broker" total, and
+   * used to throw the per-user answers away — so the panel could say "2 connected" without being
+   * able to say which two. Only users who ever started the connect flow appear; anyone missing is
+   * simply not connected.
+   */
+  const brokerByUid = useMemo(() => {
+    const map = new Map<string, AdminBrokerUser>();
+    for (const row of ready?.serverStats?.brokerUsers ?? []) map.set(row.uid, row);
+    return map;
+  }, [ready?.serverStats?.brokerUsers]);
+
+  /* False whenever the stats call failed or an older function build is deployed — in that case the
+     rows say nothing rather than claiming nobody is connected. */
+  const brokerDataLoaded = (ready?.serverStats?.brokerUsers?.length ?? 0) > 0
+    || (ready?.serverStats?.brokerRegisteredCount ?? 0) === 0;
+
   const visibleUsers = useMemo(() => {
     if (!ready) return [];
     const term = userSearch.trim().toLowerCase();
@@ -1023,8 +1051,16 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
             || u.uid.toLowerCase().includes(term),
         )
       : ready.users;
-    return sortUsers(matched, userSort);
-  }, [ready, userSearch, userSort]);
+    const scoped = brokerOnly
+      ? matched.filter((u) => brokerByUid.get(u.uid)?.connected)
+      : matched;
+    return sortUsers(scoped, userSort);
+  }, [ready, userSearch, userSort, brokerOnly, brokerByUid]);
+
+  const connectedCount = useMemo(
+    () => (ready?.users ?? []).filter((u) => brokerByUid.get(u.uid)?.connected).length,
+    [ready?.users, brokerByUid],
+  );
 
   const topBrokers = useMemo(
     () => (ready ? computeTopBrokers(ready.brokerRequests) : []),
@@ -1098,7 +1134,13 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
 
       {state.phase === 'auth-required' && firebaseEnabled && !loading && !user && <AuthModal />}
 
-      <main className="relative z-10 flex-1 max-w-5xl mx-auto px-4 md:px-6 py-12 md:py-16 w-full">
+      {/*
+        max-w-5xl was 1024px, so on a 1824px screen roughly 800px — nearly half the window — went
+        to empty margin while the panels inside were squeezed. This matches the width the journal
+        and the marketing pages already use, and the grids below were already written with lg:
+        breakpoints they never had room to reach.
+      */}
+      <main className="relative z-10 flex-1 max-w-[1680px] mx-auto px-4 md:px-6 py-8 md:py-12 w-full">
         <button
           type="button"
           onClick={onHome}
@@ -1339,7 +1381,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                 serverError={ready.serverStatsError}
               />
 
-              <div className="grid lg:grid-cols-2 gap-4 mb-8">
+              <div className="grid xl:grid-cols-2 gap-4 mb-8">
                 <SignupTrendPanel
                   serverStats={ready.serverStats}
                   serverError={ready.serverStatsError}
@@ -1560,9 +1602,31 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                   <div className="flex items-center gap-2">
                     <Users size={16} className="text-emerald-400" />
-                    <h2 className="text-sm font-semibold text-text-primary">Users ({ready.users.length})</h2>
+                    <h2 className="text-sm font-semibold text-text-primary">
+                      Users ({ready.users.length})
+                      {brokerDataLoaded && connectedCount > 0 && (
+                        <span className="ml-2 font-normal text-text-secondary">
+                          · {connectedCount} with a broker
+                        </span>
+                      )}
+                    </h2>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    {/* A toggle rather than another dropdown option: "who is connected" is the
+                        question this tab gets asked most, and it should be one click away. */}
+                    <button
+                      type="button"
+                      onClick={() => setBrokerOnly((v) => !v)}
+                      aria-pressed={brokerOnly}
+                      className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
+                        brokerOnly
+                          ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
+                          : 'border-border/60 text-text-secondary hover:text-text-primary hover:border-border'
+                      }`}
+                    >
+                      <Link2 size={13} aria-hidden />
+                      Broker connected
+                    </button>
                     <div className="relative">
                       <Search
                         size={14}
@@ -1595,7 +1659,11 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
 
                 {visibleUsers.length === 0 ? (
                   <p className="text-xs text-text-secondary">
-                    {ready.users.length === 0 ? 'No users loaded.' : 'No users match this search.'}
+                    {ready.users.length === 0
+                      ? 'No users loaded.'
+                      : brokerOnly
+                        ? 'Nobody has a brokerage linked yet.'
+                        : 'No users match this search.'}
                   </p>
                 ) : (
                   <ul className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
@@ -1621,6 +1689,26 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                                     Flagged
                                   </span>
                                 )}
+                                {/* Names the institution when SnapTrade told us one — "Schwab" is
+                                    a more useful answer than "connected". */}
+                                {brokerByUid.get(entry.uid)?.connected && (
+                                  <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 text-[9px] font-medium uppercase tracking-wide">
+                                    <Link2 size={9} />
+                                    {brokerByUid.get(entry.uid)?.institutions[0] ?? 'Broker'}
+                                    {(brokerByUid.get(entry.uid)?.accountCount ?? 0) > 1 && (
+                                      <> ·{' '}{brokerByUid.get(entry.uid)?.accountCount}</>
+                                    )}
+                                  </span>
+                                )}
+                                {/* Started the flow and never finished it — worth seeing, since
+                                    that is someone who tried to connect and could not. */}
+                                {brokerByUid.has(entry.uid)
+                                  && !brokerByUid.get(entry.uid)?.connected && (
+                                    <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 text-[9px] font-medium uppercase tracking-wide">
+                                      <Link2 size={9} />
+                                      Started, not linked
+                                    </span>
+                                  )}
                               </p>
                               <p className="text-text-secondary mt-0.5 truncate">
                                 {entry.email || 'Email not stored'}
@@ -1834,6 +1922,18 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
 
             {tab === 'content' && (
               <>
+              <AdminCheckoutCard
+                onAudit={(detail) =>
+                  void logAdminAction({
+                    ...adminIdentity,
+                    action: 'checkout.toggled',
+                    targetType: 'checkout',
+                    targetId: 'site',
+                    targetLabel: 'Plan checkout',
+                    detail,
+                  })
+                }
+              />
               <AdminAnnouncementCard
                 onAudit={(detail) =>
                   void logAdminAction({

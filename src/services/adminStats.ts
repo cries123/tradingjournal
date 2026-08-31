@@ -24,6 +24,15 @@ export interface AdminServerStats {
   brokerAbandonedCount: number;
   brokerInstitutions: BrokerInstitutionCount[];
   brokerStatsPartial: boolean;
+  /** Per-user connection state. Only users who ever started the connect flow appear here. */
+  brokerUsers: AdminBrokerUser[];
+}
+
+export interface AdminBrokerUser {
+  uid: string;
+  connected: boolean;
+  accountCount: number;
+  institutions: string[];
 }
 
 export interface AdminServerStatsResult {
@@ -84,6 +93,13 @@ export async function fetchAdminServerStats(): Promise<AdminServerStatsResult> {
         brokerAbandonedCount: num(data.brokerAbandonedCount),
         brokerInstitutions: Array.isArray(data.brokerInstitutions) ? data.brokerInstitutions : [],
         brokerStatsPartial: data.brokerStatsPartial === true,
+        // An older deploy of the function won't send this. An empty list means the Users tab shows
+        // "unknown" rather than confidently claiming nobody is connected.
+        brokerUsers: Array.isArray(data.brokerUsers)
+          ? (data.brokerUsers as AdminBrokerUser[]).filter(
+              (u) => u && typeof u.uid === 'string',
+            )
+          : [],
       },
       error: null,
     };

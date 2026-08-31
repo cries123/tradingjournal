@@ -121,6 +121,10 @@ export interface PaymentsStatus {
   webhookReady: boolean;
   testMode: boolean;
   missing: string[];
+  /** False while the owner has paused purchases from the admin panel. */
+  checkoutEnabled?: boolean;
+  /** What to tell buyers while paused. Empty when checkout is open. */
+  maintenanceMessage?: string;
 }
 
 /** Public, unauthenticated: which payment env vars the server can see. Booleans and names only. */

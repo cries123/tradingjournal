@@ -59,6 +59,18 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // The plan-checkout maintenance switch. Public read so the pricing page can say purchases are
+    // paused rather than showing a button that only fails when clicked; admin-only write because
+    // it decides whether the site takes money at all.
+    //
+    // Read access grants nothing here: the switch is enforced server-side by the checkout
+    // function, which reads this document with the Admin SDK. A client that lies to itself about
+    // the value just gets refused a moment later.
+    match /config/checkout {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /config/admin {
       allow read: if request.auth != null;
       allow create: if request.auth != null

@@ -1,6 +1,8 @@
 import type { Handler } from '@netlify/functions';
 import { PAID_TIERS, TIER_PLANS } from '../../src/config/tiers';
 import { CREEM_BASE_URL, CREEM_MODE_MISMATCH, CREEM_TEST_MODE } from '../../server/creemClient';
+import { readCheckoutStatus } from '../../server/checkoutStatus';
+import { maintenanceMessage } from '../../src/config/checkoutStatus';
 
 /**
  * Which payment environment variables the server can actually see.
@@ -13,6 +15,10 @@ import { CREEM_BASE_URL, CREEM_MODE_MISMATCH, CREEM_TEST_MODE } from '../../serv
  */
 export const handler: Handler = async () => {
   const present = (name: string) => Boolean(process.env[name]?.trim());
+
+  // Read through the same server-side path checkout uses, so the pricing page and the endpoint
+  // can never disagree about whether the store is open.
+  const checkout = await readCheckoutStatus();
 
   const products = PAID_TIERS.map((tier) => {
     const envName = TIER_PLANS[tier].productIdEnv;
@@ -36,7 +42,11 @@ export const handler: Handler = async () => {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
     body: JSON.stringify({
-      ok: missing.length === 0 && !CREEM_MODE_MISMATCH,
+      ok: missing.length === 0 && !CREEM_MODE_MISMATCH && checkout.enabled,
+      // The maintenance switch. Separate from `ok` above being false for a config reason: one is
+      // "this site cannot sell", the other is "the owner has paused selling on purpose".
+      checkoutEnabled: checkout.enabled,
+      maintenanceMessage: checkout.enabled ? '' : maintenanceMessage(checkout),
       // Checkout works without the webhook secret — it just never grants anything afterwards,
       // which is the worst failure of the two and worth separating from "can't start a checkout".
       checkoutReady: apiKey && products.every((p) => p.present),
