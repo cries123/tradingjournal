@@ -21,12 +21,15 @@ export interface BrokerStatus {
 export class BrokerApiError extends Error {
   syncsRemaining?: number;
   syncsPerDay?: number;
+  /** The underlying reason, sent only to the site admin. Undefined for everyone else. */
+  detail?: string;
 
-  constructor(message: string, syncsRemaining?: number, syncsPerDay?: number) {
+  constructor(message: string, syncsRemaining?: number, syncsPerDay?: number, detail?: string) {
     super(message);
     this.name = 'BrokerApiError';
     this.syncsRemaining = syncsRemaining;
     this.syncsPerDay = syncsPerDay;
+    this.detail = detail;
   }
 }
 
@@ -50,7 +53,12 @@ async function brokerApiPost<T>(payload: Record<string, unknown>): Promise<T> {
     body: JSON.stringify(payload),
   });
 
-  const data = (await res.json()) as T & { error?: string; syncsRemaining?: number; syncsPerDay?: number };
+  const data = (await res.json()) as T & {
+    error?: string;
+    detail?: string;
+    syncsRemaining?: number;
+    syncsPerDay?: number;
+  };
   if (!res.ok) {
     // A failed sync still spends the allowance unless the server refunded it, and the badge used
     // to have no way of learning that — it only updated on success, so a run of failures drained
@@ -60,6 +68,7 @@ async function brokerApiPost<T>(payload: Record<string, unknown>): Promise<T> {
       data.error ?? 'Request failed',
       data.syncsRemaining,
       data.syncsPerDay,
+      data.detail,
     );
   }
   return data;

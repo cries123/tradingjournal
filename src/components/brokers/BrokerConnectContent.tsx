@@ -14,7 +14,12 @@ import {
   type BrokerAccountSummary,
   type SupportedBroker,
 } from '../../services/brokerConnect';
-import { BROKER_REGISTRY, matchesBrokerEntry, type BrokerRegistryEntry } from '../../data/brokerRegistry';
+import {
+  BROKER_REGISTRY,
+  isBrokerDown,
+  matchesBrokerEntry,
+  type BrokerRegistryEntry,
+} from '../../data/brokerRegistry';
 import type { Trade } from '../../types';
 import { dedupeIncomingTrades } from '../../utils/duplicateTrades';
 
@@ -123,6 +128,8 @@ export function BrokerConnectContent({
   const [connectingBroker, setConnectingBroker] = useState<SupportedBroker | null>(null);
   const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** The underlying reason, when the server judged this caller to be the site admin. */
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const canConnect = firebaseEnabled && !loading && Boolean(user);
@@ -140,6 +147,12 @@ export function BrokerConnectContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** Records a failure along with the reason, when the server sent one. */
+  const reportError = (err: unknown, fallback: string) => {
+    setError(err instanceof Error ? err.message : fallback);
+    setErrorDetail(err instanceof BrokerApiError && err.detail ? err.detail : null);
+  };
+
   const refreshStatus = async () => {
     if (!canConnect) return;
     setStatusLoading(true);
@@ -148,7 +161,7 @@ export function BrokerConnectContent({
       const next = await fetchBrokerStatus();
       setStatus(next);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load broker connections');
+      reportError(err, 'Could not load broker connections');
     } finally {
       setStatusLoading(false);
     }
@@ -166,7 +179,7 @@ export function BrokerConnectContent({
       const { redirectURI } = await startBrokerConnect(broker);
       window.open(redirectURI, '_blank', 'noopener,noreferrer');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not start connection');
+      reportError(err, 'Could not start connection');
     } finally {
       setConnectingBroker(null);
     }
@@ -179,6 +192,7 @@ export function BrokerConnectContent({
     }
 
     setError(null);
+    setErrorDetail(null);
     setSyncMessage(null);
     setSyncingAccountId(account.id);
     try {
@@ -240,7 +254,7 @@ export function BrokerConnectContent({
           syncsRemaining: err.syncsRemaining,
         });
       }
-      setError(err instanceof Error ? err.message : 'Sync failed');
+      reportError(err, 'Sync failed');
     } finally {
       setSyncingAccountId(null);
     }
@@ -248,11 +262,12 @@ export function BrokerConnectContent({
 
   const handleDisconnect = async (account: BrokerAccountSummary) => {
     setError(null);
+    setErrorDetail(null);
     try {
       await disconnectBroker(account.authorizationId);
       await refreshStatus();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not disconnect');
+      reportError(err, 'Could not disconnect');
     }
   };
 
@@ -328,6 +343,13 @@ export function BrokerConnectContent({
         {error && (
           <div className="rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-300 mb-6">
             {error}
+            {errorDetail && (
+              // Admin-only, decided server-side. Monospace because this is upstream error text
+              // meant to be copied into a support thread, not read as prose.
+              <p className="mt-2 pt-2 border-t border-red-500/20 font-mono text-[11px] leading-relaxed text-red-300/70 break-words">
+                {errorDetail}
+              </p>
+            )}
           </div>
         )}
 
@@ -390,10 +412,33 @@ export function BrokerConnectContent({
                     ))}
                   </div>
                 ) : (
+                  <>
+                  {broker.entry.status && (
+                    /* Above the button, not below it: a greyed-out control with the reason
+                       underneath is a puzzle, and the reason is the only useful thing here. */
+                    <div
+                      className={`mb-3 rounded-lg border px-3 py-2.5 text-xs leading-relaxed ${
+                        broker.entry.status.kind === 'down'
+                          ? 'border-amber-500/30 bg-amber-500/[0.07] text-amber-200/90'
+                          : 'border-border bg-bg-tertiary/40 text-text-secondary'
+                      }`}
+                    >
+                      <span className="font-semibold">
+                        {broker.entry.status.kind === 'down' ? 'Temporarily unavailable' : 'Degraded'}
+                      </span>
+                      <span className="mx-1.5 opacity-40">·</span>
+                      {broker.entry.status.message}
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => void handleConnect(broker.key)}
-                    disabled={!canConnect || available !== true || connectingBroker === broker.key}
+                    disabled={
+                      !canConnect ||
+                      available !== true ||
+                      connectingBroker === broker.key ||
+                      isBrokerDown(broker.entry)
+                    }
                     className="inline-flex items-center gap-2 btn-primary text-sm px-4 py-2 mb-4 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {connectingBroker === broker.key ? (
@@ -403,6 +448,7 @@ export function BrokerConnectContent({
                     )}
                     Connect {broker.shortName ?? broker.name}
                   </button>
+                  </>
                 )}
 
                 <details className="text-sm">

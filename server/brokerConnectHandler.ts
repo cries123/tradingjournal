@@ -3,7 +3,7 @@ import { assertCallerUid, BrokerRequestError } from './snaptradeAuth';
 import { getSnaptrade, resolveBrokerSlug, SNAPTRADE_CONFIGURED } from './snaptradeClient';
 import { getAdminFirestore } from './firebaseAdmin';
 import { mapSnapTradeActivitiesToTrades, type SnapTradeActivityLike } from './mapSnapTradeActivities';
-import { BROKER_REGISTRY, isBrokerRegistryKey } from '../src/data/brokerRegistry';
+import { BROKER_REGISTRY, brokerRegistryEntry, isBrokerRegistryKey } from '../src/data/brokerRegistry';
 import { resolveAccess } from './entitlements';
 import { consumeDaily, refundDaily } from './usage';
 import { isUpstreamOutage } from './upstreamErrors';
@@ -253,6 +253,14 @@ async function handleConnect(uid: string, broker?: string): Promise<BrokerConnec
   if (!isBrokerRegistryKey(broker)) {
     const keys = BROKER_REGISTRY.map((b) => b.key).join(', ');
     throw new BrokerRequestError(`Unsupported broker. Use one of: ${keys}.`, 400);
+  }
+
+  // Refused here as well as in the UI. A stale tab, a cached bundle or a direct API call would
+  // otherwise start a connection we already know cannot complete — and the user would find that
+  // out on a blank page hosted by a company they have never heard of.
+  const registryEntry = brokerRegistryEntry(broker);
+  if (registryEntry?.status?.kind === 'down') {
+    throw new BrokerRequestError(registryEntry.status.message, 503);
   }
 
   const { tier, limits } = await resolveAccess(uid);
@@ -520,6 +528,21 @@ function isDatastoreUnavailable(err: unknown): boolean {
   );
 }
 
+/**
+ * Whether this caller is the site admin, read from config/admin — the same document the admin
+ * user tools use.
+ *
+ * Only used to decide how much of a failure to explain. Never to grant access to anything.
+ */
+async function isSiteAdmin(uid: string): Promise<boolean> {
+  try {
+    const snap = await getAdminFirestore().doc('config/admin').get();
+    return (snap.data() as { uid?: string } | undefined)?.uid === uid;
+  } catch {
+    return false;
+  }
+}
+
 export async function handleBrokerConnectRequest(
   headers: IncomingHttpHeaders,
   body: BrokerConnectRequestBody,
@@ -531,8 +554,11 @@ export async function handleBrokerConnectRequest(
     };
   }
 
+  let callerUid: string | null = null;
+
   try {
     const uid = await assertCallerUid(headers);
+    callerUid = uid;
 
     switch (body.action) {
       case 'connect':
@@ -595,6 +621,21 @@ export async function handleBrokerConnectRequest(
       };
     }
 
-    return { statusCode: 500, body: { error: 'Broker connect request failed. Please try again.' } };
+    /*
+     * One sentence for every possible cause is what makes this path undebuggable from outside.
+     * A rotated consumer key, a refused connection, a malformed id and a provider outage all
+     * arrived here as "Broker connect request failed. Please try again." — three separate
+     * investigations were spent recovering a reason the server already had in hand.
+     *
+     * The reason goes to the site admin only. It is upstream error text rather than anything
+     * secret, but it is internal detail and the person who can act on it is the one running the
+     * site. Everyone else keeps the plain sentence.
+     */
+    const detail = callerUid && (await isSiteAdmin(callerUid)) ? message.slice(0, 300) : undefined;
+
+    return {
+      statusCode: 500,
+      body: { error: 'Broker connect request failed. Please try again.', ...(detail ? { detail } : {}) },
+    };
   }
 }

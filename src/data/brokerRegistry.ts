@@ -7,6 +7,25 @@
  * `key` is the value sent to POST /api/broker-connect (see server/brokerConnectHandler.ts) and
  * must stay stable once shipped — it's how a user's stored connection maps back to a broker.
  */
+/**
+ * Operational state of one connector.
+ *
+ * Connections run through SnapTrade and, for some institutions, through a further network beneath
+ * it — Schwab arrives via Akoya. Any of those can break independently of this app, and when they
+ * do the user's only signal is being bounced to a blank page on a domain they have never heard of.
+ * Saying so on the card is the difference between a known issue and a broken product.
+ *
+ * 'degraded' still lets someone try; 'down' does not, and the server refuses it too, so a stale
+ * page cannot start a connection that is certain to fail.
+ */
+export interface BrokerStatusNote {
+  kind: 'degraded' | 'down';
+  /** Shown verbatim to users. Say what is happening and whether their existing data is affected. */
+  message: string;
+  /** ISO date the issue was first noted, so the copy can age honestly. */
+  since?: string;
+}
+
 export interface BrokerRegistryEntry {
   /** Stable key used in broker-connect API calls, e.g. 'FIDELITY'. */
   key: string;
@@ -29,10 +48,36 @@ export interface BrokerRegistryEntry {
   /** Whether a real logo file exists at /broker-logos/{brokerId}.png. Brokers without one show a
    *  generic name badge (see BrokerLogo.tsx) until an official logo asset is added. */
   hasLogo: boolean;
+  /** Set when this connector is known to be broken or impaired. Absent means working. */
+  status?: BrokerStatusNote;
+}
+
+/** Convenience for the common checks, so nothing has to remember the shape of the union. */
+export function isBrokerDown(entry: Pick<BrokerRegistryEntry, 'status'>): boolean {
+  return entry.status?.kind === 'down';
 }
 
 export const BROKER_REGISTRY: BrokerRegistryEntry[] = [
-  { key: 'SCHWAB', name: 'Charles Schwab', brokerId: 'schwab', matchNeedles: ['schwab'], access: 'Read & sync', hasLogo: true },
+  {
+    key: 'SCHWAB',
+    name: 'Charles Schwab',
+    brokerId: 'schwab',
+    matchNeedles: ['schwab'],
+    access: 'Read & sync',
+    hasLogo: true,
+    // Akoya — the network Schwab connections run through beneath SnapTrade — is returning
+    // "Subscription unavailable" before the Schwab login is ever reached, so a new connection
+    // cannot be established from our side at all. Existing connections and already-imported
+    // trades are untouched. Remove this once SnapTrade confirms the connector is restored.
+    status: {
+      kind: 'down',
+      message:
+        'New Schwab connections are unavailable while our data provider resolves an issue with ' +
+        'Schwab’s connection network. Trades you have already imported are unaffected, and ' +
+        'existing connections keep working. Robinhood and manual entry are unaffected.',
+      since: '2026-08-31',
+    },
+  },
   { key: 'ROBINHOOD', name: 'Robinhood', brokerId: 'robinhood', matchNeedles: ['robinhood'], access: 'Read-only', hasLogo: true },
   { key: 'WEBULL', name: 'Webull', brokerId: 'webull', matchNeedles: ['webull'], excludeNeedles: ['canada'], access: 'Read-only', hasLogo: true },
   { key: 'FIDELITY', name: 'Fidelity', brokerId: 'fidelity', matchNeedles: ['fidelity'], access: 'Read-only', hasLogo: true },
