@@ -1,7 +1,7 @@
 import type { Handler } from '@netlify/functions';
 import { assertCallerUid, BrokerRequestError } from '../../server/snaptradeAuth';
 import { readEntitlement, effectiveTier } from '../../server/entitlements';
-import { readUsed } from '../../server/usage';
+import { readUsed, usageResetsAt } from '../../server/usage';
 import { limitsFor, MARKET_REPLAY_LIVE } from '../../src/config/tiers';
 
 /**
@@ -47,6 +47,9 @@ export const handler: Handler = async (event) => {
           aiMessagesRemaining: Math.max(0, limits.aiMessagesPerDay - aiUsed),
           syncsUsed: syncUsed,
           syncsRemaining: Math.max(0, limits.syncsPerDay - syncUsed),
+          // Sent so the UI can say when "3 left" turns back into "3 of 3", rather than leaving the
+          // user to discover the boundary by being surprised by it.
+          resetsAt: usageResetsAt(),
         },
       }),
     };

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Calendar, Grid3X3, RefreshCw, Share2 } from 'lucide-react';
+import { Calendar, Grid3X3, Info, RefreshCw, Share2 } from 'lucide-react';
 import type { Filters, Trade } from '../types';
 import {
   computeStats,
@@ -120,6 +120,18 @@ export function DashboardView({
   const sessions = useMemo(() => computeSessionPerformance(analyticsTrades), [analyticsTrades]);
   const excursion = useMemo(() => computeExcursionInsights(analyticsTrades), [analyticsTrades]);
   const rMultiple = useMemo(() => computeRMultipleInsights(analyticsTrades), [analyticsTrades]);
+
+  /*
+   * How many analytics panels will actually render.
+   *
+   * Days always does. Timing needs entry times on the trades and Execution needs MAE/MFE or risk
+   * data — neither of which arrives from a broker sync, so a journal filled entirely from Schwab
+   * or Robinhood renders exactly one of the three. The grid below declared three columns
+   * regardless, leaving the Days card alone in a third of the row: 1107px of a 1649px row empty,
+   * measured in the browser rather than guessed at.
+   */
+  const hasExecution = Boolean(excursion || rMultiple);
+  const analyticsPanels = 1 + (sessions ? 1 : 0) + (hasExecution ? 1 : 0);
 
   // One plain-language read of the timing chart, so the panel answers "so what" rather than
   // leaving the trader to compare bar lengths themselves.
@@ -336,9 +348,16 @@ export function DashboardView({
 
       {/* Days, Timing and Execution across one row instead of a 2x2 block, once there is room for
           three without crowding — Execution carries two lines of prose per row and needs ~480px
-          before it starts stacking into a column of fragments. */}
+          before it starts stacking into a column of fragments.
+
+          The column count follows how many panels will actually render, rather than assuming all
+          three always do. Two panels sit in two columns; only the full set earns a third. */}
       {hasAnyTrades && (
-        <div className="grid grid-cols-1 md:grid-cols-2 wide:grid-cols-3! gap-2 md:gap-3">
+        <div
+          className={`grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 ${
+            analyticsPanels === 3 ? 'wide:grid-cols-3!' : ''
+          }`}
+        >
           <div className="panel-card p-3 md:p-4 flex flex-col min-h-[160px]">
             <div className="flex items-start justify-between mb-1.5 md:mb-3 shrink-0 gap-2">
               <div>
@@ -362,13 +381,7 @@ export function DashboardView({
           </div>
 
           {sessions && (
-            /* ExecutionPanel renders nothing without MAE/MFE or R data, which left a hole beside
-               this panel. When it has nothing to say, Timing takes the space instead. */
-            <div
-              className={`panel-card p-3 md:p-4 flex flex-col min-h-[140px] ${
-                excursion || rMultiple ? '' : 'md:col-span-2 wide:col-span-2'
-              }`}
-            >
+            <div className="panel-card p-3 md:p-4 flex flex-col min-h-[140px]">
               <div className="mb-1.5 md:mb-3 shrink-0">
                 <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
                   Timing
@@ -387,7 +400,42 @@ export function DashboardView({
               )}
             </div>
           )}
-          <ExecutionPanel excursion={excursion} rMultiple={rMultiple} />
+          {/* At md the three panels wrap 2 + 1, so the last one takes the whole second row rather
+              than sitting in half of it. The ! is needed because Tailwind v4 emits custom
+              breakpoints ahead of built-in ones, so wide: loses to md: on specificity alone. */}
+          {hasExecution && (
+            <div className="md:col-span-2 wide:col-span-1! min-w-0">
+              <ExecutionPanel excursion={excursion} rMultiple={rMultiple} />
+            </div>
+          )}
+
+          {/*
+           * Says why the row is short instead of leaving a void.
+           *
+           * Only appears when neither Timing nor Execution has anything to show, which is the
+           * normal state for a journal filled entirely by broker sync: SnapTrade sends a date and
+           * a fill price, not an entry time, a stop, or MAE/MFE. Without this the dashboard just
+           * has a hole in it, and the reasonable reading of a hole is that something is broken.
+           */}
+          {analyticsPanels === 1 && (
+            <div className="panel-card p-3 md:p-4 flex flex-col justify-center min-h-[160px]">
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 shrink-0 text-text-secondary">
+                  <Info size={16} />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-[10px] md:text-sm font-semibold text-text-primary mb-1">
+                    Timing and Execution need a little more per trade
+                  </h3>
+                  <p className="text-[11px] md:text-xs text-text-secondary leading-relaxed">
+                    Time-of-day performance needs an entry time, and execution quality needs your
+                    stop or the highest and lowest the trade went. A broker sync sends neither — add
+                    them when you log a trade or edit an imported one, and both panels appear here.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

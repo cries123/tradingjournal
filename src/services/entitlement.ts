@@ -6,6 +6,8 @@ export interface EntitlementUsage {
   aiMessagesRemaining: number;
   syncsUsed: number;
   syncsRemaining: number;
+  /** ISO timestamp of the next allowance reset (midnight US Eastern). Absent on older responses. */
+  resetsAt?: string;
 }
 
 export interface EntitlementSnapshot {

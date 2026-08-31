@@ -42,11 +42,27 @@ function Meter({ label, used, limit }: { label: string; used: number; limit: num
 }
 
 /**
+ * Says when the counters go back to full, in the reader's own clock.
+ *
+ * "3 left" with no reset time is how someone spends two syncs in the evening, finds three again an
+ * hour later, and reasonably concludes the counter is broken. Formatted locally rather than as a
+ * fixed "midnight ET" string, so a trader in Denver reads 10pm and one in London reads 5am.
+ */
+function resetLabel(resetsAt: string | undefined): string | null {
+  if (!resetsAt) return null;
+  const at = new Date(resetsAt);
+  if (Number.isNaN(at.getTime())) return null;
+  const time = at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const today = at.toDateString() === new Date().toDateString();
+  return today ? `Resets at ${time}` : `Resets tomorrow at ${time}`;
+}
+
+/**
  * The plan strip in the sidebar: what you're on, and what's left of today.
  *
- * Both counters reset at midnight UTC and are the same numbers the server enforces, so this is
- * the honest answer to "why did my sync just get refused" rather than a guess the UI keeps
- * locally.
+ * Both counters reset at midnight US Eastern — the market day, not the UTC day, which used to roll
+ * over at 8pm in New York — and they are the same numbers the server enforces, so this is the
+ * honest answer to "why did my sync just get refused" rather than a guess the UI keeps locally.
  */
 export function PlanBadge() {
   const { user } = useAuth();
@@ -87,6 +103,13 @@ export function PlanBadge() {
         <div className="space-y-2">
           {showSyncs && <Meter label="Broker syncs today" used={usage.syncsUsed} limit={limits.syncsPerDay} />}
           {showAi && <Meter label="AI messages today" used={usage.aiMessagesUsed} limit={limits.aiMessagesPerDay} />}
+          {/* Only once something has actually been spent — on a full allowance the reset time is
+              noise, and this strip is already the densest thing in the sidebar. */}
+          {resetLabel(usage.resetsAt) && (usage.syncsUsed > 0 || usage.aiMessagesUsed > 0) && (
+            <p className="text-[10px] text-text-secondary/70 leading-snug pt-0.5">
+              {resetLabel(usage.resetsAt)}
+            </p>
+          )}
         </div>
       ) : (
         <p className="text-[11px] text-text-secondary leading-snug">
