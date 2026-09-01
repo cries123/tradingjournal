@@ -3,6 +3,7 @@ import { getAdminFirestore } from '../../server/firebaseAdmin';
 import { applyBillingUpdate } from '../../server/entitlements';
 import { parseBillingEvent, verifyWebhookSignature, type CreemWebhookEvent } from '../../server/creemClient';
 import { logServerError } from '../../server/errorReports';
+import { isPaymentEvent, recordCharge } from '../../server/billingLedger';
 
 /**
  * Receives subscription events from Creem and turns them into entitlements.
@@ -109,6 +110,17 @@ export const handler: Handler = async (event) => {
       creemCustomerId: parsed.creemCustomerId,
       currentPeriodEnd: parsed.currentPeriodEnd,
     });
+
+    // Books the money, separately from the entitlement. Only for events that actually charged —
+    // a subscription flipping to active is not a payment, and counting one would invent revenue.
+    if (result.applied && isPaymentEvent(payload.eventType)) {
+      await recordCharge({
+        eventId,
+        uid: parsed.uid,
+        tier: parsed.tier,
+        eventType: payload.eventType ?? '',
+      });
+    }
 
     console.info(
       `[creem-webhook] ${payload.eventType} uid=${parsed.uid} tier=${parsed.tier} status=${parsed.status} applied=${result.applied}${result.reason ? ` (${result.reason})` : ''}`,

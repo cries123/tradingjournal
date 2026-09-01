@@ -1,6 +1,7 @@
 import { assertCallerIsAdmin, AdminRequestError, getBearerToken } from './adminAuth';
 import { getAdminFirestore } from './firebaseAdmin';
 import { logServerError } from './errorReports';
+import { readMonthRevenue } from './billingLedger';
 import {
   COST_RATES,
   launchMonth,
@@ -48,8 +49,10 @@ export interface CostReport {
   /** Brokerage connections live right now — the only connection figure that can be known, since
    *  connection state is current-state-only and was never snapshotted per month. */
   connectedNow: number;
-  /** Monthly recurring revenue from active paid entitlements, as it stands today. */
+  /** Run rate from subscriptions actually paid for on Creem. Hand-granted tiers are excluded. */
   mrrNow: number;
+  /** How many people that run rate comes from. */
+  subscribers: number;
   topUsers: { uid: string; aiMessages: number; syncs: number; cost: number }[];
   /** Set when a month could not be read, so a low total is never mistaken for a cheap month. */
   warning: string | null;
@@ -127,27 +130,59 @@ async function readMonth(month: string): Promise<RawMonth> {
   return { counts, perUser };
 }
 
-/** Revenue is current-state only: what the active subscriptions bill today. */
-async function readRevenueNow(): Promise<{ mrr: number; charges: number }> {
+/**
+ * The run rate from subscriptions somebody is actually paying for.
+ *
+ * Three conditions, and the third is the one that matters. A hand-granted tier is written with
+ * source 'admin' and bills nothing — but clearing a grant hands the record back to billing by
+ * setting source to 'purchase', so source alone would count a grandfathered account as revenue.
+ * A real Creem subscription always carries its subscription id; a granted one never does. That is
+ * the test for "did money change hands".
+ *
+ * This is a RATE — what the active subscriptions bill per month — not what was collected. What was
+ * collected comes from the ledger.
+ */
+async function readSubscriptionRunRate(): Promise<{ mrr: number; subscribers: number }> {
   const { TIER_PLANS } = await import('../src/config/tiers');
   const snap = await getAdminFirestore().collection('entitlements').get();
 
   let mrr = 0;
-  let charges = 0;
+  let subscribers = 0;
   for (const doc of snap.docs) {
-    const data = doc.data() as { tier?: string; status?: string; source?: string };
-    if (data.status !== 'active' || data.source !== 'purchase') continue;
+    const data = doc.data() as {
+      tier?: string;
+      status?: string;
+      source?: string;
+      creemSubscriptionId?: string;
+    };
+    if (data.status !== 'active') continue;
+    if (data.source !== 'purchase') continue;
+    if (!data.creemSubscriptionId) continue;
+
     const plan = TIER_PLANS[data.tier as keyof typeof TIER_PLANS];
     if (!plan || plan.price <= 0) continue;
     mrr += plan.price;
-    charges += 1;
+    subscribers += 1;
   }
-  return { mrr, charges };
+  return { mrr, subscribers };
 }
 
+/**
+ * People with a live brokerage connection — the only ones SnapTrade bills for.
+ *
+ * Having a plan that ALLOWS a connection costs nothing; SnapTrade charges per connected user. Rows
+ * written under different API credentials are discarded, because a connection under the old test
+ * client is not a connection you are being billed for now.
+ */
 async function readConnectedNow(): Promise<number> {
+  const clientId = process.env.SNAPTRADE_CLIENT_ID ?? '';
   const snap = await getAdminFirestore().collection('brokerConnections').get();
-  return snap.docs.filter((d) => (d.data() as { connected?: boolean }).connected !== false).length;
+
+  return snap.docs.filter((d) => {
+    const data = d.data() as { connected?: boolean; clientId?: string };
+    if (data.connected !== true) return false;
+    return !clientId || !data.clientId || data.clientId === clientId;
+  }).length;
 }
 
 export async function buildCostReport(): Promise<CostReport> {
@@ -155,8 +190,8 @@ export async function buildCostReport(): Promise<CostReport> {
   const thisMonth = monthKey(new Date());
   const from = launchMonth() || EARLIEST_MONTH;
 
-  const [{ mrr, charges }, connectedNow] = await Promise.all([
-    readRevenueNow().catch(() => ({ mrr: 0, charges: 0 })),
+  const [{ mrr, subscribers }, connectedNow] = await Promise.all([
+    readSubscriptionRunRate().catch(() => ({ mrr: 0, subscribers: 0 })),
     readConnectedNow().catch(() => 0),
   ]);
 
@@ -184,13 +219,25 @@ export async function buildCostReport(): Promise<CostReport> {
       }
 
       const raw = await readMonth(month);
+      // Real money, from the ledger the webhook writes — not the run rate, and not today's figure
+      // pretended backwards. Months before the ledger existed read zero, which is honest: nothing
+      // recorded them.
+      const collected = await readMonthRevenue(month).catch(() => ({ revenue: 0, charges: 0 }));
+
       const counts: UsageCounts = {
         ...raw.counts,
-        // Revenue and charge count are only knowable for the current month — nothing snapshotted
-        // them historically. Older months carry zero here rather than today's figure pretended
-        // backwards, which would make every past month look identically profitable.
-        charges: partial ? charges : 0,
-        revenue: partial ? mrr : 0,
+        /*
+         * SnapTrade bills per person who HAS a connection, so someone whose plan merely allows one
+         * costs nothing. For the month in progress that is the live connection count; for a past
+         * month, connection state was never snapshotted, so the people who ran at least one sync
+         * are the floor. Whichever is larger, since a user can connect and sync, or sync and then
+         * disconnect, and either way the dollar was spent.
+         */
+        syncingUsers: partial
+          ? Math.max(connectedNow, raw.counts.syncingUsers)
+          : raw.counts.syncingUsers,
+        charges: collected.charges,
+        revenue: collected.revenue,
       };
 
       months.push({ month, counts, breakdown: priceUsage(counts, COST_RATES), partial });
@@ -227,6 +274,7 @@ export async function buildCostReport(): Promise<CostReport> {
     rates: COST_RATES,
     connectedNow,
     mrrNow: mrr,
+    subscribers,
     topUsers: ranked,
     warning,
   };

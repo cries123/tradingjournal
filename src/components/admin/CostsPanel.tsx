@@ -41,7 +41,9 @@ export function CostsPanel({ report, error }: CostsPanelProps) {
   }
 
   const current = report.months.find((m) => m.partial);
-  const netNow = report.mrrNow - (current?.breakdown.total ?? 0);
+  const collected = current?.counts.revenue ?? 0;
+  const spend = current?.breakdown.total ?? 0;
+  const netNow = collected - spend;
 
   return (
     <section className="space-y-6">
@@ -63,29 +65,40 @@ export function CostsPanel({ report, error }: CostsPanelProps) {
       {/* Where things stand right now */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'MRR today', value: money(report.mrrNow), tone: 'text-emerald-400' },
           {
-            label: 'Spend this month',
-            value: money(current?.breakdown.total ?? 0),
-            tone: 'text-text-primary',
+            label: 'Collected this month',
+            value: money(collected),
+            tone: 'text-emerald-400',
+            note: `${current?.counts.charges ?? 0} payment${(current?.counts.charges ?? 0) === 1 ? '' : 's'}`,
           },
+          { label: 'Spend this month', value: money(spend), tone: 'text-text-primary', note: 'estimated' },
           {
             label: 'Net this month',
             value: money(netNow),
             tone: netNow >= 0 ? 'text-emerald-400' : 'text-red-400',
+            note: 'collected minus spend',
           },
-          { label: 'Brokers connected', value: String(report.connectedNow), tone: 'text-text-primary' },
+          {
+            label: 'Run rate',
+            value: `${money(report.mrrNow)}/mo`,
+            tone: 'text-text-primary',
+            note: `${report.subscribers} paid subscriber${report.subscribers === 1 ? '' : 's'}`,
+          },
         ].map((tile) => (
           <div key={tile.label} className="glass-card rounded-xl p-4">
             <p className="text-[10px] uppercase tracking-wider text-text-secondary">{tile.label}</p>
             <p className={`text-xl font-bold tabular-nums mt-1 ${tile.tone}`}>{tile.value}</p>
+            <p className="text-[10px] text-text-secondary mt-0.5">{tile.note}</p>
           </div>
         ))}
       </div>
 
-      <p className="text-[11px] text-text-secondary -mt-3">
-        Net counts this month&apos;s spend against today&apos;s MRR. Revenue was never recorded per
-        month, so the columns below show costs only for past months.
+      <p className="text-[11px] text-text-secondary -mt-3 leading-relaxed">
+        Collected is money Creem actually charged, from the billing ledger. Run rate is what the
+        live subscriptions bill per month — hand-granted tiers are excluded from both. Months
+        before the ledger existed show no revenue, because nothing recorded it.{' '}
+        {report.connectedNow} broker connection{report.connectedNow === 1 ? '' : 's'} live now;
+        SnapTrade only bills for people who have actually connected one.
       </p>
 
       {/* Month by month */}
@@ -102,13 +115,14 @@ export function CostsPanel({ report, error }: CostsPanelProps) {
                 <th className="text-right font-medium px-3 py-2.5">Syncs</th>
                 <th className="text-right font-medium px-3 py-2.5">SnapTrade</th>
                 <th className="text-right font-medium px-3 py-2.5">Fees</th>
-                <th className="text-right font-medium px-4 py-2.5">Total</th>
+                <th className="text-right font-medium px-3 py-2.5">Spend</th>
+                <th className="text-right font-medium px-4 py-2.5">Collected</th>
               </tr>
             </thead>
             <tbody className="tabular-nums">
               {report.months.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-text-secondary text-sm">
+                  <td colSpan={10} className="px-4 py-8 text-center text-text-secondary text-sm">
                     No usage recorded yet.
                   </td>
                 </tr>
@@ -134,8 +148,11 @@ export function CostsPanel({ report, error }: CostsPanelProps) {
                   <td className="text-right px-3 py-2.5">{money(m.breakdown.syncs)}</td>
                   <td className="text-right px-3 py-2.5">{money(m.breakdown.connectedUsers)}</td>
                   <td className="text-right px-3 py-2.5">{money(m.breakdown.processor)}</td>
-                  <td className="text-right px-4 py-2.5 font-semibold">
+                  <td className="text-right px-3 py-2.5 font-semibold">
                     {money(m.breakdown.total)}
+                  </td>
+                  <td className="text-right px-4 py-2.5 font-semibold text-emerald-400">
+                    {m.counts.revenue > 0 ? money(m.counts.revenue) : '—'}
                   </td>
                 </tr>
               ))}

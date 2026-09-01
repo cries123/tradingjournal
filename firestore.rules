@@ -241,6 +241,14 @@ service cloud.firestore {
      * Server-only. The numbers are derived from data the client already cannot read (per-user
      * usage), and a client that could write here could make a month look cheap.
      */
+    /*
+     * Money actually collected, one row per Creem payment event. Written only by the webhook
+     * through the Admin SDK — a client that could write here could invent revenue.
+     */
+    match /billingCharges/{eventId} {
+      allow read, write: if false;
+    }
+
     match /adminCostMonths/{month} {
       allow read, write: if false;
     }

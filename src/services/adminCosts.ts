@@ -13,6 +13,7 @@ export interface CostReport {
   rates: CostRates;
   connectedNow: number;
   mrrNow: number;
+  subscribers: number;
   topUsers: { uid: string; aiMessages: number; syncs: number; cost: number }[];
   warning: string | null;
 }
