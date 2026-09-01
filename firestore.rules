@@ -101,12 +101,20 @@ service cloud.firestore {
      * the admin can post as support. Without that, anyone could write a reply into their own
      * ticket that renders as coming from us.
      */
+    function ticketExists(ticketId) {
+      return exists(/databases/$(database)/documents/supportTickets/$(ticketId));
+    }
+
     function ticketData(ticketId) {
       return get(/databases/$(database)/documents/supportTickets/$(ticketId)).data;
     }
 
+    /* Guarded with exists(): reading .data off a document that isn't there errors, and an errored
+       condition denies — which is how the whole feature came to be unusable. */
     function ownsTicket(ticketId) {
-      return request.auth != null && ticketData(ticketId).uid == request.auth.uid;
+      return request.auth != null
+        && ticketExists(ticketId)
+        && ticketData(ticketId).uid == request.auth.uid;
     }
 
     function validTicketCreate() {
@@ -150,6 +158,19 @@ service cloud.firestore {
     match /supportTickets/{ticketId}/messages/{messageId} {
       allow read: if isAdmin() || ownsTicket(ticketId);
 
+      /*
+       * The first message of a ticket is written in the SAME batch as the ticket itself, and rules
+       * cannot see uncommitted writes from their own batch — get() reads committed data only. So
+       * requiring the parent to exist made the opening message of every ticket impossible, the
+       * batch failed atomically, and nobody could open a ticket at all.
+       *
+       * Ownership is therefore enforced against the parent only once the parent is there. While it
+       * is absent, a signed-in user may write a message that names themselves as its author, which
+       * is exactly the batch above. Nothing leaks: reading still requires ownsTicket, so an orphan
+       * message under a made-up id is unreadable even by whoever wrote it, and the moment a real
+       * ticket exists the ownership check applies again — so nobody can append to someone else's
+       * thread.
+       */
       allow create: if request.resource.data.body is string
         && request.resource.data.body.size() > 0
         && request.resource.data.body.size() <= 4000
@@ -157,9 +178,10 @@ service cloud.firestore {
         && (
           (isAdmin() && request.resource.data.from == 'support')
           || (
-            ownsTicket(ticketId)
+            request.auth != null
             && request.resource.data.from == 'user'
             && request.resource.data.authorUid == request.auth.uid
+            && (ownsTicket(ticketId) || !ticketExists(ticketId))
           )
         );
 

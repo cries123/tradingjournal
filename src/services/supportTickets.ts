@@ -108,6 +108,22 @@ function preview(body: string): string {
   return body.trim().replace(/\s+/g, ' ').slice(0, 140);
 }
 
+/** A sentence a person can act on, instead of the SDK's error code. */
+function describeWriteFailure(err: unknown, prefix: string): string {
+  const code = (err as { code?: string })?.code ?? '';
+
+  if (code === 'permission-denied') {
+    return `${prefix} Support is misconfigured on our side — please email support@trendchasers.net and we will pick it up there.`;
+  }
+  if (code === 'unavailable' || code === 'deadline-exceeded') {
+    return `${prefix} You appear to be offline — it will send once you have a connection.`;
+  }
+  if (code === 'resource-exhausted') {
+    return `${prefix} Our database is over quota right now. Please try again shortly.`;
+  }
+  return `${prefix} Please try again, or email support@trendchasers.net.`;
+}
+
 function assertConfigured(): void {
   if (!isFirebaseConfigured()) {
     throw new Error('Support is unavailable right now. Please email support@trendchasers.net instead.');
@@ -159,7 +175,13 @@ export async function createSupportTicket(input: CreateTicketInput): Promise<str
     createdAt: now,
   });
 
-  await batch.commit();
+  try {
+    await batch.commit();
+  } catch (err) {
+    /* The raw SDK text here is "Missing or insufficient permissions", which tells somebody trying
+       to report a failed payment nothing at all and reads as though their account is at fault. */
+    throw new Error(describeWriteFailure(err, 'We could not open the ticket.'), { cause: err });
+  }
   return ticketRef.id;
 }
 
@@ -212,7 +234,11 @@ export async function postTicketMessage(
     status: ticket.status === 'closed' ? 'closed' : 'open',
   });
 
-  await batch.commit();
+  try {
+    await batch.commit();
+  } catch (err) {
+    throw new Error(describeWriteFailure(err, 'That reply did not send.'), { cause: err });
+  }
 }
 
 /**
