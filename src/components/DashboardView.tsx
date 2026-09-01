@@ -31,6 +31,7 @@ import { WeekdayChart } from './WeekdayChart';
 import { YearHeatmap } from './YearHeatmap';
 import { TradingInsightsSection } from './analytics/TradingInsightsSection';
 import { DirectionPanel } from './analytics/DirectionPanel';
+import { ExecutionSection } from './analytics/ExecutionSection';
 import { EquityCurve } from './analytics/EquityCurve';
 import { TakeawayBanner } from './analytics/TakeawayBanner';
 
@@ -367,6 +368,11 @@ export function DashboardView({
           </div>
         </div>
       )}
+
+      {/* Renders whichever of timing, setups, expectancy, excursion and discipline actually have
+          data behind them, and nothing at all when none do — which is the fix for what the old
+          Timing and Execution cards got wrong. */}
+      {hasAnyTrades && <ExecutionSection trades={analyticsTrades} />}
 
       {hasAnyTrades && <TradingInsightsSection trades={analyticsTrades} />}
 
