@@ -11,7 +11,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
-import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
+import { getFirebaseAuth, getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
 import type { AdminPriority } from './adminShared';
 
 /**
@@ -213,6 +213,34 @@ export async function postTicketMessage(
   });
 
   await batch.commit();
+}
+
+/**
+ * Ask the server to email the trader that support replied.
+ *
+ * Called after the reply is written, never before: the message is the thing that must succeed, and
+ * this is a courtesy on top of it. Every failure is swallowed for the same reason — the reply is
+ * already saved and already showing an unread badge in their sidebar, and telling the admin their
+ * reply failed when it didn't is how a message gets sent twice.
+ */
+export async function notifyTicketReply(ticketId: string): Promise<void> {
+  if (!isFirebaseConfigured()) return;
+
+  try {
+    const user = getFirebaseAuth().currentUser;
+    if (!user) return;
+
+    await fetch('/api/ticket-notify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${await user.getIdToken()}`,
+      },
+      body: JSON.stringify({ ticketId }),
+    });
+  } catch {
+    // Best effort by design — see above.
+  }
 }
 
 /** Live view of one user's tickets, newest activity first. */

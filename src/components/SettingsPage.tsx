@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { ArrowLeft, Copy, Download, EyeOff, FileText, Plus, Share2, Trash2, Trophy, Upload } from 'lucide-react';
 import { useSettings } from '../context/useSettings';
 import { useAuth } from '../context/useAuth';
@@ -9,6 +9,7 @@ import { downloadBackup, parseBackup, type ParsedBackup } from '../utils/backup'
 import { exportMonthReport, exportTaxYearCsv, exportTradesCsv } from '../utils/exportTrades';
 import { availableTaxYears, buildTaxReport } from '../utils/taxReport';
 import { formatCurrency } from '../utils/format';
+import { fetchEmailPrefs, setRecapOptIn } from '../services/emailPrefs';
 import { ConfirmDialog } from './ConfirmDialog';
 import { coachShareUrl, createTradeHistoryShare, disableCoachShare } from '../services/coachShare';
 
@@ -67,6 +68,40 @@ export function SettingsPage({
   /* The tax export is per YEAR, so everything about it derives from the selected one — including
      the wash-sale count, which used to be taken over the whole journal and shown beside a button
      that claimed to export a single year. */
+  /* The recap opt-in lives in its own collection rather than in settings — see
+     services/emailPrefs.ts for why the scheduled job needs it there. Loaded once, and stored with
+     the uid it belongs to so a signed-out render can never show somebody else's choice. */
+  const [recapPref, setRecapPref] = useState<{ uid: string; recap: boolean } | null>(null);
+  const [recapSaving, setRecapSaving] = useState(false);
+
+  useEffect(() => {
+    const uid = user?.uid;
+    if (!uid) return;
+    let cancelled = false;
+    void fetchEmailPrefs(uid).then((prefs) => {
+      if (!cancelled) setRecapPref({ uid, recap: prefs.recap });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]);
+
+  const recapOn = recapPref?.uid === user?.uid && recapPref?.recap === true;
+
+  const toggleRecap = async (next: boolean) => {
+    const uid = user?.uid;
+    if (!uid) return;
+    setRecapSaving(true);
+    setRecapPref({ uid, recap: next });
+    try {
+      await setRecapOptIn(uid, next);
+    } catch {
+      setRecapPref({ uid, recap: !next });
+    } finally {
+      setRecapSaving(false);
+    }
+  };
+
   const taxYears = useMemo(() => availableTaxYears(trades), [trades]);
   const [taxYear, setTaxYear] = useState(() => availableTaxYears(trades)[0] ?? new Date().getFullYear());
   const taxReport = useMemo(() => buildTaxReport(trades, taxYear), [trades, taxYear]);
@@ -489,6 +524,30 @@ export function SettingsPage({
                 className="input-field"
               />
             </label>
+          )}
+
+          {user && firebaseEnabled && (
+            <div className="rounded-lg border border-border/60 bg-bg-tertiary/30 p-3 space-y-2">
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={recapOn}
+                  disabled={recapSaving || recapPref === null}
+                  onChange={(e) => void toggleRecap(e.target.checked)}
+                  className="rounded border-border mt-0.5"
+                />
+                <span>
+                  Email me a weekly recap
+                  <span className="block text-[11px] text-text-secondary mt-0.5">
+                    Sunday morning: net P&amp;L, best and worst day, your top setup, and how the week
+                    compared to the one before. Only sent in weeks you actually traded.
+                  </span>
+                </span>
+              </label>
+              <p className="text-[11px] text-text-secondary">
+                Replies to your own support tickets are separate and always sent.
+              </p>
+            </div>
           )}
         </section>
 

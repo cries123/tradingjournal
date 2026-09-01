@@ -3,6 +3,7 @@ import { CheckCircle2, Clock, Send, User } from 'lucide-react';
 import {
   markTicketRead,
   MAX_MESSAGE_LENGTH,
+  notifyTicketReply,
   postTicketMessage,
   subscribeToTicketMessages,
   TICKET_CATEGORY_LABELS,
@@ -77,6 +78,9 @@ function AdminTicketThread({
       await postTicketMessage(ticket, 'support', body, { uid: adminUid, name: 'Trend Chasers support' });
       setDraft('');
       onReplied(ticket.id);
+      // Not awaited: the reply is saved and on screen, and the email is a courtesy that must never
+      // hold up the next one being typed.
+      void notifyTicketReply(ticket.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not send that reply.');
     } finally {

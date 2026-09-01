@@ -167,6 +167,35 @@ service cloud.firestore {
     }
 
     /*
+     * Weekly-recap opt-in, one document per user.
+     *
+     * Top-level rather than a field on the settings document because the scheduled job has to
+     * query across everybody, and a collectionGroup query needs a hand-built index.
+     *
+     * A user may set exactly two things about themselves. lastRecapSentAt is written only by the
+     * scheduled function through the Admin SDK, and pinning the writable keys is what stops
+     * someone clearing it to make the job send them the same email repeatedly.
+     */
+    match /emailPrefs/{userId} {
+      allow read: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.uid == userId
+        && request.resource.data.recap is bool
+        && request.resource.data.keys().hasOnly(['uid', 'recap', 'updatedAt']);
+
+      allow update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.uid == userId
+        && request.resource.data.recap is bool
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['recap', 'updatedAt']);
+
+      allow delete: if adminCanDeleteUser(userId);
+    }
+
+    /*
      * The production error feed, one document per distinct bug.
      *
      * Written ONLY by the Admin SDK, from netlify/functions/report-error.ts, which recomputes the

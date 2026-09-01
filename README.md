@@ -99,7 +99,10 @@ Your trades sync to `users/{your-uid}/trades` in Firestore. Local browser trades
 | `VITE_FIREBASE_STORAGE_BUCKET` | For cloud sync | |
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | For cloud sync | |
 | `VITE_FIREBASE_APP_ID` | For cloud sync | |
-| `SITE_URL` | Production domain | `https://trendchasers.net` — used for share links and broker-connect redirects |
+| `SITE_URL` | Production domain | `https://trendchasers.net` — used for share links, broker-connect redirects and links in email |
+| `RESEND_API_KEY` | For email | Ticket-reply notifications and the weekly recap. Without it both are silently skipped and the in-app unread badge is the only notice |
+| `MAIL_FROM` | For email | Defaults to `Trend Chasers <support@trendchasers.net>`. The domain must be verified in Resend first |
+| `EMAIL_TOKEN_SECRET` | For email | Any random string of 16+ characters. Signs one-click unsubscribe links; without it the recap sends with no unsubscribe link, so set it before enabling the recap |
 
 4. Deploy. Broker sync calls `/api/broker-connect`, which runs as a Netlify Function using your SnapTrade
    and Firebase credentials.
