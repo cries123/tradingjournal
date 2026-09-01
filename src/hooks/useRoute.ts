@@ -18,6 +18,7 @@ export type AppRoute =
   | 'ai-assistant'
   | 'pricing'
   | 'help-center'
+  | 'support'
   | 'whats-new';
 
 /** Nav destinations reachable from the header dropdown and the footer — the "coming soon" and
@@ -31,6 +32,7 @@ export type ExtraNavRoute =
   | 'help-center'
   | 'whats-new'
   | 'report-bug'
+  | 'support'
   | 'request-broker';
 
 const ROUTE_PATHS: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>, string> = {
@@ -47,6 +49,7 @@ const ROUTE_PATHS: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>,
   'ai-assistant': '/ai-assistant',
   pricing: '/pricing',
   'help-center': '/help-center',
+  support: '/support',
   refunds: '/refunds',
   'whats-new': '/whats-new',
 };
@@ -86,6 +89,7 @@ function readRoute(): RouteState {
   if (path.startsWith('/ai-assistant')) return { route: 'ai-assistant' };
   if (path.startsWith('/pricing')) return { route: 'pricing' };
   if (path.startsWith('/help-center')) return { route: 'help-center' };
+  if (path.startsWith('/support')) return { route: 'support' };
   if (path.startsWith('/whats-new')) return { route: 'whats-new' };
   return { route: 'landing' };
 }

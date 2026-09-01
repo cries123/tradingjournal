@@ -1,6 +1,6 @@
-import { ArrowRight, Building2, GraduationCap, LifeBuoy, MessageSquareWarning } from 'lucide-react';
+import { ArrowRight, Building2, GraduationCap, LifeBuoy, MessageSquareWarning, Ticket } from 'lucide-react';
 
-export type SupportDestination = 'tutorials' | 'brokers' | 'help' | 'report';
+export type SupportDestination = 'tutorials' | 'brokers' | 'help' | 'report' | 'ticket';
 
 interface SupportLinksProps {
   /** The page this renders on, so it never links to where you already are. */
@@ -9,6 +9,7 @@ interface SupportLinksProps {
   onBrokers?: () => void;
   onHelp?: () => void;
   onReportBug?: () => void;
+  onSupport?: () => void;
 }
 
 const ICONS = {
@@ -16,6 +17,7 @@ const ICONS = {
   brokers: Building2,
   help: LifeBuoy,
   report: MessageSquareWarning,
+  ticket: Ticket,
 } as const;
 
 const COPY: Record<SupportDestination, { title: string; blurb: string }> = {
@@ -23,6 +25,7 @@ const COPY: Record<SupportDestination, { title: string; blurb: string }> = {
   brokers: { title: 'Supported brokers', blurb: 'Check whether yours connects, and how its import works.' },
   help: { title: 'Help Center', blurb: 'Short answers to specific questions, organised by area.' },
   report: { title: 'Report a bug', blurb: "Something broken or behaving oddly? Tell us and we'll look." },
+  ticket: { title: 'Open a ticket', blurb: 'Billing, memberships or anything that needs a real reply.' },
 };
 
 /**
@@ -35,15 +38,16 @@ const COPY: Record<SupportDestination, { title: string; blurb: string }> = {
  * It also fills the bottom of a page that is short, which the Help Center is whenever there are
  * few published articles.
  */
-export function SupportLinks({ current, onGuides, onBrokers, onHelp, onReportBug }: SupportLinksProps) {
+export function SupportLinks({ current, onGuides, onBrokers, onHelp, onReportBug, onSupport }: SupportLinksProps) {
   const handlers: Record<SupportDestination, (() => void) | undefined> = {
     tutorials: onGuides,
     brokers: onBrokers,
     help: onHelp,
     report: onReportBug,
+    ticket: onSupport,
   };
 
-  const destinations = (['tutorials', 'brokers', 'help', 'report'] as SupportDestination[]).filter(
+  const destinations = (['tutorials', 'brokers', 'help', 'report', 'ticket'] as SupportDestination[]).filter(
     (d) => d !== current && handlers[d],
   );
 

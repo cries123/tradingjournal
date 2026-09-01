@@ -23,6 +23,7 @@ const PricingPage = lazy(() => import('./pages/PricingPage').then((m) => ({ defa
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage').then((m) => ({ default: m.PrivacyPolicyPage })));
 const ReportBugPage = lazy(() => import('./pages/ReportBugPage').then((m) => ({ default: m.ReportBugPage })));
 const RequestBrokerPage = lazy(() => import('./pages/RequestBrokerPage').then((m) => ({ default: m.RequestBrokerPage })));
+const SupportPage = lazy(() => import('./pages/SupportPage').then((m) => ({ default: m.SupportPage })));
 const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage').then((m) => ({ default: m.TermsOfServicePage })));
 const WhatsNewPage = lazy(() => import('./pages/WhatsNewPage').then((m) => ({ default: m.WhatsNewPage })));
 
@@ -110,6 +111,8 @@ export default function App() {
     content = <ReportBugPage {...publicPageProps} />;
   } else if (route === 'request-broker') {
     content = <RequestBrokerPage {...publicPageProps} />;
+  } else if (route === 'support') {
+    content = <SupportPage {...publicPageProps} />;
   } else if (route === 'admin') {
     content = <AdminPage {...publicPageProps} />;
   } else if (route === 'whats-new') {

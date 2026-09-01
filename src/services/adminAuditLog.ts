@@ -17,6 +17,10 @@ export type AdminAuditAction =
   | 'broker-request.status-changed'
   | 'broker-request.priority-changed'
   | 'broker-request.note-saved'
+  | 'ticket.status-changed'
+  | 'ticket.priority-changed'
+  | 'ticket.note-saved'
+  | 'error.status-changed'
   | 'help-article.created'
   | 'help-article.updated'
   | 'help-article.published'
@@ -31,7 +35,15 @@ export interface AdminAuditEntry {
   adminUid: string;
   adminEmail: string;
   action: AdminAuditAction;
-  targetType: 'user' | 'bug-report' | 'broker-request' | 'help-article' | 'announcement' | 'checkout';
+  targetType:
+    | 'user'
+    | 'bug-report'
+    | 'broker-request'
+    | 'support-ticket'
+    | 'error-event'
+    | 'help-article'
+    | 'announcement'
+    | 'checkout';
   targetId: string;
   targetLabel: string;
   detail: string;

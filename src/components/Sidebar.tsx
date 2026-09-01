@@ -7,6 +7,7 @@ import {
   MessageSquarePlus,
   Settings,
   Share2,
+  LifeBuoy,
   ShieldCheck,
   Trophy,
 } from 'lucide-react';
@@ -15,6 +16,7 @@ import { BrandLogo } from './BrandLogo';
 import { SidebarJournalPicker } from './SidebarJournalPicker';
 import { useAuth } from '../context/useAuth';
 import { isCurrentUserAdmin } from '../services/admin';
+import { useSupportUnread } from '../hooks/useSupportUnread';
 
 export type SidebarAppView =
   | 'dashboard'
@@ -23,6 +25,7 @@ export type SidebarAppView =
   | 'connect-broker'
   | 'report-bug'
   | 'request-broker'
+  | 'support'
   | 'leaderboard';
 
 interface SidebarProps {
@@ -34,6 +37,7 @@ interface SidebarProps {
   onSettings: () => void;
   onBrokers: () => void;
   onReportBug: () => void;
+  onSupport: () => void;
   onRequestBroker: () => void;
   onLeaderboard: () => void;
   onShareCard?: () => void;
@@ -59,6 +63,7 @@ export function Sidebar({
   onSettings,
   onBrokers,
   onReportBug,
+  onSupport,
   onRequestBroker,
   onLeaderboard,
   onShareCard,
@@ -70,6 +75,7 @@ export function Sidebar({
 }: SidebarProps) {
   const { user, loading, firebaseEnabled, logout, username } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
+  const supportUnread = useSupportUnread();
 
   useEffect(() => {
     if (!user?.uid || !firebaseEnabled) {
@@ -185,6 +191,20 @@ export function Sidebar({
             >
               <Building2 size={15} />
               Supported brokers
+            </button>
+            <button
+              type="button"
+              onClick={wrap(onSupport)}
+              className={navItemClass(appView === 'support')}
+            >
+              <LifeBuoy size={15} />
+              <span className="flex-1 text-left">Support</span>
+              {/* A reply nobody opens is the same as no reply, and there is no email going out. */}
+              {supportUnread > 0 && (
+                <span className="ml-auto text-[10px] font-semibold tabular-nums rounded-full px-1.5 py-0.5 bg-accent/20 text-accent">
+                  {supportUnread}
+                </span>
+              )}
             </button>
             <button
               type="button"

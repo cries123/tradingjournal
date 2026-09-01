@@ -60,6 +60,12 @@ const PAGE_SEO: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>, Pa
     path: '/report-bug',
     noindex: true,
   },
+  support: {
+    title: 'Support — Trend Chasers',
+    description: 'Open a support ticket and talk to us about billing, memberships or broker connections.',
+    path: '/support',
+    noindex: true,
+  },
   'request-broker': {
     title: 'Request Broker Support — Trend Chasers',
     description:

@@ -56,6 +56,21 @@ import {
 import { fetchAllAdminUserNotes, saveAdminUserNote, type AdminUserNote } from '../services/adminUserNotes';
 import { fetchRecentAuditLog, logAdminAction, type AdminAuditEntry } from '../services/adminAuditLog';
 import {
+  fetchAllTickets,
+  updateTicketStatus,
+  type SupportTicket,
+  type TicketStatus,
+} from '../services/supportTickets';
+import {
+  fetchErrorEvents,
+  fetchErrorsDroppedToday,
+  updateErrorEventStatus,
+  type ErrorEvent,
+  type ErrorStatus,
+} from '../services/errorEvents';
+import { SupportTicketsPanel } from '../components/admin/SupportTicketsPanel';
+import { ErrorEventsPanel } from '../components/admin/ErrorEventsPanel';
+import {
   fetchAllHelpArticles,
   helpCategoryLabel,
   createHelpArticle,
@@ -157,6 +172,9 @@ type AdminState =
       isNewClaim: boolean;
       reports: BugReport[];
       brokerRequests: BrokerSupportRequest[];
+      tickets: SupportTicket[];
+      errorEvents: ErrorEvent[];
+      errorsDropped: number;
       userCount: number;
       users: AdminUserSummary[];
       health: AdminHealthStatus | null;
@@ -395,6 +413,10 @@ const AUDIT_ACTION_LABELS: Record<AdminAuditEntry['action'], string> = {
   'broker-request.status-changed': 'Updated status on broker request',
   'broker-request.priority-changed': 'Changed priority on broker request',
   'broker-request.note-saved': 'Added a note to broker request',
+  'ticket.status-changed': 'Updated status on support ticket',
+  'ticket.priority-changed': 'Changed priority on support ticket',
+  'ticket.note-saved': 'Added a note to support ticket',
+  'error.status-changed': 'Updated status on production error',
   'help-article.created': 'Created help article',
   'help-article.updated': 'Edited help article',
   'help-article.published': 'Published help article',
@@ -454,12 +476,14 @@ function StatusFilterBar({
   );
 }
 
-type AdminTab = 'overview' | 'users' | 'requests' | 'content';
+type AdminTab = 'overview' | 'users' | 'support' | 'requests' | 'errors' | 'content';
 
 const ADMIN_TABS: { id: AdminTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'users', label: 'Users' },
+  { id: 'support', label: 'Support' },
   { id: 'requests', label: 'Requests' },
+  { id: 'errors', label: 'Errors' },
   { id: 'content', label: 'Content' },
 ];
 
@@ -477,14 +501,20 @@ function AdminTabBar({
   onChange,
   openCount,
   userCount,
+  ticketsWaiting,
+  openErrors,
 }: {
   tab: AdminTab;
   onChange: (tab: AdminTab) => void;
   openCount: number;
   userCount: number;
+  ticketsWaiting: number;
+  openErrors: number;
 }) {
   const badgeFor = (id: AdminTab): string | null => {
     if (id === 'requests' && openCount > 0) return String(openCount);
+    if (id === 'support' && ticketsWaiting > 0) return String(ticketsWaiting);
+    if (id === 'errors' && openErrors > 0) return String(openErrors);
     if (id === 'users') return String(userCount);
     return null;
   };
@@ -509,9 +539,11 @@ function AdminTabBar({
               {badge && (
                 <span
                   className={`text-[10px] font-semibold tabular-nums rounded-full px-1.5 py-0.5 ${
-                    t.id === 'requests'
-                      ? 'bg-amber-500/15 text-amber-400'
-                      : 'bg-bg-tertiary text-text-secondary'
+                    t.id === 'errors'
+                      ? 'bg-red-500/15 text-red-400'
+                      : t.id === 'requests' || t.id === 'support'
+                        ? 'bg-amber-500/15 text-amber-400'
+                        : 'bg-bg-tertiary text-text-secondary'
                   }`}
                 >
                   {badge}
@@ -537,13 +569,21 @@ function AdminTabBar({
 function NeedsAttention({
   openBugs,
   openBrokers,
+  ticketsWaiting,
+  openErrors,
   health,
   onGoToRequests,
+  onGoToSupport,
+  onGoToErrors,
 }: {
   openBugs: number;
   openBrokers: number;
+  ticketsWaiting: number;
+  openErrors: number;
   health: AdminHealthStatus | null;
   onGoToRequests: () => void;
+  onGoToSupport: () => void;
+  onGoToErrors: () => void;
 }) {
   const down: string[] = [];
   if (health) {
@@ -555,6 +595,12 @@ function NeedsAttention({
   }
 
   const waiting: string[] = [];
+  // Tickets first: a person is on the other end of one, and unlike a bug report they are waiting
+  // for a reply rather than for a fix.
+  if (ticketsWaiting > 0) {
+    waiting.push(`${ticketsWaiting} support ticket${ticketsWaiting === 1 ? '' : 's'}`);
+  }
+  if (openErrors > 0) waiting.push(`${openErrors} production error${openErrors === 1 ? '' : 's'}`);
   if (openBugs > 0) waiting.push(`${openBugs} open bug report${openBugs === 1 ? '' : 's'}`);
   if (openBrokers > 0) {
     waiting.push(`${openBrokers} broker request${openBrokers === 1 ? '' : 's'}`);
@@ -562,7 +608,12 @@ function NeedsAttention({
 
   if (waiting.length === 0 && down.length === 0) return null;
 
-  const critical = down.length > 0;
+  // An unanswered ticket or an active crash is escalated to the red treatment: both mean someone
+  // is currently having a bad time in the product.
+  const critical = down.length > 0 || openErrors > 0 || ticketsWaiting > 0;
+
+  // Whichever queue is loudest is where "Review" should land.
+  const review = ticketsWaiting > 0 ? onGoToSupport : openErrors > 0 ? onGoToErrors : onGoToRequests;
 
   return (
     <div
@@ -588,7 +639,7 @@ function NeedsAttention({
       {waiting.length > 0 && (
         <button
           type="button"
-          onClick={onGoToRequests}
+          onClick={review}
           className="text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors focus-ring rounded shrink-0"
         >
           Review &rarr;
@@ -705,8 +756,18 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
     }
 
     try {
-      const [reportsResult, brokerResult, usersResult, healthResult, notesResult, auditResult, healthHistoryResult] =
-        await Promise.allSettled([
+      const [
+        reportsResult,
+        brokerResult,
+        usersResult,
+        healthResult,
+        notesResult,
+        auditResult,
+        healthHistoryResult,
+        ticketsResult,
+        errorsResult,
+        droppedResult,
+      ] = await Promise.allSettled([
           fetchBugReports(),
           fetchBrokerSupportRequests(),
           fetchSignedUpUsers(),
@@ -714,6 +775,9 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
           fetchAllAdminUserNotes(),
           fetchRecentAuditLog(),
           fetchAdminHealthHistory(),
+          fetchAllTickets(),
+          fetchErrorEvents(),
+          fetchErrorsDroppedToday(),
         ]);
 
       const users =
@@ -736,6 +800,9 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         isNewClaim: access.isNewClaim,
         reports: reportsResult.status === 'fulfilled' ? reportsResult.value : [],
         brokerRequests: brokerResult.status === 'fulfilled' ? brokerResult.value : [],
+        tickets: ticketsResult.status === 'fulfilled' ? ticketsResult.value : [],
+        errorEvents: errorsResult.status === 'fulfilled' ? errorsResult.value : [],
+        errorsDropped: droppedResult.status === 'fulfilled' ? droppedResult.value : 0,
         userCount,
         users,
         health,
@@ -753,6 +820,9 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         isNewClaim: access.isNewClaim,
         reports: [],
         brokerRequests: [],
+        tickets: [],
+        errorEvents: [],
+        errorsDropped: 0,
         userCount: 0,
         users: [],
         health: null,
@@ -788,6 +858,69 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
   }, [state.phase]);
 
   const adminIdentity = { adminUid: user?.uid ?? '', adminEmail: user?.email ?? '' };
+
+  const handleTicketStatusChange = async (ticketId: string, status: TicketStatus, subject: string) => {
+    setUpdatingKey(`ticket:${ticketId}`);
+    try {
+      await updateTicketStatus(ticketId, status);
+      setState((prev) => {
+        if (prev.phase !== 'ready') return prev;
+        return {
+          ...prev,
+          tickets: prev.tickets.map((t) => (t.id === ticketId ? { ...t, status } : t)),
+        };
+      });
+      void logAdminAction({
+        ...adminIdentity,
+        action: 'ticket.status-changed',
+        targetType: 'support-ticket',
+        targetId: ticketId,
+        targetLabel: subject,
+        detail: `Status \u2192 ${STATUS_LABELS[status]}`,
+      });
+    } finally {
+      setUpdatingKey(null);
+    }
+  };
+
+  /* A reply flips unreadForSupport off in Firestore, but this page holds its tickets in local
+     state — without this the "waiting on you" badge would keep counting a ticket you just
+     answered until the next refresh. */
+  const handleTicketReplied = (ticketId: string) => {
+    setState((prev) => {
+      if (prev.phase !== 'ready') return prev;
+      return {
+        ...prev,
+        tickets: prev.tickets.map((t) =>
+          t.id === ticketId ? { ...t, unreadForSupport: false, lastMessageFrom: 'support' as const } : t,
+        ),
+      };
+    });
+  };
+
+  const handleErrorStatusChange = async (errorId: string, status: ErrorStatus) => {
+    setUpdatingKey(`error:${errorId}`);
+    try {
+      await updateErrorEventStatus(errorId, status);
+      setState((prev) => {
+        if (prev.phase !== 'ready') return prev;
+        return {
+          ...prev,
+          errorEvents: prev.errorEvents.map((e) => (e.id === errorId ? { ...e, status } : e)),
+        };
+      });
+      void logAdminAction({
+        ...adminIdentity,
+        action: 'error.status-changed',
+        targetType: 'error-event',
+        targetId: errorId,
+        targetLabel: errorId.slice(0, 8),
+        detail: `Status \u2192 ${status}`,
+      });
+    } finally {
+      setUpdatingKey(null);
+    }
+  };
 
   const handleBugStatusChange = async (reportId: string, status: BugReportStatus, label: string) => {
     setUpdatingKey(`bug:${reportId}`);
@@ -1132,6 +1265,8 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
   const openBugCount = bugFilterCounts.open;
   const openBrokerCount = brokerFilterCounts.open;
   const openCount = openBugCount + openBrokerCount;
+  const ticketsWaiting = ready?.tickets.filter((t) => t.unreadForSupport && t.status !== 'closed').length ?? 0;
+  const openErrorCount = ready?.errorEvents.filter((e) => e.status === 'open').length ?? 0;
 
   const usersWithTrades = ready?.users.filter((u) => u.tradeCount > 0).length ?? 0;
   const maxDailySignup = Math.max(1, ...(signupStats?.dailyLast7.map((d) => d.count) ?? [1]));
@@ -1250,8 +1385,12 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
             <NeedsAttention
               openBugs={openBugCount}
               openBrokers={openBrokerCount}
+              ticketsWaiting={ticketsWaiting}
+              openErrors={openErrorCount}
               health={ready.health}
               onGoToRequests={() => setTab('requests')}
+              onGoToSupport={() => setTab('support')}
+              onGoToErrors={() => setTab('errors')}
             />
 
             <AdminTabBar
@@ -1259,6 +1398,8 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
               onChange={setTab}
               openCount={openCount}
               userCount={ready.users.length}
+              ticketsWaiting={ticketsWaiting}
+              openErrors={openErrorCount}
             />
 
 
@@ -1768,6 +1909,32 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                   </ul>
                 )}
               </div>
+            )}
+
+            {tab === 'support' && (
+              <>
+                <h2 className="text-base font-semibold mb-2">Support tickets</h2>
+                <p className="text-xs text-text-secondary mb-4">
+                  Conversations with traders. Anything marked &ldquo;waiting on you&rdquo; has a
+                  message nobody has answered yet, oldest first.
+                </p>
+                <SupportTicketsPanel
+                  tickets={ready.tickets}
+                  adminUid={user?.uid ?? ''}
+                  busyId={updatingKey?.startsWith('ticket:') ? updatingKey.slice('ticket:'.length) : null}
+                  onStatusChange={(id, status, subject) => void handleTicketStatusChange(id, status, subject)}
+                  onReplied={handleTicketReplied}
+                />
+              </>
+            )}
+
+            {tab === 'errors' && (
+              <ErrorEventsPanel
+                events={ready.errorEvents}
+                droppedToday={ready.errorsDropped}
+                busyId={updatingKey?.startsWith('error:') ? updatingKey.slice('error:'.length) : null}
+                onStatusChange={(id, status) => void handleErrorStatusChange(id, status)}
+              />
             )}
 
             {tab === 'requests' && (

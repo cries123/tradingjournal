@@ -16,6 +16,7 @@ import { BrokerConnectContent } from '../components/brokers/BrokerConnectContent
 import { LockedFeature } from '../components/plan/LockedFeature';
 import { BrokersContent } from '../components/support/BrokersContent';
 import { ReportBugContent } from '../components/support/ReportBugContent';
+import { SupportTicketsContent } from '../components/support/SupportTicketsContent';
 import { RequestBrokerContent } from '../components/support/RequestBrokerContent';
 import { TradeModal } from '../components/TradeModal';
 import { UsernameSetupModal } from '../components/UsernameSetupModal';
@@ -192,6 +193,10 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
       setAppView('report-bug');
       closeMobileMenu();
     },
+    onSupport: () => {
+      setAppView('support');
+      closeMobileMenu();
+    },
     onRequestBroker: () => {
       setAppView('request-broker');
       closeMobileMenu();
@@ -265,6 +270,11 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                   journalReady={syncStatus !== 'loading'}
                 />
               </LockedFeature>
+            ) : appView === 'support' ? (
+              <SupportTicketsContent
+                onBack={() => setAppView('dashboard')}
+                intro="Open a ticket and talk to us directly — billing, memberships, broker connections, anything. Replies show up here, and the sidebar tells you when one lands."
+              />
             ) : appView === 'report-bug' ? (
               <ReportBugContent onBack={() => setAppView('dashboard')} />
             ) : appView === 'request-broker' ? (

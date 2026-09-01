@@ -256,6 +256,15 @@ export function LandingFooter({
               </li>
               <li>
                 <a
+                  href="/support"
+                  onClick={navHandler(onNavigate && (() => onNavigate('support')))}
+                  className="hover:text-emerald-400 transition-colors"
+                >
+                  Open a support ticket
+                </a>
+              </li>
+              <li>
+                <a
                   href="/report-bug"
                   onClick={navHandler(onNavigate && (() => onNavigate('report-bug')))}
                   className="hover:text-emerald-400 transition-colors"

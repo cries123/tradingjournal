@@ -2,13 +2,45 @@ import { useState } from 'react';
 import { ArrowLeft, Bug, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
 import { submitBugReport } from '../../services/bugReports';
+import { SupportTicketsContent } from './SupportTicketsContent';
 
 interface ReportBugContentProps {
   onBack: () => void;
   backLabel?: string;
 }
 
+/**
+ * Reporting a bug, for whoever is doing it.
+ *
+ * A signed-in trader gets a ticket, because a bug report is the start of a conversation far more
+ * often than anyone admits — "which browser?", "does it still happen?", "try this" — and the old
+ * form had no way to carry one. Their report becomes a thread they can come back to, in the same
+ * queue as billing and broker problems.
+ *
+ * A signed-out visitor keeps the plain form. There is nowhere to deliver a reply to someone with
+ * no account, and demanding a signup from a person doing us the favour of reporting a bug is a
+ * good way to stop receiving bug reports.
+ */
 export function ReportBugContent({ onBack, backLabel = 'Back to dashboard' }: ReportBugContentProps) {
+  const { user: signedInUser, firebaseEnabled: backendReady } = useAuth();
+
+  if (signedInUser && backendReady) {
+    return (
+      <SupportTicketsContent
+        onBack={onBack}
+        backLabel={backLabel}
+        initialCategory="bug"
+        heading="Report a bug"
+        intro="Tell us what broke. It opens a ticket, so we can ask a follow-up and you can see the answer without leaving the app."
+      />
+    );
+  }
+
+  return <AnonymousBugReportForm onBack={onBack} backLabel={backLabel} />;
+}
+
+/** The original one-way form, kept for people without an account. */
+function AnonymousBugReportForm({ onBack, backLabel = 'Back to dashboard' }: ReportBugContentProps) {
   const { user, username, firebaseEnabled } = useAuth();
   const [description, setDescription] = useState('');
   const [steps, setSteps] = useState('');

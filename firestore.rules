@@ -87,6 +87,109 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    /*
+     * Support tickets, and the conversation inside each one.
+     *
+     * A ticket belongs to exactly one signed-in user; both they and the admin can read it and
+     * append to it, and nobody else can do either. The subcollection is where the chat lives, so
+     * its rules are the ones that matter most: a message is immutable once written (no update, no
+     * delete, for either side), because a support thread that can be silently edited afterwards is
+     * worthless as a record of what was agreed — particularly for the billing disputes this exists
+     * to handle.
+     *
+     * `from` is pinned to who is writing: a user's message can only be a user message, and only
+     * the admin can post as support. Without that, anyone could write a reply into their own
+     * ticket that renders as coming from us.
+     */
+    function ticketData(ticketId) {
+      return get(/databases/$(database)/documents/supportTickets/$(ticketId)).data;
+    }
+
+    function ownsTicket(ticketId) {
+      return request.auth != null && ticketData(ticketId).uid == request.auth.uid;
+    }
+
+    function validTicketCreate() {
+      return request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.subject is string
+        && request.resource.data.subject.size() >= 3
+        && request.resource.data.subject.size() <= 120
+        && request.resource.data.category is string
+        && request.resource.data.status == 'open'
+        && request.resource.data.createdAt is string
+        && request.resource.data.messageCount is number;
+    }
+
+    match /supportTickets/{ticketId} {
+      allow create: if validTicketCreate();
+
+      // `read` covers both get and list. A list query is only permitted when every document it
+      // would return passes this rule, so a client asking for the whole collection is denied and
+      // one filtered to `where('uid', '==', <their own uid>)` succeeds.
+      allow read: if isAdmin()
+        || (request.auth != null && resource.data.uid == request.auth.uid);
+
+      // The owner may move the conversation along and close it, and nothing else — not the uid it
+      // belongs to, not the email it was opened with, not the admin's private note.
+      allow update: if isAdmin()
+        || (
+          request.auth != null
+          && resource.data.uid == request.auth.uid
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'status', 'updatedAt', 'lastMessageAt', 'lastMessageFrom', 'lastMessagePreview',
+              'messageCount', 'unreadForUser', 'unreadForSupport'
+            ])
+          && request.resource.data.status in ['open', 'closed']
+        );
+
+      allow delete: if false;
+    }
+
+    match /supportTickets/{ticketId}/messages/{messageId} {
+      allow read: if isAdmin() || ownsTicket(ticketId);
+
+      allow create: if request.resource.data.body is string
+        && request.resource.data.body.size() > 0
+        && request.resource.data.body.size() <= 4000
+        && request.resource.data.createdAt is string
+        && (
+          (isAdmin() && request.resource.data.from == 'support')
+          || (
+            ownsTicket(ticketId)
+            && request.resource.data.from == 'user'
+            && request.resource.data.authorUid == request.auth.uid
+          )
+        );
+
+      allow update, delete: if false;
+    }
+
+    /*
+     * The production error feed, one document per distinct bug.
+     *
+     * Written ONLY by the Admin SDK, from netlify/functions/report-error.ts, which recomputes the
+     * fingerprint itself — so a client cannot choose a document id, cannot forge a failure, and
+     * cannot inflate a count. Read is admin-only because these documents contain stack traces and
+     * the uids of the people who hit them.
+     *
+     * The single writable field is `status`, which is the admin marking a bug fixed or ignored
+     * from the panel.
+     */
+    match /errorEvents/{fingerprint} {
+      allow read: if isAdmin();
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+      allow create, delete: if false;
+    }
+
+    // Daily counter for the error feed's own fuse. Server-only, like every other rate limit here.
+    match /errorBudget/{day} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     match /brokerSupportRequests/{requestId} {
       allow create: if validBrokerSupportCreate();
       allow read, update: if isAdmin();
