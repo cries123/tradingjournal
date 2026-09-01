@@ -1,5 +1,5 @@
 import type { ParsedTradeInput } from '../types';
-import { parseSchwabCsv } from './parseSchwabCsv';
+import { execClockTime, parseSchwabCsv } from './parseSchwabCsv';
 
 /** Thinkorswim activity export and TOS-branded Schwab statements. */
 export function parseTosCsv(text: string): ParsedTradeInput[] {
@@ -41,6 +41,8 @@ export function parseTosCsv(text: string): ParsedTradeInput[] {
       symbol,
       pnl,
       side: type.includes('SELL') || type.includes('SHORT') ? 'short' : 'long',
+      // The date column is often "Exec Time", which carries a clock time this used to discard.
+      entryTime: execClockTime(rawDate),
       notes: cols[descIdx] || undefined,
     });
   }

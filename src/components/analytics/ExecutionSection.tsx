@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Clock, Crosshair, ListChecks, Ruler, Tags } from 'lucide-react';
+import { CandlestickChart, Clock, Crosshair, ListChecks, Ruler, Tags } from 'lucide-react';
 import type { Trade } from '../../types';
 import { useSettings } from '../../context/useSettings';
 import { formatCurrency } from '../../utils/format';
@@ -266,13 +266,27 @@ function DisciplinePanel({ data, currency }: { data: DisciplineStats; currency: 
 
 /* ------------------------------------------------------------------ setups */
 
-function TagPanel({ rows, currency }: { rows: TagRow[]; currency: Currency }) {
+function TagPanel({
+  rows,
+  currency,
+  eyebrow = 'Setups',
+  title = 'Which setups make money',
+  icon,
+  noun = 'setup',
+}: {
+  rows: TagRow[];
+  currency: Currency;
+  eyebrow?: string;
+  title?: string;
+  icon?: React.ReactNode;
+  noun?: string;
+}) {
   const maxAbs = Math.max(...rows.map((r) => Math.abs(r.pnl)), 1);
-  // A setup that wins most of the time and still loses money is the finding worth surfacing.
+  // Something you win on most of the time and still lose money to is the finding worth surfacing.
   const trap = rows.find((r) => r.winRate >= 55 && r.pnl < 0);
 
   return (
-    <PanelShell eyebrow="Setups" title="Which setups make money" icon={<Tags size={14} />}>
+    <PanelShell eyebrow={eyebrow} title={title} icon={icon ?? <Tags size={14} />}>
       <div className="space-y-1.5">
         {rows.map((row) => (
           <div key={row.tag} className="flex items-center gap-2">
@@ -299,7 +313,7 @@ function TagPanel({ rows, currency }: { rows: TagRow[]; currency: Currency }) {
         <p className="text-[10px] text-text-secondary mt-2.5 leading-relaxed">
           <span className="text-loss-bright font-medium">{trap.tag}</span> wins{' '}
           {Math.round(trap.winRate)}% of the time and still loses money — the wins are too small for
-          the losses.
+          the losses. Worth a hard look at that {noun}.
         </p>
       )}
     </PanelShell>
@@ -358,6 +372,19 @@ export function ExecutionSection({ trades, showPrompts = false }: ExecutionSecti
             needs="Needs an entry time on at least five trades. Broker imports fill this in automatically — for hand-typed trades it is the time field on the trade form."
           />
         )
+      )}
+
+      {/* Symbols first among the always-available panels: it needs nothing but a ticker and a
+          P&L, so it is the one thing on this screen that draws for every journal. */}
+      {coverage.symbols.length > 0 && (
+        <TagPanel
+          rows={coverage.symbols}
+          currency={currency}
+          eyebrow="Symbols"
+          title="Which tickers make money"
+          icon={<CandlestickChart size={14} />}
+          noun="ticker"
+        />
       )}
 
       {coverage.tags.length > 0 ? (

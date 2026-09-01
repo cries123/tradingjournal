@@ -296,6 +296,43 @@ export function tagPerformance(trades: Trade[], minPerTag = 3, limit = 8): TagRo
     .slice(0, limit);
 }
 
+/* ------------------------------------------------------------------ symbols */
+
+/**
+ * P&L by ticker.
+ *
+ * Every other panel here depends on a field somebody has to fill in, which means a journal built
+ * from CSV imports can open this screen and find five locked cards — a paid feature that shows
+ * nothing to the person who just paid for it. A symbol and a P&L are on every trade that exists,
+ * from every source, so this one always draws.
+ *
+ * Sorted by money for the same reason the setup table is: a ticker you win on constantly and still
+ * lose money to is the finding, and sorting by win rate would hide it at the top.
+ */
+export function symbolPerformance(trades: Trade[], minPerSymbol = 3, limit = 8): TagRow[] {
+  const bySymbol = new Map<string, Trade[]>();
+
+  for (const t of trades) {
+    const symbol = (t.symbol ?? '').trim().toUpperCase();
+    if (!symbol) continue;
+    const list = bySymbol.get(symbol) ?? [];
+    list.push(t);
+    bySymbol.set(symbol, list);
+  }
+
+  return [...bySymbol.entries()]
+    .filter(([, xs]) => xs.length >= minPerSymbol)
+    .map(([tag, xs]) => ({
+      tag,
+      pnl: net(xs),
+      trades: xs.length,
+      winRate: winRate(xs),
+      perTrade: net(xs) / xs.length,
+    }))
+    .sort((a, b) => b.pnl - a.pnl)
+    .slice(0, limit);
+}
+
 /* ------------------------------------------------------------------ coverage */
 
 export interface ExecutionCoverage {
@@ -304,6 +341,7 @@ export interface ExecutionCoverage {
   excursions: ExcursionStats | null;
   discipline: DisciplineStats | null;
   tags: TagRow[];
+  symbols: TagRow[];
 }
 
 /** Everything at once, so a caller can ask "is there anything to show?" with one call. */
@@ -314,6 +352,7 @@ export function executionCoverage(trades: Trade[]): ExecutionCoverage {
     excursions: excursionStats(trades),
     discipline: disciplineStats(trades),
     tags: tagPerformance(trades),
+    symbols: symbolPerformance(trades),
   };
 }
 
@@ -323,6 +362,7 @@ export function hasAnyExecutionData(coverage: ExecutionCoverage): boolean {
       coverage.expectancy ||
       coverage.excursions ||
       coverage.discipline ||
-      coverage.tags.length > 0,
+      coverage.tags.length > 0 ||
+      coverage.symbols.length > 0,
   );
 }

@@ -9,8 +9,10 @@ import {
   hourlyBreakdown,
   MIN_SAMPLE,
   parseHour,
+  symbolPerformance,
   tagPerformance,
 } from './executionAnalytics';
+import { execClockTime } from './parseSchwabCsv';
 
 function trade(over: Partial<Trade> = {}): Trade {
   return { id: Math.random().toString(36), date: '2026-08-03', symbol: 'AAPL', pnl: 100, ...over };
@@ -202,10 +204,17 @@ describe('tagPerformance', () => {
 });
 
 describe('executionCoverage', () => {
-  it('reports nothing to show for plain broker-imported trades with no enrichment', () => {
+  it('still has something to show for plain trades with no enrichment at all', () => {
+    /* This used to assert the opposite, and the opposite was the bug: a journal built from CSV
+       imports opened the Performance screen and found five locked cards. Symbols draw from a
+       ticker and a P&L, which every trade has, so the screen is never entirely empty. */
     const plain = Array.from({ length: 20 }, () => trade());
     const coverage = executionCoverage(plain);
-    expect(hasAnyExecutionData(coverage)).toBe(false);
+    expect(coverage.hourly).toBeNull();
+    expect(coverage.expectancy).toBeNull();
+    expect(coverage.discipline).toBeNull();
+    expect(coverage.symbols.length).toBeGreaterThan(0);
+    expect(hasAnyExecutionData(coverage)).toBe(true);
   });
 
   it('reports the time panel alone when only entry times are present', () => {
@@ -215,5 +224,66 @@ describe('executionCoverage', () => {
     expect(coverage.hourly).not.toBeNull();
     expect(coverage.expectancy).toBeNull();
     expect(coverage.discipline).toBeNull();
+  });
+});
+
+describe('symbolPerformance', () => {
+  it('draws from nothing but a ticker and a P&L, which every trade has', () => {
+    const bare = [
+      ...Array.from({ length: 3 }, () => trade({ symbol: 'SPY', pnl: 200 })),
+      ...Array.from({ length: 4 }, () => trade({ symbol: 'TSLA', pnl: -150 })),
+    ];
+    const rows = symbolPerformance(bare);
+    expect(rows.map((r) => r.tag)).toEqual(['SPY', 'TSLA']);
+    expect(rows[0].pnl).toBe(600);
+  });
+
+  it('is the panel that keeps the screen from being entirely locked', () => {
+    // No entry times, no tags, no R, no MAE, no grades — a CSV-imported journal.
+    const imported = Array.from({ length: 12 }, () => trade({ symbol: 'SPY' }));
+    const coverage = executionCoverage(imported);
+    expect(coverage.hourly).toBeNull();
+    expect(coverage.expectancy).toBeNull();
+    expect(coverage.tags).toEqual([]);
+    expect(coverage.symbols.length).toBe(1);
+    expect(hasAnyExecutionData(coverage)).toBe(true);
+  });
+
+  it('ignores a ticker with too few trades to mean anything', () => {
+    const trades = [
+      ...Array.from({ length: 3 }, () => trade({ symbol: 'SPY' })),
+      trade({ symbol: 'ONCE', pnl: 5000 }),
+    ];
+    expect(symbolPerformance(trades).map((r) => r.tag)).toEqual(['SPY']);
+  });
+
+  it('folds case so spy and SPY are one ticker', () => {
+    const trades = [
+      trade({ symbol: 'spy', pnl: 100 }),
+      trade({ symbol: 'SPY', pnl: 100 }),
+      trade({ symbol: 'Spy', pnl: 100 }),
+    ];
+    expect(symbolPerformance(trades)).toHaveLength(1);
+    expect(symbolPerformance(trades)[0].trades).toBe(3);
+  });
+});
+
+describe('execClockTime', () => {
+  it('keeps the time the CSV importer used to throw away', () => {
+    expect(execClockTime('8/29/26 10:31:14')).toBe('10:31');
+    expect(execClockTime('2026-08-29 09:05:00')).toBe('09:05');
+  });
+
+  it('normalises a 12-hour export so afternoon sorts after morning', () => {
+    expect(execClockTime('8/29/26 1:05:00 PM')).toBe('13:05');
+    expect(execClockTime('8/29/26 11:05:00 AM')).toBe('11:05');
+    expect(execClockTime('8/29/26 12:30:00 AM')).toBe('00:30');
+    expect(execClockTime('8/29/26 12:30:00 PM')).toBe('12:30');
+  });
+
+  it('returns nothing rather than inventing midnight', () => {
+    expect(execClockTime('8/29/26')).toBeUndefined();
+    expect(execClockTime('')).toBeUndefined();
+    expect(execClockTime('99:99')).toBeUndefined();
   });
 });

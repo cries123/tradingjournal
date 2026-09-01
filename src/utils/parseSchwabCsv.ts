@@ -136,6 +136,34 @@ interface OpenLot {
   exec: RawExecution;
 }
 
+/**
+ * The clock time out of an execution timestamp, as HH:MM.
+ *
+ * Schwab and thinkorswim both export "Exec Time" as a full timestamp, and this importer was
+ * splitting it on the space, keeping the date and dropping the time into a sentence in the notes
+ * field. So every CSV-imported trade arrived without an entry time, and the hour-of-day panel had
+ * nothing to read for anyone who imports rather than syncs — which is most people.
+ *
+ * Returns undefined rather than a guess when there is no time in the string: an invented 00:00
+ * would put a whole journal in the midnight bucket and read as a real finding.
+ */
+export function execClockTime(execTime: string): string | undefined {
+  const match = /(\d{1,2}):(\d{2})/.exec(execTime);
+  if (!match) return undefined;
+
+  const hour = Number(match[1]);
+  if (!Number.isInteger(hour) || hour > 23) return undefined;
+
+  // 12-hour exports carry a meridiem; normalise so 1:05 PM sorts after 11:05 AM.
+  const pm = /p\.?m\.?/i.test(execTime);
+  const am = /a\.?m\.?/i.test(execTime);
+  let h = hour;
+  if (pm && h < 12) h += 12;
+  if (am && h === 12) h = 0;
+
+  return `${String(h).padStart(2, '0')}:${match[2]}`;
+}
+
 function matchRoundTrips(executions: RawExecution[]): ParsedTradeInput[] {
   const openLots = new Map<string, OpenLot[]>();
   const trades: ParsedTradeInput[] = [];
@@ -207,6 +235,9 @@ function buildTrade(
     strike: open.strike ? parseNumber(open.strike) : undefined,
     quantity: qty,
     tradePrice: open.price,
+    exitPrice: close.price,
+    entryTime: execClockTime(open.execTime),
+    exitTime: execClockTime(close.execTime),
     notes: `Closed ${close.execTime} @ ${close.price} (opened @ ${open.price})`,
     accountType: 'Individual',
   };
