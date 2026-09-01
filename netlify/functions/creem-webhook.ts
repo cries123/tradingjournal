@@ -2,6 +2,7 @@ import type { Handler } from '@netlify/functions';
 import { getAdminFirestore } from '../../server/firebaseAdmin';
 import { applyBillingUpdate } from '../../server/entitlements';
 import { parseBillingEvent, verifyWebhookSignature, type CreemWebhookEvent } from '../../server/creemClient';
+import { logServerError } from '../../server/errorReports';
 
 /**
  * Receives subscription events from Creem and turns them into entitlements.
@@ -88,6 +89,7 @@ export const handler: Handler = async (event) => {
     }
   } catch (err) {
     console.error('[creem-webhook] could not record the event id:', err);
+    logServerError('creem-webhook-dedupe', err);
     return { statusCode: 500, body: JSON.stringify({ error: 'Storage unavailable' }) };
   }
 
@@ -114,6 +116,12 @@ export const handler: Handler = async (event) => {
     return ok({ received: true, applied: result.applied });
   } catch (err) {
     console.error('[creem-webhook] failed to apply entitlement:', err);
+    /*
+     * The single worst failure in the product: money has changed hands and the plan did not
+     * arrive. Creem will retry, and the retry usually wins — but if it doesn't, this is the row
+     * that says so, with the uid attached, before the customer has to notice and write in.
+     */
+    logServerError('creem-webhook-apply', err, { uid: parsed.uid });
     // A real failure — let Creem retry, and undo the seen-marker so the retry isn't swallowed as
     // a duplicate of an attempt that never took effect.
     if (eventId) {

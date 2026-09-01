@@ -4,8 +4,12 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { AuthProvider } from './context/AuthContext'
 import { EntitlementProvider } from './context/EntitlementContext'
 import { SettingsProvider } from './context/SettingsContext'
+import { installGlobalErrorReporting } from './services/errorReporting'
 import './index.css'
 import App from './App.tsx'
+
+// Before anything renders, so a crash during the first paint is still caught.
+installGlobalErrorReporting()
 
 const rootEl = document.getElementById('root')!
 const isApp = window.location.pathname.startsWith('/app')

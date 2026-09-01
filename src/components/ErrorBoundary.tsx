@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { reportErrorSilently } from '../services/errorReporting';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -45,6 +46,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('Unhandled render error:', error, info.componentStack);
+
+    // The one crash a user definitely notices, because it replaces the page. Reported before the
+    // reload below so a chunk error that self-heals still leaves a trace — the filter in
+    // errorFingerprint decides which of these are worth a row, not this call site.
+    reportErrorSilently(error, 'render');
 
     if (CHUNK_LOAD_ERROR_PATTERN.test(error?.message ?? '') && shouldAutoReload()) {
       window.location.reload();

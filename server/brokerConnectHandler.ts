@@ -1,5 +1,6 @@
 import type { IncomingHttpHeaders } from 'http';
 import { assertCallerUid, BrokerRequestError } from './snaptradeAuth';
+import { logServerError } from './errorReports';
 import { getSnaptrade, resolveBrokerSlug, SNAPTRADE_CONFIGURED } from './snaptradeClient';
 import { getAdminFirestore } from './firebaseAdmin';
 import { mapSnapTradeActivitiesToTrades, type SnapTradeActivityLike } from './mapSnapTradeActivities';
@@ -595,6 +596,14 @@ export async function handleBrokerConnectRequest(
 
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('[broker-connect] failed:', message);
+
+    /*
+     * Everything above this line is expected control flow — a spent sync allowance, a bad request,
+     * a broker that needs reconnecting. Anything that gets here is a failure nobody planned for,
+     * which is exactly the class that used to be discovered only when a user wrote in. Recorded,
+     * not awaited: the user is owed a response, not a wait on a diagnostic.
+     */
+    logServerError('broker-connect', err, { uid: callerUid });
 
     // Your broker credentials live in Firestore, so a Firestore outage or an exhausted quota
     // surfaces here as "broker connect failed" — which sends the owner hunting through SnapTrade
