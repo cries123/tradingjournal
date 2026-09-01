@@ -14,9 +14,21 @@ const VISITOR_ID_KEY = 'tc_visitor_id';
 /** Last UTC date this browser successfully wrote a daily visit doc for. */
 const VISITOR_DAY_KEY = 'tc_visitor_day';
 
+/**
+ * The funnel is a rolling twelve months, not all time.
+ *
+ * All-time totals stop being a measurement after the first year: a site that has been up for
+ * three years shows a conversion rate averaged over versions of the product that no longer
+ * exist, and it can only ever go up. A trailing year moves, which is what makes it worth
+ * looking at, and it lines up with how a trading business thinks about a year anyway.
+ */
+export const FUNNEL_WINDOW_DAYS = 365;
+
 export interface VisitorStats {
-  totalUniqueVisitors: number;
-  totalConverted: number;
+  /** Distinct browsers seen in the last 12 months. */
+  uniqueVisitors: number;
+  /** Of those, how many went on to create an account. */
+  converted: number;
   conversionRate: number;
   /** Visitors who opened the journal itself, signed up or not. */
   openedApp: number;
@@ -24,6 +36,8 @@ export interface VisitorStats {
   localOnlyUsers: number;
   /** Never got past the marketing pages. */
   browsedOnly: number;
+  /** Visit-days in the window: one per browser per day, so it counts returns as well as arrivals. */
+  visits: number;
   last7DaysVisitors: number;
   last7DaysSignups: number;
   last7DaysConversionRate: number;
@@ -39,12 +53,13 @@ export interface VisitorStatsResult {
  *  two hand-rolled copies of this object in AdminPage were exactly how that happened before. */
 export function emptyVisitorStats(signupsLast7Days: number): VisitorStats {
   return {
-    totalUniqueVisitors: 0,
-    totalConverted: 0,
+    uniqueVisitors: 0,
+    converted: 0,
     conversionRate: 0,
     openedApp: 0,
     localOnlyUsers: 0,
     browsedOnly: 0,
+    visits: 0,
     last7DaysVisitors: 0,
     last7DaysSignups: signupsLast7Days,
     last7DaysConversionRate: 0,
@@ -72,6 +87,20 @@ export function getVisitorId(): string | null {
 
 function todayUtc(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+/** Start of the rolling window, as a YYYY-MM-DD day key. */
+function windowStartDay(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - FUNNEL_WINDOW_DAYS);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Same instant as an ISO timestamp, for comparing against lastSeenAt. */
+function windowStartIso(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - FUNNEL_WINDOW_DAYS);
+  return d.toISOString();
 }
 
 function last7DayKeys(): string[] {
@@ -202,22 +231,37 @@ export async function fetchVisitorStats(signupsLast7Days: number): Promise<Visit
     // fetched in full rather than counted because it's bounded by the signup count (small) and
     // we need to know how many of those had opened the app, which a count query can't tell us
     // without a composite index on (converted, openedApp).
-    const [totalSnap, openedAppSnap, convertedDocs, weekSnap] = await Promise.all([
-      getCountFromServer(collection(db, 'analyticsVisitors')),
-      getCountFromServer(query(collection(db, 'analyticsVisitors'), where('openedApp', '==', true))),
+    const sinceIso = windowStartIso();
+    const sinceDay = windowStartDay();
+
+    const [activeSnap, visitsSnap, openedAppDocs, convertedDocs, weekSnap] = await Promise.all([
+      getCountFromServer(
+        query(collection(db, 'analyticsVisitors'), where('lastSeenAt', '>=', sinceIso)),
+      ),
+      getCountFromServer(
+        query(collection(db, 'analyticsDailyVisitors'), where('date', '>=', sinceDay)),
+      ),
+      // These two sets are small — everyone who opened the journal, and everyone who signed up —
+      // so they are fetched and filtered here rather than counted with a second filter, which
+      // would need a composite index built by hand in the console.
+      getDocs(query(collection(db, 'analyticsVisitors'), where('openedApp', '==', true))),
       getDocs(query(collection(db, 'analyticsVisitors'), where('converted', '==', true))),
       getDocs(query(collection(db, 'analyticsDailyVisitors'), where('date', '>=', weekStart))),
     ]);
 
-    const totalUniqueVisitors = totalSnap.data().count;
-    const openedApp = openedAppSnap.data().count;
-    const totalConverted = convertedDocs.size;
-    const convertedWhoOpenedApp = convertedDocs.docs.filter(
+    const inWindow = (d: { data: () => Record<string, unknown> }) =>
+      typeof d.data().lastSeenAt === 'string' && (d.data().lastSeenAt as string) >= sinceIso;
+
+    const uniqueVisitors = activeSnap.data().count;
+    const visits = visitsSnap.data().count;
+    const openedApp = openedAppDocs.docs.filter(inWindow).length;
+    const convertedInWindow = convertedDocs.docs.filter(inWindow);
+    const converted = convertedInWindow.length;
+    const convertedWhoOpenedApp = convertedInWindow.filter(
       (d) => (d.data() as { openedApp?: boolean }).openedApp === true,
     ).length;
 
-    const conversionRate =
-      totalUniqueVisitors > 0 ? (totalConverted / totalUniqueVisitors) * 100 : 0;
+    const conversionRate = uniqueVisitors > 0 ? (converted / uniqueVisitors) * 100 : 0;
 
     const byDate = new Map<string, number>();
     const weekVisitorIds = new Set<string>();
@@ -247,12 +291,13 @@ export async function fetchVisitorStats(signupsLast7Days: number): Promise<Visit
 
     return {
       stats: {
-        totalUniqueVisitors,
-        totalConverted,
+        uniqueVisitors,
+        converted,
         conversionRate,
         openedApp,
         localOnlyUsers: Math.max(0, openedApp - convertedWhoOpenedApp),
-        browsedOnly: Math.max(0, totalUniqueVisitors - openedApp),
+        browsedOnly: Math.max(0, uniqueVisitors - openedApp),
+        visits,
         last7DaysVisitors,
         last7DaysSignups: signupsLast7Days,
         last7DaysConversionRate,

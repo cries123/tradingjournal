@@ -100,6 +100,7 @@ import {
   emptyVisitorStats,
   fetchVisitorStats,
   type VisitorStats,
+  FUNNEL_WINDOW_DAYS,
 } from '../services/visitorAnalytics';
 import {
   fetchAdminServerStats,
@@ -1265,6 +1266,16 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
   const openBugCount = bugFilterCounts.open;
   const openBrokerCount = brokerFilterCounts.open;
   const openCount = openBugCount + openBrokerCount;
+  /* The funnel measures a rolling year, so signups have to be counted over the same window —
+     an all-time signup count beside a 12-month visitor count is two different periods stacked in
+     one chart, and it reads as a conversion rate that cannot be true. */
+  const annualSignups = useMemo(() => {
+    if (!ready) return 0;
+    const since = new Date();
+    since.setDate(since.getDate() - FUNNEL_WINDOW_DAYS);
+    const cutoff = since.toISOString();
+    return ready.users.filter((u) => (u.createdAt ?? '') >= cutoff).length;
+  }, [ready]);
   const ticketsWaiting = ready?.tickets.filter((t) => t.unreadForSupport && t.status !== 'closed').length ?? 0;
   const openErrorCount = ready?.errorEvents.filter((e) => e.status === 'open').length ?? 0;
 
@@ -1534,7 +1545,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
               <AcquisitionFunnel
                 visitors={ready.visitorStats}
                 serverStats={ready.serverStats}
-                fallbackSignups={ready.userCount}
+                annualSignups={annualSignups}
                 visitorError={ready.visitorStatsError}
                 serverError={ready.serverStatsError}
               />
@@ -1564,7 +1575,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                     {ready.visitorStats.last7DaysVisitors.toLocaleString()}
                   </p>
                   <p className="text-xs text-text-secondary mt-2">
-                    {ready.visitorStats.totalUniqueVisitors.toLocaleString()} all time
+                    {ready.visitorStats.uniqueVisitors.toLocaleString()} in the last 12 months
                   </p>
                   {ready.visitorStats.dailyLast7.some((d) => d.visitors > 0) ? (
                     <div className="mt-4 flex items-end gap-1 h-12">

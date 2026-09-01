@@ -343,9 +343,24 @@ service cloud.firestore {
         && request.resource.data.createdAt is string;
     }
 
-    function validVisitorProfileWrite() {
+    /*
+     * The document id is passed IN rather than read from the enclosing match.
+     *
+     * This function is declared out here, at the documents level, and rules functions close over
+     * the scope they are DECLARED in — not the scope they are called from. The previous version
+     * referenced a bare `visitorId`, which is the wildcard of `match /analyticsVisitors/{visitorId}`
+     * and simply does not exist here. An undefined identifier makes the whole expression error,
+     * and an errored condition denies.
+     *
+     * So every write to a visitor profile — create and update alike — was refused from the day
+     * this shipped, and analyticsVisitors never received a single document. The admin funnel read
+     * a real zero for "Visitors" and "Opened the journal" while the daily-visit collection beside
+     * it filled up normally, because validVisitorDailyCreate touches no path variable and was
+     * therefore never affected.
+     */
+    function validVisitorProfileWrite(docId) {
       return request.resource.data.visitorId is string
-        && request.resource.data.visitorId == visitorId
+        && request.resource.data.visitorId == docId
         && request.resource.data.visitorId.size() >= 8
         && request.resource.data.lastSeenAt is string
         && request.resource.data.lastPath is string;
@@ -365,7 +380,7 @@ service cloud.firestore {
     }
 
     match /analyticsVisitors/{visitorId} {
-      allow create: if validVisitorProfileWrite()
+      allow create: if validVisitorProfileWrite(visitorId)
         && request.resource.data.converted == false
         && request.resource.data.firstSeenAt is string;
 
@@ -381,7 +396,7 @@ service cloud.firestore {
       // the check that was actually intended.
       allow update: if resource.data.visitorId == visitorId
         && (
-          (validVisitorProfileWrite()
+          (validVisitorProfileWrite(visitorId)
             && request.resource.data.converted == resource.data.converted)
           || (resource.data.converted == false && validVisitorConversionWrite())
         );

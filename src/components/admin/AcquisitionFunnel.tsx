@@ -5,8 +5,8 @@ import type { VisitorStats } from '../../services/visitorAnalytics';
 interface AcquisitionFunnelProps {
   visitors: VisitorStats;
   serverStats: AdminServerStats | null;
-  /** Fallback signup count from Firestore profiles, used when the server stats can't load. */
-  fallbackSignups: number;
+  /** Accounts created inside the same 12-month window, so every stage measures one period. */
+  annualSignups: number;
   visitorError: string | null;
   serverError: string | null;
 }
@@ -39,18 +39,17 @@ function pct(value: number, total: number): string {
 export function AcquisitionFunnel({
   visitors,
   serverStats,
-  fallbackSignups,
+  annualSignups,
   visitorError,
   serverError,
 }: AcquisitionFunnelProps) {
-  const signups = serverStats?.authUserCount ?? fallbackSignups;
 
   const stages: Stage[] = [
     {
       key: 'visitors',
       label: 'Visitors',
-      hint: 'Unique logged-out browsers, counted once per day',
-      value: visitors.totalUniqueVisitors,
+      hint: 'Unique logged-out browsers seen in the last 12 months',
+      value: visitors.uniqueVisitors,
       icon: <Eye size={16} />,
       accent: 'text-cyan-400 bg-cyan-500/10',
       bar: 'bg-cyan-500/50',
@@ -67,8 +66,8 @@ export function AcquisitionFunnel({
     {
       key: 'signups',
       label: 'Signed up',
-      hint: 'Firebase Auth accounts, all time',
-      value: signups,
+      hint: 'Accounts created in the last 12 months',
+      value: annualSignups,
       icon: <UserPlus size={16} />,
       accent: 'text-emerald-400 bg-emerald-500/10',
       bar: 'bg-emerald-500/50',
@@ -76,7 +75,7 @@ export function AcquisitionFunnel({
     {
       key: 'broker',
       label: 'Connected a broker',
-      hint: 'At least one linked brokerage account',
+      hint: 'At least one linked brokerage account, right now',
       value: serverStats?.brokerConnectedCount ?? 0,
       icon: <Building2 size={16} />,
       accent: 'text-amber-400 bg-amber-500/10',
@@ -85,7 +84,7 @@ export function AcquisitionFunnel({
     },
   ];
 
-  const widthBase = Math.max(1, visitors.totalUniqueVisitors, signups);
+  const widthBase = Math.max(1, visitors.uniqueVisitors, annualSignups);
 
   return (
     <div className="glass-card rounded-xl p-5 md:p-6 mb-8">
@@ -93,13 +92,13 @@ export function AcquisitionFunnel({
         <div>
           <h2 className="text-sm font-semibold">Acquisition funnel</h2>
           <p className="text-[10px] text-text-secondary mt-0.5">
-            Percentages are of total visitors, not of the previous stage
+            Rolling 12 months · percentages are of total visitors, not of the previous stage
           </p>
         </div>
         <div className="text-right">
           <p className="text-[10px] uppercase tracking-wider text-text-secondary">Visitor → signup</p>
           <p className="text-sm font-semibold text-emerald-300">
-            {pct(visitors.totalConverted, visitors.totalUniqueVisitors)}
+            {pct(visitors.converted, visitors.uniqueVisitors)}
           </p>
         </div>
       </div>
@@ -124,7 +123,7 @@ export function AcquisitionFunnel({
                       {stage.unavailable ? '—' : stage.value.toLocaleString()}
                     </span>
                     <span className="text-[10px] text-text-secondary tabular-nums w-12 text-right">
-                      {stage.unavailable ?? pct(stage.value, visitors.totalUniqueVisitors)}
+                      {stage.unavailable ?? pct(stage.value, visitors.uniqueVisitors)}
                     </span>
                   </span>
                 </div>
@@ -152,12 +151,12 @@ export function AcquisitionFunnel({
           </p>
         </div>
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-text-secondary">Browsed only</p>
+          <p className="text-[10px] uppercase tracking-wider text-text-secondary">Visits · 12 months</p>
           <p className="text-lg font-bold tabular-nums text-text-primary">
-            {visitors.browsedOnly.toLocaleString()}
+            {visitors.visits.toLocaleString()}
           </p>
           <p className="text-[10px] text-text-secondary mt-0.5">
-            Never got past the marketing pages
+            One per browser per day, so returns count too
           </p>
         </div>
         <div>
