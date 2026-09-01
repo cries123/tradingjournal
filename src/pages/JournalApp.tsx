@@ -17,6 +17,7 @@ import { LockedFeature } from '../components/plan/LockedFeature';
 import { BrokersContent } from '../components/support/BrokersContent';
 import { ReportBugContent } from '../components/support/ReportBugContent';
 import { SupportTicketsContent } from '../components/support/SupportTicketsContent';
+import { PerformanceContent } from '../components/PerformanceContent';
 import { RequestBrokerContent } from '../components/support/RequestBrokerContent';
 import { TradeModal } from '../components/TradeModal';
 import { UsernameSetupModal } from '../components/UsernameSetupModal';
@@ -197,6 +198,10 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
       setAppView('support');
       closeMobileMenu();
     },
+    onPerformance: () => {
+      setAppView('performance');
+      closeMobileMenu();
+    },
     onRequestBroker: () => {
       setAppView('request-broker');
       closeMobileMenu();
@@ -268,6 +273,19 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                      trade already imported into another one is still already imported. */
                   existingTrades={everyTrade}
                   journalReady={syncStatus !== 'loading'}
+                />
+              </LockedFeature>
+            ) : appView === 'performance' ? (
+              <LockedFeature
+                feature="performanceAnalytics"
+                title="Performance analysis is a paid feature"
+                description="See what time of day you actually make money, which setups pay, your expectancy in R, and whether following your own rules is worth anything."
+              >
+                <PerformanceContent
+                  trades={allTrades}
+                  year={year}
+                  month={month}
+                  onBack={() => setAppView('dashboard')}
                 />
               </LockedFeature>
             ) : appView === 'support' ? (

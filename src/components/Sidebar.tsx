@@ -7,6 +7,7 @@ import {
   MessageSquarePlus,
   Settings,
   Share2,
+  Gauge,
   LifeBuoy,
   ShieldCheck,
   Trophy,
@@ -23,6 +24,7 @@ export type SidebarAppView =
   | 'settings'
   | 'brokers'
   | 'connect-broker'
+  | 'performance'
   | 'report-bug'
   | 'request-broker'
   | 'support'
@@ -33,6 +35,7 @@ interface SidebarProps {
   onDashboard: () => void;
   onAddTrade: () => void;
   onConnectBroker: () => void;
+  onPerformance: () => void;
   onClearAll: () => void;
   onSettings: () => void;
   onBrokers: () => void;
@@ -59,6 +62,7 @@ export function Sidebar({
   onDashboard,
   onAddTrade,
   onConnectBroker,
+  onPerformance,
   onClearAll,
   onSettings,
   onBrokers,
@@ -142,6 +146,14 @@ export function Sidebar({
           >
             <Link2 size={16} className={appView === 'connect-broker' ? 'text-accent' : undefined} />
             Connect broker
+          </button>
+          <button
+            type="button"
+            onClick={wrap(onPerformance)}
+            className={navItemClass(appView === 'performance')}
+          >
+            <Gauge size={16} className={appView === 'performance' ? 'text-accent' : undefined} />
+            Performance
           </button>
           <button
             type="button"

@@ -29,6 +29,15 @@ type Currency = Parameters<typeof formatCurrency>[1];
  */
 interface ExecutionSectionProps {
   trades: Trade[];
+  /**
+   * Show a panel that has no data yet, as a prompt for what to record.
+   *
+   * Off on any surface somebody landed on for another reason — that is what made the old Timing
+   * and Execution cards read as a broken dashboard. On a screen you navigated to in order to look
+   * at your execution, the opposite is true: a missing panel is the most useful thing on the page,
+   * because it names the one field that would unlock it.
+   */
+  showPrompts?: boolean;
 }
 
 function PanelShell({
@@ -299,21 +308,109 @@ function TagPanel({ rows, currency }: { rows: TagRow[]; currency: Currency }) {
 
 /* ------------------------------------------------------------------ section */
 
-export function ExecutionSection({ trades }: ExecutionSectionProps) {
+function LockedPanel({
+  eyebrow,
+  title,
+  icon,
+  needs,
+}: {
+  eyebrow: string;
+  title: string;
+  icon: React.ReactNode;
+  needs: string;
+}) {
+  return (
+    <div className="rounded-xl border border-dashed border-border/60 p-3 md:p-4 flex flex-col min-h-[160px]">
+      <div className="mb-2 md:mb-3 shrink-0 flex items-start gap-2 opacity-60">
+        <span className="text-text-secondary mt-0.5 shrink-0">{icon}</span>
+        <div>
+          <p className="text-[10px] uppercase tracking-widest text-text-secondary font-medium mb-0.5">
+            {eyebrow}
+          </p>
+          <h3 className="text-[10px] md:text-sm font-semibold text-text-secondary">{title}</h3>
+        </div>
+      </div>
+      <div className="flex-1 flex items-center">
+        <p className="text-xs text-text-secondary leading-relaxed">{needs}</p>
+      </div>
+    </div>
+  );
+}
+
+export function ExecutionSection({ trades, showPrompts = false }: ExecutionSectionProps) {
   const { settings } = useSettings();
   const coverage = useMemo(() => executionCoverage(trades), [trades]);
 
-  if (!hasAnyExecutionData(coverage)) return null;
+  if (!showPrompts && !hasAnyExecutionData(coverage)) return null;
 
   const currency = settings.currency;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
-      {coverage.hourly && <HourPanel data={coverage.hourly} currency={currency} />}
-      {coverage.tags.length > 0 && <TagPanel rows={coverage.tags} currency={currency} />}
-      {coverage.expectancy && <ExpectancyPanel data={coverage.expectancy} />}
-      {coverage.excursions && <ExcursionPanel data={coverage.excursions} currency={currency} />}
-      {coverage.discipline && <DisciplinePanel data={coverage.discipline} currency={currency} />}
+      {coverage.hourly ? (
+        <HourPanel data={coverage.hourly} currency={currency} />
+      ) : (
+        showPrompts && (
+          <LockedPanel
+            eyebrow="Timing"
+            title="P&L by hour entered"
+            icon={<Clock size={14} />}
+            needs="Needs an entry time on at least five trades. Broker imports fill this in automatically — for hand-typed trades it is the time field on the trade form."
+          />
+        )
+      )}
+
+      {coverage.tags.length > 0 ? (
+        <TagPanel rows={coverage.tags} currency={currency} />
+      ) : (
+        showPrompts && (
+          <LockedPanel
+            eyebrow="Setups"
+            title="Which setups make money"
+            icon={<Tags size={14} />}
+            needs="Needs a setup or tag on at least three trades of the same kind. Tag them as you review and this fills in within a week."
+          />
+        )
+      )}
+
+      {coverage.expectancy ? (
+        <ExpectancyPanel data={coverage.expectancy} />
+      ) : (
+        showPrompts && (
+          <LockedPanel
+            eyebrow="Edge"
+            title="Expectancy in R"
+            icon={<Crosshair size={14} />}
+            needs="Needs the R multiple on at least five trades — what the result was in units of the risk you took. It is the number that says whether the edge is real."
+          />
+        )
+      )}
+
+      {coverage.excursions ? (
+        <ExcursionPanel data={coverage.excursions} currency={currency} />
+      ) : (
+        showPrompts && (
+          <LockedPanel
+            eyebrow="Excursion"
+            title="How far trades ran"
+            icon={<Ruler size={14} />}
+            needs="Needs MAE and MFE — how far a trade went against you, and how far it ran in your favour. Together they say whether the stop or the exit is what is costing you."
+          />
+        )
+      )}
+
+      {coverage.discipline ? (
+        <DisciplinePanel data={coverage.discipline} currency={currency} />
+      ) : (
+        showPrompts && (
+          <LockedPanel
+            eyebrow="Discipline"
+            title="Did following the plan pay?"
+            icon={<ListChecks size={14} />}
+            needs="Needs a grade or a checklist score on at least five trades. Grading takes a second per trade and answers the hardest question there is: whether your rules make money."
+          />
+        )
+      )}
     </div>
   );
 }

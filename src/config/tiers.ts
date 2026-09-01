@@ -23,6 +23,14 @@ export interface TierLimits {
   aiMessagesPerDay: number;
   /** Market replay. Built but not shipped — see MARKET_REPLAY_LIVE. */
   marketReplay: boolean;
+  /**
+   * The Performance screen: hour-of-day, setup breakdown, expectancy in R, excursions, discipline.
+   *
+   * A flag rather than a count because it is one screen you either have or don't. Free keeps the
+   * whole journal — calendar, dashboard, notes, grading, the tax export — so this gates the
+   * analysis of the data, never the recording of it or getting it back out.
+   */
+  performanceAnalytics: boolean;
 }
 
 export interface TierPlan {
@@ -52,14 +60,14 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     name: 'Free',
     price: 0,
     tagline: 'Log trades by hand and keep the full journal.',
-    limits: { brokers: 0, syncsPerDay: 0, aiMessagesPerDay: 0, marketReplay: false },
+    limits: { brokers: 0, syncsPerDay: 0, aiMessagesPerDay: 0, marketReplay: false, performanceAnalytics: false },
   },
   silver: {
     id: 'silver',
     name: 'Silver',
     price: 5,
     tagline: 'Connect a broker and stop typing trades in.',
-    limits: { brokers: 1, syncsPerDay: 1, aiMessagesPerDay: 0, marketReplay: false },
+    limits: { brokers: 1, syncsPerDay: 1, aiMessagesPerDay: 0, marketReplay: false, performanceAnalytics: true },
     productIdEnv: 'CREEM_PRODUCT_SILVER',
   },
   gold: {
@@ -67,7 +75,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     name: 'Gold',
     price: 10,
     tagline: 'Two brokers, and an assistant that reads your stats.',
-    limits: { brokers: 2, syncsPerDay: 2, aiMessagesPerDay: 15, marketReplay: false },
+    limits: { brokers: 2, syncsPerDay: 2, aiMessagesPerDay: 15, marketReplay: false, performanceAnalytics: true },
     productIdEnv: 'CREEM_PRODUCT_GOLD',
   },
   diamond: {
@@ -75,7 +83,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     name: 'Diamond',
     price: 25,
     tagline: 'Everything, with room to actually use it.',
-    limits: { brokers: 3, syncsPerDay: 3, aiMessagesPerDay: 50, marketReplay: true },
+    limits: { brokers: 3, syncsPerDay: 3, aiMessagesPerDay: 50, marketReplay: true, performanceAnalytics: true },
     productIdEnv: 'CREEM_PRODUCT_DIAMOND',
   },
 };
@@ -95,7 +103,7 @@ export function tierAtLeast(tier: Tier, required: Tier): boolean {
   return TIER_ORDER.indexOf(tier) >= TIER_ORDER.indexOf(required);
 }
 
-export type Feature = 'brokerSync' | 'aiAssistant' | 'marketReplay';
+export type Feature = 'brokerSync' | 'aiAssistant' | 'marketReplay' | 'performanceAnalytics';
 
 /** The lowest tier that includes each feature, derived from the limits rather than hardcoded. */
 export function lowestTierWith(feature: Feature): Tier | null {
@@ -104,6 +112,7 @@ export function lowestTierWith(feature: Feature): Tier | null {
       const l = limitsFor(t);
       if (feature === 'brokerSync') return l.brokers > 0;
       if (feature === 'aiAssistant') return l.aiMessagesPerDay > 0;
+      if (feature === 'performanceAnalytics') return l.performanceAnalytics;
       return l.marketReplay;
     }) ?? null
   );
@@ -113,6 +122,7 @@ export function tierHas(tier: Tier, feature: Feature): boolean {
   const l = limitsFor(tier);
   if (feature === 'brokerSync') return l.brokers > 0;
   if (feature === 'aiAssistant') return l.aiMessagesPerDay > 0;
+  if (feature === 'performanceAnalytics') return l.performanceAnalytics;
   // Sold with Diamond, but withheld until it actually works.
   return l.marketReplay && MARKET_REPLAY_LIVE;
 }
@@ -125,9 +135,10 @@ export function featureLines(tier: Tier): { text: string; soon?: boolean }[] {
   if (tier === 'free') {
     lines.push(
       { text: 'Unlimited manual trade logging' },
-      { text: 'P&L calendar and full analytics' },
+      { text: 'P&L calendar, equity curve and dashboard stats' },
       { text: 'Notes, tags, screenshots and grading' },
       { text: 'Share a read-only journal link with a coach' },
+      { text: 'Year-end realized P&L export for your accountant' },
     );
     return lines;
   }
@@ -142,6 +153,9 @@ export function featureLines(tier: Tier): { text: string; soon?: boolean }[] {
   // True of broker import and not of manual entry, so it earns its place on every paid card —
   // and it stops Silver reading as three thin bullets next to Gold's five.
   lines.push({ text: 'Round-trip trades matched for you' });
+  if (l.performanceAnalytics) {
+    lines.push({ text: 'Performance screen — time of day, setups, expectancy, excursions' });
+  }
   if (l.aiMessagesPerDay > 0) {
     lines.push({ text: `AI trade analysis — ${l.aiMessagesPerDay} messages per day` });
   }
