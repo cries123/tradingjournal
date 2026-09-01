@@ -45,6 +45,20 @@ const IGNORED_MESSAGE_PATTERNS: RegExp[] = [
   /Loading chunk .* failed/i,
   /^AbortError/i,
   /The operation was aborted/i,
+  /*
+   * Firestore's own IndexedDB layer, on a tab that is going away.
+   *
+   * iOS Safari closes the IndexedDB connection when the app is backgrounded or another tab takes
+   * the multi-tab lock, and any write in flight rejects with this. The SDK retries and falls back
+   * to its memory cache, so nothing is lost and nothing is broken — but a trader who switches apps
+   * mid-session generates one of these every time, which on a phone-heavy user base would make it
+   * the loudest row in the feed and bury everything real underneath it.
+   *
+   * Narrow on purpose. QuotaExceededError from the same layer means writes are genuinely failing
+   * and the journal is not saving, so that one still has to come through.
+   */
+  /database connection is closing/i,
+  /An attempt was made to use an object that is not, or is no longer, usable/i,
   /^Non-Error promise rejection captured with value: undefined$/i,
 ];
 

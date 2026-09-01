@@ -42,6 +42,26 @@ describe('shouldReport', () => {
     ).toBe(true);
   });
 
+  it("drops Firestore's IndexedDB teardown, which iOS fires on every app switch", () => {
+    expect(
+      shouldReport({
+        kind: 'promise',
+        message:
+          "InvalidStateError: Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.",
+        stack: 'transaction@[native code]\n    at _withRetries (firebase-CSWbg9pq.js:1:91364)',
+      }),
+    ).toBe(false);
+  });
+
+  it('still reports a full disk, which is the same layer genuinely failing', () => {
+    expect(
+      shouldReport({
+        kind: 'promise',
+        message: "QuotaExceededError: Failed to execute 'transaction' on 'IDBDatabase'",
+      }),
+    ).toBe(true);
+  });
+
   it('drops an empty message, which carries nothing to act on', () => {
     expect(shouldReport({ kind: 'window', message: '   ' })).toBe(false);
   });
