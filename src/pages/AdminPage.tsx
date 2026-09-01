@@ -70,6 +70,8 @@ import {
 } from '../services/errorEvents';
 import { SupportTicketsPanel } from '../components/admin/SupportTicketsPanel';
 import { ErrorEventsPanel } from '../components/admin/ErrorEventsPanel';
+import { CostsPanel } from '../components/admin/CostsPanel';
+import { fetchCostReport, type CostReport } from '../services/adminCosts';
 import {
   fetchAllHelpArticles,
   helpCategoryLabel,
@@ -176,6 +178,8 @@ type AdminState =
       tickets: SupportTicket[];
       errorEvents: ErrorEvent[];
       errorsDropped: number;
+      costs: CostReport | null;
+      costsError: string | null;
       userCount: number;
       users: AdminUserSummary[];
       health: AdminHealthStatus | null;
@@ -477,7 +481,7 @@ function StatusFilterBar({
   );
 }
 
-type AdminTab = 'overview' | 'users' | 'support' | 'requests' | 'errors' | 'content';
+type AdminTab = 'overview' | 'users' | 'support' | 'requests' | 'errors' | 'costs' | 'content';
 
 const ADMIN_TABS: { id: AdminTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -485,6 +489,7 @@ const ADMIN_TABS: { id: AdminTab; label: string }[] = [
   { id: 'support', label: 'Support' },
   { id: 'requests', label: 'Requests' },
   { id: 'errors', label: 'Errors' },
+  { id: 'costs', label: 'Costs' },
   { id: 'content', label: 'Content' },
 ];
 
@@ -768,6 +773,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         ticketsResult,
         errorsResult,
         droppedResult,
+        costsResult,
       ] = await Promise.allSettled([
           fetchBugReports(),
           fetchBrokerSupportRequests(),
@@ -779,6 +785,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
           fetchAllTickets(),
           fetchErrorEvents(),
           fetchErrorsDroppedToday(),
+          fetchCostReport(),
         ]);
 
       const users =
@@ -804,6 +811,11 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         tickets: ticketsResult.status === 'fulfilled' ? ticketsResult.value : [],
         errorEvents: errorsResult.status === 'fulfilled' ? errorsResult.value : [],
         errorsDropped: droppedResult.status === 'fulfilled' ? droppedResult.value : 0,
+        costs: costsResult.status === 'fulfilled' ? costsResult.value.report : null,
+        costsError:
+          costsResult.status === 'fulfilled'
+            ? costsResult.value.error
+            : 'Could not load the cost report.',
         userCount,
         users,
         health,
@@ -824,6 +836,8 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         tickets: [],
         errorEvents: [],
         errorsDropped: 0,
+        costs: null,
+        costsError: null,
         userCount: 0,
         users: [],
         health: null,
@@ -1937,6 +1951,10 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                   onReplied={handleTicketReplied}
                 />
               </>
+            )}
+
+            {tab === 'costs' && (
+              <CostsPanel report={ready.costs} error={ready.costsError} />
             )}
 
             {tab === 'errors' && (

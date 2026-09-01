@@ -235,6 +235,16 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
+    /*
+     * Cached monthly cost totals, written by the admin cost report as it walks the usage counters.
+     *
+     * Server-only. The numbers are derived from data the client already cannot read (per-user
+     * usage), and a client that could write here could make a month look cheap.
+     */
+    match /adminCostMonths/{month} {
+      allow read, write: if false;
+    }
+
     // Daily counter for the error feed's own fuse. Server-only, like every other rate limit here.
     match /errorBudget/{day} {
       allow read: if isAdmin();
