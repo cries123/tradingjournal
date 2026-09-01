@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import { ArrowLeft, Copy, Download, EyeOff, FileText, Plus, Share2, Trash2, Trophy, Upload } from 'lucide-react';
 import { useSettings } from '../context/useSettings';
 import { useAuth } from '../context/useAuth';
@@ -6,10 +6,11 @@ import type { CurrencyCode, ThemeAccent } from '../types/settings';
 import type { Trade } from '../types';
 import { computeStats, type TradingStats } from '../utils/stats';
 import { downloadBackup, parseBackup, type ParsedBackup } from '../utils/backup';
-import { exportMonthReport, exportTaxCsv, exportTradesCsv } from '../utils/exportTrades';
+import { exportMonthReport, exportTaxYearCsv, exportTradesCsv } from '../utils/exportTrades';
+import { availableTaxYears, buildTaxReport } from '../utils/taxReport';
+import { formatCurrency } from '../utils/format';
 import { ConfirmDialog } from './ConfirmDialog';
 import { coachShareUrl, createTradeHistoryShare, disableCoachShare } from '../services/coachShare';
-import { detectWashSales } from '../utils/washSale';
 
 function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -63,7 +64,12 @@ export function SettingsPage({
   const [backupMessageIsError, setBackupMessageIsError] = useState(false);
   const backupInputRef = useRef<HTMLInputElement>(null);
 
-  const washSaleCount = detectWashSales(trades).length;
+  /* The tax export is per YEAR, so everything about it derives from the selected one — including
+     the wash-sale count, which used to be taken over the whole journal and shown beside a button
+     that claimed to export a single year. */
+  const taxYears = useMemo(() => availableTaxYears(trades), [trades]);
+  const [taxYear, setTaxYear] = useState(() => availableTaxYears(trades)[0] ?? new Date().getFullYear());
+  const taxReport = useMemo(() => buildTaxReport(trades, taxYear), [trades, taxYear]);
 
   const handleBackupFile = async (file: File | null) => {
     if (!file) return;
@@ -651,17 +657,55 @@ export function SettingsPage({
             <FileText size={16} />
             Print monthly report (PDF)
           </button>
-          <button
-            type="button"
-            onClick={() => exportTaxCsv(trades, `tax-realized-${year}.csv`)}
-            className="w-full flex items-center justify-center gap-2 btn-secondary py-2.5 text-sm"
-          >
-            <Download size={16} />
-            Export tax summary (wash-sale aware)
-          </button>
-          {washSaleCount > 0 && (
-            <p className="text-xs text-amber-300">{washSaleCount} potential wash sale(s) flagged in export.</p>
-          )}
+          <div className="rounded-lg border border-border/50 p-3 space-y-2.5">
+            <div className="flex items-center gap-2">
+              <label htmlFor="tax-year" className="text-xs text-text-secondary shrink-0">
+                Tax year
+              </label>
+              <select
+                id="tax-year"
+                value={taxYear}
+                onChange={(e) => setTaxYear(Number(e.target.value))}
+                className="input-field text-sm py-1.5 px-2 flex-1"
+              >
+                {(taxYears.length > 0 ? taxYears : [taxYear]).map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              disabled={taxReport.tradeCount === 0}
+              onClick={() => exportTaxYearCsv(trades, taxYear)}
+              className="w-full flex items-center justify-center gap-2 btn-secondary py-2.5 text-sm disabled:opacity-50"
+            >
+              <Download size={16} />
+              Export realized P&amp;L for {taxYear}
+            </button>
+
+            <p className="text-xs text-text-secondary">
+              {taxReport.tradeCount === 0
+                ? `No closed trades in ${taxYear} in this journal.`
+                : `${taxReport.tradeCount} closed trade${taxReport.tradeCount === 1 ? '' : 's'} · net ${formatCurrency(taxReport.netPnl, settings.currency)} · totals and a per-symbol breakdown included.`}
+            </p>
+
+            {taxReport.potentialWashSaleCount > 0 && (
+              <p className="text-xs text-amber-300">
+                {taxReport.potentialWashSaleCount} potential wash sale
+                {taxReport.potentialWashSaleCount === 1 ? '' : 's'} flagged for review. These are
+                matched from round-trip results, not a disallowed-loss calculation — check them
+                against your broker statements.
+              </p>
+            )}
+
+            <p className="text-xs text-text-secondary">
+              A working file for your accountant, not a tax document. Trend Chasers does not give
+              tax advice.
+            </p>
+          </div>
         </section>
 
         <section className="panel-card p-5 space-y-3">

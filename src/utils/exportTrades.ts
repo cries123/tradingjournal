@@ -2,8 +2,7 @@ import type { Trade } from '../types';
 import type { TradingStats } from './stats';
 import { formatCurrency, formatMonthYear } from './format';
 import type { CurrencyCode } from '../types/settings';
-import { effectivePnl } from './tradeHelpers';
-import { detectWashSales } from './washSale';
+import { buildTaxReport, taxReportCsv } from './taxReport';
 
 const CSV_HEADERS = [
   'date',
@@ -47,40 +46,16 @@ export function exportTradesCsv(trades: Trade[], filename = 'trades.csv'): void 
   downloadBlob(csv, filename, 'text/csv;charset=utf-8');
 }
 
-export function exportTaxCsv(trades: Trade[], filename = 'tax-summary.csv'): void {
-  const washSales = detectWashSales(trades);
-  const washByLossId = new Map(washSales.map((w) => [w.lossTradeId, w]));
-
-  const headers = [
-    'date',
-    'symbol',
-    'realized_pnl',
-    'fees',
-    'net_pnl',
-    'asset_class',
-    'wash_sale',
-    'disallowed_loss',
-    'replacement_date',
-  ];
-  const rows = trades
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .map((t) => {
-      const wash = washByLossId.get(t.id);
-      return [
-        t.date,
-        t.symbol,
-        t.pnl,
-        t.fees ?? 0,
-        effectivePnl(t),
-        t.assetClass ?? 'stock',
-        wash ? 'YES' : 'NO',
-        wash?.disallowedLoss ?? 0,
-        wash?.replacementDate ?? '',
-      ]
-        .map(csvCell)
-        .join(',');
-    });
-  downloadBlob([headers.join(','), ...rows].join('\n'), filename, 'text/csv;charset=utf-8');
+/**
+ * The year-end realized P&L file, for one tax year.
+ *
+ * Replaces an export that named a year in its filename and then wrote every trade in the journal
+ * into it, whatever year they belonged to. See taxReport.ts for the totals, the per-symbol rollup
+ * and why wash sales are only ever flagged for review here.
+ */
+export function exportTaxYearCsv(trades: Trade[], year: number): void {
+  const report = buildTaxReport(trades, year);
+  downloadBlob(taxReportCsv(report), `trend-chasers-realized-pnl-${year}.csv`, 'text/csv;charset=utf-8');
 }
 
 export function exportMonthReport(
