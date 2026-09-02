@@ -9,6 +9,8 @@ interface AcquisitionFunnelProps {
   annualSignups: number;
   visitorError: string | null;
   serverError: string | null;
+  /** Both halves come from functions. Until they land, a zero funnel would be a claim, not a count. */
+  loading: boolean;
 }
 
 interface Stage {
@@ -42,7 +44,15 @@ export function AcquisitionFunnel({
   annualSignups,
   visitorError,
   serverError,
+  loading,
 }: AcquisitionFunnelProps) {
+  if (loading) {
+    return (
+      <div className="glass-card rounded-xl p-8 text-center text-sm text-text-secondary">
+        Counting visitors…
+      </div>
+    );
+  }
 
   const stages: Stage[] = [
     {

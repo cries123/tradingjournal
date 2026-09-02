@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -45,6 +45,7 @@ import {
   type AdminUserSummary,
 } from '../services/admin';
 import { formatCurrency } from '../utils/format';
+import { adminActionFailureMessage, describeAdminActionError, withTimeout } from '../utils/adminActionError';
 import { exportBrokerRequestsCsv, exportBugReportsCsv, exportUsersCsv } from '../services/adminExport';
 import {
   fetchAdminHealth,
@@ -167,12 +168,23 @@ function sortUsers(users: AdminUserSummary[], sort: UserSortKey): AdminUserSumma
 }
 
 type AdminState =
-  | { phase: 'loading' }
+  /**
+   * 'access' is the admin check itself. 'data' is everything after it — the check has already
+   * passed, and saying "Checking access" through a slow read was the panel describing the wrong
+   * step, which reads as being locked out rather than as waiting.
+   */
+  | { phase: 'loading'; step: 'access' | 'data' }
   | { phase: 'unavailable' }
   | { phase: 'auth-required' }
   | { phase: 'denied' }
   | {
       phase: 'ready';
+      /**
+       * The panel renders once the Firestore reads land. Everything that leaves the browser for a
+       * Netlify function — health, server stats, the cost report — arrives after, because a cold
+       * function start should not decide when an admin gets to see their bug reports.
+       */
+      extras: 'loading' | 'ready';
       isNewClaim: boolean;
       reports: BugReport[];
       brokerRequests: BrokerSupportRequest[];
@@ -322,6 +334,7 @@ function AdminNoteField({
   const [draft, setDraft] = useState(value);
   const [savedValue, setSavedValue] = useState(value);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   /*
    * Re-seed the box when the saved note changes underneath it.
@@ -338,8 +351,12 @@ function AdminNoteField({
   const save = async () => {
     if (draft.trim() === value.trim()) return;
     setSaving(true);
+    setSaveError(null);
     try {
       await onSave(draft);
+    } catch (error) {
+      // This runs from onBlur, so a rejection here would have no caller to land in.
+      setSaveError(adminActionFailureMessage('Saving the note', error));
     } finally {
       setSaving(false);
     }
@@ -361,6 +378,7 @@ function AdminNoteField({
         aria-label={label}
       />
       {saving && <p className="text-[10px] text-text-secondary mt-1">Saving…</p>}
+      {saveError && <p className="text-[10px] text-rose-300 mt-1">{saveError}</p>}
     </div>
   );
 }
@@ -717,9 +735,11 @@ function ExportMenu({
 
 export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onGuides, onNavigate }: AdminPageProps) {
   const { user, username, loading, firebaseEnabled, logout } = useAuth();
-  const [state, setState] = useState<AdminState>({ phase: 'loading' });
+  const [state, setState] = useState<AdminState>({ phase: 'loading', step: 'access' });
   const [tab, setTab] = useState<AdminTab>('overview');
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
+  /** The last admin mutation that failed, named. Cleared when the next one starts. */
+  const [actionError, setActionError] = useState<string | null>(null);
   const [bugFilter, setBugFilter] = useState<StatusFilter>('all');
   const [brokerFilter, setBrokerFilter] = useState<StatusFilter>('all');
   const [selectedUser, setSelectedUser] = useState<AdminUserSummary | null>(null);
@@ -731,14 +751,23 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
   const [articleBusy, setArticleBusy] = useState<string | null>(null);
   const [articleModal, setArticleModal] = useState<'new' | HelpArticle | null>(null);
 
+  /**
+   * Which load is current. A refresh started while the previous run's slow half is still in flight
+   * would otherwise let the older answer overwrite the newer one.
+   */
+  const loadToken = useRef(0);
+
   const loadAdmin = useCallback(async () => {
+    const token = ++loadToken.current;
+    const isCurrent = () => loadToken.current === token;
+
     if (!firebaseEnabled) {
       setState({ phase: 'unavailable' });
       return;
     }
 
     if (loading) {
-      setState({ phase: 'loading' });
+      setState({ phase: 'loading', step: 'access' });
       return;
     }
 
@@ -747,7 +776,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
       return;
     }
 
-    setState({ phase: 'loading' });
+    setState({ phase: 'loading', step: 'access' });
 
     let access: AdminAccessResult;
     try {
@@ -757,80 +786,114 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
       return;
     }
 
+    if (!isCurrent()) return;
+
     if (!access.ok) {
       setState({ phase: access.reason === 'not-configured' ? 'unavailable' : 'denied' });
       return;
     }
 
+    setState({ phase: 'loading', step: 'data' });
+
     try {
+      // First wave: the reads the panel is made of. All of these are Firestore, and none of them
+      // wakes a Netlify function.
       const [
         reportsResult,
         brokerResult,
         usersResult,
-        healthResult,
         notesResult,
         auditResult,
-        healthHistoryResult,
         ticketsResult,
         errorsResult,
-        droppedResult,
-        costsResult,
       ] = await Promise.allSettled([
-          fetchBugReports(),
-          fetchBrokerSupportRequests(),
-          fetchSignedUpUsers(),
-          fetchAdminHealth(),
-          fetchAllAdminUserNotes(),
-          fetchRecentAuditLog(),
-          fetchAdminHealthHistory(),
-          fetchAllTickets(),
-          fetchErrorEvents(),
-          fetchErrorsDroppedToday(),
-          fetchCostReport(),
-        ]);
-
-      const users =
-        usersResult.status === 'fulfilled' ? usersResult.value : [];
-      const userCount = users.length;
-      const signupStats = computeSignupStats(users);
-      const [visitorResult, serverResult] = await Promise.all([
-        fetchVisitorStats(signupStats.last7Days).catch(() => ({
-          stats: emptyVisitorStats(signupStats.last7Days),
-          error: 'Could not load visitor stats',
-        })),
-        fetchAdminServerStats(),
+        fetchBugReports(),
+        fetchBrokerSupportRequests(),
+        fetchSignedUpUsers(),
+        fetchAllAdminUserNotes(),
+        fetchRecentAuditLog(),
+        fetchAllTickets(),
+        fetchErrorEvents(),
       ]);
 
-      const health = healthResult.status === 'fulfilled' ? healthResult.value : null;
-      if (health) void recordAdminHealthSnapshot(health);
+      if (!isCurrent()) return;
+
+      const users = usersResult.status === 'fulfilled' ? usersResult.value : [];
+      const signupStats = computeSignupStats(users);
 
       setState({
         phase: 'ready',
+        extras: 'loading',
         isNewClaim: access.isNewClaim,
         reports: reportsResult.status === 'fulfilled' ? reportsResult.value : [],
         brokerRequests: brokerResult.status === 'fulfilled' ? brokerResult.value : [],
         tickets: ticketsResult.status === 'fulfilled' ? ticketsResult.value : [],
         errorEvents: errorsResult.status === 'fulfilled' ? errorsResult.value : [],
-        errorsDropped: droppedResult.status === 'fulfilled' ? droppedResult.value : 0,
-        costs: costsResult.status === 'fulfilled' ? costsResult.value.report : null,
-        costsError:
-          costsResult.status === 'fulfilled'
-            ? costsResult.value.error
-            : 'Could not load the cost report.',
-        userCount,
+        errorsDropped: 0,
+        costs: null,
+        costsError: null,
+        userCount: users.length,
         users,
-        health,
-        visitorStats: visitorResult.stats,
-        visitorStatsError: visitorResult.error,
-        serverStats: serverResult.stats,
-        serverStatsError: serverResult.error,
+        health: null,
+        visitorStats: emptyVisitorStats(signupStats.last7Days),
+        visitorStatsError: null,
+        serverStats: null,
+        serverStatsError: null,
         userNotes: notesResult.status === 'fulfilled' ? notesResult.value : new Map(),
         auditLog: auditResult.status === 'fulfilled' ? auditResult.value : [],
-        healthHistory: healthHistoryResult.status === 'fulfilled' ? healthHistoryResult.value : [],
+        healthHistory: [],
+      });
+
+      // Second wave: the slow half. Timed out rather than awaited forever — a function that never
+      // answers should leave one card saying so, not a panel that never finishes loading.
+      const [healthResult, healthHistoryResult, droppedResult, costsResult, visitorResult, serverResult] =
+        await Promise.allSettled([
+          withTimeout(fetchAdminHealth(), 'health check'),
+          withTimeout(fetchAdminHealthHistory(), 'health history'),
+          withTimeout(fetchErrorsDroppedToday(), 'dropped-error count'),
+          withTimeout(fetchCostReport(), 'cost report'),
+          withTimeout(fetchVisitorStats(signupStats.last7Days), 'visitor stats'),
+          withTimeout(fetchAdminServerStats(), 'server stats'),
+        ]);
+
+      if (!isCurrent()) return;
+
+      const health = healthResult.status === 'fulfilled' ? healthResult.value : null;
+      if (health) void recordAdminHealthSnapshot(health);
+
+      setState((prev) => {
+        if (prev.phase !== 'ready') return prev;
+        return {
+          ...prev,
+          extras: 'ready',
+          health,
+          healthHistory: healthHistoryResult.status === 'fulfilled' ? healthHistoryResult.value : [],
+          errorsDropped: droppedResult.status === 'fulfilled' ? droppedResult.value : 0,
+          costs: costsResult.status === 'fulfilled' ? costsResult.value.report : null,
+          costsError:
+            costsResult.status === 'fulfilled'
+              ? costsResult.value.error
+              : describeAdminActionError(costsResult.reason),
+          visitorStats:
+            visitorResult.status === 'fulfilled'
+              ? visitorResult.value.stats
+              : emptyVisitorStats(signupStats.last7Days),
+          visitorStatsError:
+            visitorResult.status === 'fulfilled'
+              ? visitorResult.value.error
+              : describeAdminActionError(visitorResult.reason),
+          serverStats: serverResult.status === 'fulfilled' ? serverResult.value.stats : null,
+          serverStatsError:
+            serverResult.status === 'fulfilled'
+              ? serverResult.value.error
+              : describeAdminActionError(serverResult.reason),
+        };
       });
     } catch {
+      if (!isCurrent()) return;
       setState({
         phase: 'ready',
+        extras: 'ready',
         isNewClaim: access.isNewClaim,
         reports: [],
         brokerRequests: [],
@@ -875,9 +938,34 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
 
   const adminIdentity = { adminUid: user?.uid ?? '', adminEmail: user?.email ?? '' };
 
-  const handleTicketStatusChange = async (ticketId: string, status: TicketStatus, subject: string) => {
-    setUpdatingKey(`ticket:${ticketId}`);
+  /**
+   * Every mutation in this panel goes through here.
+   *
+   * These handlers are all called as `void handleSomething(...)` from an onClick, so a rejection
+   * had nowhere to go: it became an unhandled promise rejection, was reported to the error feed as
+   * an anonymous permission failure attributed to the page, and left the button looking like it had
+   * simply done nothing. Catching here means the panel names the action that failed, in the panel,
+   * at the moment it fails.
+   */
+  const runAdminAction = async <T,>(
+    busyKey: string,
+    what: string,
+    run: () => Promise<T>,
+  ): Promise<T | undefined> => {
+    setUpdatingKey(busyKey);
+    setActionError(null);
     try {
+      return await run();
+    } catch (error) {
+      setActionError(adminActionFailureMessage(what, error));
+      return undefined;
+    } finally {
+      setUpdatingKey(null);
+    }
+  };
+
+  const handleTicketStatusChange = (ticketId: string, status: TicketStatus, subject: string) =>
+    runAdminAction(`ticket:${ticketId}`, 'Updating the ticket', async () => {
       await updateTicketStatus(ticketId, status);
       setState((prev) => {
         if (prev.phase !== 'ready') return prev;
@@ -894,10 +982,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         targetLabel: subject,
         detail: `Status \u2192 ${STATUS_LABELS[status]}`,
       });
-    } finally {
-      setUpdatingKey(null);
-    }
-  };
+    });
 
   /* A reply flips unreadForSupport off in Firestore, but this page holds its tickets in local
      state — without this the "waiting on you" badge would keep counting a ticket you just
@@ -914,9 +999,8 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
     });
   };
 
-  const handleErrorStatusChange = async (errorId: string, status: ErrorStatus) => {
-    setUpdatingKey(`error:${errorId}`);
-    try {
+  const handleErrorStatusChange = (errorId: string, status: ErrorStatus) =>
+    runAdminAction(`error:${errorId}`, 'Updating the error', async () => {
       await updateErrorEventStatus(errorId, status);
       setState((prev) => {
         if (prev.phase !== 'ready') return prev;
@@ -933,14 +1017,10 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         targetLabel: errorId.slice(0, 8),
         detail: `Status \u2192 ${status}`,
       });
-    } finally {
-      setUpdatingKey(null);
-    }
-  };
+    });
 
-  const handleBugStatusChange = async (reportId: string, status: BugReportStatus, label: string) => {
-    setUpdatingKey(`bug:${reportId}`);
-    try {
+  const handleBugStatusChange = (reportId: string, status: BugReportStatus, label: string) =>
+    runAdminAction(`bug:${reportId}`, 'Updating the bug report', async () => {
       await updateBugReportStatus(reportId, status);
       setState((prev) => {
         if (prev.phase !== 'ready') return prev;
@@ -957,14 +1037,10 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         targetLabel: label,
         detail: `Status → ${STATUS_LABELS[status]}`,
       });
-    } finally {
-      setUpdatingKey(null);
-    }
-  };
+    });
 
-  const handleBugPriorityChange = async (reportId: string, priority: AdminPriority, label: string) => {
-    setUpdatingKey(`bug-priority:${reportId}`);
-    try {
+  const handleBugPriorityChange = (reportId: string, priority: AdminPriority, label: string) =>
+    runAdminAction(`bug-priority:${reportId}`, 'Changing the bug priority', async () => {
       await updateBugReportPriority(reportId, priority);
       setState((prev) => {
         if (prev.phase !== 'ready') return prev;
@@ -981,14 +1057,10 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         targetLabel: label,
         detail: `Priority → ${PRIORITY_LABELS[priority]}`,
       });
-    } finally {
-      setUpdatingKey(null);
-    }
-  };
+    });
 
-  const handleBrokerStatusChange = async (requestId: string, status: BrokerSupportStatus, label: string) => {
-    setUpdatingKey(`broker:${requestId}`);
-    try {
+  const handleBrokerStatusChange = (requestId: string, status: BrokerSupportStatus, label: string) =>
+    runAdminAction(`broker:${requestId}`, 'Updating the broker request', async () => {
       await updateBrokerSupportStatus(requestId, status);
       setState((prev) => {
         if (prev.phase !== 'ready') return prev;
@@ -1007,14 +1079,10 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         targetLabel: label,
         detail: `Status → ${STATUS_LABELS[status]}`,
       });
-    } finally {
-      setUpdatingKey(null);
-    }
-  };
+    });
 
-  const handleBrokerPriorityChange = async (requestId: string, priority: AdminPriority, label: string) => {
-    setUpdatingKey(`broker-priority:${requestId}`);
-    try {
+  const handleBrokerPriorityChange = (requestId: string, priority: AdminPriority, label: string) =>
+    runAdminAction(`broker-priority:${requestId}`, 'Changing the broker priority', async () => {
       await updateBrokerSupportPriority(requestId, priority);
       setState((prev) => {
         if (prev.phase !== 'ready') return prev;
@@ -1033,14 +1101,10 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         targetLabel: label,
         detail: `Priority → ${PRIORITY_LABELS[priority]}`,
       });
-    } finally {
-      setUpdatingKey(null);
-    }
-  };
+    });
 
-  const handleBugNoteSave = async (reportId: string, adminNote: string, label: string) => {
-    setUpdatingKey(`bug-note:${reportId}`);
-    try {
+  const handleBugNoteSave = (reportId: string, adminNote: string, label: string) =>
+    runAdminAction(`bug-note:${reportId}`, 'Saving the note', async () => {
       await updateBugReportAdminNote(reportId, adminNote);
       setState((prev) => {
         if (prev.phase !== 'ready') return prev;
@@ -1057,14 +1121,10 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         targetLabel: label,
         detail: 'Admin note updated',
       });
-    } finally {
-      setUpdatingKey(null);
-    }
-  };
+    });
 
-  const handleBrokerNoteSave = async (requestId: string, adminNote: string, label: string) => {
-    setUpdatingKey(`broker-note:${requestId}`);
-    try {
+  const handleBrokerNoteSave = (requestId: string, adminNote: string, label: string) =>
+    runAdminAction(`broker-note:${requestId}`, 'Saving the note', async () => {
       await updateBrokerSupportAdminNote(requestId, adminNote);
       setState((prev) => {
         if (prev.phase !== 'ready') return prev;
@@ -1083,10 +1143,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         targetLabel: label,
         detail: 'Admin note updated',
       });
-    } finally {
-      setUpdatingKey(null);
-    }
-  };
+    });
 
   const handleUserNoteSave = async (uid: string, patch: { note?: string; flagged?: boolean }, label: string) => {
     const saved = await saveAdminUserNote(uid, patch, user?.email ?? '');
@@ -1333,7 +1390,11 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Admin</h1>
         </div>
 
-        {state.phase === 'loading' && <p className="text-text-secondary">Checking access…</p>}
+        {state.phase === 'loading' && (
+          <p className="text-text-secondary">
+            {state.step === 'access' ? 'Checking access…' : 'Loading the panel…'}
+          </p>
+        )}
 
         {state.phase === 'unavailable' && (
           <div className="glass-card rounded-xl p-6 text-sm text-text-secondary">
@@ -1427,6 +1488,23 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
               ticketsWaiting={ticketsWaiting}
               openErrors={openErrorCount}
             />
+
+            {actionError && (
+              <div
+                role="alert"
+                className="mb-6 flex items-start gap-2 rounded-xl border border-rose-400/40 bg-rose-500/10 px-4 py-3"
+              >
+                <AlertTriangle size={15} className="text-rose-300 mt-0.5 shrink-0" />
+                <p className="text-sm text-rose-100 flex-1">{actionError}</p>
+                <button
+                  type="button"
+                  onClick={() => setActionError(null)}
+                  className="text-xs font-medium text-rose-200/80 hover:text-rose-100 focus-ring rounded px-1"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
 
 
             {tab === 'overview' && (
@@ -1563,6 +1641,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                 annualSignups={annualSignups}
                 visitorError={ready.visitorStatsError}
                 serverError={ready.serverStatsError}
+                loading={ready.extras === 'loading'}
               />
 
               <div className="grid xl:grid-cols-2 gap-4 mb-8">
@@ -1955,7 +2034,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
             )}
 
             {tab === 'costs' && (
-              <CostsPanel report={ready.costs} error={ready.costsError} />
+              <CostsPanel report={ready.costs} error={ready.costsError} loading={ready.extras === 'loading'} />
             )}
 
             {tab === 'errors' && (

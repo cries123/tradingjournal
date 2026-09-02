@@ -6,6 +6,8 @@ import type { CostReport } from '../../services/adminCosts';
 interface CostsPanelProps {
   report: CostReport | null;
   error: string | null;
+  /** The report comes from a Netlify function, so it lands after the panel does. */
+  loading: boolean;
 }
 
 function money(value: number): string {
@@ -31,7 +33,15 @@ function monthLabel(month: string): string {
  * to real counts, not a reconciliation of invoices, and the moment somebody forgets that they will
  * make a pricing decision against a number that was never a bill.
  */
-export function CostsPanel({ report, error }: CostsPanelProps) {
+export function CostsPanel({ report, error, loading }: CostsPanelProps) {
+  if (loading && !report && !error) {
+    return (
+      <div className="glass-card rounded-xl p-8 text-center text-sm text-text-secondary">
+        Working out the running costs…
+      </div>
+    );
+  }
+
   if (error || !report) {
     return (
       <div className="glass-card rounded-xl p-8 text-center text-sm text-text-secondary">

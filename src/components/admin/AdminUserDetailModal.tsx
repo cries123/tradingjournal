@@ -15,6 +15,7 @@ import {
 } from '../../services/adminUserManagement';
 import { formatCurrency } from '../../utils/format';
 import { useEscapeToClose } from '../../hooks/useEscapeToClose';
+import { describeAdminActionError } from '../../utils/adminActionError';
 
 interface AdminUserDetailModalProps {
   user: AdminUserSummary;
@@ -85,11 +86,25 @@ export function AdminUserDetailModal({
       detail,
     });
 
+  const run = async (key: string, fn: () => Promise<void>) => {
+    setBusy(key);
+    setError(null);
+    setMessage(null);
+    try {
+      await fn();
+    } catch (err) {
+      setError(describeAdminActionError(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const saveNote = async () => {
     if (noteDraft.trim() === note.note.trim()) return;
     setNoteSaving(true);
     try {
-      await onNoteSave({ note: noteDraft });
+      // Through run(), so a refused write says so here instead of rejecting into the blur handler.
+      await run('note', () => onNoteSave({ note: noteDraft }).then(() => undefined));
     } finally {
       setNoteSaving(false);
     }
@@ -98,20 +113,16 @@ export function AdminUserDetailModal({
   const toggleFlag = async () => {
     const next = !flagged;
     setFlagged(next);
-    await onNoteSave({ flagged: next });
-  };
-
-  const run = async (key: string, fn: () => Promise<void>) => {
-    setBusy(key);
-    setError(null);
-    setMessage(null);
-    try {
-      await fn();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Action failed');
-    } finally {
-      setBusy(null);
-    }
+    await run('flag', () =>
+      onNoteSave({ flagged: next }).then(
+        () => undefined,
+        (error: unknown) => {
+          // The switch already moved. Put it back, or it will claim a state the server rejected.
+          setFlagged(!next);
+          throw error;
+        },
+      ),
+    );
   };
 
   /* Metered usage is server-only by rule, so it is fetched on open rather than carried on the
