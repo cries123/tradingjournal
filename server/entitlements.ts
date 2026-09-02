@@ -27,7 +27,32 @@ export interface Entitlement {
   updatedAt: string;
 }
 
-const FREE: Entitlement = { tier: 'free', source: 'admin', status: 'active', updatedAt: '' };
+/*
+ * Defaults filled in around a stored record's own fields.
+ *
+ * `source` is 'purchase' here, and that matters more than it looks. This object is spread UNDER a
+ * stored document, so any field the document is missing is taken from it — and it used to say
+ * 'admin'. That meant an entitlement written without an explicit source silently read as a
+ * hand-granted account, which is the one state the rest of the system treats as untouchable:
+ * checkout refuses to sell to it and the billing webhook refuses to update it. An unknown record
+ * is not a grant. A real grant is always written with source 'admin' by hand, explicitly.
+ */
+const DEFAULTS: Entitlement = { tier: 'free', source: 'purchase', status: 'active', updatedAt: '' };
+
+/**
+ * A hand-granted tier the billing system must not touch.
+ *
+ * Only a PAID grant is protected. Someone "granted" free has been given nothing — there is no
+ * subscription to preserve, so treating it as protected only ever blocks them from buying and
+ * blocks a payment from applying if they somehow did.
+ */
+export function isProtectedGrant(entitlement: Entitlement | null): boolean {
+  return (
+    entitlement?.source === 'admin' &&
+    entitlement.status === 'active' &&
+    entitlement.tier !== 'free'
+  );
+}
 
 function entitlementDoc(uid: string) {
   return getAdminFirestore().doc(`entitlements/${uid}`);
@@ -57,7 +82,7 @@ export async function readEntitlement(uid: string): Promise<Entitlement | null> 
   if (!snap.exists) return null;
   const data = snap.data() as Partial<Entitlement>;
   if (!isTier(data.tier)) return null;
-  return { ...FREE, ...data, tier: data.tier } as Entitlement;
+  return { ...DEFAULTS, ...data, tier: data.tier } as Entitlement;
 }
 
 /** The tier and limits to enforce for this request. Falls back to free on any doubt. */
@@ -100,7 +125,7 @@ export async function applyBillingUpdate(
   patch: Partial<Entitlement>,
 ): Promise<{ applied: boolean; reason?: string }> {
   const existing = await readEntitlement(uid);
-  if (existing?.source === 'admin') {
+  if (isProtectedGrant(existing)) {
     return { applied: false, reason: 'admin grant is not overridden by billing' };
   }
   await writeEntitlement(uid, { ...patch, source: 'purchase' });

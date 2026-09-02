@@ -8,7 +8,7 @@ import {
   CREEM_CONFIGURED,
   productIdForTier,
 } from '../../server/creemClient';
-import { readEntitlement, writeEntitlement } from '../../server/entitlements';
+import { isProtectedGrant, readEntitlement, writeEntitlement } from '../../server/entitlements';
 import { planChangeRoute } from '../../server/planChangeRoute';
 import { readCheckoutStatus } from '../../server/checkoutStatus';
 import { maintenanceMessage } from '../../src/config/checkoutStatus';
@@ -93,15 +93,22 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
     return { statusCode: 400, body: JSON.stringify({ error: 'Unknown plan' }) };
   }
 
-  // An admin-granted tier has no subscription behind it, and the webhook deliberately refuses to
-  // overwrite one. Letting someone check out anyway would take their money and change nothing.
+  /*
+   * An admin-granted PAID tier has no subscription behind it, and the webhook deliberately refuses
+   * to overwrite one — so letting someone check out would take their money and change nothing.
+   *
+   * The tier check is the whole point. This used to fire for any active admin-sourced record,
+   * including free, and a record missing a `source` field defaulted to admin — so ordinary free
+   * users were told "your account already has Free access, contact support" and could not buy
+   * anything at all. Free is not access that competes with a purchase.
+   */
   const existing = await readEntitlement(uid).catch(() => null);
-  if (existing?.source === 'admin' && existing.status === 'active') {
+  if (isProtectedGrant(existing)) {
     return {
       statusCode: 409,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        error: `Your account already has ${TIER_PLANS[existing.tier].name} access. Contact support if you'd like to change plans.`,
+        error: `Your account was given ${TIER_PLANS[existing!.tier].name} access directly, so there is nothing to buy. Contact support if you'd like to change plans.`,
       }),
     };
   }
