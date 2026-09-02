@@ -187,7 +187,9 @@ export function LandingFooter({
                   </a>
                 </li>
               ))}
-              {BROKER_GUIDES.map((guide) => (
+              {/* A handful, not all twenty: this column renders on every page, and a footer that
+                  is mostly broker links buries the rest of it. The full set is on /guides. */}
+              {BROKER_GUIDES.slice(0, 6).map((guide) => (
                 <li key={guide.slug}>
                   <a
                     href={guide.path}
@@ -199,6 +201,20 @@ export function LandingFooter({
                   </a>
                 </li>
               ))}
+              <li>
+                <a
+                  href="/guides"
+                  onClick={(e) => {
+                    if (onGuides) {
+                      e.preventDefault();
+                      onGuides();
+                    }
+                  }}
+                  className="hover:text-emerald-400 transition-colors"
+                >
+                  All {BROKER_GUIDES.length} broker guides →
+                </a>
+              </li>
             </ul>
           </div>
 
