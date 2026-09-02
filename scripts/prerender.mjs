@@ -31,6 +31,12 @@ const ROUTES = [
   '/refunds',
   '/request-broker',
   '/report-bug',
+  // Indexable product pages. Without a prerendered snapshot Google sees an empty SPA shell, so a
+  // page can be linked from every footer on the site and still never be crawled properly.
+  '/pricing',
+  '/help-center',
+  '/ai-assistant',
+  '/whats-new',
 ];
 
 function findFreePort(start = 4173) {

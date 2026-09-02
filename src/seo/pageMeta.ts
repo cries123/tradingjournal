@@ -95,17 +95,21 @@ const PAGE_SEO: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>, Pa
     path: '/market-simulator',
     noindex: true,
   },
+  /* These two were placeholders once and carried noindex to match. They shipped; the tags did
+     not follow. A live pricing page telling Google not to index it cannot rank, cannot be
+     crawled, and cannot become a sitelink — which is the one sitelink almost every competitor
+     has. */
   'ai-assistant': {
-    title: 'AI Assistant (Coming Soon) — Trend Chasers',
-    description: 'An AI assistant for your trading habits. Coming soon to Trend Chasers.',
+    title: 'AI Trading Assistant — Trend Chasers',
+    description:
+      'Ask questions about your own trades. The AI assistant reads your journal and answers with your numbers — setups, timing, and where the losses actually come from.',
     path: '/ai-assistant',
-    noindex: true,
   },
   pricing: {
-    title: 'Pricing (Coming Soon) — Trend Chasers',
-    description: 'Trend Chasers pricing details. Coming soon.',
+    title: 'Pricing — Trend Chasers Trading Journal',
+    description:
+      'Free forever with manual entry and the full P&L calendar. Paid plans add broker sync, execution analytics and the AI assistant. No credit card to start.',
     path: '/pricing',
-    noindex: true,
   },
   'help-center': {
     title: 'Help Center — Trend Chasers',

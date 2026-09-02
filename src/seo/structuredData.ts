@@ -49,7 +49,10 @@ const SOFTWARE_APP = {
 
 const NAV_LINKS = [
   { name: 'Open Journal', url: `${SITE_ORIGIN}/app` },
+  { name: 'Pricing', url: `${SITE_ORIGIN}/pricing` },
   { name: 'Supported Brokers', url: `${SITE_ORIGIN}/brokers` },
+  { name: 'Help Center', url: `${SITE_ORIGIN}/help-center` },
+  { name: 'AI Assistant', url: `${SITE_ORIGIN}/ai-assistant` },
   { name: 'Guides', url: `${SITE_ORIGIN}/guides` },
   { name: 'Request Broker', url: `${SITE_ORIGIN}/request-broker` },
   { name: 'Privacy Policy', url: `${SITE_ORIGIN}/privacy` },
