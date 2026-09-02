@@ -5,6 +5,7 @@ import { BROKER_GUIDES } from '../seo/brokerGuides';
 import { SUPPORTED_BROKER_COUNT } from '../data/brokerCopy';
 import type { ExtraNavRoute } from '../hooks/useRoute';
 import { SupportLinks } from '../components/support/SupportLinks';
+import { BackLink } from '../components/BackLink';
 
 interface GuidesIndexPageProps {
   onHome: () => void;
@@ -75,16 +76,7 @@ export function GuidesIndexPage({
             much there is to read is doing its job before you click anything. */}
         <section className="border-b border-border/40">
           <div className="max-w-[1680px] mx-auto px-4 md:px-8 pt-10 pb-12 md:pt-14 md:pb-16">
-            <a
-              href="/"
-              onClick={(e) => {
-                e.preventDefault();
-                onHome();
-              }}
-              className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors mb-8 focus-ring rounded"
-            >
-              <span aria-hidden>←</span> Back to home
-            </a>
+        <BackLink onHome={onHome} className="mb-8" />
 
             <p className="text-[11px] uppercase tracking-[0.2em] text-accent/80 font-semibold mb-3">
               Learn

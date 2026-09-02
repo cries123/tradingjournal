@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { pushAppHistory } from '../utils/appHistory';
 
 export type AppRoute =
   | 'landing'
@@ -132,19 +133,19 @@ export function useRoute() {
   }, [route]);
 
   const navigate = useCallback((next: Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>) => {
-    window.history.pushState({}, '', ROUTE_PATHS[next]);
+    pushAppHistory(ROUTE_PATHS[next]);
     setState({ route: next });
     if (next !== 'app') window.scrollTo(0, 0);
   }, []);
 
   const navigateGuide = useCallback((slug: string) => {
-    window.history.pushState({}, '', `/guides/${slug}`);
+    pushAppHistory(`/guides/${slug}`);
     setState({ route: 'guide', guideSlug: slug });
     window.scrollTo(0, 0);
   }, []);
 
   const navigateBrokerGuide = useCallback((slug: string) => {
-    window.history.pushState({}, '', `/brokers/${slug}`);
+    pushAppHistory(`/brokers/${slug}`);
     setState({ route: 'broker-guide', brokerSlug: slug });
     window.scrollTo(0, 0);
   }, []);

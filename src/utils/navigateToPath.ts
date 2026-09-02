@@ -1,3 +1,5 @@
+import { pushAppHistory } from './appHistory';
+
 /**
  * Client-side navigation from anywhere, without threading a router callback down every tree.
  *
@@ -9,7 +11,8 @@ export function navigateToPath(path: string): void {
     window.scrollTo(0, 0);
     return;
   }
-  window.history.pushState({}, '', path);
+  // Through pushAppHistory, so the screen being left is recorded and back can return to it.
+  pushAppHistory(path);
   window.dispatchEvent(new PopStateEvent('popstate'));
   window.scrollTo(0, 0);
 }

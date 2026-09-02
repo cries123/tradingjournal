@@ -84,6 +84,7 @@ import {
   type HelpArticle,
 } from '../services/adminHelpArticles';
 import type { AdminPriority } from '../services/adminShared';
+import { useBackDestination } from '../hooks/useBackDestination';
 import {
   fetchBrokerSupportRequests,
   updateBrokerSupportAdminNote,
@@ -755,6 +756,8 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
    * Which load is current. A refresh started while the previous run's slow half is still in flight
    * would otherwise let the older answer overwrite the newer one.
    */
+  const back = useBackDestination(onHome);
+
   const loadToken = useRef(0);
 
   const loadAdmin = useCallback(async () => {
@@ -1376,11 +1379,11 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
       <main className="relative z-10 flex-1 max-w-[1680px] mx-auto px-4 md:px-6 py-8 md:py-12 w-full">
         <button
           type="button"
-          onClick={onHome}
+          onClick={back.goBack}
           className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-emerald-400 transition-colors mb-8"
         >
           <ArrowLeft size={16} />
-          Back to home
+          {back.label}
         </button>
 
         <div className="flex items-center gap-3 mb-2">

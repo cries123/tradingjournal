@@ -32,6 +32,7 @@ import { computeStats, getMonthTrades, getYearTrades } from '../utils/stats';
 import { takePendingAppView } from '../utils/pendingAppView';
 import { AssistantDock } from '../components/analytics/AssistantDock';
 import { formatMonthYear } from '../utils/format';
+import { currentView, popView, pushView } from '../utils/viewStack';
 
 interface JournalAppProps {
   onHome?: () => void;
@@ -71,15 +72,22 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   // Open straight to the broker screen when the URL asks for it, so the landing page's
   // "Connect a broker" button lands where it says it will instead of dropping you on the
   // dashboard to go find it. Also covers SnapTrade's post-connect redirect (?brokerConnected=1).
-  const [appView, setAppView] = useState<AppView>(() => {
-    if (typeof window === 'undefined') return 'dashboard';
+  const [viewStack, setViewStack] = useState<AppView[]>(() => {
+    if (typeof window === 'undefined') return ['dashboard'];
     // Either the landing page asked for the broker screen, or SnapTrade just redirected the
-    // user back here after they approved a connection.
-    if (takePendingAppView() === 'connect-broker') return 'connect-broker';
-    return new URLSearchParams(window.location.search).has('brokerConnected')
-      ? 'connect-broker'
-      : 'dashboard';
+    // user back here after they approved a connection. Either way the dashboard stays underneath,
+    // so back from the broker screen has somewhere to go.
+    const wantsBroker =
+      takePendingAppView() === 'connect-broker'
+      || new URLSearchParams(window.location.search).has('brokerConnected');
+    return wantsBroker ? ['dashboard', 'connect-broker'] : ['dashboard'];
   });
+
+  const appView = currentView(viewStack, 'dashboard');
+  /** Drill into a screen, remembering the one being left. */
+  const openView = (next: AppView) => setViewStack((stack) => pushView(stack, next));
+  /** Back: the screen before this one, whatever it was. */
+  const goBackView = () => setViewStack((stack) => popView(stack, 'dashboard'));
   const [showTradeModal, setShowTradeModal] = useState(false);
   const [tradeModalDate, setTradeModalDate] = useState<string | undefined>();
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
@@ -173,45 +181,45 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   const sidebarActions = {
     appView,
     onDashboard: () => {
-      setAppView('dashboard');
+      openView('dashboard');
       closeMobileMenu();
     },
     onAddTrade: () => openAddTrade(),
     onConnectBroker: () => {
-      setAppView('connect-broker');
+      openView('connect-broker');
       closeMobileMenu();
     },
     onClearAll: () => setClearConfirmStage(1),
     onSettings: () => {
-      setAppView('settings');
+      openView('settings');
       closeMobileMenu();
     },
     onBrokers: () => {
-      setAppView('brokers');
+      openView('brokers');
       closeMobileMenu();
     },
     onReportBug: () => {
-      setAppView('report-bug');
+      openView('report-bug');
       closeMobileMenu();
     },
     onSupport: () => {
-      setAppView('support');
+      openView('support');
       closeMobileMenu();
     },
     onPerformance: () => {
-      setAppView('performance');
+      openView('performance');
       closeMobileMenu();
     },
     onRequestBroker: () => {
-      setAppView('request-broker');
+      openView('request-broker');
       closeMobileMenu();
     },
     onLeaderboard: () => {
-      setAppView('leaderboard');
+      openView('leaderboard');
       closeMobileMenu();
     },
     onShareCard: () => {
-      setAppView('dashboard');
+      openView('dashboard');
       setShowShareCard(true);
       closeMobileMenu();
     },
@@ -250,13 +258,13 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 monthStats={monthStats}
                 year={year}
                 month={month}
-                onBack={() => setAppView('dashboard')}
+                onBack={goBackView}
                 onRestoreTrades={restoreTrades}
               />
             ) : appView === 'brokers' ? (
               <BrokersContent
-                onBack={() => setAppView('dashboard')}
-                onRequestBroker={() => setAppView('request-broker')}
+                onBack={goBackView}
+                onRequestBroker={() => openView('request-broker')}
               />
             ) : appView === 'connect-broker' ? (
               <LockedFeature
@@ -265,7 +273,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 description="Connect your brokerage and press Sync to import your fills — entries, exits, fees and all, matched into round-trip trades."
               >
                 <BrokerConnectContent
-                  onBack={() => setAppView('dashboard')}
+                  onBack={goBackView}
                   onImportTrades={addTrades}
                   /* everyTrade, not `trades`: `trades` is the FILTERED view, so syncing with a
                      symbol or tag filter active would dedupe against a subset and re-import
@@ -285,27 +293,27 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                   trades={allTrades}
                   year={year}
                   month={month}
-                  onBack={() => setAppView('dashboard')}
+                  onBack={goBackView}
                 />
               </LockedFeature>
             ) : appView === 'support' ? (
               <SupportTicketsContent
-                onBack={() => setAppView('dashboard')}
+                onBack={goBackView}
                 intro="Open a ticket and talk to us directly — billing, memberships, broker connections, anything. Replies show up here, and the sidebar tells you when one lands."
               />
             ) : appView === 'report-bug' ? (
-              <ReportBugContent onBack={() => setAppView('dashboard')} />
+              <ReportBugContent onBack={goBackView} />
             ) : appView === 'request-broker' ? (
-              <RequestBrokerContent onBack={() => setAppView('dashboard')} />
+              <RequestBrokerContent onBack={goBackView} />
             ) : appView === 'leaderboard' ? (
-              <LeaderboardContent onBack={() => setAppView('dashboard')} />
+              <LeaderboardContent onBack={goBackView} />
             ) : isLoading ? (
               <DashboardSkeleton />
             ) : (
               <DashboardView
                 everyTrade={everyTrade}
                 onRemoveTrades={removeTrades}
-                onSyncBroker={() => setAppView('connect-broker')}
+                onSyncBroker={() => openView('connect-broker')}
                 hasBrokerTrades={hasBrokerTrades}
                 trades={trades}
                 hasAnyTrades={allTrades.length > 0}
@@ -323,7 +331,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 onNextYear={() => setYear((y) => y + 1)}
                 onSelectMonth={setMonth}
                 onAddTrade={() => openAddTrade()}
-                onConnectBroker={() => setAppView('connect-broker')}
+                onConnectBroker={() => openView('connect-broker')}
                 sampleActive={sampleActive}
                 onLoadSample={loadSampleData}
                 onClearSample={clearSampleData}
@@ -337,8 +345,8 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
             appView={appView}
             onOpenMenu={() => setMobileMenuOpen(true)}
             onAddTrade={() => openAddTrade()}
-            onDashboard={() => setAppView('dashboard')}
-            onLeaderboard={() => setAppView('leaderboard')}
+            onDashboard={() => openView('dashboard')}
+            onLeaderboard={() => openView('leaderboard')}
             onAssistant={() => setAssistantOpen((v) => !v)}
             assistantOpen={assistantOpen}
           />

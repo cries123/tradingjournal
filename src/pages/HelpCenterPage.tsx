@@ -9,6 +9,7 @@ import {
 } from '../services/adminHelpArticles';
 import type { ExtraNavRoute } from '../hooks/useRoute';
 import { SupportLinks } from '../components/support/SupportLinks';
+import { BackLink } from '../components/BackLink';
 
 interface HelpCenterPageProps {
   onHome: () => void;
@@ -143,16 +144,7 @@ export function HelpCenterPage({
       />
 
       <main className="relative z-10 flex-1 max-w-[1680px] mx-auto px-4 md:px-8 py-12 md:py-16 w-full">
-        <a
-          href="/"
-          onClick={(e) => {
-            e.preventDefault();
-            onHome();
-          }}
-          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-emerald-400 transition-colors mb-8"
-        >
-          <span aria-hidden>←</span> Back to home
-        </a>
+        <BackLink onHome={onHome} className="mb-8" />
 
         <div className="flex items-center gap-2 mb-2">
           <LifeBuoy className="h-6 w-6 text-emerald-400" aria-hidden />

@@ -1,6 +1,7 @@
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import { BrokersContent } from '../components/support/BrokersContent';
 import type { ExtraNavRoute } from '../hooks/useRoute';
+import { useBackDestination } from '../hooks/useBackDestination';
 
 interface BrokersPageProps {
   onHome: () => void;
@@ -25,6 +26,7 @@ export function BrokersPage({
   onHelp,
   onNavigate,
 }: BrokersPageProps) {
+  const back = useBackDestination(onHome);
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
       <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
@@ -39,8 +41,8 @@ export function BrokersPage({
 
       <main className="relative z-10 flex-1">
         <BrokersContent
-          onBack={onHome}
-          backLabel="Back to home"
+          onBack={back.goBack}
+          backLabel={back.label}
           onRequestBroker={onRequestBroker}
           wide
           onGuides={onGuides}

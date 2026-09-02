@@ -1,6 +1,7 @@
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import { PricingContent } from '../components/pricing/PricingContent';
 import type { ExtraNavRoute } from '../hooks/useRoute';
+import { useBackDestination } from '../hooks/useBackDestination';
 
 interface PricingPageProps {
   onHome: () => void;
@@ -21,6 +22,7 @@ export function PricingPage({
   onGuides,
   onNavigate,
 }: PricingPageProps) {
+  const back = useBackDestination(onHome);
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
       <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
@@ -33,7 +35,8 @@ export function PricingPage({
       />
       <main className="relative z-10 flex-1">
         <PricingContent
-          onBack={onHome}
+          onBack={back.goBack}
+          backLabel={back.label}
           onLaunch={onLaunch}
           onRefunds={onNavigate ? () => onNavigate('refunds') : undefined}
           onBrokers={onBrokers}

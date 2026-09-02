@@ -1,6 +1,7 @@
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import { SupportTicketsContent } from '../components/support/SupportTicketsContent';
 import type { ExtraNavRoute } from '../hooks/useRoute';
+import { useBackDestination } from '../hooks/useBackDestination';
 
 interface SupportPageProps {
   onHome: () => void;
@@ -21,6 +22,7 @@ export function SupportPage({
   onGuides,
   onNavigate,
 }: SupportPageProps) {
+  const back = useBackDestination(onHome);
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
       <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
@@ -28,8 +30,8 @@ export function SupportPage({
 
       <main className="relative z-10 flex-1 w-full">
         <SupportTicketsContent
-          onBack={onHome}
-          backLabel="Back to home"
+          onBack={back.goBack}
+          backLabel={back.label}
           onSignIn={onLaunch}
           heading="Support"
           intro="Open a ticket and talk to a person. Billing, memberships, broker connections — anything. Replies arrive right here, and the thread stays with your account."

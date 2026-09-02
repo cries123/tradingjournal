@@ -1,6 +1,7 @@
 import { Construction } from 'lucide-react';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import type { ExtraNavRoute } from '../hooks/useRoute';
+import { BackLink } from '../components/BackLink';
 
 interface ComingSoonPageProps {
   feature: string;
@@ -51,13 +52,7 @@ export function ComingSoonPage({
             <button type="button" onClick={onLaunch} className="btn-primary text-sm px-6 py-3">
               Open your journal
             </button>
-            <button
-              type="button"
-              onClick={onHome}
-              className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors px-6 py-3"
-            >
-              Back to home
-            </button>
+        <BackLink onHome={onHome} className="mb-8" />
           </div>
         </div>
       </main>
