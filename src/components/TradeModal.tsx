@@ -5,6 +5,7 @@ import type { Trade, TradeGrade, TradeSide, AssetClass } from '../types';
 import { compressImage } from '../utils/compressImage';
 import { buildTradingViewReplayUrl } from '../utils/tradingView';
 import { useEscapeToClose } from '../hooks/useEscapeToClose';
+import { readTradeForm } from '../utils/tradeFormValues';
 
 interface TradeModalProps {
   trade?: Trade;
@@ -45,17 +46,29 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
   const [ivRank, setIvRank] = useState(trade?.ivRank != null ? String(trade.ivRank) : '');
   const [imageUrls, setImageUrls] = useState<string[]>(trade?.imageUrls ?? []);
   const [chartUrl, setChartUrl] = useState(trade?.chartUrl ?? '');
+  /* Errors appear only once someone has tried to save. Marking a field red while it is still
+     being typed into is nagging, not help. */
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   // Field state is seeded straight from `trade` above. The parent remounts this
   // component (via `key={trade?.id ?? 'new'}`) whenever it switches which trade
   // is being edited, so the initializers above are all that's needed — no effect
   // resyncing state from props on every render.
 
-  const parseOptNum = (v: string) => {
-    if (!v.trim()) return undefined;
-    const n = parseFloat(v);
-    return Number.isNaN(n) ? undefined : n;
-  };
+  const reading = readTradeForm({
+    symbol, pnl, grossPnl, fees, mae, mfe, rMultiple, checklistScore, ivRank,
+  });
+  const { derivedNet, netRaw, errors } = reading;
+
+  /** So collapsing Advanced does not hide the fact that something is in there. */
+  const advancedFilled = [
+    extraTags, strategyId, grossPnl, fees, entryTime, exitTime,
+    mae, mfe, rMultiple, grade, checklistScore, assetClass, chartUrl,
+  ].filter((v) => String(v).trim()).length + imageUrls.length;
+
+  /* Errors stay quiet until someone has actually tried to save. Marking a field red while it is
+     still being typed into is nagging, not help. */
+  const show = (error?: string) => (submitAttempted ? error : undefined);
 
   const handleImageUpload = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -75,12 +88,18 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    let pnlValue = parseFloat(pnl);
-    if (!symbol || Number.isNaN(pnlValue)) return;
+    setSubmitAttempted(true);
 
-    const feesVal = parseOptNum(fees);
-    const grossVal = parseOptNum(grossPnl);
-    if (grossVal != null && feesVal != null) pnlValue = grossVal - feesVal;
+    /* Previously this returned with no explanation, so the Save button simply did nothing and left
+       the person to guess which field it disliked. */
+    if (!reading.canSave || reading.net === null) {
+      if (reading.advancedErrorCount > 0) setShowAdvanced(true);
+      return;
+    }
+
+    const pnlValue = reading.net;
+    const feesVal = reading.values.fees;
+    const grossVal = reading.values.gross;
 
     const tags = extraTags
       .split(',')
@@ -90,7 +109,7 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
 
     const payload: Omit<Trade, 'id'> = {
       date,
-      symbol: symbol.toUpperCase(),
+      symbol: symbol.trim().toUpperCase(),
       pnl: pnlValue,
       setup: setup || undefined,
       side,
@@ -101,13 +120,13 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
       grossPnl: grossVal,
       entryTime: entryTime || undefined,
       exitTime: exitTime || undefined,
-      mae: parseOptNum(mae),
-      mfe: parseOptNum(mfe),
-      rMultiple: parseOptNum(rMultiple),
+      mae: reading.values.mae,
+      mfe: reading.values.mfe,
+      rMultiple: reading.values.rMultiple,
       grade: grade || undefined,
-      checklistScore: parseOptNum(checklistScore),
+      checklistScore: reading.values.checklistScore,
       assetClass: assetClass || undefined,
-      ivRank: parseOptNum(ivRank),
+      ivRank: reading.values.ivRank,
       imageUrls: imageUrls.length ? imageUrls : undefined,
       chartUrl: chartUrl.trim() || undefined,
       accountId: trade?.accountId,
@@ -156,11 +175,44 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
           <Field label="Date">
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input-field" required />
           </Field>
-          <Field label="Symbol">
-            <input type="text" value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder="SPY" className="input-field" required />
+          <Field label="Symbol" error={show(errors.symbol)}>
+            {/* iOS autocorrects tickers into words, and lower case only becomes upper on save, so
+                the field disagreed with the trade it was about to write. */}
+            <input
+              type="text"
+              value={symbol}
+              onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+              placeholder="SPY"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              autoComplete="off"
+              spellCheck={false}
+              aria-invalid={Boolean(show(errors.symbol))}
+              className={inputClass(show(errors.symbol))}
+            />
           </Field>
-          <Field label="Net P/L ($)">
-            <input type="number" step="0.01" value={pnl} onChange={(e) => setPnl(e.target.value)} placeholder="260.00 or -1274.22" className="input-field" required />
+          <Field
+            label="Net P/L ($)"
+            hint={derivedNet !== null ? undefined : 'Minus sign for a loss, e.g. -1274.22'}
+            error={show(errors.pnl)}
+          >
+            <input
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              value={netRaw}
+              onChange={(e) => setPnl(e.target.value)}
+              readOnly={derivedNet !== null}
+              placeholder="260.00"
+              aria-invalid={Boolean(show(errors.pnl))}
+              className={inputClass(show(errors.pnl), derivedNet !== null)}
+            />
+            {derivedNet !== null && (
+              <p className="text-[11px] text-text-secondary mt-1">
+                Gross {reading.values.gross?.toFixed(2)} &minus; fees {reading.values.fees?.toFixed(2)}. Clear
+                either to type this yourself.
+              </p>
+            )}
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Setup / Tag">
@@ -189,6 +241,14 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
           >
             <ChevronDown size={14} className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
             Advanced details
+            {!showAdvanced && advancedFilled > 0 && (
+              <span className="text-text-secondary">· {advancedFilled} filled</span>
+            )}
+            {submitAttempted && reading.advancedErrorCount > 0 && (
+              <span className="text-rose-300">
+                · {reading.advancedErrorCount} need{reading.advancedErrorCount === 1 ? 's' : ''} fixing
+              </span>
+            )}
           </button>
 
           {showAdvanced && (
@@ -207,13 +267,14 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
                 </Field>
               )}
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Gross P/L">
-                  <input type="number" step="0.01" value={grossPnl} onChange={(e) => setGrossPnl(e.target.value)} className="input-field" />
-                </Field>
-                <Field label="Fees">
-                  <input type="number" step="0.01" value={fees} onChange={(e) => setFees(e.target.value)} className="input-field" />
-                </Field>
+                <NumericField label="Gross P/L" value={grossPnl} onChange={setGrossPnl} error={show(errors.grossPnl)} placeholder="300.00" />
+                <NumericField label="Fees" value={fees} onChange={setFees} error={show(errors.fees)} placeholder="5.00" />
               </div>
+              {derivedNet !== null && (
+                <p className="text-[11px] text-text-secondary -mt-1">
+                  Net P/L above is now {derivedNet.toFixed(2)}, computed from these two.
+                </p>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Entry time">
                   <input type="time" value={entryTime} onChange={(e) => setEntryTime(e.target.value)} className="input-field" />
@@ -222,18 +283,14 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
                   <input type="time" value={exitTime} onChange={(e) => setExitTime(e.target.value)} className="input-field" />
                 </Field>
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                <Field label="MAE $">
-                  <input type="number" step="0.01" value={mae} onChange={(e) => setMae(e.target.value)} className="input-field" />
-                </Field>
-                <Field label="MFE $">
-                  <input type="number" step="0.01" value={mfe} onChange={(e) => setMfe(e.target.value)} className="input-field" />
-                </Field>
-                <Field label="R multiple">
-                  <input type="number" step="0.1" value={rMultiple} onChange={(e) => setRMultiple(e.target.value)} className="input-field" />
-                </Field>
+              {/* Stacked on a phone: three number boxes across a 390px screen left no room for the
+                  labels, let alone for saying what the acronyms mean. */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-2">
+                <NumericField label="MAE $" hint="Worst it went against you" value={mae} onChange={setMae} error={show(errors.mae)} />
+                <NumericField label="MFE $" hint="Best it got before you closed" value={mfe} onChange={setMfe} error={show(errors.mfe)} />
+                <NumericField label="R multiple" hint="Result ÷ risk" value={rMultiple} onChange={setRMultiple} error={show(errors.rMultiple)} />
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-2 sm:gap-2">
                 <Field label="Grade">
                   <select value={grade} onChange={(e) => setGrade(e.target.value as TradeGrade | '')} className="input-field">
                     <option value="">—</option>
@@ -242,12 +299,8 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
                     ))}
                   </select>
                 </Field>
-                <Field label="Checklist %">
-                  <input type="number" min={0} max={100} value={checklistScore} onChange={(e) => setChecklistScore(e.target.value)} className="input-field" />
-                </Field>
-                <Field label="IV rank">
-                  <input type="number" min={0} max={100} value={ivRank} onChange={(e) => setIvRank(e.target.value)} className="input-field" />
-                </Field>
+                <NumericField label="Checklist %" value={checklistScore} onChange={setChecklistScore} error={show(errors.checklistScore)} />
+                <NumericField label="IV rank" value={ivRank} onChange={setIvRank} error={show(errors.ivRank)} />
               </div>
               <Field label="Asset class">
                 <select value={assetClass} onChange={(e) => setAssetClass(e.target.value as AssetClass | '')} className="input-field">
@@ -300,11 +353,77 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function inputClass(error?: string, readOnly = false): string {
+  return [
+    'input-field',
+    error ? 'border-rose-400/60' : '',
+    readOnly ? 'opacity-70 cursor-default' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+function Field({
+  label,
+  hint,
+  error,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
   return (
     <label className="block">
       <span className="text-xs text-text-secondary mb-1 block">{label}</span>
       {children}
+      {/* The error replaces the hint rather than stacking under it — two lines of small grey and
+          red text below one input is where a form starts feeling like a tax return. */}
+      {error ? (
+        <p className="text-[11px] text-rose-300 mt-1">{error}</p>
+      ) : hint ? (
+        <p className="text-[11px] text-text-secondary/70 mt-1">{hint}</p>
+      ) : null}
     </label>
+  );
+}
+
+/**
+ * A number a person types.
+ *
+ * `type="number"` was the wrong control for money: it discards a pasted "$1,274.22" without a
+ * word, and its spinner arrows eat width in the three-across rows. Text plus inputMode="decimal"
+ * keeps the numeric keypad on a phone while letting the field hold what someone actually pasted,
+ * and parseMoneyInput does the reading.
+ */
+function NumericField({
+  label,
+  hint,
+  value,
+  onChange,
+  error,
+  placeholder,
+}: {
+  label: string;
+  hint?: string;
+  value: string;
+  onChange: (next: string) => void;
+  error?: string;
+  placeholder?: string;
+}) {
+  return (
+    <Field label={label} hint={hint} error={error}>
+      <input
+        type="text"
+        inputMode="decimal"
+        autoComplete="off"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-invalid={Boolean(error)}
+        className={inputClass(error)}
+      />
+    </Field>
   );
 }
