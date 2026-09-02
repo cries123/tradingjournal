@@ -137,7 +137,7 @@ export function LandingPage({
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
       {/* reactive={false}: the landing page keeps its fixed emerald/blue brand look regardless of
           which Theme accent a signed-in user has picked in Settings — same reasoning as the logo. */}
-      <Starfield reactive={false} />
+      <Starfield reactive={false} drift />
       <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
       <AnnouncementBar />
       <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate} />

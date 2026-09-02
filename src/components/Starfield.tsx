@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { depthFor, driftedPosition, sway } from '../utils/starDrift';
 
 interface Star {
   x: number;
@@ -8,6 +9,8 @@ interface Star {
   twinkle: boolean;
   phase: number;
   speed: number;
+  /** Parallax factor from the radius — see depthFor. */
+  depth: number;
 }
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -48,6 +51,17 @@ interface StarfieldProps {
    * regardless of what a signed-in user later picks, same reasoning as the logo staying fixed.
    */
   reactive?: boolean;
+  /**
+   * Slowly drifts the field, for the landing page only.
+   *
+   * Off everywhere else on purpose. Behind a journal the background is a backdrop to numbers
+   * someone is reading, and drift in the corner of the eye pulls attention off the thing they came
+   * for. The landing page is the one surface where the backdrop is allowed to be the point.
+   *
+   * Ignored under prefers-reduced-motion, along with the twinkle — the field renders one static
+   * frame there, exactly as before.
+   */
+  drift?: boolean;
 }
 
 /**
@@ -58,11 +72,13 @@ interface StarfieldProps {
  * Purely decorative: fixed position, zero layout footprint (doesn't affect any surrounding
  * layout), pointer-events disabled, and freezes to a static frame under prefers-reduced-motion.
  */
-export function Starfield({ reactive = true, subtle = false }: StarfieldProps) {
+export function Starfield({ reactive = true, subtle = false, drift = false }: StarfieldProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const starsRef = useRef<Star[]>([]);
   const colorsRef = useRef<[string, string]>(['#34d399', '#38bdf8']);
   const rafRef = useRef<number | null>(null);
+  /** Last frame's timestamp, so a resize redraws where the field actually is. */
+  const lastTRef = useRef(0);
 
   useEffect(() => {
     const canvasEl = canvasRef.current;
@@ -88,14 +104,16 @@ export function Starfield({ reactive = true, subtle = false }: StarfieldProps) {
       const count = Math.round((w * h) / (subtle ? 11000 : 4200));
       const stars: Star[] = [];
       for (let i = 0; i < count; i++) {
+        const r = 0.4 + Math.random() * 1.3;
         stars.push({
           x: Math.random(),
           y: Math.random(),
-          r: 0.4 + Math.random() * 1.3,
+          r,
           base: 0.18 + Math.random() * 0.55,
           twinkle: Math.random() < 0.18,
           phase: Math.random() * Math.PI * 2,
           speed: 0.6 + Math.random() * 1.1,
+          depth: depthFor(r),
         });
       }
       starsRef.current = stars;
@@ -106,16 +124,30 @@ export function Starfield({ reactive = true, subtle = false }: StarfieldProps) {
       const h = window.innerHeight;
       ctx.clearRect(0, 0, w, h);
 
+      // One switch for every kind of movement below, so reduced motion cannot be honoured in one
+      // place and forgotten in another.
+      const moving = drift && !reduceMotion;
+      // The glows and the constellation lines sit relative to the corners, so they sway a few
+      // pixels rather than travelling — drifting them would walk them out of frame. Different
+      // periods, or the two glows would breathe in lockstep and read as the page pulsing.
+      const glowSwayX = moving ? sway(t, 190, w * 0.02) : 0;
+      const glowSwayY = moving ? sway(t, 240, h * 0.015, 1.1) : 0;
+      const lineSway = moving ? sway(t, 160, Math.min(w, h) * 0.006, 0.6) : 0;
+
       const [pr, pg, pb] = hexToRgb(colorsRef.current[0]);
       const [ar, ag, ab] = hexToRgb(colorsRef.current[1]);
 
-      const g1 = ctx.createRadialGradient(w * 0.12, h * 0.08, 0, w * 0.12, h * 0.08, Math.max(w, h) * 0.5);
+      const g1x = w * 0.12 + glowSwayX;
+      const g1y = h * 0.08 + glowSwayY;
+      const g1 = ctx.createRadialGradient(g1x, g1y, 0, g1x, g1y, Math.max(w, h) * 0.5);
       g1.addColorStop(0, `rgba(${pr},${pg},${pb},0.14)`);
       g1.addColorStop(1, `rgba(${pr},${pg},${pb},0)`);
       ctx.fillStyle = g1;
       ctx.fillRect(0, 0, w, h);
 
-      const g2 = ctx.createRadialGradient(w * 0.92, h * 0.85, 0, w * 0.92, h * 0.85, Math.max(w, h) * 0.45);
+      const g2x = w * 0.92 - glowSwayX;
+      const g2y = h * 0.85 - glowSwayY;
+      const g2 = ctx.createRadialGradient(g2x, g2y, 0, g2x, g2y, Math.max(w, h) * 0.45);
       g2.addColorStop(0, `rgba(${ar},${ag},${ab},0.1)`);
       g2.addColorStop(1, `rgba(${ar},${ag},${ab},0)`);
       ctx.fillStyle = g2;
@@ -125,8 +157,8 @@ export function Starfield({ reactive = true, subtle = false }: StarfieldProps) {
       ctx.lineWidth = 1;
       LINES.forEach(([x1, y1, x2, y2]) => {
         ctx.beginPath();
-        ctx.moveTo(x1 * w, y1 * h);
-        ctx.lineTo(x2 * w, y2 * h);
+        ctx.moveTo(x1 * w + lineSway, y1 * h - lineSway);
+        ctx.lineTo(x2 * w + lineSway, y2 * h - lineSway);
         ctx.stroke();
       });
 
@@ -136,9 +168,10 @@ export function Starfield({ reactive = true, subtle = false }: StarfieldProps) {
           a = s.base + Math.sin(t * 0.001 * s.speed + s.phase) * 0.35;
           if (a < 0.05) a = 0.05;
         }
+        const at = moving ? driftedPosition(s, t, w, h) : s;
         ctx.beginPath();
         ctx.fillStyle = `rgba(241,245,249,${a.toFixed(3)})`;
-        ctx.arc(s.x * w, s.y * h, s.r, 0, Math.PI * 2);
+        ctx.arc(at.x * w, at.y * h, s.r, 0, Math.PI * 2);
         ctx.fill();
       });
     }
@@ -153,7 +186,9 @@ export function Starfield({ reactive = true, subtle = false }: StarfieldProps) {
       canvas.style.height = `${h}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       seed(w, h);
-      draw(0);
+      // The frame's own clock, not zero: redrawing at t=0 mid-drift would jump the whole field
+      // back to where it started and then jump forward again on the next frame.
+      draw(lastTRef.current);
     }
 
     refreshColors();
@@ -167,12 +202,13 @@ export function Starfield({ reactive = true, subtle = false }: StarfieldProps) {
     if (reactive) {
       observer = new MutationObserver(() => {
         refreshColors();
-        if (reduceMotion) draw(0);
+        if (reduceMotion) draw(lastTRef.current);
       });
       observer.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
     }
 
     function loop(t: number) {
+      lastTRef.current = t;
       draw(t);
       rafRef.current = requestAnimationFrame(loop);
     }
@@ -185,7 +221,7 @@ export function Starfield({ reactive = true, subtle = false }: StarfieldProps) {
       observer?.disconnect();
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [reactive, subtle]);
+  }, [reactive, subtle, drift]);
 
   return (
     <canvas
