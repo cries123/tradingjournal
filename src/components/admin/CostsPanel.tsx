@@ -1,4 +1,4 @@
-import { AlertTriangle, TrendingDown } from 'lucide-react';
+import { AlertTriangle, Receipt, TrendingDown } from 'lucide-react';
 import { TIER_PLANS, PAID_TIERS } from '../../config/tiers';
 import { worstCaseMonthlyCost } from '../../config/costs';
 import type { CostReport } from '../../services/adminCosts';
@@ -159,6 +159,40 @@ export function CostsPanel({ report, error }: CostsPanelProps) {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Who actually paid */}
+      <div>
+        <h3 className="text-sm font-semibold mb-1">Purchases</h3>
+        <p className="text-xs text-text-secondary mb-3">
+          Every payment Creem has charged since the ledger started, newest first. Hand-granted
+          tiers never appear here — nobody paid for one.
+        </p>
+        {report.purchases.length === 0 ? (
+          <div className="glass-card rounded-xl p-6 text-center text-xs text-text-secondary">
+            No payments recorded yet. Sales made before the ledger existed are not in here.
+          </div>
+        ) : (
+          <div className="glass-card rounded-xl divide-y divide-border/30">
+            {report.purchases.map((p) => (
+              <div key={`${p.uid}-${p.at}`} className="flex items-center gap-3 px-4 py-2.5 text-xs">
+                <Receipt size={13} className="text-emerald-400 shrink-0" />
+                <span className="truncate flex-1 min-w-0">
+                  {p.email || <span className="font-mono text-text-secondary">{p.uid}</span>}
+                </span>
+                <span className="uppercase tracking-wide text-text-secondary shrink-0">
+                  {p.tier}
+                </span>
+                <span className="text-text-secondary tabular-nums shrink-0 hidden sm:inline">
+                  {p.at ? new Date(p.at).toLocaleDateString() : ''}
+                </span>
+                <span className="font-semibold tabular-nums w-14 text-right shrink-0 text-emerald-400">
+                  {money(p.amount)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* The number that decides a discount */}

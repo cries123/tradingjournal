@@ -5,6 +5,7 @@ import { readEntitlement, writeEntitlement } from './entitlements';
 import { isTier, TIER_PLANS, type Tier } from '../src/config/tiers';
 
 export type AdminUserAction =
+  | 'readUsage'
   | 'updateEmail'
   | 'updatePassword'
   | 'deleteUser'
@@ -144,6 +145,45 @@ async function handleClearTierGrant(targetUid: string) {
   return { message: 'Grant removed — back to Free' };
 }
 
+/**
+ * How much of the metered features one person has actually used.
+ *
+ * The usage counters are one document per user per day and server-only by rule, so the admin panel
+ * could show what somebody is entitled to but never what they had spent — which is the number that
+ * says whether a heavy user is costing money or a paid tier is going unused.
+ */
+async function handleReadUsage(targetUid: string) {
+  const db = getAdminFirestore();
+  const since = new Date();
+  since.setDate(since.getDate() - 30);
+  const cutoff = since.toISOString().slice(0, 10);
+
+  const read = async (collection: string) => {
+    const snap = await db.collection(collection).where('uid', '==', targetUid).get();
+    let total = 0;
+    let last30 = 0;
+    let lastDay: string | null = null;
+
+    for (const doc of snap.docs) {
+      const data = doc.data() as { count?: number; day?: string };
+      const n = typeof data.count === 'number' && data.count > 0 ? data.count : 0;
+      if (n === 0) continue;
+      total += n;
+      if (data.day && data.day >= cutoff) last30 += n;
+      if (data.day && (!lastDay || data.day > lastDay)) lastDay = data.day;
+    }
+    return { total, last30, lastDay };
+  };
+
+  const [syncs, ai, takeaways] = await Promise.all([
+    read('syncUsage'),
+    read('aiUsage'),
+    read('takeawayUsage'),
+  ]);
+
+  return { usage: { syncs, ai, takeaways } };
+}
+
 export async function handleAdminUserRequest(
   headers: IncomingHttpHeaders,
   body: AdminUserRequestBody,
@@ -189,6 +229,10 @@ export async function handleAdminUserRequest(
       }
       case 'clearTierGrant': {
         const result = await handleClearTierGrant(targetUid);
+        return { statusCode: 200, body: { ok: true, ...result } };
+      }
+      case 'readUsage': {
+        const result = await handleReadUsage(targetUid);
         return { statusCode: 200, body: { ok: true, ...result } };
       }
       default:

@@ -71,6 +71,7 @@ import {
 import { SupportTicketsPanel } from '../components/admin/SupportTicketsPanel';
 import { ErrorEventsPanel } from '../components/admin/ErrorEventsPanel';
 import { CostsPanel } from '../components/admin/CostsPanel';
+import { BrokerStatusPanel } from '../components/admin/BrokerStatusPanel';
 import { fetchCostReport, type CostReport } from '../services/adminCosts';
 import {
   fetchAllHelpArticles,
@@ -2131,6 +2132,12 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                 </div>
               )}
               </>
+            )}
+
+            {tab === 'content' && user && (
+              <div className="mb-8">
+                <BrokerStatusPanel adminUid={user.uid} />
+              </div>
             )}
 
             {tab === 'content' && (

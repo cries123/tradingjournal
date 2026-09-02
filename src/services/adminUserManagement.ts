@@ -38,6 +38,47 @@ async function adminApiPost(payload: {
   return { ok: true, message: data.message ?? 'Done' };
 }
 
+export interface UserUsageCounts {
+  total: number;
+  last30: number;
+  lastDay: string | null;
+}
+
+export interface UserUsage {
+  syncs: UserUsageCounts;
+  ai: UserUsageCounts;
+  takeaways: UserUsageCounts;
+}
+
+/**
+ * What one person has actually spent of their metered allowances.
+ *
+ * Served from the admin function rather than read directly: the usage counters are server-only by
+ * rule, because a client that could read them could read everybody's.
+ */
+export async function adminReadUserUsage(targetUid: string): Promise<UserUsage | null> {
+  if (!isFirebaseConfigured()) return null;
+
+  const user = getFirebaseAuth().currentUser;
+  if (!user) return null;
+
+  try {
+    const res = await fetch('/api/admin-user', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${await user.getIdToken()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'readUsage', targetUid }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { usage?: UserUsage };
+    return data.usage ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Sends Firebase's standard password reset email to the user. */
 export async function adminSendPasswordResetEmail(email: string): Promise<void> {
   if (!isFirebaseConfigured()) {

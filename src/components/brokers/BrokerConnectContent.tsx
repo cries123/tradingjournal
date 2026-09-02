@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, CheckCircle2, ExternalLink, Link2, Loader2, RefreshCw, Unlink } from 'lucide-react';
 import { BrokerLogo } from './BrokerLogo';
 import { useEntitlement } from '../../context/useEntitlement';
@@ -15,6 +15,11 @@ import {
   type BrokerStatus,
   type SupportedBroker,
 } from '../../services/brokerConnect';
+import {
+  applyBrokerStatusOverrides,
+  type BrokerStatusOverrides,
+} from '../../data/brokerStatusOverrides';
+import { subscribeToBrokerStatus } from '../../services/brokerStatus';
 import {
   BROKER_REGISTRY,
   isBrokerDown,
@@ -85,19 +90,21 @@ function defaultSteps(name: string): string[] {
   ];
 }
 
-const BROKER_COPY: BrokerCardCopy[] = BROKER_REGISTRY.map((entry) => {
-  const custom = CUSTOM_COPY[entry.key];
-  return {
-    key: entry.key,
-    entry,
-    name: custom?.name ?? entry.name,
-    shortName: custom?.shortName,
-    brokerId: entry.brokerId,
-    access: custom?.access ?? entry.access,
-    steps: custom?.steps ?? defaultSteps(entry.name),
-    note: custom?.note ?? `This is a read-only connection — it can pull your ${entry.name} trade history, but can’t place trades.`,
-  };
-});
+function buildBrokerCopy(registry: typeof BROKER_REGISTRY): BrokerCardCopy[] {
+  return registry.map((entry) => {
+    const custom = CUSTOM_COPY[entry.key];
+    return {
+      key: entry.key,
+      entry,
+      name: custom?.name ?? entry.name,
+      shortName: custom?.shortName,
+      brokerId: entry.brokerId,
+      access: custom?.access ?? entry.access,
+      steps: custom?.steps ?? defaultSteps(entry.name),
+      note: custom?.note ?? `This is a read-only connection — it can pull your ${entry.name} trade history, but can’t place trades.`,
+    };
+  });
+}
 
 interface BrokerConnectContentProps {
   onBack: () => void;
@@ -122,6 +129,17 @@ export function BrokerConnectContent({
   journalReady = true,
 }: BrokerConnectContentProps) {
   const { user, loading, firebaseEnabled } = useAuth();
+
+  /* Availability comes from Firestore so it can be flipped from the admin panel without a deploy.
+     Live, because a broker coming back up mid-session should unlock the card without a reload. */
+  const [statusOverrides, setStatusOverrides] = useState<BrokerStatusOverrides>({});
+
+  useEffect(() => subscribeToBrokerStatus(setStatusOverrides), []);
+
+  const brokerCopy = useMemo(
+    () => buildBrokerCopy(applyBrokerStatusOverrides(statusOverrides)),
+    [statusOverrides],
+  );
   const { noteUsage, limits, tier, usage, refresh } = useEntitlement();
   const [available, setAvailable] = useState<boolean | null>(null);
   const [status, setStatus] = useState<{ registered: boolean; accounts: BrokerAccountSummary[] } | null>(null);
@@ -380,7 +398,7 @@ export function BrokerConnectContent({
         )}
 
         <div className="space-y-5">
-          {BROKER_COPY.map((broker) => {
+          {brokerCopy.map((broker) => {
             const accounts = accountsForInstitution(broker.entry);
             const isConnected = accounts.length > 0;
 

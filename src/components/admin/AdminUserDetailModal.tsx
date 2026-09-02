@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Flag, KeyRound, Mail, Trash2, User, X } from 'lucide-react';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { AdminUserPlanSection } from './AdminUserPlanSection';
@@ -10,6 +10,8 @@ import {
   adminSendPasswordResetEmail,
   adminUpdateUserEmail,
   adminUpdateUserPassword,
+  adminReadUserUsage,
+  type UserUsage,
 } from '../../services/adminUserManagement';
 import { formatCurrency } from '../../utils/format';
 import { useEscapeToClose } from '../../hooks/useEscapeToClose';
@@ -112,6 +114,20 @@ export function AdminUserDetailModal({
     }
   };
 
+  /* Metered usage is server-only by rule, so it is fetched on open rather than carried on the
+     summary row — and only for the one person being looked at, which keeps it to one query. */
+  const [usage, setUsage] = useState<UserUsage | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void adminReadUserUsage(user.uid).then((u) => {
+      if (!cancelled) setUsage(u);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user.uid]);
+
   return (
     <>
       <div
@@ -168,6 +184,35 @@ export function AdminUserDetailModal({
                 )}
                 {user.tradesSessionLast7Days > 0 && user.tradesSavedLast7Days === 0 && (
                   <span className="text-text-secondary"> · {user.tradesSessionLast7Days} session trades in last 7 days</span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-text-secondary uppercase tracking-wider">Usage</dt>
+              <dd className="mt-0.5">
+                {usage === null ? (
+                  <span className="text-text-secondary">Loading…</span>
+                ) : usage.syncs.total === 0 && usage.ai.total === 0 ? (
+                  <span className="text-text-secondary">Never synced or used the assistant</span>
+                ) : (
+                  <>
+                    {usage.syncs.total} broker sync{usage.syncs.total === 1 ? '' : 's'}
+                    {usage.syncs.last30 > 0 && (
+                      <span className="text-text-secondary"> ({usage.syncs.last30} in 30d)</span>
+                    )}
+                    {usage.ai.total > 0 && (
+                      <>
+                        {' · '}
+                        {usage.ai.total} AI message{usage.ai.total === 1 ? '' : 's'}
+                        {usage.ai.last30 > 0 && (
+                          <span className="text-text-secondary"> ({usage.ai.last30} in 30d)</span>
+                        )}
+                      </>
+                    )}
+                    {usage.syncs.lastDay && (
+                      <span className="text-text-secondary"> · last sync {usage.syncs.lastDay}</span>
+                    )}
+                  </>
                 )}
               </dd>
             </div>

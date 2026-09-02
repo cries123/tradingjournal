@@ -71,6 +71,19 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    /*
+     * Broker availability, flipped from the admin panel instead of by deploying a code change.
+     *
+     * Public read because every visitor's connect page renders it — and a visitor who cannot read
+     * it would be shown a connect button for a broker that is known to be down. Admin-only write
+     * because the message is displayed to users in the product's own voice, and 'down' blocks a
+     * feature people pay for.
+     */
+    match /config/brokerStatus {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /config/admin {
       allow read: if request.auth != null;
       allow create: if request.auth != null

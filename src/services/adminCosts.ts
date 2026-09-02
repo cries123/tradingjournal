@@ -15,6 +15,7 @@ export interface CostReport {
   mrrNow: number;
   subscribers: number;
   topUsers: { uid: string; aiMessages: number; syncs: number; cost: number }[];
+  purchases: { uid: string; email: string; tier: string; amount: number; at: string }[];
   warning: string | null;
 }
 

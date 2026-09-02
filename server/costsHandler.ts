@@ -2,6 +2,7 @@ import { assertCallerIsAdmin, AdminRequestError, getBearerToken } from './adminA
 import { getAdminFirestore } from './firebaseAdmin';
 import { logServerError } from './errorReports';
 import { readMonthRevenue } from './billingLedger';
+import { getAdminAuth } from './firebaseAdmin';
 import {
   COST_RATES,
   launchMonth,
@@ -54,6 +55,8 @@ export interface CostReport {
   /** How many people that run rate comes from. */
   subscribers: number;
   topUsers: { uid: string; aiMessages: number; syncs: number; cost: number }[];
+  /** Who bought what, newest first. Straight from the ledger, so it is money, not entitlement. */
+  purchases: { uid: string; email: string; tier: string; amount: number; at: string }[];
   /** Set when a month could not be read, so a low total is never mistaken for a cheap month. */
   warning: string | null;
 }
@@ -185,14 +188,53 @@ async function readConnectedNow(): Promise<number> {
   }).length;
 }
 
+/**
+ * Recent purchases, with a name attached.
+ *
+ * The ledger stores a uid because that is what the webhook has; a uid is useless to read. Emails
+ * are looked up in one batched call rather than one per row.
+ */
+async function readPurchases(limit = 50) {
+  const snap = await getAdminFirestore()
+    .collection('billingCharges')
+    .orderBy('at', 'desc')
+    .limit(limit)
+    .get();
+
+  const rows = snap.docs.map((d) => {
+    const data = d.data() as { uid?: string; tier?: string; amount?: number; at?: string };
+    return {
+      uid: data.uid ?? '',
+      tier: data.tier ?? 'unknown',
+      amount: typeof data.amount === 'number' ? data.amount : 0,
+      at: data.at ?? '',
+      email: '',
+    };
+  });
+
+  const uids = [...new Set(rows.map((r) => r.uid).filter(Boolean))].slice(0, 100);
+  if (uids.length === 0) return rows;
+
+  try {
+    const found = await getAdminAuth().getUsers(uids.map((uid) => ({ uid })));
+    const byUid = new Map(found.users.map((u) => [u.uid, u.email ?? '']));
+    for (const row of rows) row.email = byUid.get(row.uid) ?? '';
+  } catch {
+    // A deleted account has no email left to show. The uid still identifies the sale.
+  }
+
+  return rows;
+}
+
 export async function buildCostReport(): Promise<CostReport> {
   const db = getAdminFirestore();
   const thisMonth = monthKey(new Date());
   const from = launchMonth() || EARLIEST_MONTH;
 
-  const [{ mrr, subscribers }, connectedNow] = await Promise.all([
+  const [{ mrr, subscribers }, connectedNow, purchases] = await Promise.all([
     readSubscriptionRunRate().catch(() => ({ mrr: 0, subscribers: 0 })),
     readConnectedNow().catch(() => 0),
+    readPurchases().catch(() => []),
   ]);
 
   const months: MonthCosts[] = [];
@@ -276,6 +318,7 @@ export async function buildCostReport(): Promise<CostReport> {
     mrrNow: mrr,
     subscribers,
     topUsers: ranked,
+    purchases,
     warning,
   };
 }

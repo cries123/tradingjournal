@@ -5,6 +5,11 @@ import { getSnaptrade, resolveBrokerSlug, SNAPTRADE_CONFIGURED } from './snaptra
 import { getAdminFirestore } from './firebaseAdmin';
 import { mapSnapTradeActivitiesToTrades, type SnapTradeActivityLike } from './mapSnapTradeActivities';
 import { BROKER_REGISTRY, brokerRegistryEntry, isBrokerRegistryKey } from '../src/data/brokerRegistry';
+import {
+  BROKER_STATUS_DOC,
+  parseBrokerStatusOverrides,
+  resolveBrokerStatus,
+} from '../src/data/brokerStatusOverrides';
 import { resolveAccess } from './entitlements';
 import { consumeDaily, refundDaily } from './usage';
 import { describeHttpError, isRejectedCredential, isUpstreamOutage } from './upstreamErrors';
@@ -221,6 +226,27 @@ async function countConnections(creds: SnaptradeCreds): Promise<number> {
   ).size;
 }
 
+/**
+ * The admin's broker availability overrides, read fresh on each connect attempt.
+ *
+ * Not cached: the whole point of moving this out of the registry is that it changes while the app
+ * is running, and a cached value would mean flipping a broker back on still needs a deploy — just
+ * a slower one. It is a single document read on an action that already makes several network
+ * calls, so the cost is noise.
+ *
+ * Unreadable means "no overrides", never "everything is down": a Firestore blip must not take
+ * every broker offline.
+ */
+async function readBrokerStatusOverrides() {
+  try {
+    const snap = await getAdminFirestore().doc(BROKER_STATUS_DOC).get();
+    return parseBrokerStatusOverrides(snap.data()?.brokers);
+  } catch (err) {
+    console.error('[broker-connect] could not read broker status overrides:', err);
+    return {};
+  }
+}
+
 async function handleConnect(uid: string, broker?: string): Promise<BrokerConnectResult> {
   if (!isBrokerRegistryKey(broker)) {
     const keys = BROKER_REGISTRY.map((b) => b.key).join(', ');
@@ -231,8 +257,11 @@ async function handleConnect(uid: string, broker?: string): Promise<BrokerConnec
   // otherwise start a connection we already know cannot complete — and the user would find that
   // out on a blank page hosted by a company they have never heard of.
   const registryEntry = brokerRegistryEntry(broker);
-  if (registryEntry?.status?.kind === 'down') {
-    throw new BrokerRequestError(registryEntry.status.message, 503);
+  if (registryEntry) {
+    const status = resolveBrokerStatus(registryEntry, await readBrokerStatusOverrides());
+    if (status?.kind === 'down') {
+      throw new BrokerRequestError(status.message, 503);
+    }
   }
 
   const { tier, limits } = await resolveAccess(uid);
