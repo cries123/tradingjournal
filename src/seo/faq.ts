@@ -1,4 +1,5 @@
 import { BROKER_REGISTRY, THINKORSWIM_DISPLAY } from '../data/brokerRegistry';
+import { freeAnswer } from './pricingClaims';
 
 export interface FaqItem {
   question: string;
@@ -46,7 +47,9 @@ export const LANDING_FAQ: FaqItem[] = [
   },
   {
     question: 'Is Trend Chasers a free trading journal?',
-    answer:
-      'Yes. Trend Chasers is a free trading journal with a P&L calendar, performance analytics, optional broker sync, and optional cloud sync. No credit card required.',
+    // Built from the tier table. This answer is emitted as schema.org FAQPage markup, so a stale
+    // version of it is the one Google shows — it said the free plan included performance
+    // analytics and broker sync for as long as both were paid.
+    answer: freeAnswer(),
   },
 ];

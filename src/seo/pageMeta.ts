@@ -13,7 +13,8 @@ export interface PageSeo {
   noindex?: boolean;
 }
 
-const PAGE_SEO: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>, PageSeo> = {
+/** Exported so the pricing-claim test can read every published title and description. */
+export const PAGE_SEO: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>, PageSeo> = {
   landing: {
     title: 'Trend Chasers — Trading Journal & P&L Calendar',
     description:
@@ -51,7 +52,7 @@ const PAGE_SEO: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>, Pa
   },
   terms: {
     title: 'Terms of Service — Trend Chasers',
-    description: 'Terms of use for Trend Chasers, the free trading journal with P&L calendar and broker imports.',
+    description: 'Terms of use for Trend Chasers — the trading journal with a P&L calendar, free manual logging, and optional paid broker sync.',
     path: '/terms',
   },
   'report-bug': {

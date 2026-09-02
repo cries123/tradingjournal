@@ -1,4 +1,5 @@
 import { BROKER_COUNT_PHRASE, BROKER_EXAMPLES } from '../data/brokerCopy';
+import { lowestPaidPrice } from './pricingClaims';
 /**
  * What a guide page is for.
  *
@@ -68,21 +69,21 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
     slug: 'free-trading-journal',
     title: 'Free Trading Journal for Active Traders',
     description:
-      'Why a free trading journal helps you track performance, review mistakes, and improve consistency — with automatic broker sync or manual entry.',
+      `Why a free trading journal helps you track performance, review mistakes, and improve consistency — logging by hand free, or broker sync from $${lowestPaidPrice()} a month.`,
     path: '/guides/free-trading-journal',
     sections: [
       {
         heading: 'What makes a good free trading journal?',
         paragraphs: [
           'A trading journal should show your results clearly — not bury them in rows. Trend Chasers is built around a visual P&L calendar so green and red days stand out immediately.',
-          `You get net P&L, win rate, profit factor, and average profit per trade without exporting to another tool. Connect any of ${BROKER_COUNT_PHRASE} to import trades in one tap, or log them manually.`,
+          `You get net P&L, win rate, profit factor, and average profit per trade without exporting to another tool. Log trades manually on any plan, or connect any of ${BROKER_COUNT_PHRASE} on a paid plan to import them in one tap.`,
         ],
       },
       {
         heading: 'Why traders switch from spreadsheets',
         paragraphs: [
           'Spreadsheets work until you skip a week, mis-tag a setup, or lose track of which account a trade belongs to. A dedicated journal keeps daily P&L, tags, and notes tied to each session.',
-          'Trend Chasers is free to start. Optional sign-in syncs your journal across devices, and broker sync keeps it current without any manual work.',
+          `Logging trades by hand is free, with no trade limit — the calendar, the stats, the notes and the tags are all in the free plan, and signing in syncs them across your devices at no cost. Broker sync, which keeps the journal current without you typing anything, is a paid plan from $${lowestPaidPrice()} a month.`,
         ],
       },
     ],
