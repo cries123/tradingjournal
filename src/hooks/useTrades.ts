@@ -15,8 +15,10 @@ import { clearLegacyTradesStorage, clearTrades, loadTrades, saveTrades } from '.
 import { resolveTradeAccountId } from '../utils/accounts';
 import { buildSampleTrades, isSampleTrade } from '../utils/sampleData';
 import { tradeTags } from '../utils/tradeHelpers';
+import { describeJournalWriteError } from '../utils/journalWriteError';
 
-export type SyncStatus = 'loading' | 'local' | 'cloud' | 'syncing';
+/** 'error' means the cloud journal is not working — shown, never guessed at silently. */
+export type SyncStatus = 'loading' | 'local' | 'cloud' | 'syncing' | 'error';
 
 export function useTrades() {
   const { user, firebaseEnabled, loading: authLoading } = useAuth();
@@ -25,6 +27,8 @@ export function useTrades() {
   /** Example trades shown in the UI only — never persisted or synced. */
   const [sampleTrades, setSampleTrades] = useState<Trade[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('loading');
+  /** Why the journal stopped saving, in words a trader can act on. */
+  const [syncError, setSyncError] = useState<string | null>(null);
   const migratedRef = useRef(false);
   const activitySyncedRef = useRef(false);
   const activeUidRef = useRef<string | null>(null);
@@ -88,16 +92,32 @@ export function useTrades() {
         // is the moment there is something true to show.
       }
 
-      unsubscribe = subscribeTrades(uid, (cloudTrades) => {
-        if (cancelled || activeUidRef.current !== uid) return;
-        setTrades(cloudTrades);
-        saveTrades(cloudTrades, uid);
-        setSyncStatus('cloud');
-        if (!activitySyncedRef.current) {
-          activitySyncedRef.current = true;
-          void syncUserTradeActivityFromTrades(uid, cloudTrades);
-        }
-      });
+      unsubscribe = subscribeTrades(
+        uid,
+        (cloudTrades) => {
+          if (cancelled || activeUidRef.current !== uid) return;
+          setTrades(cloudTrades);
+          saveTrades(cloudTrades, uid);
+          setSyncStatus('cloud');
+          setSyncError(null);
+          if (!activitySyncedRef.current) {
+            activitySyncedRef.current = true;
+            // Bookkeeping for the admin list. Caught, because an unguarded floating promise here
+            // rejects into nothing — which is how a denied write became an anonymous unhandled
+            // rejection in the error feed, attributed to the listener that merely started it.
+            void syncUserTradeActivityFromTrades(uid, cloudTrades).catch((error: unknown) => {
+              console.warn('[trades] could not update activity bookkeeping.', error);
+            });
+          }
+        },
+        (error) => {
+          // Without this the listen failure is silent: the callback simply stops firing and the
+          // journal keeps showing its last snapshot as though it were current.
+          if (cancelled || activeUidRef.current !== uid) return;
+          setSyncStatus('error');
+          setSyncError(describeJournalWriteError(error));
+        },
+      );
     };
 
     void setup();
@@ -151,12 +171,32 @@ export function useTrades() {
     setSampleTrades([]);
   }, []);
 
+  /**
+   * Every write to the cloud journal goes through here.
+   *
+   * These were `setSyncStatus('syncing')` followed by a bare await. A rejection left the status on
+   * 'syncing' forever — a spinner that never resolves and never explains itself — and, where the
+   * caller did not await, became an unhandled promise rejection instead of anything a trader could
+   * see. It still rethrows: the caller decides what its own UI says, this decides what the journal
+   * as a whole reports.
+   */
+  const runCloudWrite = useCallback(async <T,>(op: () => Promise<T>): Promise<T> => {
+    setSyncStatus('syncing');
+    setSyncError(null);
+    try {
+      return await op();
+    } catch (error) {
+      setSyncStatus('error');
+      setSyncError(describeJournalWriteError(error));
+      throw error;
+    }
+  }, []);
+
   const persistTrade = useCallback(
     async (trade: Trade) => {
       setSampleTrades([]);
       if (user && firebaseEnabled) {
-        setSyncStatus('syncing');
-        await saveTrade(user.uid, trade);
+        await runCloudWrite(() => saveTrade(user.uid, trade));
       } else {
         setTrades((prev) => {
           const next = [...prev.filter((t) => t.id !== trade.id), trade];
@@ -165,7 +205,7 @@ export function useTrades() {
         });
       }
     },
-    [user, firebaseEnabled],
+    [user, firebaseEnabled, runCloudWrite],
   );
 
   const withAccount = useCallback(
@@ -192,8 +232,7 @@ export function useTrades() {
         id: crypto.randomUUID(),
       }));
       if (user && firebaseEnabled) {
-        setSyncStatus('syncing');
-        await saveTradesBatch(user.uid, withIds);
+        await runCloudWrite(() => saveTradesBatch(user.uid, withIds));
       } else {
         setTrades((prev) => {
           const next = [...prev, ...withIds];
@@ -202,14 +241,13 @@ export function useTrades() {
         });
       }
     },
-    [user, firebaseEnabled, withAccount],
+    [user, firebaseEnabled, withAccount, runCloudWrite],
   );
 
   const deleteTrade = useCallback(
     async (id: string) => {
       if (user && firebaseEnabled) {
-        setSyncStatus('syncing');
-        await deleteTradeDoc(user.uid, id);
+        await runCloudWrite(() => deleteTradeDoc(user.uid, id));
       } else {
         setTrades((prev) => {
           const next = prev.filter((t) => t.id !== id);
@@ -218,7 +256,7 @@ export function useTrades() {
         });
       }
     },
-    [user, firebaseEnabled],
+    [user, firebaseEnabled, runCloudWrite],
   );
 
   /**
@@ -232,8 +270,7 @@ export function useTrades() {
     async (ids: string[]) => {
       if (ids.length === 0) return;
       if (user && firebaseEnabled) {
-        setSyncStatus('syncing');
-        await deleteTradesBatch(user.uid, ids);
+        await runCloudWrite(() => deleteTradesBatch(user.uid, ids));
       } else {
         const toRemove = new Set(ids);
         setTrades((prev) => {
@@ -243,7 +280,7 @@ export function useTrades() {
         });
       }
     },
-    [user, firebaseEnabled],
+    [user, firebaseEnabled, runCloudWrite],
   );
 
   const updateTrade = useCallback(
@@ -258,8 +295,7 @@ export function useTrades() {
     async (backupTrades: Trade[]) => {
       if (backupTrades.length === 0) return;
       if (user && firebaseEnabled) {
-        setSyncStatus('syncing');
-        await saveTradesBatch(user.uid, backupTrades);
+        await runCloudWrite(() => saveTradesBatch(user.uid, backupTrades));
       } else {
         setTrades((prev) => {
           const byId = new Map(prev.map((t) => [t.id, t]));
@@ -272,7 +308,7 @@ export function useTrades() {
         });
       }
     },
-    [user, firebaseEnabled],
+    [user, firebaseEnabled, runCloudWrite],
   );
 
   /**
@@ -296,15 +332,10 @@ export function useTrades() {
     if (toRemove.length === 0) return;
 
     if (user && firebaseEnabled) {
-      setSyncStatus('syncing');
-      try {
-        await deleteTradesBatch(user.uid, toRemove);
-      } catch (err) {
-        // The snapshot listener never fired, so nothing re-set the status — put it back rather
-        // than leaving the dashboard stuck on a spinner forever.
-        setSyncStatus('cloud');
-        throw err;
-      }
+      // Was a hand-rolled version of runCloudWrite that reset the status to 'cloud' on failure —
+      // honest about the spinner, but it reported a journal that had just refused a delete as
+      // healthy. runCloudWrite says what actually happened.
+      await runCloudWrite(() => deleteTradesBatch(user.uid, toRemove));
     } else {
       const removing = new Set(toRemove);
       setTrades((prev) => {
@@ -313,7 +344,7 @@ export function useTrades() {
         return next;
       });
     }
-  }, [user, firebaseEnabled, settings.activeAccountId, trades]);
+  }, [user, firebaseEnabled, settings.activeAccountId, trades, runCloudWrite]);
 
   return {
     trades: filteredTrades,
@@ -332,6 +363,7 @@ export function useTrades() {
     restoreTrades,
     clearAll,
     syncStatus,
+    syncError,
     sampleActive: sampleTrades.length > 0,
     loadSampleData,
     clearSampleData,

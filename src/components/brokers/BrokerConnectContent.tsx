@@ -28,6 +28,8 @@ import {
 } from '../../data/brokerRegistry';
 import type { Trade } from '../../types';
 import { dedupeIncomingTrades } from '../../utils/duplicateTrades';
+import { describeJournalWriteError } from '../../utils/journalWriteError';
+import { reportErrorSilently } from '../../services/errorReporting';
 
 interface BrokerCardCopy {
   key: SupportedBroker;
@@ -108,7 +110,16 @@ function buildBrokerCopy(registry: typeof BROKER_REGISTRY): BrokerCardCopy[] {
 
 interface BrokerConnectContentProps {
   onBack: () => void;
-  onImportTrades: (trades: Trade[]) => void;
+  /**
+   * Returns a promise, and it is awaited.
+   *
+   * This was typed `=> void` while the implementation was async, so the call below was a floating
+   * promise: the "Imported N trades" message was shown before the write had happened and whether
+   * or not it succeeded, and a failure rejected into nothing instead of into the catch a few lines
+   * further down. A trader whose journal could not accept the write saw a success message, a sync
+   * deducted from their daily allowance, and no trades.
+   */
+  onImportTrades: (trades: Trade[]) => void | Promise<void>;
   /** Already-saved trades, used to skip re-importing anything a previous sync already pulled in. */
   existingTrades: Trade[];
   /**
@@ -260,7 +271,28 @@ export function BrokerConnectContent({
             id: `snaptrade_${account.id}_${Date.now()}_${i}`,
           }) as Trade,
       );
-      onImportTrades(withIds);
+      // Awaited: the message below is a claim that these trades are in the journal, so it must
+      // not be made until they are. A rejection here lands in the catch, where the sync is
+      // reported as failed rather than celebrated.
+      const pulled = `${freshTrades.length} trade${freshTrades.length === 1 ? '' : 's'}`;
+      try {
+        await onImportTrades(withIds);
+      } catch (saveErr) {
+        /*
+         * The pull worked and the sync has already been spent — the journal is what refused. That
+         * is a different failure from "your broker said no", and saying so is the difference
+         * between a trader who reloads and one who concludes the product does not work. It is
+         * still reported, but as a named error rather than the anonymous unhandled rejection this
+         * used to become.
+         */
+        reportErrorSilently(saveErr, 'promise', 'broker-sync-save');
+        setError(
+          `We pulled ${pulled} from ${label}, but your journal could not save them. `
+          + describeJournalWriteError(saveErr),
+        );
+        setErrorDetail(null);
+        return;
+      }
       const skipped = trades.length - freshTrades.length;
       setSyncMessage(
         `Imported ${freshTrades.length} trade${freshTrades.length === 1 ? '' : 's'} from ${label}` +

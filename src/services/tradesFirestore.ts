@@ -29,12 +29,45 @@ export async function fetchTradesOnce(uid: string): Promise<Trade[]> {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Trade);
 }
 
-export function subscribeTrades(uid: string, onChange: (trades: Trade[]) => void): Unsubscribe {
-  return onSnapshot(tradesCollection(uid), (snap) => {
-    const trades = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Trade);
-    trades.sort((a, b) => a.date.localeCompare(b.date));
-    onChange(trades);
-  });
+/**
+ * The journal's live view of its own trades.
+ *
+ * onError is not optional in practice. Without it a failed listen is silent: Firestore has nowhere
+ * to deliver the error, the callback simply stops being called, and the app goes on showing the
+ * last snapshot it received as though it were current. On a phone that has been in the background
+ * long enough for the auth token to lapse, that is a journal quietly frozen in the past.
+ */
+export function subscribeTrades(
+  uid: string,
+  onChange: (trades: Trade[]) => void,
+  onError?: (error: unknown) => void,
+): Unsubscribe {
+  return onSnapshot(
+    tradesCollection(uid),
+    (snap) => {
+      const trades = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Trade);
+      trades.sort((a, b) => a.date.localeCompare(b.date));
+      onChange(trades);
+    },
+    (error) => onError?.(error),
+  );
+}
+
+
+/**
+ * Denormalized activity fields for the admin panel, written after the trades themselves.
+ *
+ * Deliberately swallowed. These fields exist so an admin list can sort by last activity without
+ * reading everyone's trades — nice to have, and nothing a trader ever sees. Awaiting it unguarded
+ * meant a failure here rejected saveTradesBatch AFTER every trade had already been committed, so a
+ * sync that fully worked reported itself as failed and threw into an unhandled rejection.
+ */
+async function touchActivityQuietly(uid: string, dates: string[], savedAt: string): Promise<void> {
+  try {
+    await touchUserTradeActivity(uid, dates, savedAt);
+  } catch (error) {
+    console.warn('[trades] activity bookkeeping failed; the trades themselves are saved.', error);
+  }
 }
 
 export async function saveTrade(uid: string, trade: Trade): Promise<void> {
@@ -46,7 +79,7 @@ export async function saveTrade(uid: string, trade: Trade): Promise<void> {
       savedAt,
     }),
   );
-  await touchUserTradeActivity(uid, [trade.date], savedAt);
+  await touchActivityQuietly(uid, [trade.date], savedAt);
 }
 
 // Firestore limits a WriteBatch to 500 operations.
@@ -71,7 +104,7 @@ export async function saveTradesBatch(uid: string, trades: Trade[]): Promise<voi
     await batch.commit();
   }
 
-  await touchUserTradeActivity(
+  await touchActivityQuietly(
     uid,
     trades.map((t) => t.date),
     savedAt,
