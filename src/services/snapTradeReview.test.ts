@@ -178,3 +178,62 @@ describe('a fee reported as a negative number', () => {
     expect(describeSyncGaps({ negativeFees: 2 })[0]).toContain('2 fills reported the fee as a negative number');
   });
 });
+
+/*
+ * Modelled on the July 7 that the statement exposed: many fills of the same strike, no time of
+ * day, and a feed order that puts closes ahead of their opens. The old code dropped the orphaned
+ * closes, and the day came out a thousand dollars wrong.
+ */
+describe('a heavy 0DTE day with no time of day', () => {
+  const DAY = '2026-07-07T00:00:00Z';
+  const spy = (
+    id: string, type: 'BUY' | 'SELL', action: string, units: number, price: number, fee: number,
+  ) => ({
+    id, type, units, price, fee, trade_date: DAY, option_type: action,
+    option_symbol: {
+      ticker: 'SPY260707C747', option_type: 'CALL' as const, strike_price: 747,
+      expiration_date: '2026-07-07', underlying_symbol: { symbol: 'SPY' },
+    },
+    account: { id: 'a1' },
+  });
+
+  // What actually happened, in order: open 6, close 6, open 6, close 6.
+  const opens = [spy('o1', 'BUY', 'BUY_TO_OPEN', 6, 1.05, 3.98), spy('o2', 'BUY', 'BUY_TO_OPEN', 6, 0.62, 3.98)];
+  const closes = [spy('c1', 'SELL', 'SELL_TO_CLOSE', 6, 1.36, 4.02), spy('c2', 'SELL', 'SELL_TO_CLOSE', 6, 0.89, 4.01)];
+  // Net cash, which is the truth however the pairing falls:
+  //   sales  (1.36 + 0.89) × 600 − 4.02 − 4.01 = 1341.97
+  //   buys   (1.05 + 0.62) × 600 + 3.98 + 3.98 = 1009.96
+  const TRUTH = 1341.97 - 1009.96;
+
+  it('pairs every close even when the feed puts the closes first', () => {
+    const { trades, diagnostics } = mapSnapTradeActivities([...closes, ...opens]);
+    expect(diagnostics.unmatchedOptionCloses).toEqual([]);
+    expect(trades).toHaveLength(2);
+    expect(trades.reduce((s, t) => s + t.pnl, 0)).toBeCloseTo(TRUTH, 2);
+  });
+
+  it('pairs every close when the feed interleaves them wrongly', () => {
+    const { trades, diagnostics } = mapSnapTradeActivities([closes[0], opens[0], closes[1], opens[1]]);
+    expect(diagnostics.unmatchedOptionCloses).toEqual([]);
+    expect(trades.reduce((s, t) => s + t.pnl, 0)).toBeCloseTo(TRUTH, 2);
+  });
+
+  it('still lets a real time of day decide, when there is one', () => {
+    // With real times, a close genuinely before the open in the same second is not a thing; but a
+    // close at 10:00 must not be pulled ahead of an open at 09:30 by the rank.
+    const timed = (a: ReturnType<typeof spy>, t: string) => ({ ...a, trade_date: `2026-07-07T${t}Z` });
+    const { trades } = mapSnapTradeActivities([
+      timed(opens[0], '13:30:00'),
+      timed(closes[0], '14:00:00'),
+      timed(opens[1], '15:00:00'),
+      timed(closes[1], '15:30:00'),
+    ]);
+    // Real chronology: o1→c1 and o2→c2, so the per-trade split is the true one, not merely the total.
+    expect(trades.map((t) => [t.tradePrice, t.exitPrice])).toEqual([[1.05, 1.36], [0.62, 0.89]]);
+  });
+
+  it('says the split between trades was inferred on such a day', () => {
+    const { diagnostics } = mapSnapTradeActivities([...closes, ...opens]);
+    expect(diagnostics.inferredOrderDays).toEqual([{ symbol: 'SPY260707C747', date: '2026-07-07', fills: 4 }]);
+  });
+});

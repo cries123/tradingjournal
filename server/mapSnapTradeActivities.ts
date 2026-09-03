@@ -202,9 +202,39 @@ function normalize(activities: SnapTradeActivityLike[], diagnostics: SyncDiagnos
     });
   }
 
-  // Feed order breaks ties, never the id — see orientOldestFirst.
-  out.sort((x, y) => x.tradeDate.localeCompare(y.tradeDate) || x.feedIndex - y.feedIndex);
+  // Within one timestamp: opens first, then feed order. Never the id — see orientOldestFirst.
+  out.sort(
+    (x, y) =>
+      x.tradeDate.localeCompare(y.tradeDate)
+      || tieRank(x) - tieRank(y)
+      || x.feedIndex - y.feedIndex,
+  );
   return out;
+}
+
+/**
+ * Among fills that share a timestamp, opens go before closes.
+ *
+ * A July statement made the case. On a day with one or two round trips the journal matched
+ * Schwab to the cent; on a day with thirty fills of the same strike it was off by a thousand
+ * dollars, because a close that sorted ahead of its own open found nothing to close and was
+ * dropped. For a position opened and closed inside one day — which is every 0DTE trade — the open
+ * always exists somewhere in that day's group, so putting opens first means no close can ever go
+ * unpaired for want of one. And once every fill is matched, the day's total for that contract is
+ * exact whichever open each close happened to pair with; only the split between trades is inferred,
+ * and that is already reported.
+ *
+ * Real times still dominate, since the timestamp is the first sort key; this only decides exact
+ * ties, which for a brokerage that sends no time of day means the whole trading day. Stock fills
+ * and settlements are unaffected: they carry no open/close flag and keep feed order among
+ * themselves, and each instrument is matched in its own pass, so their rank relative to option
+ * fills does not matter.
+ */
+function tieRank(a: RawActivity): number {
+  if (a.settlement) return 2;
+  if (a.positionEffect === 'OPEN') return 0;
+  if (a.positionEffect === 'CLOSE') return 2;
+  return 1;
 }
 
 
