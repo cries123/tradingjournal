@@ -3,7 +3,7 @@ import { assertCallerUid, BrokerRequestError } from './snaptradeAuth';
 import { logServerError } from './errorReports';
 import { getSnaptrade, resolveBrokerSlug, SNAPTRADE_CONFIGURED } from './snaptradeClient';
 import { getAdminFirestore } from './firebaseAdmin';
-import { mapSnapTradeActivitiesToTrades, type SnapTradeActivityLike } from './mapSnapTradeActivities';
+import { mapSnapTradeActivities, type SnapTradeActivityLike } from './mapSnapTradeActivities';
 import { BROKER_REGISTRY, brokerRegistryEntry, isBrokerRegistryKey } from '../src/data/brokerRegistry';
 import {
   BROKER_STATUS_DOC,
@@ -472,12 +472,16 @@ async function pullActivities(
     );
   }
 
-  const trades = mapSnapTradeActivitiesToTrades(activities);
+  const { trades, diagnostics } = mapSnapTradeActivities(activities);
 
   return {
     statusCode: 200,
     body: {
       trades,
+      // What the matcher could not account for, so the screen can say why the journal's total may
+      // not equal the broker's rather than leaving the trader to find the gap themselves.
+      unmatchedCloses: diagnostics.unmatchedOptionCloses.length,
+      assumedShorts: diagnostics.assumedShorts.length,
       activityCount: activities.length,
       totalActivityCount: total ?? activities.length,
       truncated,

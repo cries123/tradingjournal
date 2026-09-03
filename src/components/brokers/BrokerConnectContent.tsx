@@ -30,6 +30,7 @@ import type { Trade } from '../../types';
 import { dedupeIncomingTrades } from '../../utils/duplicateTrades';
 import { describeJournalWriteError } from '../../utils/journalWriteError';
 import { reportErrorSilently } from '../../services/errorReporting';
+import { describeSyncGaps } from '../../utils/syncGaps';
 
 interface BrokerCardCopy {
   key: SupportedBroker;
@@ -157,6 +158,8 @@ export function BrokerConnectContent({
   const [statusLoading, setStatusLoading] = useState(false);
   const [connectingBroker, setConnectingBroker] = useState<SupportedBroker | null>(null);
   const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
+  /** What the sync could not match, shown under the success message. */
+  const [syncNotes, setSyncNotes] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   /** The underlying reason, when the server judged this caller to be the site admin. */
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
@@ -231,9 +234,11 @@ export function BrokerConnectContent({
     setError(null);
     setErrorDetail(null);
     setSyncMessage(null);
+    setSyncNotes([]);
     setSyncingAccountId(account.id);
     try {
-      const { trades, truncated, syncsRemaining, syncsPerDay } = await syncBrokerAccount(account.id);
+      const { trades, truncated, syncsRemaining, syncsPerDay, unmatchedCloses, assumedShorts } =
+        await syncBrokerAccount(account.id);
       // The server has already spent one of today's syncs by the time this returns, so the meter
       // is updated from its answer rather than guessed at.
       if (typeof syncsRemaining === 'number' && typeof syncsPerDay === 'number') {
@@ -301,6 +306,8 @@ export function BrokerConnectContent({
             ? ' This account has more activity than one sync can pull in — the oldest history was left out.'
             : ''),
       );
+      // Said out loud rather than left for the trader to discover by disagreeing with their broker.
+      setSyncNotes(describeSyncGaps(unmatchedCloses, assumedShorts));
     } catch (err) {
       // A failed sync usually still costs one. The server now says how many are left even when it
       // fails — and says so after refunding, when the failure was an outage rather than a rejected
@@ -423,9 +430,23 @@ export function BrokerConnectContent({
         )}
 
         {syncMessage && (
-          <div className="rounded-lg border border-accent/30 bg-accent/5 px-4 py-3 text-sm text-accent mb-6 flex items-center gap-2">
-            <CheckCircle2 size={16} className="shrink-0" />
-            {syncMessage}
+          <div className="rounded-lg border border-accent/30 bg-accent/5 px-4 py-3 text-sm text-accent mb-6 flex items-start gap-2">
+            <CheckCircle2 size={16} className="shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <p>{syncMessage}</p>
+              {/* Amber, not the success green: these are things the import could not do, and a
+                  trader who never notices them is a trader whose totals silently disagree with
+                  their broker. */}
+              {syncNotes.length > 0 && (
+                <ul className="mt-2 space-y-1.5 border-t border-accent/20 pt-2">
+                  {syncNotes.map((note) => (
+                    <li key={note} className="text-xs text-amber-200/90 leading-relaxed">
+                      {note}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         )}
 

@@ -110,6 +110,10 @@ export async function syncBrokerAccount(
   activityCount: number;
   totalActivityCount: number;
   truncated: boolean;
+  /** Closing fills whose opening trade is older than the history the brokerage returned. */
+  unmatchedCloses?: number;
+  /** Positions opened by a sale with no prior purchase — a real short, or a pre-existing holding. */
+  assumedShorts?: number;
   /** Syncs left today on this plan, counted server-side. */
   syncsRemaining?: number;
   syncsPerDay?: number;

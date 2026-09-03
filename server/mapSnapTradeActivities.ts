@@ -28,6 +28,8 @@ interface RawActivity {
   strike?: number;
   expiration?: string;
   positionEffect?: 'OPEN' | 'CLOSE';
+  /** Set when the position ended by expiry, assignment or exercise rather than by a trade. */
+  settlement: SettlementKind | null;
   accountId: string;
   accountName?: string;
 }
@@ -98,15 +100,20 @@ function normalize(activities: SnapTradeActivityLike[]): RawActivity[] {
 
   for (const a of activities) {
     const type = (a.type || '').toUpperCase();
-    if (type !== 'BUY' && type !== 'SELL') continue;
-    if (!a.trade_date || typeof a.price !== 'number' || typeof a.units !== 'number') continue;
-
     const isOption = Boolean(a.option_symbol);
+    const settlement = isOption ? optionSettlementKind(type) : null;
+
+    // A BUY or a SELL, or one of the ways an option position ends without either.
+    if (type !== 'BUY' && type !== 'SELL' && !settlement) continue;
+    if (!a.trade_date) continue;
+    if (!settlement && (typeof a.price !== 'number' || typeof a.units !== 'number')) continue;
+
     const optionAction = (a.option_type || '').toUpperCase();
 
     let positionEffect: 'OPEN' | 'CLOSE' | undefined;
     if (isOption) {
-      if (optionAction.includes('OPEN')) positionEffect = 'OPEN';
+      if (settlement) positionEffect = 'CLOSE';
+      else if (optionAction.includes('OPEN')) positionEffect = 'OPEN';
       else if (optionAction.includes('CLOSE')) positionEffect = 'CLOSE';
       else continue; // can't safely place an option fill without an open/close flag
     }
@@ -114,10 +121,16 @@ function normalize(activities: SnapTradeActivityLike[]): RawActivity[] {
     out.push({
       id: a.id || fallbackActivityId(a, seen),
       tradeDate: a.trade_date,
-      units: Math.abs(a.units),
-      price: a.price,
+      units: Math.abs(typeof a.units === 'number' ? a.units : 0),
+      // An expiring option is worth nothing, which is the whole point of recording it: the premium
+      // is the P&L. Brokers report these with no price, or with zero.
+      price: settlement ? 0 : (a.price as number),
       fee: typeof a.fee === 'number' ? a.fee : 0,
-      side: type,
+      // A settlement is economically a sale of whatever is held — a long position closing at zero
+      // is a loss of the premium, a short one closing at zero is a gain of it. Which of the two it
+      // is comes from the lot being closed, not from here.
+      side: settlement ? 'SELL' : (type as 'BUY' | 'SELL'),
+      settlement,
       isOption,
       underlyingSymbol: (
         a.option_symbol?.underlying_symbol?.symbol ||
@@ -138,6 +151,50 @@ function normalize(activities: SnapTradeActivityLike[]): RawActivity[] {
 
   out.sort((x, y) => x.tradeDate.localeCompare(y.tradeDate) || x.id.localeCompare(y.id));
   return out;
+}
+
+
+export type SettlementKind = 'expired' | 'assigned' | 'exercised';
+
+/**
+ * The ways an option position ends without a BUY or a SELL.
+ *
+ * Only BUY and SELL rows were accepted, so an option that expired produced no trade at all: a call
+ * bought for $1,000 that expired worthless left the premium unrecorded and the open lot sitting in
+ * the matcher, where it would later mispair against an unrelated fill. Expiries are routine, and
+ * absent from test data, which is why real accounts and sandbox ones disagreed.
+ *
+ * Matched loosely on the type string. SnapTrade normalises across brokerages and the exact spelling
+ * varies; missing one spelling means silently losing trades again, and the words below do not
+ * appear in any activity type that is not one of these three.
+ */
+export function optionSettlementKind(type: string): SettlementKind | null {
+  const t = type.toUpperCase();
+  if (t.includes('EXPIR')) return 'expired';
+  if (t.includes('ASSIGN')) return 'assigned';
+  if (t.includes('EXERCIS')) return 'exercised';
+  return null;
+}
+
+/**
+ * What the matcher could not account for.
+ *
+ * Both cases mean the same thing — the position was opened before the history the brokerage gave
+ * us — and neither can be resolved from activity data alone. Reporting them is the point: a silent
+ * gap is what makes a journal disagree with a broker statement for no visible reason.
+ */
+export interface SyncDiagnostics {
+  /** Closing option fills with no opening fill to pair against. Not recorded as trades. */
+  unmatchedOptionCloses: { symbol: string; date: string; units: number }[];
+  /**
+   * Positions the matcher opened from a sale with no prior inventory.
+   *
+   * These are correct for a genuine short sale and wrong for a sale of shares bought before the
+   * history begins, and the two are indistinguishable here: a short sale IS a sell with no prior
+   * buy. So they are recorded — a journal that dropped every short would be worse — and reported,
+   * so the trader can check the ones they did not mean to be short.
+   */
+  assumedShorts: { symbol: string; date: string; units: number }[];
 }
 
 interface OpenLot {
@@ -235,7 +292,10 @@ function buildTrade(
   };
 }
 
-function matchOptions(activities: RawActivity[]): ParsedTradeInput[] {
+function matchOptions(
+  activities: RawActivity[],
+  diagnostics: SyncDiagnostics,
+): ParsedTradeInput[] {
   const openLots = new Map<string, OpenLot[]>();
   const trades: ParsedTradeInput[] = [];
 
@@ -248,22 +308,57 @@ function matchOptions(activities: RawActivity[]): ParsedTradeInput[] {
       continue;
     }
 
-    let remaining = exec.units;
     const queue = openLots.get(key)!;
+
+    /*
+     * A settlement closes whatever is actually left, not the size the brokerage reported.
+     *
+     * Expiry rows carry inconsistent quantities between brokerages — sometimes the contract count,
+     * sometimes zero, sometimes nothing at all — and the position that expired is the one the
+     * matcher is holding. Taking the units from the row would leave a remnant lot behind on any
+     * brokerage that reports it differently, which is the bug this is meant to end.
+     */
+    let remaining = exec.settlement
+      ? queue.reduce((total, lot) => total + lot.qty, 0)
+      : exec.units;
+
+    if (remaining <= 0 && queue.length === 0) {
+      // A close with nothing to close. The opening fill predates the history we were given.
+      diagnostics.unmatchedOptionCloses.push({
+        symbol: exec.optionTicker || exec.underlyingSymbol,
+        date: exec.tradeDate.slice(0, 10),
+        units: exec.units,
+      });
+      continue;
+    }
+
+    const remainingAtStart = remaining;
 
     while (remaining > 0 && queue.length > 0) {
       const lot = queue[0];
       const matched = Math.min(remaining, lot.qty);
       const mult = 100;
 
-      const grossPnl =
-        exec.side === 'SELL'
-          ? (exec.price - lot.price) * matched * mult
-          : (lot.price - exec.price) * matched * mult;
+      /*
+       * Direction comes from the lot, not from the closing fill.
+       *
+       * Keying off exec.side worked only because a long is normally closed by a sell and a short
+       * by a buy, so the closing side stood in for the lot's direction. A settlement breaks that
+       * proxy: expiry has no side of its own, and reading it as a sell made a short put that
+       * expired worthless — the best outcome that trade has — book the premium as a $600 loss
+       * instead of a $600 gain. The lot always knew which way it was pointing.
+       */
+      const openedLong = lot.open.side === 'BUY';
+      const grossPnl = openedLong
+        ? (exec.price - lot.price) * matched * mult
+        : (lot.price - exec.price) * matched * mult;
 
-      const feeShare = drawEntryFee(lot, matched, lot.qty) + exec.fee * (matched / exec.units);
+      const exitUnits = exec.settlement ? (remainingAtStart || exec.units) : exec.units;
+      const feeShare =
+        drawEntryFee(lot, matched, lot.qty)
+        + (exitUnits > 0 ? exec.fee * (matched / exitUnits) : 0);
       const pnl = grossPnl - feeShare;
-      const side: TradeSide = lot.open.side === 'BUY' ? 'long' : 'short';
+      const side: TradeSide = openedLong ? 'long' : 'short';
 
       trades.push(buildTrade(lot.open, exec, matched, pnl, grossPnl, feeShare, side));
 
@@ -271,12 +366,23 @@ function matchOptions(activities: RawActivity[]): ParsedTradeInput[] {
       remaining -= matched;
       if (lot.qty <= 0.0001) queue.shift();
     }
+
+    if (remaining > 0.0001 && !exec.settlement) {
+      diagnostics.unmatchedOptionCloses.push({
+        symbol: exec.optionTicker || exec.underlyingSymbol,
+        date: exec.tradeDate.slice(0, 10),
+        units: remaining,
+      });
+    }
   }
 
   return trades;
 }
 
-function matchStocks(activities: RawActivity[]): ParsedTradeInput[] {
+function matchStocks(
+  activities: RawActivity[],
+  diagnostics: SyncDiagnostics,
+): ParsedTradeInput[] {
   const queues = new Map<string, OpenLot[]>();
   const trades: ParsedTradeInput[] = [];
 
@@ -307,6 +413,21 @@ function matchStocks(activities: RawActivity[]): ParsedTradeInput[] {
     }
 
     if (remaining > 0.0001) {
+      /*
+       * A sale with nothing to sell opens a short.
+       *
+       * That is right for a genuine short and wrong for a sale of shares bought before the history
+       * begins, and nothing here can tell them apart — a short sale is a sell with no prior buy, so
+       * any rule that suppressed one would suppress the other. Recording it keeps short sellers
+       * working; reporting it means a trader who sees a short they never placed knows why.
+       */
+      if (execSign < 0) {
+        diagnostics.assumedShorts.push({
+          symbol: exec.underlyingSymbol,
+          date: exec.tradeDate.slice(0, 10),
+          units: remaining,
+        });
+      }
       queue.push({ qty: execSign * remaining, price: exec.price, fee: exec.fee * (remaining / exec.units), open: exec });
     }
   }
@@ -314,10 +435,24 @@ function matchStocks(activities: RawActivity[]): ParsedTradeInput[] {
   return trades;
 }
 
-export function mapSnapTradeActivitiesToTrades(activities: SnapTradeActivityLike[]): ParsedTradeInput[] {
+export interface MappedSync {
+  trades: ParsedTradeInput[];
+  diagnostics: SyncDiagnostics;
+}
+
+export function mapSnapTradeActivities(activities: SnapTradeActivityLike[]): MappedSync {
+  const diagnostics: SyncDiagnostics = { unmatchedOptionCloses: [], assumedShorts: [] };
   const normalized = normalize(activities);
   const options = normalized.filter((a) => a.isOption);
   const stocks = normalized.filter((a) => !a.isOption);
 
-  return [...matchOptions(options), ...matchStocks(stocks)].sort((a, b) => a.date.localeCompare(b.date));
+  const trades = [...matchOptions(options, diagnostics), ...matchStocks(stocks, diagnostics)]
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  return { trades, diagnostics };
+}
+
+/** Trades only, for callers that do not surface the diagnostics. */
+export function mapSnapTradeActivitiesToTrades(activities: SnapTradeActivityLike[]): ParsedTradeInput[] {
+  return mapSnapTradeActivities(activities).trades;
 }
