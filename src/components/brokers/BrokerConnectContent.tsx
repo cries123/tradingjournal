@@ -237,8 +237,10 @@ export function BrokerConnectContent({
     setSyncNotes([]);
     setSyncingAccountId(account.id);
     try {
-      const { trades, truncated, syncsRemaining, syncsPerDay, unmatchedCloses, assumedShorts } =
-        await syncBrokerAccount(account.id);
+      const {
+        trades, truncated, syncsRemaining, syncsPerDay,
+        unmatchedCloses, assumedShorts, inferredOrderDays, ignored, negativeFees,
+      } = await syncBrokerAccount(account.id);
       // The server has already spent one of today's syncs by the time this returns, so the meter
       // is updated from its answer rather than guessed at.
       if (typeof syncsRemaining === 'number' && typeof syncsPerDay === 'number') {
@@ -307,7 +309,7 @@ export function BrokerConnectContent({
             : ''),
       );
       // Said out loud rather than left for the trader to discover by disagreeing with their broker.
-      setSyncNotes(describeSyncGaps(unmatchedCloses, assumedShorts));
+      setSyncNotes(describeSyncGaps({ unmatchedCloses, assumedShorts, inferredOrderDays, ignored, negativeFees }));
     } catch (err) {
       // A failed sync usually still costs one. The server now says how many are left even when it
       // fails — and says so after refunding, when the failure was an outage rather than a rejected

@@ -30,6 +30,10 @@ interface RawActivity {
   positionEffect?: 'OPEN' | 'CLOSE';
   /** Set when the position ended by expiry, assignment or exercise rather than by a trade. */
   settlement: SettlementKind | null;
+  /** Position in the feed after it has been oriented oldest-first. Breaks timestamp ties. */
+  feedIndex: number;
+  /** True when the brokerage gave a real time of day; false for a bare date or the midnight sentinel. */
+  hasTimeOfDay: boolean;
   accountId: string;
   accountName?: string;
 }
@@ -94,17 +98,59 @@ function fallbackActivityId(a: SnapTradeActivityLike, seen: Map<string, number>)
   return n === 0 ? `derived:${key}` : `derived:${key}#${n}`;
 }
 
-function normalize(activities: SnapTradeActivityLike[]): RawActivity[] {
+/**
+ * Whether a trade_date carries a real time of day.
+ *
+ * Some brokerages report no time at all, which SnapTrade represents as a bare date or as exactly
+ * midnight UTC. Both mean "unknown", and anything that converts the timestamp to a time zone must
+ * leave those alone — converting midnight UTC to Eastern would put every one of that brokerage's
+ * trades on the previous evening.
+ */
+export function hasTimeOfDay(isoOrDate: string): boolean {
+  if (!isoOrDate.includes('T')) return false;
+  const d = new Date(isoOrDate);
+  if (Number.isNaN(d.getTime())) return false;
+  return !(d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0);
+}
+
+/**
+ * The feed, oldest first.
+ *
+ * SnapTrade emits activities in one consistent direction, and within a single timestamp — which
+ * for a brokerage with no time of day is a whole trading day — that direction is the only
+ * ordering information there is. Sorting with the activity id as the tiebreak threw it away: the
+ * id is a UUID, so same-day fills were paired in effectively random order. For a trader who bought
+ * at 10, sold at 11, bought at 12 and sold at 13, that could produce a long 12→13 and a SHORT
+ * 11→10 — a short they never placed, with an entry and exit invented from two unrelated fills.
+ *
+ * The direction is read off the dates that do differ. If the first dated row is newer than the
+ * last, the feed is newest-first and is reversed; then a stable sort on the date alone keeps
+ * feed order within each timestamp.
+ */
+function orientOldestFirst(activities: SnapTradeActivityLike[]): SnapTradeActivityLike[] {
+  const dated = activities.filter((a) => a.trade_date);
+  if (dated.length < 2) return activities;
+  const first = dated[0].trade_date as string;
+  const last = dated[dated.length - 1].trade_date as string;
+  return first.localeCompare(last) > 0 ? [...activities].reverse() : activities;
+}
+
+function normalize(activities: SnapTradeActivityLike[], diagnostics: SyncDiagnostics): RawActivity[] {
   const out: RawActivity[] = [];
   const seen = new Map<string, number>();
 
-  for (const a of activities) {
+  for (const [feedIndex, a] of orientOldestFirst(activities).entries()) {
     const type = (a.type || '').toUpperCase();
     const isOption = Boolean(a.option_symbol);
     const settlement = isOption ? optionSettlementKind(type) : null;
 
-    // A BUY or a SELL, or one of the ways an option position ends without either.
-    if (type !== 'BUY' && type !== 'SELL' && !settlement) continue;
+    // A BUY or a SELL, or one of the ways an option position ends without either. Anything else
+    // is counted rather than dropped on the floor: a transfer-in of shares that is silently
+    // skipped is exactly why a later sale of them reads as a short.
+    if (type !== 'BUY' && type !== 'SELL' && !settlement) {
+      diagnostics.ignored[type || 'UNKNOWN'] = (diagnostics.ignored[type || 'UNKNOWN'] ?? 0) + 1;
+      continue;
+    }
     if (!a.trade_date) continue;
     if (!settlement && (typeof a.price !== 'number' || typeof a.units !== 'number')) continue;
 
@@ -115,8 +161,11 @@ function normalize(activities: SnapTradeActivityLike[]): RawActivity[] {
       if (settlement) positionEffect = 'CLOSE';
       else if (optionAction.includes('OPEN')) positionEffect = 'OPEN';
       else if (optionAction.includes('CLOSE')) positionEffect = 'CLOSE';
-      else continue; // can't safely place an option fill without an open/close flag
+      // No flag: the fill is real, it just does not say whether it opened or closed. It used to be
+      // dropped here. It is matched by inventory instead, the way every stock fill already is.
     }
+
+    if (typeof a.fee === 'number' && a.fee < 0) diagnostics.negativeFees += 1;
 
     out.push({
       id: a.id || fallbackActivityId(a, seen),
@@ -125,7 +174,9 @@ function normalize(activities: SnapTradeActivityLike[]): RawActivity[] {
       // An expiring option is worth nothing, which is the whole point of recording it: the premium
       // is the P&L. Brokers report these with no price, or with zero.
       price: settlement ? 0 : (a.price as number),
-      fee: typeof a.fee === 'number' ? a.fee : 0,
+      // A fee is a cost. A brokerage that reports costs as negative numbers would otherwise have
+      // every fee ADDED to P&L, doubling the error; the count above says whether that happened.
+      fee: typeof a.fee === 'number' ? Math.abs(a.fee) : 0,
       // A settlement is economically a sale of whatever is held — a long position closing at zero
       // is a loss of the premium, a short one closing at zero is a gain of it. Which of the two it
       // is comes from the lot being closed, not from here.
@@ -144,12 +195,15 @@ function normalize(activities: SnapTradeActivityLike[]): RawActivity[] {
       strike: a.option_symbol?.strike_price,
       expiration: a.option_symbol?.expiration_date,
       positionEffect,
+      feedIndex,
+      hasTimeOfDay: hasTimeOfDay(a.trade_date),
       accountId: a.account?.id || 'unknown',
       accountName: a.account?.name || undefined,
     });
   }
 
-  out.sort((x, y) => x.tradeDate.localeCompare(y.tradeDate) || x.id.localeCompare(y.id));
+  // Feed order breaks ties, never the id — see orientOldestFirst.
+  out.sort((x, y) => x.tradeDate.localeCompare(y.tradeDate) || x.feedIndex - y.feedIndex);
   return out;
 }
 
@@ -195,6 +249,18 @@ export interface SyncDiagnostics {
    * so the trader can check the ones they did not mean to be short.
    */
   assumedShorts: { symbol: string; date: string; units: number }[];
+  /**
+   * Same-day buys and sells of one symbol from a brokerage that gives no time of day.
+   *
+   * Their pairing follows the order the feed arrived in, which is the best available and usually
+   * right — but it is inferred, and a trader whose per-trade entries and exits look shuffled on
+   * such a day deserves to know why.
+   */
+  inferredOrderDays: { symbol: string; date: string; fills: number }[];
+  /** Activity rows skipped by type — dividends, transfers, splits, fees — and how many of each. */
+  ignored: Record<string, number>;
+  /** Fills whose fee arrived as a negative number. Treated as a cost; the count says it happened. */
+  negativeFees: number;
 }
 
 interface OpenLot {
@@ -237,10 +303,8 @@ function drawEntryFee(lot: OpenLot, matched: number, lotRemaining: number): numb
  * at all, which SnapTrade represents as an exact UTC midnight, so we don't show a fabricated 00:00.
  */
 function extractEasternTime(isoOrDate: string): string | undefined {
-  if (!isoOrDate.includes('T')) return undefined;
+  if (!hasTimeOfDay(isoOrDate)) return undefined;
   const d = new Date(isoOrDate);
-  if (Number.isNaN(d.getTime())) return undefined;
-  if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) return undefined;
 
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
@@ -251,6 +315,31 @@ function extractEasternTime(isoOrDate: string): string | undefined {
   const hh = parts.find((p) => p.type === 'hour')?.value ?? '00';
   const mm = parts.find((p) => p.type === 'minute')?.value ?? '00';
   return `${hh}:${mm}`;
+}
+
+/**
+ * The calendar day a fill belongs to.
+ *
+ * The time shown on a trade is Eastern (extractEasternTime), and the date was the UTC date, so
+ * the two disagreed for anything after 8pm Eastern: a close at 20:30 on June 15 was journaled on
+ * June 16 with an exit time of 20:30 — a moment that never happened. For US equities that is only
+ * extended hours; for a crypto exchange it is every evening. The date is read in the same zone as
+ * the time now. A bare date, or the midnight sentinel a time-less brokerage sends, is taken as-is:
+ * converting that midnight would move the whole account back a day.
+ */
+function journalDate(isoOrDate: string): string {
+  if (!hasTimeOfDay(isoOrDate)) return isoOrDate.slice(0, 10);
+  try {
+    // en-CA renders as YYYY-MM-DD, the key shape everything else here already uses.
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/New_York',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date(isoOrDate));
+  } catch {
+    return isoOrDate.slice(0, 10);
+  }
 }
 
 function buildTrade(
@@ -269,7 +358,7 @@ function buildTrade(
   return {
     symbol: open.underlyingSymbol,
     pnl: Math.round(pnl * 100) / 100,
-    date: close.tradeDate.slice(0, 10),
+    date: journalDate(close.tradeDate),
     side,
     contract,
     assetType: open.isOption ? 'option' : 'stock',
@@ -379,15 +468,23 @@ function matchOptions(
   return trades;
 }
 
-function matchStocks(
+/**
+ * FIFO matching by running inventory, for fills that do not say whether they open or close.
+ *
+ * Stocks never say. Option fills usually do, and go through matchOptions — but a brokerage that
+ * omits the flag used to have those fills dropped outright, which is a worse answer than the one
+ * every stock fill already gets. The multiplier is the only difference between the two.
+ */
+function matchByInventory(
   activities: RawActivity[],
   diagnostics: SyncDiagnostics,
+  instrument: { key: (a: RawActivity) => string; label: (a: RawActivity) => string; mult: number },
 ): ParsedTradeInput[] {
   const queues = new Map<string, OpenLot[]>();
   const trades: ParsedTradeInput[] = [];
 
   for (const exec of activities) {
-    const key = `${exec.accountId}|${exec.underlyingSymbol}`;
+    const key = `${exec.accountId}|${instrument.key(exec)}`;
     if (!queues.has(key)) queues.set(key, []);
     const queue = queues.get(key)!;
 
@@ -400,7 +497,7 @@ function matchStocks(
       const matched = Math.min(remaining, lotAbs);
       const lotSign = Math.sign(lot.qty);
 
-      const grossPnl = (exec.price - lot.price) * matched * lotSign;
+      const grossPnl = (exec.price - lot.price) * matched * lotSign * instrument.mult;
       const feeShare = drawEntryFee(lot, matched, lotAbs) + exec.fee * (matched / exec.units);
       const pnl = grossPnl - feeShare;
       const side: TradeSide = lotSign > 0 ? 'long' : 'short';
@@ -423,7 +520,7 @@ function matchStocks(
        */
       if (execSign < 0) {
         diagnostics.assumedShorts.push({
-          symbol: exec.underlyingSymbol,
+          symbol: instrument.label(exec),
           date: exec.tradeDate.slice(0, 10),
           units: remaining,
         });
@@ -440,14 +537,61 @@ export interface MappedSync {
   diagnostics: SyncDiagnostics;
 }
 
+/**
+ * Same-day buys and sells of one symbol with no time of day: their order is inferred, and worth
+ * saying so. One entry per symbol-day, however many fills were involved.
+ */
+function noteInferredOrderDays(activities: RawActivity[], diagnostics: SyncDiagnostics): void {
+  const groups = new Map<string, { buys: number; sells: number; symbol: string; date: string }>();
+  for (const a of activities) {
+    if (a.hasTimeOfDay || a.settlement) continue;
+    const symbol = a.optionTicker ?? a.underlyingSymbol;
+    const date = a.tradeDate.slice(0, 10);
+    const key = `${a.accountId}|${symbol}|${date}`;
+    const g = groups.get(key) ?? { buys: 0, sells: 0, symbol, date };
+    if (a.side === 'BUY') g.buys += 1;
+    else g.sells += 1;
+    groups.set(key, g);
+  }
+  for (const g of groups.values()) {
+    if (g.buys > 0 && g.sells > 0) {
+      diagnostics.inferredOrderDays.push({ symbol: g.symbol, date: g.date, fills: g.buys + g.sells });
+    }
+  }
+}
+
+const STOCK = {
+  key: (a: RawActivity) => a.underlyingSymbol,
+  label: (a: RawActivity) => a.underlyingSymbol,
+  mult: 1,
+};
+
+const FLAGLESS_OPTION = {
+  key: (a: RawActivity) => a.optionTicker ?? a.underlyingSymbol,
+  label: (a: RawActivity) => a.optionTicker ?? a.underlyingSymbol,
+  mult: 100,
+};
+
 export function mapSnapTradeActivities(activities: SnapTradeActivityLike[]): MappedSync {
-  const diagnostics: SyncDiagnostics = { unmatchedOptionCloses: [], assumedShorts: [] };
-  const normalized = normalize(activities);
-  const options = normalized.filter((a) => a.isOption);
+  const diagnostics: SyncDiagnostics = {
+    unmatchedOptionCloses: [],
+    assumedShorts: [],
+    inferredOrderDays: [],
+    ignored: {},
+    negativeFees: 0,
+  };
+  const normalized = normalize(activities, diagnostics);
+  const flaggedOptions = normalized.filter((a) => a.isOption && a.positionEffect !== undefined);
+  const flaglessOptions = normalized.filter((a) => a.isOption && a.positionEffect === undefined);
   const stocks = normalized.filter((a) => !a.isOption);
 
-  const trades = [...matchOptions(options, diagnostics), ...matchStocks(stocks, diagnostics)]
-    .sort((a, b) => a.date.localeCompare(b.date));
+  noteInferredOrderDays(normalized, diagnostics);
+
+  const trades = [
+    ...matchOptions(flaggedOptions, diagnostics),
+    ...matchByInventory(flaglessOptions, diagnostics, FLAGLESS_OPTION),
+    ...matchByInventory(stocks, diagnostics, STOCK),
+  ].sort((a, b) => a.date.localeCompare(b.date));
 
   return { trades, diagnostics };
 }

@@ -482,6 +482,9 @@ async function pullActivities(
       // not equal the broker's rather than leaving the trader to find the gap themselves.
       unmatchedCloses: diagnostics.unmatchedOptionCloses.length,
       assumedShorts: diagnostics.assumedShorts.length,
+      inferredOrderDays: diagnostics.inferredOrderDays.length,
+      ignored: diagnostics.ignored,
+      negativeFees: diagnostics.negativeFees,
       activityCount: activities.length,
       totalActivityCount: total ?? activities.length,
       truncated,

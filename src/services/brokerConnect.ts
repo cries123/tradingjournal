@@ -114,6 +114,12 @@ export async function syncBrokerAccount(
   unmatchedCloses?: number;
   /** Positions opened by a sale with no prior purchase — a real short, or a pre-existing holding. */
   assumedShorts?: number;
+  /** Symbol-days where buys and sells had no time of day, so their pairing follows feed order. */
+  inferredOrderDays?: number;
+  /** Rows skipped by activity type: dividends, transfers, splits, fees. */
+  ignored?: Record<string, number>;
+  /** Fills whose fee was reported as a negative number; treated as a cost. */
+  negativeFees?: number;
   /** Syncs left today on this plan, counted server-side. */
   syncsRemaining?: number;
   syncsPerDay?: number;
