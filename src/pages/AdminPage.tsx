@@ -3,6 +3,7 @@ import {
   Activity,
   AlertTriangle,
   ArrowLeft,
+  Ban,
   BarChart3,
   Building2,
   Download,
@@ -55,7 +56,7 @@ import {
   type AdminHealthStatus,
 } from '../services/adminHealth';
 import { fetchAllAdminUserNotes, saveAdminUserNote, type AdminUserNote } from '../services/adminUserNotes';
-import { fetchRecentAuditLog, logAdminAction, type AdminAuditEntry } from '../services/adminAuditLog';
+import { AUDIT_ACTION_LABELS, fetchRecentAuditLog, logAdminAction, type AdminAuditEntry } from '../services/adminAuditLog';
 import {
   fetchAllTickets,
   updateTicketStatus,
@@ -420,34 +421,6 @@ function ActivityFeedItem({ item }: { item: AdminActivityItem }) {
   );
 }
 
-const AUDIT_ACTION_LABELS: Record<AdminAuditEntry['action'], string> = {
-  'user.email-changed': 'Changed email for',
-  'user.password-changed': 'Set a new password for',
-  'user.password-reset-sent': 'Sent password reset to',
-  'user.deleted': 'Deleted user',
-  'announcement.published': 'Updated the site announcement',
-  'checkout.toggled': 'Changed plan checkout availability',
-  'user.tier-granted': 'Granted a plan to',
-  'user.tier-grant-cleared': 'Removed the granted plan from',
-  'user.note-saved': 'Updated internal note for',
-  'user.flagged': 'Flagged',
-  'user.unflagged': 'Unflagged',
-  'bug.status-changed': 'Updated status on bug report',
-  'bug.priority-changed': 'Changed priority on bug report',
-  'bug.note-saved': 'Added a note to bug report',
-  'broker-request.status-changed': 'Updated status on broker request',
-  'broker-request.priority-changed': 'Changed priority on broker request',
-  'broker-request.note-saved': 'Added a note to broker request',
-  'ticket.status-changed': 'Updated status on support ticket',
-  'ticket.priority-changed': 'Changed priority on support ticket',
-  'ticket.note-saved': 'Added a note to support ticket',
-  'error.status-changed': 'Updated status on production error',
-  'help-article.created': 'Created help article',
-  'help-article.updated': 'Edited help article',
-  'help-article.published': 'Published help article',
-  'help-article.unpublished': 'Unpublished help article',
-  'help-article.deleted': 'Deleted help article',
-};
 
 function AuditLogItem({ entry }: { entry: AdminAuditEntry }) {
   const time = new Date(entry.at).toLocaleString();
@@ -1944,6 +1917,12 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                             <div className="min-w-0">
                               <p className="font-semibold text-text-primary">
                                 {entry.username ? `@${entry.username}` : 'No username'}
+                                {entry.suspended && (
+                                  <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 text-[9px] font-medium uppercase tracking-wide">
+                                    <Ban size={9} />
+                                    Suspended
+                                  </span>
+                                )}
                                 {entry.coachShareEnabled && (
                                   <span className="ml-2 inline-flex px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400 text-[9px] font-medium uppercase tracking-wide">
                                     Coach share
@@ -2369,6 +2348,8 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
               updatedBy: null,
             }
           }
+          tickets={ready?.tickets.filter((t) => t.uid === selectedUser.uid) ?? []}
+          reports={ready?.reports.filter((r) => r.uid === selectedUser.uid) ?? []}
           onNoteSave={(patch) => handleUserNoteSave(selectedUser.uid, patch, selectedUser.username ?? selectedUser.email)}
           onClose={() => setSelectedUser(null)}
           onUserUpdated={(uid, patch) => {

@@ -1,7 +1,7 @@
 import type { Handler, HandlerResponse } from '@netlify/functions';
 import { assertCallerUid, BrokerRequestError } from '../../server/snaptradeAuth';
-import { readEntitlement, effectiveTier } from '../../server/entitlements';
-import { readUsed, usageResetsAt } from '../../server/usage';
+import { accessSource, complimentaryUntil, effectiveTier, readEntitlement } from '../../server/entitlements';
+import { readUsed, readUserCredits, usageResetsAt } from '../../server/usage';
 import { limitsFor, MARKET_REPLAY_LIVE } from '../../src/config/tiers';
 
 /**
@@ -30,7 +30,14 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
     const tier = effectiveTier(record);
     const limits = limitsFor(tier);
 
-    const [aiUsed, syncUsed] = await Promise.all([readUsed('ai', uid), readUsed('sync', uid)]);
+    const [aiUsed, syncUsed, credits] = await Promise.all([
+      readUsed('ai', uid),
+      readUsed('sync', uid),
+      readUserCredits(uid),
+    ]);
+    // Credits only count where the plan includes the feature at all — see decideSpend.
+    const aiCredits = limits.aiMessagesPerDay > 0 ? credits.ai : 0;
+    const syncCredits = limits.syncsPerDay > 0 ? credits.sync : 0;
 
     return {
       statusCode: 200,
@@ -40,13 +47,18 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
         limits,
         marketReplayLive: MARKET_REPLAY_LIVE,
         status: record?.status ?? 'active',
-        source: record?.source ?? null,
+        source: accessSource(record),
         currentPeriodEnd: record?.currentPeriodEnd ?? null,
+        complimentaryUntil: complimentaryUntil(record),
         usage: {
           aiMessagesUsed: aiUsed,
-          aiMessagesRemaining: Math.max(0, limits.aiMessagesPerDay - aiUsed),
+          aiMessagesRemaining: Math.max(0, limits.aiMessagesPerDay - aiUsed) + aiCredits,
           syncsUsed: syncUsed,
-          syncsRemaining: Math.max(0, limits.syncsPerDay - syncUsed),
+          syncsRemaining: Math.max(0, limits.syncsPerDay - syncUsed) + syncCredits,
+          // Named separately so the meter can say "2 left (+3 bonus)" instead of a bare 5 that
+          // reads as a bug against a plan that says 2 a day.
+          aiCredits,
+          syncCredits,
           // Sent so the UI can say when "3 left" turns back into "3 of 3", rather than leaving the
           // user to discover the boundary by being surprised by it.
           resetsAt: usageResetsAt(),

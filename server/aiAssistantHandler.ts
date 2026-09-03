@@ -1,7 +1,7 @@
 import type { IncomingHttpHeaders } from 'http';
 import { assertCallerUid, BrokerRequestError } from './snaptradeAuth';
 import { resolveAccess } from './entitlements';
-import { consumeDaily, refundDaily } from './usage';
+import { consumeDaily, refundDaily, type SpendSource } from './usage';
 import { lowestTierWith, TIER_PLANS, type Tier } from '../src/config/tiers';
 
 /**
@@ -111,7 +111,7 @@ export interface AiAssistantResult {
  * UTC day so it resets on its own with no cleanup job.
  */
 type RateOutcome =
-  | { ok: true; remaining: number; limit: number; tier: Tier }
+  | { ok: true; remaining: number; limit: number; tier: Tier; source: SpendSource; credits: number }
   | { ok: false; reason: 'capped' | 'not_included' | 'unavailable'; limit: number; tier: Tier };
 
 async function consumeRateLimit(uid: string): Promise<RateOutcome> {
@@ -120,7 +120,7 @@ async function consumeRateLimit(uid: string): Promise<RateOutcome> {
   const result = await consumeDaily('ai', uid, limit);
 
   return result.ok
-    ? { ok: true, remaining: result.remaining, limit, tier }
+    ? { ok: true, remaining: result.remaining, limit, tier, source: result.source, credits: result.credits }
     : { ok: false, reason: result.reason, limit, tier };
 }
 
@@ -145,7 +145,7 @@ function rateLimitRejection(outcome: Extract<RateOutcome, { ok: false }>): {
   }
   return {
     statusCode: 429,
-    error: `You've used all ${outcome.limit} of today's AI messages on ${TIER_PLANS[outcome.tier].name}. They reset at midnight UTC.`,
+    error: `You've used all ${outcome.limit} of today's AI messages on ${TIER_PLANS[outcome.tier].name}. They reset at midnight Eastern.`,
   };
 }
 
@@ -321,6 +321,10 @@ export interface StreamPreflight {
   tier?: Tier;
   /** Needed so the caller can hand back the counted message if the stream never delivers one. */
   uid?: string;
+  /** Where that message was counted from, so the refund lands in the same place. */
+  spentFrom?: SpendSource;
+  /** Bonus messages still banked, already inside `remaining`. */
+  credits?: number;
 }
 
 /**
@@ -378,6 +382,8 @@ export async function prepareAssistantStream(
       limit: limit.limit,
       tier: limit.tier,
       uid,
+      spentFrom: limit.source,
+      credits: limit.credits,
     };
   } catch (err) {
     if (err instanceof BrokerRequestError) {
@@ -465,13 +471,13 @@ export async function handleAiAssistantRequest(
       // The allowance is spent before the model is called so a failing request can't be retried
       // for free in a loop. When the failure is ours, give it back — charging someone a message
       // for an answer they never received is the kind of small unfairness people remember.
-      await refundDaily('ai', uid);
+      await refundDaily('ai', uid, limit.source);
       throw err;
     }
 
     return {
       statusCode: 200,
-      body: { answer, remaining: limit.remaining, limit: limit.limit, tier: limit.tier },
+      body: { answer, remaining: limit.remaining, limit: limit.limit, tier: limit.tier, credits: limit.credits },
     };
   } catch (err) {
     if (err instanceof BrokerRequestError) {

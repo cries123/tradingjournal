@@ -92,6 +92,8 @@ export interface AdminUserSummary {
   /** Trades with a session date in the last 7 calendar days. */
   tradesSessionLast7Days: number;
   coachShareEnabled: boolean;
+  /** Sign-in blocked by an admin. Mirrored from Auth onto the user document; Auth is what holds. */
+  suspended: boolean;
 }
 
 export interface AdminPlatformStats {
@@ -200,6 +202,7 @@ export async function fetchSignedUpUsers(): Promise<AdminUserSummary[]> {
       createdAt?: unknown;
       lastTradeActivityAt?: unknown;
       lastTradeSessionDate?: string;
+      suspended?: unknown;
     };
 
     byUid.set(docSnap.id, {
@@ -217,6 +220,7 @@ export async function fetchSignedUpUsers(): Promise<AdminUserSummary[]> {
       tradesSavedLast7Days: 0,
       tradesSessionLast7Days: 0,
       coachShareEnabled: false,
+      suspended: data.suspended === true,
     });
   }
 
@@ -247,6 +251,7 @@ export async function fetchSignedUpUsers(): Promise<AdminUserSummary[]> {
         tradesSavedLast7Days: 0,
         tradesSessionLast7Days: 0,
         coachShareEnabled: false,
+        suspended: false,
       });
     }
   }

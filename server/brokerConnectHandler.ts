@@ -203,12 +203,15 @@ function assertBrokerSyncIncluded(_tier: Tier, brokers: number): void {
 export class BrokerSyncError extends BrokerRequestError {
   syncsRemaining: number;
   syncsPerDay: number;
+  /** Bonus syncs still banked, already counted inside syncsRemaining. */
+  syncCredits: number;
 
-  constructor(message: string, statusCode: number, syncsRemaining: number, syncsPerDay: number) {
+  constructor(message: string, statusCode: number, syncsRemaining: number, syncsPerDay: number, syncCredits = 0) {
     super(message, statusCode);
     this.name = 'BrokerSyncError';
     this.syncsRemaining = syncsRemaining;
     this.syncsPerDay = syncsPerDay;
+    this.syncCredits = syncCredits;
   }
 }
 
@@ -384,24 +387,25 @@ async function handleSync(uid: string, accountId?: string, startDate?: string, e
       assertBrokerSyncIncluded(tier, 0);
     }
     throw new BrokerRequestError(
-      `You've used ${limits.syncsPerDay === 1 ? "today's sync" : `all ${limits.syncsPerDay} of today's syncs`} on ${TIER_PLANS[tier].name}. Syncs reset at midnight UTC.`,
+      `You've used ${limits.syncsPerDay === 1 ? "today's sync" : `all ${limits.syncsPerDay} of today's syncs`} on ${TIER_PLANS[tier].name}. Syncs reset at midnight Eastern.`,
       429,
     );
   }
 
   try {
-    return await pullActivities(uid, creds, accountId, startDate, endDate, spend.remaining, limits.syncsPerDay, tier);
+    return await pullActivities(uid, creds, accountId, startDate, endDate, spend.remaining, limits.syncsPerDay, tier, spend.credits);
   } catch (err) {
     if (isUpstreamOutage(err)) {
       // The user paid for a request nobody answered. Give it back before the error goes out, so
       // the remaining count on the response is the one they actually have.
-      await refundDaily('sync', uid);
+      await refundDaily('sync', uid, spend.source);
       console.warn(`[broker-connect] refunded a sync for ${uid} — upstream failure, not a rejected call.`);
       throw new BrokerSyncError(
         'Your broker could not be reached just now. This did not use one of your syncs — try again shortly.',
         503,
         spend.remaining + 1,
         limits.syncsPerDay,
+        spend.source === 'credit' ? spend.credits + 1 : spend.credits,
       );
     }
 
@@ -412,6 +416,7 @@ async function handleSync(uid: string, accountId?: string, startDate?: string, e
       err instanceof BrokerRequestError ? err.statusCode : 502,
       spend.remaining,
       limits.syncsPerDay,
+      spend.credits,
     );
   }
 }
@@ -426,6 +431,7 @@ async function pullActivities(
   syncsRemaining: number,
   syncsPerDay: number,
   tier: Tier,
+  syncCredits: number,
 ): Promise<BrokerConnectResult> {
   const snaptrade = getSnaptrade();
   const PAGE_SIZE = 1000;
@@ -490,6 +496,7 @@ async function pullActivities(
       truncated,
       syncsRemaining,
       syncsPerDay,
+      syncCredits,
       tier,
     },
   };
@@ -622,6 +629,7 @@ export async function handleBrokerConnectRequest(
           error: err.message,
           syncsRemaining: err.syncsRemaining,
           syncsPerDay: err.syncsPerDay,
+          syncCredits: err.syncCredits,
         },
       };
     }

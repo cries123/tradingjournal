@@ -10,6 +10,18 @@ import { getAdminFirestore } from './firebaseAdmin';
 
 export type UsageKind = 'ai' | 'sync' | 'takeaway';
 
+/**
+ * The kinds an admin can top up with credits.
+ *
+ * The takeaway has no place here: it is generated for everyone at a flat cap nobody notices, and a
+ * credit for it would be a credit for a thing no one has ever asked for more of.
+ */
+export type CreditKind = 'ai' | 'sync';
+
+export function isCreditKind(value: unknown): value is CreditKind {
+  return value === 'ai' || value === 'sync';
+}
+
 const COLLECTION: Record<UsageKind, string> = {
   ai: 'aiUsage',
   sync: 'syncUsage',
@@ -19,6 +31,88 @@ const COLLECTION: Record<UsageKind, string> = {
   // asked for would be a strange way to spend their allowance. Its own counter, its own cap.
   takeaway: 'takeawayUsage',
 };
+
+/*
+ * One day's counter, in full.
+ *
+ * `count` is everything spent today, whatever paid for it — it is what the cost report reads, and
+ * a sync funded by a credit still cost the SnapTrade call. `bonus` is how many of those came out
+ * of the user's credit bank, and `forgiven` is how many an admin handed back. What stands against
+ * the daily cap is what is left once both are taken off. Keeping all three, rather than
+ * decrementing `count`, means giving somebody their syncs back never erases the record that the
+ * calls were made.
+ */
+export interface UsageDay {
+  count: number;
+  bonus: number;
+  forgiven: number;
+}
+
+const EMPTY_DAY: UsageDay = { count: 0, bonus: 0, forgiven: 0 };
+
+function wholeNumber(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+}
+
+export function readUsageDay(data: unknown): UsageDay {
+  const d = (data ?? {}) as Partial<Record<keyof UsageDay, unknown>>;
+  return { count: wholeNumber(d.count), bonus: wholeNumber(d.bonus), forgiven: wholeNumber(d.forgiven) };
+}
+
+/** The units that count against today's cap. */
+export function dailyUnitsSpent(day: UsageDay): number {
+  return Math.max(0, day.count - day.bonus - day.forgiven);
+}
+
+/**
+ * Extra units that sit outside the daily cap and are spent only once it is reached.
+ *
+ * One document per user, not per day: a credit is compensation or a favour, and either would be
+ * an odd thing to have expire at midnight. Written only by the Admin SDK, like the counters.
+ */
+export interface UsageCredits {
+  sync: number;
+  ai: number;
+}
+
+export const NO_CREDITS: UsageCredits = { sync: 0, ai: 0 };
+
+/** The most an account can hold of either kind. A typo in the admin panel should not mint infinity. */
+export const MAX_CREDITS = 1000;
+
+export function readCredits(data: unknown): UsageCredits {
+  const d = (data ?? {}) as Partial<Record<CreditKind, unknown>>;
+  return {
+    sync: Math.min(MAX_CREDITS, wholeNumber(d.sync)),
+    ai: Math.min(MAX_CREDITS, wholeNumber(d.ai)),
+  };
+}
+
+function creditsDoc(uid: string) {
+  return getAdminFirestore().doc(`usageCredits/${uid}`);
+}
+
+export type SpendSource = 'daily' | 'credit';
+
+export type SpendDecision =
+  | { allowed: true; source: SpendSource; remaining: number; credits: number }
+  | { allowed: false; reason: 'capped' | 'not_included' };
+
+/**
+ * What one request does to the day, decided in one place so the transaction below stays thin
+ * enough to read.
+ *
+ * Credits never unlock a feature the plan does not include — a Silver account with AI credits is a
+ * mistake in the admin panel, not a trial — and they are only touched once the daily allowance is
+ * gone, so a credit is always the last thing spent and the first thing a refund puts back.
+ */
+export function decideSpend(day: UsageDay, limit: number, credits: number): SpendDecision {
+  if (limit <= 0) return { allowed: false, reason: 'not_included' };
+  const used = dailyUnitsSpent(day);
+  if (used < limit) return { allowed: true, source: 'daily', remaining: limit - used - 1 + credits, credits };
+  if (credits > 0) return { allowed: true, source: 'credit', remaining: credits - 1, credits: credits - 1 };
+  return { allowed: false, reason: 'capped' };
+}
 
 /**
  * The day an allowance belongs to, in US market time rather than UTC.
@@ -86,15 +180,38 @@ function usageDoc(kind: UsageKind, uid: string, day: string) {
 export async function readUsed(kind: UsageKind, uid: string): Promise<number> {
   try {
     const snap = await usageDoc(kind, uid, usageDay()).get();
-    return (snap.data()?.count as number | undefined) ?? 0;
+    return dailyUnitsSpent(readUsageDay(snap.data()));
   } catch (err) {
     console.error(`[usage] read failed for ${kind}/${uid}:`, err);
     return 0;
   }
 }
 
+/** Today's counter in full, for the admin panel. Never throws. */
+export async function readUsageToday(kind: UsageKind, uid: string): Promise<UsageDay> {
+  try {
+    const snap = await usageDoc(kind, uid, usageDay()).get();
+    return readUsageDay(snap.data());
+  } catch (err) {
+    console.error(`[usage] read failed for ${kind}/${uid}:`, err);
+    return EMPTY_DAY;
+  }
+}
+
+/** The credit bank. Never throws — an unreadable bank is empty, which is the safe direction. */
+export async function readUserCredits(uid: string): Promise<UsageCredits> {
+  try {
+    const snap = await creditsDoc(uid).get();
+    return readCredits(snap.data());
+  } catch (err) {
+    console.error(`[usage] credits read failed for ${uid}:`, err);
+    return NO_CREDITS;
+  }
+}
+
 export type ConsumeResult =
-  | { ok: true; remaining: number }
+  /** `remaining` counts everything still available today, credits included; `credits` is the bank alone. */
+  | { ok: true; remaining: number; source: SpendSource; credits: number }
   | { ok: false; reason: 'capped' | 'not_included' | 'unavailable' };
 
 /**
@@ -116,14 +233,26 @@ export async function consumeDaily(
   const ref = usageDoc(kind, uid, day);
   const db = getAdminFirestore();
 
+  const bank = isCreditKind(kind) ? creditsDoc(uid) : null;
+
   try {
     return await db.runTransaction(async (tx) => {
-      const snap = await tx.get(ref);
-      const used = (snap.data()?.count as number | undefined) ?? 0;
-      if (used >= limit) return { ok: false as const, reason: 'capped' as const };
+      const [snap, bankSnap] = await Promise.all([tx.get(ref), bank ? tx.get(bank) : null]);
+      const today = readUsageDay(snap.data());
+      const credits = bank && isCreditKind(kind) ? readCredits(bankSnap?.data())[kind] : 0;
+      const decision = decideSpend(today, limit, credits);
+      if (!decision.allowed) return { ok: false as const, reason: decision.reason };
 
-      tx.set(ref, { uid, day, count: used + 1, updatedAt: new Date().toISOString() }, { merge: true });
-      return { ok: true as const, remaining: limit - (used + 1) };
+      const updatedAt = new Date().toISOString();
+      const fromCredit = decision.source === 'credit';
+      tx.set(
+        ref,
+        { uid, day, count: today.count + 1, bonus: today.bonus + (fromCredit ? 1 : 0), forgiven: today.forgiven, updatedAt },
+        { merge: true },
+      );
+      if (fromCredit && bank) tx.set(bank, { [kind]: credits - 1, updatedAt }, { merge: true });
+
+      return { ok: true as const, remaining: decision.remaining, source: decision.source, credits: decision.credits };
     });
   } catch (err) {
     // Fail closed. Handing out unlimited requests because Firestore blinked is how a cap becomes
@@ -142,19 +271,69 @@ export async function consumeDaily(
  * they never received. Best-effort on purpose: if the refund itself fails, the user is out one
  * unit, which is the right way round.
  */
-export async function refundDaily(kind: UsageKind, uid: string): Promise<void> {
+export async function refundDaily(kind: UsageKind, uid: string, source: SpendSource = 'daily'): Promise<void> {
   const day = usageDay();
   const ref = usageDoc(kind, uid, day);
   const db = getAdminFirestore();
+  // A unit that came out of the credit bank goes back into it. Refunding it to the day instead
+  // would hand back an allowance that expires at midnight in place of one that does not.
+  const bank = source === 'credit' && isCreditKind(kind) ? creditsDoc(uid) : null;
 
   try {
     await db.runTransaction(async (tx) => {
-      const snap = await tx.get(ref);
-      const used = (snap.data()?.count as number | undefined) ?? 0;
-      if (used <= 0) return;
-      tx.set(ref, { uid, day, count: used - 1, updatedAt: new Date().toISOString() }, { merge: true });
+      const [snap, bankSnap] = await Promise.all([tx.get(ref), bank ? tx.get(bank) : null]);
+      const today = readUsageDay(snap.data());
+      if (today.count <= 0) return;
+
+      const updatedAt = new Date().toISOString();
+      const bonus = bank ? Math.max(0, today.bonus - 1) : today.bonus;
+      tx.set(ref, { uid, day, count: today.count - 1, bonus, forgiven: today.forgiven, updatedAt }, { merge: true });
+      if (bank && isCreditKind(kind)) {
+        const credits = readCredits(bankSnap?.data())[kind];
+        tx.set(bank, { [kind]: Math.min(MAX_CREDITS, credits + 1), updatedAt }, { merge: true });
+      }
     });
   } catch (err) {
     console.error(`[usage] refund failed for ${kind}/${uid}:`, err);
   }
+}
+
+/* ------------------------------------------------------------------ admin */
+
+/**
+ * Hands today's spent allowance back, without pretending the calls were never made.
+ *
+ * `forgiven` goes up by what was standing against the cap; `count` is left alone, so the cost
+ * report still sees every call. Returns how many units the person got back.
+ */
+export async function forgiveToday(kind: CreditKind, uid: string): Promise<number> {
+  const day = usageDay();
+  const ref = usageDoc(kind, uid, day);
+
+  return getAdminFirestore().runTransaction(async (tx) => {
+    const today = readUsageDay((await tx.get(ref)).data());
+    const spent = dailyUnitsSpent(today);
+    if (spent === 0) return 0;
+    tx.set(
+      ref,
+      { uid, day, count: today.count, bonus: today.bonus, forgiven: today.forgiven + spent, updatedAt: new Date().toISOString() },
+      { merge: true },
+    );
+    return spent;
+  });
+}
+
+/**
+ * Adds to (or takes from) the credit bank. Floors at zero and ceilings at MAX_CREDITS; returns the
+ * balance the account now holds.
+ */
+export async function adjustCredits(kind: CreditKind, uid: string, delta: number): Promise<number> {
+  const bank = creditsDoc(uid);
+
+  return getAdminFirestore().runTransaction(async (tx) => {
+    const current = readCredits((await tx.get(bank)).data())[kind];
+    const next = Math.max(0, Math.min(MAX_CREDITS, current + Math.trunc(delta)));
+    tx.set(bank, { uid, [kind]: next, updatedAt: new Date().toISOString() }, { merge: true });
+    return next;
+  });
 }

@@ -1,13 +1,20 @@
-import { useEffect, useState } from 'react';
-import { Flag, KeyRound, Mail, Trash2, User, X } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Ban, Flag, KeyRound, Mail, Trash2, Unplug, User, UserCheck, X } from 'lucide-react';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { AdminUserPlanSection } from './AdminUserPlanSection';
+import { AdminUserUsageSection } from './AdminUserUsageSection';
+import { AdminUserEmailComposer } from './AdminUserEmailComposer';
+import { AdminUserHistorySection } from './AdminUserHistorySection';
 import type { AdminUserSummary } from '../../services/admin';
-import { logAdminAction } from '../../services/adminAuditLog';
+import { AUDIT_ACTION_LABELS, logAdminAction } from '../../services/adminAuditLog';
 import type { AdminUserNote } from '../../services/adminUserNotes';
+import type { BugReport } from '../../services/bugReports';
+import type { SupportTicket } from '../../services/supportTickets';
 import {
   adminDeleteUser,
+  adminResetBrokerLink,
   adminSendPasswordResetEmail,
+  adminSetSuspended,
   adminUpdateUserEmail,
   adminUpdateUserPassword,
   adminReadUserUsage,
@@ -22,6 +29,9 @@ interface AdminUserDetailModalProps {
   adminUid: string;
   adminEmail: string;
   note: AdminUserNote;
+  /** This person's own tickets and bug reports, already loaded for the panel's other tabs. */
+  tickets: SupportTicket[];
+  reports: BugReport[];
   onNoteSave: (patch: { note?: string; flagged?: boolean }) => Promise<AdminUserNote>;
   onClose: () => void;
   onUserUpdated: (uid: string, patch: Partial<AdminUserSummary>) => void;
@@ -53,6 +63,8 @@ export function AdminUserDetailModal({
   adminUid,
   adminEmail,
   note,
+  tickets,
+  reports,
   onNoteSave,
   onClose,
   onUserUpdated,
@@ -68,6 +80,11 @@ export function AdminUserDetailModal({
   const [noteDraft, setNoteDraft] = useState(note.note);
   const [noteSaving, setNoteSaving] = useState(false);
   const [flagged, setFlagged] = useState(note.flagged);
+  const [confirmBrokerReset, setConfirmBrokerReset] = useState(false);
+  const [suspendReason, setSuspendReason] = useState('');
+  const [suspending, setSuspending] = useState(false);
+  // Bumped after every action taken here, so the history below picks it up without a reopen.
+  const [historyVersion, setHistoryVersion] = useState(0);
 
   const isSelf = user.uid === adminUid;
   const targetLabel = user.username ? `@${user.username}` : user.email || user.uid;
@@ -75,7 +92,7 @@ export function AdminUserDetailModal({
   const logSelf = (
     action: Parameters<typeof logAdminAction>[0]['action'],
     detail: string,
-  ) =>
+  ) => {
     void logAdminAction({
       adminUid,
       adminEmail,
@@ -84,7 +101,8 @@ export function AdminUserDetailModal({
       targetId: user.uid,
       targetLabel,
       detail,
-    });
+    }).then(() => setHistoryVersion((v) => v + 1));
+  };
 
   const run = async (key: string, fn: () => Promise<void>) => {
     setBusy(key);
@@ -128,6 +146,9 @@ export function AdminUserDetailModal({
   /* Metered usage is server-only by rule, so it is fetched on open rather than carried on the
      summary row — and only for the one person being looked at, which keeps it to one query. */
   const [usage, setUsage] = useState<UserUsage | null>(null);
+  const reloadUsage = useCallback(async () => {
+    setUsage(await adminReadUserUsage(user.uid));
+  }, [user.uid]);
 
   useEffect(() => {
     let cancelled = false;
@@ -138,6 +159,16 @@ export function AdminUserDetailModal({
       cancelled = true;
     };
   }, [user.uid]);
+
+  const setSuspended = (suspended: boolean) =>
+    run('suspend', async () => {
+      const result = await adminSetSuspended(user.uid, suspended, suspendReason);
+      onUserUpdated(user.uid, { suspended });
+      setMessage(result.message);
+      setSuspending(false);
+      setSuspendReason('');
+      logSelf(suspended ? 'user.suspended' : 'user.reactivated', suspended ? suspendReason.trim() || 'No reason given' : 'Sign-in restored');
+    });
 
   return (
     <>
@@ -158,6 +189,12 @@ export function AdminUserDetailModal({
               <h3 id="user-detail-title" className="text-lg font-semibold">
                 {user.username ? `@${user.username}` : 'User details'}
               </h3>
+              {user.suspended && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 text-[10px] font-medium uppercase tracking-wide">
+                  <Ban size={10} aria-hidden />
+                  Suspended
+                </span>
+              )}
             </div>
             <button
               type="button"
@@ -275,8 +312,38 @@ export function AdminUserDetailModal({
             onAudit={logSelf}
           />
 
-          <div className="border-t border-border/50 pt-5 space-y-4">
+          <AdminUserUsageSection
+            uid={user.uid}
+            usage={usage}
+            onChanged={reloadUsage}
+            onDone={(m) => {
+              setError(null);
+              setMessage(m);
+            }}
+            onError={(m) => {
+              setMessage(null);
+              setError(m);
+            }}
+            onAudit={logSelf}
+          />
+
+          <div className="border-t border-border/50 pt-5 mt-5 space-y-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Account</p>
+
+            <AdminUserEmailComposer
+              uid={user.uid}
+              email={user.email}
+              displayName={user.username ? `@${user.username}` : 'there'}
+              onDone={(m) => {
+                setError(null);
+                setMessage(m);
+              }}
+              onError={(m) => {
+                setMessage(null);
+                setError(m);
+              }}
+              onAudit={logSelf}
+            />
 
             <button
               type="button"
@@ -353,6 +420,79 @@ export function AdminUserDetailModal({
               </div>
             </div>
 
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => setConfirmBrokerReset(true)}
+              className="w-full flex items-center justify-center gap-2 btn-secondary py-2.5 text-sm disabled:opacity-50"
+            >
+              <Unplug size={15} />
+              {busy === 'broker' ? 'Resetting…' : 'Reset broker link'}
+            </button>
+
+            {!isSelf && !user.suspended && !suspending && (
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => setSuspending(true)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm rounded-lg border border-amber-500/30 text-amber-300 hover:bg-amber-500/10 transition-colors disabled:opacity-50"
+              >
+                <Ban size={15} />
+                Suspend sign-in
+              </button>
+            )}
+
+            {!isSelf && !user.suspended && suspending && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
+                <input
+                  type="text"
+                  value={suspendReason}
+                  onChange={(e) => setSuspendReason(e.target.value)}
+                  maxLength={200}
+                  placeholder="Why (kept in the audit trail, not shown to them)"
+                  className="input-field text-sm w-full"
+                  aria-label="Reason for suspending"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={busy !== null}
+                    onClick={() => void setSuspended(true)}
+                    className="flex-1 flex items-center justify-center gap-2 py-2 text-sm rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                  >
+                    <Ban size={14} />
+                    {busy === 'suspend' ? 'Suspending…' : 'Suspend now'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy !== null}
+                    onClick={() => {
+                      setSuspending(false);
+                      setSuspendReason('');
+                    }}
+                    className="btn-secondary px-3 py-2 text-xs"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <p className="text-[11px] text-text-secondary leading-relaxed">
+                  Blocks sign-in and ends any open session within the hour. Their data stays; you can undo it here.
+                </p>
+              </div>
+            )}
+
+            {!isSelf && user.suspended && (
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => void setSuspended(false)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm rounded-lg border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 transition-colors disabled:opacity-50"
+              >
+                <UserCheck size={15} />
+                {busy === 'suspend' ? 'Restoring…' : 'Restore sign-in'}
+              </button>
+            )}
+
             {!isSelf && (
               <button
                 type="button"
@@ -404,8 +544,33 @@ export function AdminUserDetailModal({
                   : 'Never noted'}
             </p>
           </div>
+
+          <AdminUserHistorySection
+            uid={user.uid}
+            tickets={tickets}
+            reports={reports}
+            actionLabels={AUDIT_ACTION_LABELS}
+            version={historyVersion}
+          />
         </div>
       </div>
+
+      {confirmBrokerReset && (
+        <ConfirmDialog
+          title="Reset their broker link?"
+          message={`Removes ${user.email || user.uid} from SnapTrade and forgets the stored connection, so the next Connect starts clean. Their trades are not touched. They will need to link their broker again.`}
+          confirmLabel="Reset link"
+          onCancel={() => setConfirmBrokerReset(false)}
+          onConfirm={() => {
+            setConfirmBrokerReset(false);
+            void run('broker', async () => {
+              const result = await adminResetBrokerLink(user.uid);
+              setMessage(result.message);
+              logSelf('user.broker-link-reset', result.hadLink ? 'Link removed; they can reconnect' : 'No link was stored');
+            });
+          }}
+        />
+      )}
 
       {confirmDelete && (
         <ConfirmDialog

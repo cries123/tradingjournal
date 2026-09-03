@@ -131,8 +131,9 @@ export function AssistantPanel({ periods, rules, bare = false }: AssistantPanelP
       // Keeps the sidebar meter honest without another round trip — the server has already
       // counted this message, so the number it hands back is the truth.
       noteUsage({
-        aiMessagesUsed: Math.max(0, limits.aiMessagesPerDay - reply.remaining),
+        aiMessagesUsed: Math.max(0, limits.aiMessagesPerDay - (reply.remaining - reply.credits)),
         aiMessagesRemaining: reply.remaining,
+        aiCredits: reply.credits,
       });
     } catch (err) {
       // Take the optimistic user turn back out and return the text to the box, so a failed send

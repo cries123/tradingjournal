@@ -17,9 +17,9 @@ export const TIER_ORDER: Tier[] = ['free', 'silver', 'gold', 'diamond'];
 export interface TierLimits {
   /** How many brokerage connections may be live at once. 0 means broker sync is not included. */
   brokers: number;
-  /** Broker imports permitted per UTC day. Each one costs a SnapTrade call, hence the cap. */
+  /** Broker imports permitted per market day (midnight Eastern). Each one costs a SnapTrade call, hence the cap. */
   syncsPerDay: number;
-  /** Assistant questions per UTC day. 0 means the assistant is not included. */
+  /** Assistant questions per market day. 0 means the assistant is not included. */
   aiMessagesPerDay: number;
   /** Market replay. Built but not shipped — see MARKET_REPLAY_LIVE. */
   marketReplay: boolean;

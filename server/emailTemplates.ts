@@ -197,3 +197,44 @@ export function weeklyRecapEmail(options: {
       .join('\n'),
   };
 }
+
+/* ------------------------------------------------------------------ a note from the team */
+
+/**
+ * A message written by hand in the admin panel — "we've added a month to your account", "the sync
+ * problem you reported is fixed". Plain paragraphs, the person's own words, nothing quoted from
+ * the account. The reply address is support, so answering it lands where a reply can be read.
+ */
+export function adminMessageEmail(options: {
+  subject: string;
+  message: string;
+  siteUrl: string;
+}): TicketReplyEmail {
+  const paragraphs = options.message
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  const body = paragraphs
+    .map((p) => `<p style="margin:0 0 12px 0;">${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
+    .join('\n');
+
+  return {
+    subject: options.subject,
+    html: layout({
+      title: options.subject,
+      body,
+      ctaLabel: 'Open Trend Chasers',
+      ctaUrl: `${options.siteUrl}/app`,
+      footerNote: 'Sent by the Trend Chasers team. Reply to this email to reach support.',
+    }),
+    text: [
+      options.subject,
+      '',
+      ...paragraphs.flatMap((p) => [p, '']),
+      `Open Trend Chasers: ${options.siteUrl}/app`,
+      '',
+      'Sent by the Trend Chasers team. Reply to this email to reach support.',
+    ].join('\n'),
+  };
+}

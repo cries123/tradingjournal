@@ -18,10 +18,12 @@ const TIER_TEXT: Record<Tier, string> = {
   diamond: 'text-sky-300',
 };
 
-function Meter({ label, used, limit }: { label: string; used: number; limit: number }) {
+function Meter({ label, used, limit, bonus = 0 }: { label: string; used: number; limit: number; bonus?: number }) {
   const remaining = Math.max(0, limit - used);
   const pct = limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
-  const spent = remaining === 0;
+  // Bonus units are spent only once the day's allowance is gone, so the day is not "spent" while
+  // any remain — but the bar still shows the plan's own allowance, which is what resets tonight.
+  const spent = remaining === 0 && bonus === 0;
 
   return (
     <div>
@@ -29,6 +31,7 @@ function Meter({ label, used, limit }: { label: string; used: number; limit: num
         <span className="text-text-secondary">{label}</span>
         <span className={`tabular-nums font-medium ${spent ? 'text-loss-bright' : 'text-text-primary'}`}>
           {remaining} left
+          {bonus > 0 && <span className="text-emerald-400 font-normal"> +{bonus} bonus</span>}
         </span>
       </div>
       <div className="mt-1 h-1 rounded-full bg-bg-tertiary overflow-hidden">
@@ -66,7 +69,7 @@ function resetLabel(resetsAt: string | undefined): string | null {
  */
 export function PlanBadge() {
   const { user } = useAuth();
-  const { tier, limits, usage, loaded, source, status } = useEntitlement();
+  const { tier, limits, usage, loaded, source, status, complimentaryUntil } = useEntitlement();
 
   if (!user || !loaded) return null;
 
@@ -101,8 +104,12 @@ export function PlanBadge() {
 
       {showSyncs || showAi ? (
         <div className="space-y-2">
-          {showSyncs && <Meter label="Broker syncs today" used={usage.syncsUsed} limit={limits.syncsPerDay} />}
-          {showAi && <Meter label="AI messages today" used={usage.aiMessagesUsed} limit={limits.aiMessagesPerDay} />}
+          {showSyncs && (
+            <Meter label="Broker syncs today" used={usage.syncsUsed} limit={limits.syncsPerDay} bonus={usage.syncCredits ?? 0} />
+          )}
+          {showAi && (
+            <Meter label="AI messages today" used={usage.aiMessagesUsed} limit={limits.aiMessagesPerDay} bonus={usage.aiCredits ?? 0} />
+          )}
           {/* Only once something has actually been spent — on a full allowance the reset time is
               noise, and this strip is already the densest thing in the sidebar. */}
           {resetLabel(usage.resetsAt) && (usage.syncsUsed > 0 || usage.aiMessagesUsed > 0) && (
@@ -119,6 +126,11 @@ export function PlanBadge() {
 
       {source === 'admin' && (
         <p className="text-[11px] text-text-secondary leading-snug">Granted to your account — nothing to pay.</p>
+      )}
+      {source === 'comp' && complimentaryUntil && (
+        <p className="text-[11px] text-text-secondary leading-snug">
+          On us until {new Date(complimentaryUntil).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} — nothing to pay.
+        </p>
       )}
     </div>
   );

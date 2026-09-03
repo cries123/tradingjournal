@@ -472,6 +472,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Bonus syncs and AI messages an admin has banked for a user, spent by the same server code
+    // once the daily cap is reached. Server-only for the same reason as the counters: a bank the
+    // client could top up is free syncs for anyone who reads the rules.
+    match /usageCredits/{userId} {
+      allow read, write: if false;
+    }
+
     // What a user has paid for (or been granted). Written ONLY by the Admin SDK — the Creem
     // webhook and the admin panel — because an entitlement the client can write is not an
     // entitlement, it's a suggestion. Users may read their own so the UI knows what to show,

@@ -316,7 +316,7 @@ export function PricingContent({
                   </button>
                 ) : isCurrent ? (
                   <div className="w-full rounded-lg border border-emerald-400/40 bg-emerald-400/10 px-4 py-2.5 text-center text-sm font-medium text-emerald-300">
-                    {source === 'admin' ? 'Granted to your account' : 'Current plan'}
+                    {source === 'admin' ? 'Granted to your account' : source === 'comp' ? 'Yours for now, on us' : 'Current plan'}
                   </div>
                 ) : checkoutPaused ? (
                   /* Not a disabled buy button: a disabled control invites clicking to find out

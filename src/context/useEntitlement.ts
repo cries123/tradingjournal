@@ -13,9 +13,11 @@ export interface EntitlementContextValue {
   tier: Tier;
   limits: TierLimits;
   status: EntitlementSnapshot['status'];
-  /** 'admin' means grandfathered — no subscription to manage, so don't offer to cancel one. */
+  /** 'admin' means grandfathered, 'comp' means complimentary for a while — neither has a subscription to manage. */
   source: EntitlementSnapshot['source'];
   currentPeriodEnd: string | null;
+  /** When complimentary access runs out, if any is live. */
+  complimentaryUntil: string | null;
   usage: EntitlementSnapshot['usage'];
   loading: boolean;
   /** True only once a real answer has come back, so the UI can avoid flashing a locked state. */

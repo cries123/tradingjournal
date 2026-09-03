@@ -1,5 +1,6 @@
 import { getAdminFirestore } from './firebaseAdmin';
 import { isTier, limitsFor, type Tier, type TierLimits } from '../src/config/tiers';
+import { compIsLive, tierWithComp, type ComplimentaryAccess } from '../src/config/accessExtension';
 
 /**
  * What a user is entitled to, and why.
@@ -24,6 +25,14 @@ export interface Entitlement {
   /** ISO date the paid period runs to. A canceled subscription stays usable until then. */
   currentPeriodEnd?: string;
   grantedBy?: string;
+  /**
+   * Time-limited access given by hand, on top of whatever billing says.
+   *
+   * Kept apart from `tier`/`source` on purpose: those describe the subscription, and a webhook is
+   * free to rewrite them. A comp survives that rewrite because the merge never touches it, and it
+   * expires on its own because effectiveTier checks the date — nothing has to run to end it.
+   */
+  comp?: ComplimentaryAccess | null;
   updatedAt: string;
 }
 
@@ -59,22 +68,59 @@ function entitlementDoc(uid: string) {
 }
 
 /**
- * The tier a record actually confers right now.
+ * What the subscription (or permanent grant) alone confers right now.
  *
  * A subscription that has been cancelled but is still inside its paid period keeps working — the
  * customer paid for that time. One that is past due or expired does not. Reading the tier through
  * this function rather than off the document is what stops an expired record granting access
  * forever because nothing ever ran to clear it.
  */
-export function effectiveTier(e: Entitlement | null): Tier {
+export function billingTier(e: Entitlement | null, now: number = Date.now()): Tier {
   if (!e) return 'free';
   if (e.status === 'active') return e.tier;
 
   if (e.status === 'canceled' && e.currentPeriodEnd) {
     const endsAt = Date.parse(e.currentPeriodEnd);
-    if (Number.isFinite(endsAt) && endsAt > Date.now()) return e.tier;
+    if (Number.isFinite(endsAt) && endsAt > now) return e.tier;
   }
   return 'free';
+}
+
+/** The tier a record actually confers right now: billing, with any live complimentary access on top. */
+export function effectiveTier(e: Entitlement | null, now: number = Date.now()): Tier {
+  return tierWithComp(billingTier(e, now), e, now);
+}
+
+/**
+ * Where the access is coming from, for the UI.
+ *
+ * 'comp' only when the complimentary access is doing work — giving a tier billing alone would
+ * not. A paying Gold customer with a Gold comp stacked for later is still, today, a purchase, and
+ * the pricing page must keep treating them as one.
+ */
+export function accessSource(e: Entitlement | null, now: number = Date.now()): 'purchase' | 'admin' | 'comp' | null {
+  if (!e) return null;
+  const fromBilling = billingTier(e, now);
+  if (effectiveTier(e, now) !== fromBilling) return 'comp';
+  return e.source;
+}
+
+/** When the complimentary access runs out, if it is live. */
+export function complimentaryUntil(e: Entitlement | null, now: number = Date.now()): string | null {
+  return e && compIsLive(e.comp, now) ? e.comp.until : null;
+}
+
+/** A stored comp, or null for anything that is not one. A half-written record grants nothing. */
+export function readComp(value: unknown): ComplimentaryAccess | null {
+  const c = value as Partial<ComplimentaryAccess> | null | undefined;
+  if (!c || !isTier(c.tier) || typeof c.until !== 'string' || !Number.isFinite(Date.parse(c.until))) return null;
+  return {
+    tier: c.tier,
+    until: c.until,
+    grantedBy: typeof c.grantedBy === 'string' ? c.grantedBy : '',
+    grantedAt: typeof c.grantedAt === 'string' ? c.grantedAt : '',
+    ...(typeof c.reason === 'string' && c.reason ? { reason: c.reason } : {}),
+  };
 }
 
 export async function readEntitlement(uid: string): Promise<Entitlement | null> {
@@ -82,7 +128,7 @@ export async function readEntitlement(uid: string): Promise<Entitlement | null> 
   if (!snap.exists) return null;
   const data = snap.data() as Partial<Entitlement>;
   if (!isTier(data.tier)) return null;
-  return { ...DEFAULTS, ...data, tier: data.tier } as Entitlement;
+  return { ...DEFAULTS, ...data, tier: data.tier, comp: readComp(data.comp) } as Entitlement;
 }
 
 /** The tier and limits to enforce for this request. Falls back to free on any doubt. */

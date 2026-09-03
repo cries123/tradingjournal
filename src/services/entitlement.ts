@@ -8,6 +8,9 @@ export interface EntitlementUsage {
   syncsRemaining: number;
   /** ISO timestamp of the next allowance reset (midnight US Eastern). Absent on older responses. */
   resetsAt?: string;
+  /** Bonus units an admin added, already included in the remaining counts above. */
+  aiCredits?: number;
+  syncCredits?: number;
 }
 
 export interface EntitlementSnapshot {
@@ -15,8 +18,11 @@ export interface EntitlementSnapshot {
   limits: TierLimits;
   marketReplayLive: boolean;
   status: 'active' | 'canceled' | 'past_due' | 'expired';
-  source: 'purchase' | 'admin' | null;
+  /** 'comp' when complimentary access is what confers the tier — nothing to pay, nothing to cancel. */
+  source: 'purchase' | 'admin' | 'comp' | null;
   currentPeriodEnd: string | null;
+  /** When complimentary access runs out, if any is live. Absent on older responses. */
+  complimentaryUntil?: string | null;
   usage: EntitlementUsage;
 }
 
@@ -28,6 +34,7 @@ export const FREE_SNAPSHOT: EntitlementSnapshot = {
   status: 'active',
   source: null,
   currentPeriodEnd: null,
+  complimentaryUntil: null,
   usage: { aiMessagesUsed: 0, aiMessagesRemaining: 0, syncsUsed: 0, syncsRemaining: 0 },
 };
 

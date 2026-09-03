@@ -8,8 +8,10 @@ export interface AssistantMessage {
 
 export interface AssistantReply {
   answer: string;
-  /** Questions left in today's allowance, so the UI can warn before it runs out. */
+  /** Questions left today, bonus included, so the UI can warn before it runs out. */
   remaining: number;
+  /** The bonus part of `remaining`: messages an admin banked for this account. */
+  credits: number;
 }
 
 export class AssistantError extends Error {
@@ -79,6 +81,7 @@ export async function streamAssistant(
   let buffer = '';
   let answer = '';
   let remaining = 0;
+  let credits = 0;
   let failed = false;
 
   for (;;) {
@@ -95,14 +98,17 @@ export async function streamAssistant(
       if (!dataLine) continue;
       const event = eventLine?.slice(6).trim() ?? 'message';
 
-      let payload: { token?: string; remaining?: number; error?: string };
+      let payload: { token?: string; remaining?: number; credits?: number; error?: string };
       try {
         payload = JSON.parse(dataLine.slice(5).trim()) as typeof payload;
       } catch {
         continue;
       }
 
-      if (event === 'meta' && typeof payload.remaining === 'number') remaining = payload.remaining;
+      if (event === 'meta' && typeof payload.remaining === 'number') {
+        remaining = payload.remaining;
+        credits = typeof payload.credits === 'number' ? payload.credits : 0;
+      }
       else if (event === 'error') failed = true;
       else if (payload.token) {
         answer += payload.token;
@@ -115,7 +121,7 @@ export async function streamAssistant(
     return askAssistant(question, facts, history, options);
   }
 
-  return { answer, remaining };
+  return { answer, remaining, credits };
 }
 
 export async function requireIdToken(): Promise<string> {
@@ -146,7 +152,12 @@ export async function askAssistant(
     }),
   });
 
-  const data = (await res.json().catch(() => ({}))) as { answer?: string; error?: string; remaining?: number };
+  const data = (await res.json().catch(() => ({}))) as {
+    answer?: string;
+    error?: string;
+    remaining?: number;
+    credits?: number;
+  };
 
   if (!res.ok) {
     throw new AssistantError(data.error ?? 'The assistant is unavailable right now.', res.status === 429);
@@ -155,5 +166,5 @@ export async function askAssistant(
     throw new AssistantError('The assistant returned an empty answer.');
   }
 
-  return { answer: data.answer, remaining: data.remaining ?? 0 };
+  return { answer: data.answer, remaining: data.remaining ?? 0, credits: data.credits ?? 0 };
 }

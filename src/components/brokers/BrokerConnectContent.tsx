@@ -238,13 +238,19 @@ export function BrokerConnectContent({
     setSyncingAccountId(account.id);
     try {
       const {
-        trades, truncated, syncsRemaining, syncsPerDay,
+        trades, truncated, syncsRemaining, syncsPerDay, syncCredits,
         unmatchedCloses, assumedShorts, inferredOrderDays, ignored, negativeFees,
       } = await syncBrokerAccount(account.id);
       // The server has already spent one of today's syncs by the time this returns, so the meter
-      // is updated from its answer rather than guessed at.
+      // is updated from its answer rather than guessed at. Bonus syncs ride inside the remaining
+      // count, so they come out before the day's own allowance is worked back.
       if (typeof syncsRemaining === 'number' && typeof syncsPerDay === 'number') {
-        noteUsage({ syncsUsed: Math.max(0, syncsPerDay - syncsRemaining), syncsRemaining });
+        const bonus = syncCredits ?? 0;
+        noteUsage({
+          syncsUsed: Math.max(0, syncsPerDay - (syncsRemaining - bonus)),
+          syncsRemaining,
+          syncCredits: bonus,
+        });
       }
 
       // See dedupeIncomingTrades for why the rules live in one place rather than here.
@@ -316,9 +322,11 @@ export function BrokerConnectContent({
       // call — so the meter tracks reality instead of freezing at whatever it read on page load.
       if (err instanceof BrokerApiError && typeof err.syncsRemaining === 'number') {
         const perDay = err.syncsPerDay ?? limits.syncsPerDay;
+        const bonus = err.syncCredits ?? usage.syncCredits ?? 0;
         noteUsage({
-          syncsUsed: Math.max(0, perDay - err.syncsRemaining),
+          syncsUsed: Math.max(0, perDay - (err.syncsRemaining - bonus)),
           syncsRemaining: err.syncsRemaining,
+          syncCredits: bonus,
         });
       }
       reportError(err, 'Sync failed');
@@ -395,8 +403,11 @@ export function BrokerConnectContent({
             <span className="text-text-primary font-medium">
               {limits.syncsPerDay} sync{limits.syncsPerDay === 1 ? '' : 's'} a day
             </span>
-            {usage.syncsRemaining < limits.syncsPerDay && (
-              <> — {usage.syncsRemaining} left today</>
+            {(usage.syncsRemaining < limits.syncsPerDay || (usage.syncCredits ?? 0) > 0) && (
+              <>
+                {' '}— {usage.syncsRemaining} left today
+                {(usage.syncCredits ?? 0) > 0 && <> (including {usage.syncCredits} bonus)</>}
+              </>
             )}
             .
           </p>

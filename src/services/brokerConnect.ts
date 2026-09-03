@@ -21,14 +21,17 @@ export interface BrokerStatus {
 export class BrokerApiError extends Error {
   syncsRemaining?: number;
   syncsPerDay?: number;
+  /** Bonus syncs banked, already inside syncsRemaining. */
+  syncCredits?: number;
   /** The underlying reason, sent only to the site admin. Undefined for everyone else. */
   detail?: string;
 
-  constructor(message: string, syncsRemaining?: number, syncsPerDay?: number, detail?: string) {
+  constructor(message: string, syncsRemaining?: number, syncsPerDay?: number, detail?: string, syncCredits?: number) {
     super(message);
     this.name = 'BrokerApiError';
     this.syncsRemaining = syncsRemaining;
     this.syncsPerDay = syncsPerDay;
+    this.syncCredits = syncCredits;
     this.detail = detail;
   }
 }
@@ -58,6 +61,7 @@ async function brokerApiPost<T>(payload: Record<string, unknown>): Promise<T> {
     detail?: string;
     syncsRemaining?: number;
     syncsPerDay?: number;
+    syncCredits?: number;
   };
   if (!res.ok) {
     // A failed sync still spends the allowance unless the server refunded it, and the badge used
@@ -69,6 +73,7 @@ async function brokerApiPost<T>(payload: Record<string, unknown>): Promise<T> {
       data.syncsRemaining,
       data.syncsPerDay,
       data.detail,
+      data.syncCredits,
     );
   }
   return data;
@@ -120,9 +125,11 @@ export async function syncBrokerAccount(
   ignored?: Record<string, number>;
   /** Fills whose fee was reported as a negative number; treated as a cost. */
   negativeFees?: number;
-  /** Syncs left today on this plan, counted server-side. */
+  /** Syncs left today on this plan, counted server-side. Includes any banked bonus syncs. */
   syncsRemaining?: number;
   syncsPerDay?: number;
+  /** The bonus part of syncsRemaining, if any. */
+  syncCredits?: number;
 }> {
   return brokerApiPost({ action: 'sync', accountId, startDate, endDate });
 }
