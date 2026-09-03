@@ -237,3 +237,75 @@ describe('a heavy 0DTE day with no time of day', () => {
     expect(diagnostics.inferredOrderDays).toEqual([{ symbol: 'SPY260707C747', date: '2026-07-07', fills: 4 }]);
   });
 });
+
+/*
+ * Modelled on the June 26 that the statement exposed: one strike traded long all day, with a
+ * short sale and its cover in the middle. One queue per contract let the cover — a buy — close a
+ * long lot, and let a sell-to-close take the short. The day came out $328 off a statement that
+ * every other day agreed with to the dollar.
+ */
+describe('a contract traded long and short on the same day', () => {
+  const DAY = '2026-06-26T00:00:00Z';
+  const spy = (
+    id: string, type: 'BUY' | 'SELL', action: string, units: number, price: number, fee: number,
+  ) => ({
+    id, type, units, price, fee, trade_date: DAY, option_type: action,
+    option_symbol: {
+      ticker: 'SPY260626C735', option_type: 'CALL' as const, strike_price: 735,
+      expiration_date: '2026-06-26', underlying_symbol: { symbol: 'SPY' },
+    },
+    account: { id: 'a1' },
+  });
+
+  const longOpens = [
+    spy('lo1', 'BUY', 'BUY_TO_OPEN', 2, 1.60, 1.32),
+    spy('lo2', 'BUY', 'BUY_TO_OPEN', 6, 1.99, 3.97),
+    spy('lo3', 'BUY', 'BUY_TO_OPEN', 6, 2.29, 3.97),
+  ];
+  const longCloses = [
+    spy('lc1', 'SELL', 'SELL_TO_CLOSE', 2, 1.44, 1.34),
+    spy('lc2', 'SELL', 'SELL_TO_CLOSE', 6, 2.16, 4.02),
+    spy('lc3', 'SELL', 'SELL_TO_CLOSE', 6, 2.05, 4.02),
+  ];
+  const shortOpen = spy('so', 'SELL', 'SELL_TO_OPEN', 2, 1.44, 1.34);
+  const cover = spy('sc', 'BUY', 'BUY_TO_CLOSE', 2, 1.23, 1.32);
+
+  // Net cash, which is the truth however the pairing falls:
+  //   sales  (1.44 + 1.44) × 200 + (2.16 + 2.05) × 600 − 1.34 − 1.34 − 4.02 − 4.02 = 3091.28
+  //   buys   (1.60 + 1.23) × 200 + (1.99 + 2.29) × 600 + 1.32 + 1.32 + 3.97 + 3.97 = 3144.58
+  const TRUTH = 3091.28 - 3144.58;
+
+  // How the feed arrived: the day's buys, then the day's sells. This is the order that broke.
+  const asFed = [longOpens[0], cover, longOpens[1], longOpens[2], longCloses[0], shortOpen, longCloses[1], longCloses[2]];
+  // How the statement lists them: sales, then purchases.
+  const asStated = [longCloses[0], shortOpen, longCloses[1], longCloses[2], longOpens[0], cover, longOpens[1], longOpens[2]];
+
+  it('books the short sale and its cover as one short trade', () => {
+    const { trades } = mapSnapTradeActivities(asFed);
+    const shorts = trades.filter((t) => t.side === 'short');
+    expect(shorts.map((t) => [t.quantity, t.tradePrice, t.exitPrice])).toEqual([[2, 1.44, 1.23]]);
+    // (1.44 − 1.23) × 200, less the 1.34 to sell and the 1.32 to buy back.
+    expect(shorts[0].pnl).toBeCloseTo(39.34, 2);
+  });
+
+  it('never lets a buy close a long, or a sell close the short', () => {
+    const ascending = (prices: (number | undefined)[]) => prices.map((p) => p ?? Number.NaN).sort((a, b) => a - b);
+    for (const feed of [asFed, asStated]) {
+      const { trades } = mapSnapTradeActivities(feed);
+      const longs = trades.filter((t) => t.side === 'long');
+      // Every long was bought at one of the three buy-to-open prices and sold at one of the three
+      // sell-to-close prices. The cover at 1.23 and the short sale at 1.44 belong to the short alone.
+      expect(ascending(longs.map((t) => t.tradePrice))).toEqual([1.60, 1.99, 2.29]);
+      expect(ascending(longs.map((t) => t.exitPrice))).toEqual([1.44, 2.05, 2.16]);
+    }
+  });
+
+  it('comes out at the statement figure in either feed order, with nothing unmatched', () => {
+    for (const feed of [asFed, asStated]) {
+      const { trades, diagnostics } = mapSnapTradeActivities(feed);
+      expect(diagnostics.unmatchedOptionCloses).toEqual([]);
+      expect(trades).toHaveLength(4);
+      expect(trades.reduce((s, t) => s + t.pnl, 0)).toBeCloseTo(TRUTH, 2);
+    }
+  });
+});

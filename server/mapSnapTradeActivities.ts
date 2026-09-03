@@ -411,23 +411,52 @@ function buildTrade(
   };
 }
 
+/**
+ * A close consumes only lots of the side it closes.
+ *
+ * One queue per contract, with any close eating from the front, was right for as long as the
+ * account only went long. The first day with a short sale in a contract that was also being traded
+ * long exposed it: the cover — a buy — was matched against a long lot, and a sell-to-close was
+ * matched against the short. Both P&Ls came out wrong, and the day was $328 off a statement that
+ * every other day agreed with to the dollar. A sell can only close a long; a buy can only close a
+ * short. The lots are kept apart by side so that is the only pairing possible.
+ */
+type LotSide = 'long' | 'short';
+
+/** What an opening fill creates, or what a closing fill is entitled to close. */
+function lotSideFor(exec: RawActivity): LotSide {
+  if (exec.positionEffect === 'OPEN') return exec.side === 'BUY' ? 'long' : 'short';
+  // A sell-to-close closes longs; a buy-to-close closes shorts.
+  return exec.side === 'SELL' ? 'long' : 'short';
+}
+
 function matchOptions(
   activities: RawActivity[],
   diagnostics: SyncDiagnostics,
 ): ParsedTradeInput[] {
   const openLots = new Map<string, OpenLot[]>();
   const trades: ParsedTradeInput[] = [];
+  const queueFor = (exec: RawActivity, side: LotSide): OpenLot[] => {
+    const key = `${exec.accountId}|${exec.optionTicker}|${side}`;
+    let queue = openLots.get(key);
+    if (!queue) {
+      queue = [];
+      openLots.set(key, queue);
+    }
+    return queue;
+  };
 
   for (const exec of activities) {
-    const key = `${exec.accountId}|${exec.optionTicker}`;
-    if (!openLots.has(key)) openLots.set(key, []);
-
     if (exec.positionEffect === 'OPEN') {
-      openLots.get(key)!.push({ qty: exec.units, price: exec.price, fee: exec.fee, open: exec });
+      queueFor(exec, lotSideFor(exec)).push({ qty: exec.units, price: exec.price, fee: exec.fee, open: exec });
       continue;
     }
 
-    const queue = openLots.get(key)!;
+    // A settlement ends whatever is held, whichever way it points. A trade closes one side only.
+    const queues = exec.settlement
+      ? [queueFor(exec, 'long'), queueFor(exec, 'short')]
+      : [queueFor(exec, lotSideFor(exec))];
+    const held = queues.reduce((total, q) => total + q.reduce((t, lot) => t + lot.qty, 0), 0);
 
     /*
      * A settlement closes whatever is actually left, not the size the brokerage reported.
@@ -437,11 +466,9 @@ function matchOptions(
      * matcher is holding. Taking the units from the row would leave a remnant lot behind on any
      * brokerage that reports it differently, which is the bug this is meant to end.
      */
-    let remaining = exec.settlement
-      ? queue.reduce((total, lot) => total + lot.qty, 0)
-      : exec.units;
+    let remaining = exec.settlement ? held : exec.units;
 
-    if (remaining <= 0 && queue.length === 0) {
+    if (remaining <= 0 && held <= 0) {
       // A close with nothing to close. The opening fill predates the history we were given.
       diagnostics.unmatchedOptionCloses.push({
         symbol: exec.optionTicker || exec.underlyingSymbol,
@@ -453,37 +480,39 @@ function matchOptions(
 
     const remainingAtStart = remaining;
 
-    while (remaining > 0 && queue.length > 0) {
-      const lot = queue[0];
-      const matched = Math.min(remaining, lot.qty);
-      const mult = 100;
+    for (const queue of queues) {
+      while (remaining > 0 && queue.length > 0) {
+        const lot = queue[0];
+        const matched = Math.min(remaining, lot.qty);
+        const mult = 100;
 
-      /*
-       * Direction comes from the lot, not from the closing fill.
-       *
-       * Keying off exec.side worked only because a long is normally closed by a sell and a short
-       * by a buy, so the closing side stood in for the lot's direction. A settlement breaks that
-       * proxy: expiry has no side of its own, and reading it as a sell made a short put that
-       * expired worthless — the best outcome that trade has — book the premium as a $600 loss
-       * instead of a $600 gain. The lot always knew which way it was pointing.
-       */
-      const openedLong = lot.open.side === 'BUY';
-      const grossPnl = openedLong
-        ? (exec.price - lot.price) * matched * mult
-        : (lot.price - exec.price) * matched * mult;
+        /*
+         * Direction comes from the lot, not from the closing fill.
+         *
+         * Keying off exec.side worked only because a long is normally closed by a sell and a short
+         * by a buy, so the closing side stood in for the lot's direction. A settlement breaks that
+         * proxy: expiry has no side of its own, and reading it as a sell made a short put that
+         * expired worthless — the best outcome that trade has — book the premium as a $600 loss
+         * instead of a $600 gain. The lot always knew which way it was pointing.
+         */
+        const openedLong = lot.open.side === 'BUY';
+        const grossPnl = openedLong
+          ? (exec.price - lot.price) * matched * mult
+          : (lot.price - exec.price) * matched * mult;
 
-      const exitUnits = exec.settlement ? (remainingAtStart || exec.units) : exec.units;
-      const feeShare =
-        drawEntryFee(lot, matched, lot.qty)
-        + (exitUnits > 0 ? exec.fee * (matched / exitUnits) : 0);
-      const pnl = grossPnl - feeShare;
-      const side: TradeSide = openedLong ? 'long' : 'short';
+        const exitUnits = exec.settlement ? (remainingAtStart || exec.units) : exec.units;
+        const feeShare =
+          drawEntryFee(lot, matched, lot.qty)
+          + (exitUnits > 0 ? exec.fee * (matched / exitUnits) : 0);
+        const pnl = grossPnl - feeShare;
+        const side: TradeSide = openedLong ? 'long' : 'short';
 
-      trades.push(buildTrade(lot.open, exec, matched, pnl, grossPnl, feeShare, side));
+        trades.push(buildTrade(lot.open, exec, matched, pnl, grossPnl, feeShare, side));
 
-      lot.qty -= matched;
-      remaining -= matched;
-      if (lot.qty <= 0.0001) queue.shift();
+        lot.qty -= matched;
+        remaining -= matched;
+        if (lot.qty <= 0.0001) queue.shift();
+      }
     }
 
     if (remaining > 0.0001 && !exec.settlement) {
