@@ -144,8 +144,31 @@ interface OpenLot {
   /** Signed quantity: positive = long inventory, negative = short inventory. */
   qty: number;
   price: number;
+  /**
+   * The entry fee still unattributed — drawn down as the lot is closed.
+   *
+   * It has to shrink with the lot. Prorating a fixed fee against `qty` while `qty` was being
+   * decremented meant the denominator got smaller while the numerator stayed whole, so an entry
+   * closed in two exits was charged its commission at 50% and then again at 100%. Buy 100 with a
+   * $10 commission, sell 50 and 50, and the journal booked $15 of entry fees against the $10 paid.
+   * Scaling out of a position is ordinary trading, so this was wrong for most real accounts and
+   * invisible in test data, where every fill closes in one go.
+   */
   fee: number;
   open: RawActivity;
+}
+
+/**
+ * Takes this exit's share of a lot's remaining entry fee, and consumes it.
+ *
+ * Prorating against what is left, then subtracting, makes the shares across every exit sum to
+ * exactly the fee that was paid — whatever order or sizes the exits come in.
+ */
+function drawEntryFee(lot: OpenLot, matched: number, lotRemaining: number): number {
+  if (lotRemaining <= 0) return 0;
+  const share = lot.fee * (matched / lotRemaining);
+  lot.fee -= share;
+  return share;
 }
 
 /**
@@ -238,7 +261,7 @@ function matchOptions(activities: RawActivity[]): ParsedTradeInput[] {
           ? (exec.price - lot.price) * matched * mult
           : (lot.price - exec.price) * matched * mult;
 
-      const feeShare = (lot.fee * (matched / lot.qty)) + (exec.fee * (matched / exec.units));
+      const feeShare = drawEntryFee(lot, matched, lot.qty) + exec.fee * (matched / exec.units);
       const pnl = grossPnl - feeShare;
       const side: TradeSide = lot.open.side === 'BUY' ? 'long' : 'short';
 
@@ -272,7 +295,7 @@ function matchStocks(activities: RawActivity[]): ParsedTradeInput[] {
       const lotSign = Math.sign(lot.qty);
 
       const grossPnl = (exec.price - lot.price) * matched * lotSign;
-      const feeShare = (lot.fee * (matched / lotAbs)) + (exec.fee * (matched / exec.units));
+      const feeShare = drawEntryFee(lot, matched, lotAbs) + exec.fee * (matched / exec.units);
       const pnl = grossPnl - feeShare;
       const side: TradeSide = lotSign > 0 ? 'long' : 'short';
 
