@@ -1,19 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowLeft, BadgeCheck, Check, Clock, Crown, Gem, Medal, Notebook, ShieldCheck, Sparkles } from 'lucide-react';
-import { featureLines, TIER_ORDER, TIER_PLANS, type Tier } from '../../config/tiers';
+import {
+  ANNUAL_BILLING_LIVE,
+  ANNUAL_MONTHS_CHARGED,
+  annualMonthlyEquivalent,
+  annualPrice,
+  featureLines,
+  TIER_ORDER,
+  TIER_PLANS,
+  type Tier,
+} from '../../config/tiers';
 import { REFUND_WINDOW_DAYS } from '../../config/legal';
 import { BROKER_COUNT_PHRASE } from '../../data/brokerCopy';
 import { useAuth } from '../../context/useAuth';
 import { useEntitlement } from '../../context/useEntitlement';
-import { TRIAL_DAYS, TRIAL_TIER } from '../../config/trial';
+import { TRIAL_TIER } from '../../config/trial';
 import {
   CheckoutError,
   choosePlan,
   fetchPaymentsStatus,
   openBillingPortal,
-  startFreeTrial,
   type PaymentsStatus,
 } from '../../services/entitlement';
+import { StartTrialButton } from '../plan/StartTrialButton';
 
 const TIER_ICON: Record<Tier, typeof Notebook> = {
   free: Notebook,
@@ -67,15 +76,34 @@ export function PricingContent({
   onBrokers,
 }: PricingContentProps) {
   const { user } = useAuth();
-  const { tier: currentTier, loaded, source, refresh, trialAvailable, onTrial, complimentaryUntil } =
-    useEntitlement();
+  const {
+    tier: currentTier,
+    loaded,
+    source,
+    refresh,
+    trialAvailable,
+    onTrial,
+    complimentaryUntil,
+    trialBlockedReason,
+  } = useEntitlement();
   const [busy, setBusy] = useState<Tier | null>(null);
   const [error, setError] = useState<string | null>(null);
   /** The payment provider's own words. Only ever populated for the site admin. */
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [portalBusy, setPortalBusy] = useState(false);
-  const [trialBusy, setTrialBusy] = useState(false);
+  /*
+   * Yearly is shown but not sold yet.
+   *
+   * The prices are real and the saving is real; what does not exist yet is the product in Creem,
+   * so the toggle previews the plan and says so rather than opening a checkout that would fail.
+   * ANNUAL_BILLING_LIVE is the only thing to change when those ids exist.
+   */
+  const [yearly, setYearly] = useState(false);
+
+  /** The trial is on offer while it is available, or while only a confirmation stands in the way. */
+  const trialOnOffer =
+    Boolean(user) && loaded && (trialAvailable || trialBlockedReason === 'email-unverified');
   const [payments, setPayments] = useState<PaymentsStatus | null>(null);
   // Read from the URL at mount rather than set from an effect, so the banner is right on the
   // first paint the buyer sees after being sent back from checkout.
@@ -122,24 +150,6 @@ export function PricingContent({
   const checkoutPaused = payments?.checkoutEnabled === false;
   /** Paying customer with a real subscription — as opposed to free, or a hand-granted tier. */
   const subscribed = Boolean(user) && loaded && source === 'purchase' && currentTier !== 'free';
-
-  const handleTrial = async () => {
-    setError(null);
-    setErrorDetail(null);
-    setNotice(null);
-    setTrialBusy(true);
-    try {
-      const { message } = await startFreeTrial();
-      // The plan the whole page is about has just changed, so nothing on it is right until the
-      // entitlement is re-read.
-      await refresh();
-      setNotice(message);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not start your trial.');
-    } finally {
-      setTrialBusy(false);
-    }
-  };
 
   const handlePortal = async () => {
     setError(null);
@@ -202,6 +212,44 @@ export function PricingContent({
           are priced against that, not against how much we think your P&amp;L is worth.
         </p>
       </header>
+
+      <div className="mt-7 flex flex-wrap items-center gap-3">
+        <div
+          className="inline-flex rounded-lg border border-border bg-bg-secondary/60 p-0.5"
+          role="group"
+          aria-label="Billing period"
+        >
+          {([false, true] as const).map((isYearly) => (
+            <button
+              key={String(isYearly)}
+              type="button"
+              onClick={() => setYearly(isYearly)}
+              aria-pressed={yearly === isYearly}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                yearly === isYearly
+                  ? 'bg-bg-tertiary text-text-primary'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              {isYearly ? 'Yearly' : 'Monthly'}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-text-secondary">
+          {yearly ? (
+            <>
+              {12 - ANNUAL_MONTHS_CHARGED} months free on every plan
+              {!ANNUAL_BILLING_LIVE && (
+                <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-400/15 text-amber-200">
+                  Coming soon
+                </span>
+              )}
+            </>
+          ) : (
+            <>Pay monthly, cancel whenever. Yearly saves {12 - ANNUAL_MONTHS_CHARGED} months.</>
+          )}
+        </p>
+      </div>
 
       {justPaid && (
         <div className="mt-8 rounded-xl border border-emerald-400/40 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200 flex items-center gap-2">
@@ -296,10 +344,17 @@ export function PricingContent({
               </div>
 
               <p className="mt-4 flex items-baseline gap-1">
-                <span className="text-4xl font-bold tracking-tight tabular-nums">${plan.price}</span>
+                <span className="text-4xl font-bold tracking-tight tabular-nums">
+                  ${yearly && plan.price > 0 ? annualMonthlyEquivalent(tier) : plan.price}
+                </span>
                 <span className="text-sm text-text-secondary">
                   {plan.price === 0 ? 'forever' : '/month'}
                 </span>
+              </p>
+              {/* The yearly total, spelled out. "$4.17/month" with no annual figure beside it is
+                  the oldest trick on a pricing page and people rightly distrust it. */}
+              <p className="mt-1 text-xs text-text-secondary min-h-[1rem]">
+                {yearly && plan.price > 0 ? `$${annualPrice(tier)} billed once a year` : ''}
               </p>
               <p className="mt-2 text-sm text-text-secondary leading-relaxed sm:min-h-[2.75rem]">
                 {plan.tagline}
@@ -346,28 +401,25 @@ export function PricingContent({
                           ? 'Yours for now, on us'
                           : 'Current plan'}
                   </div>
+                ) : yearly && !ANNUAL_BILLING_LIVE ? (
+                  <div className="w-full rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-center text-sm font-medium text-amber-200">
+                    Yearly billing is coming soon
+                  </div>
                 ) : checkoutPaused ? (
                   /* Not a disabled buy button: a disabled control invites clicking to find out
                      why. This says the reason where the button would have been. */
                   <div className="w-full rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-center text-sm font-medium text-amber-200">
                     Temporarily unavailable
                   </div>
-                ) : tier === TRIAL_TIER && user && loaded && trialAvailable ? (
+                ) : tier === TRIAL_TIER && trialOnOffer ? (
                   /*
                    * Broker sync is the only thing this product charges for, and a free account
                    * cannot touch it — so the one feature worth paying for is the one nobody has
-                   * ever used. This button is the whole answer to that, which is why it takes the
-                   * primary position on the card and the card's own buy action moves underneath.
+                   * ever used. The trial takes the primary position, and the card's own buy action
+                   * moves underneath it.
                    */
                   <div className="space-y-2">
-                    <button
-                      type="button"
-                      disabled={trialBusy}
-                      onClick={() => void handleTrial()}
-                      className={`w-full rounded-lg px-4 py-2.5 text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${accent.button}`}
-                    >
-                      {trialBusy ? 'Starting your trial…' : `Start ${TRIAL_DAYS} days free`}
-                    </button>
+                    <StartTrialButton showTerms={false} onStarted={() => setNotice(null)} />
                     <button
                       type="button"
                       disabled={busy !== null}

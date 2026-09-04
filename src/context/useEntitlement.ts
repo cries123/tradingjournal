@@ -20,6 +20,9 @@ export interface EntitlementContextValue {
   complimentaryUntil: string | null;
   /** They have never had a free trial and could start one now. */
   trialAvailable: boolean;
+  /** Why not, when not — 'email-unverified' is the one the page can do something about. */
+  trialBlockedReason: string | null;
+  trialBlockedMessage: string | null;
   /** What is running is a self-serve trial rather than something granted by hand. */
   onTrial: boolean;
   usage: EntitlementSnapshot['usage'];

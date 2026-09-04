@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Ban, Flag, KeyRound, Mail, Trash2, Unplug, User, UserCheck, X } from 'lucide-react';
+import { AlertTriangle, Ban, Flag, KeyRound, Mail, Trash2, Unplug, User, UserCheck, X } from 'lucide-react';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { AdminUserPlanSection } from './AdminUserPlanSection';
 import { AdminUserUsageSection } from './AdminUserUsageSection';
@@ -12,12 +12,14 @@ import type { BugReport } from '../../services/bugReports';
 import type { SupportTicket } from '../../services/supportTickets';
 import {
   adminDeleteUser,
+  adminReadTrialClaim,
   adminResetBrokerLink,
   adminSendPasswordResetEmail,
   adminSetSuspended,
   adminUpdateUserEmail,
   adminUpdateUserPassword,
   adminReadUserUsage,
+  type TrialClaimView,
   type UserUsage,
 } from '../../services/adminUserManagement';
 import { formatCurrency } from '../../utils/format';
@@ -154,6 +156,21 @@ export function AdminUserDetailModal({
     let cancelled = false;
     void adminReadUserUsage(user.uid).then((u) => {
       if (!cancelled) setUsage(u);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user.uid]);
+
+  /* Whether this account's free trial looked like one already claimed. Advisory: the trial was
+     granted either way, and a shared browser or network is a household far more often than it is
+     somebody farming free weeks. */
+  const [trialClaim, setTrialClaim] = useState<TrialClaimView | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void adminReadTrialClaim(user.uid).then((c) => {
+      if (!cancelled) setTrialClaim(c);
     });
     return () => {
       cancelled = true;
@@ -297,6 +314,27 @@ export function AdminUserDetailModal({
               <dt className="text-xs text-text-secondary uppercase tracking-wider">Coach share</dt>
               <dd className="mt-0.5">{user.coachShareEnabled ? 'On' : 'Off'}</dd>
             </div>
+            {trialClaim && (
+              <div>
+                <dt className="text-xs text-text-secondary uppercase tracking-wider">Free trial</dt>
+                <dd className="mt-0.5">
+                  Started {formatDateTime(trialClaim.claimedAt)}
+                  {trialClaim.flags.length > 0 && (
+                    <span className="mt-1 flex flex-wrap gap-1">
+                      {trialClaim.flags.map((flag) => (
+                        <span
+                          key={flag}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 text-[10px] font-medium"
+                        >
+                          <AlertTriangle size={10} aria-hidden />
+                          {flag.replaceAll('-', ' ')}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                </dd>
+              </div>
+            )}
           </dl>
 
           <AdminUserPlanSection

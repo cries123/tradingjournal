@@ -10,7 +10,9 @@ import {
   parseBrokerStatusOverrides,
   resolveBrokerStatus,
 } from '../src/data/brokerStatusOverrides';
-import { resolveAccess } from './entitlements';
+import { readEntitlement, resolveAccess } from './entitlements';
+import { brokerageKey, brokerageOwner, claimBrokerage } from './trialGuards';
+import { compIsLive } from '../src/config/accessExtension';
 import { consumeDaily, refundDaily } from './usage';
 import { describeHttpError, isRejectedCredential, isUpstreamOutage } from './upstreamErrors';
 import { lowestTierWith, TIER_PLANS, type Tier } from '../src/config/tiers';
@@ -363,6 +365,55 @@ async function handleStatus(uid: string): Promise<BrokerConnectResult> {
   return { statusCode: 200, body: { registered: true, accounts, plan } };
 }
 
+/**
+ * One free trial per real brokerage account.
+ *
+ * The account ids SnapTrade issues are per-user, so they say nothing across two signups — link
+ * the same Schwab account under a second login and every id differs. The masked account number
+ * does not change, and with the institution beside it that pair identifies the actual account
+ * behind two logins. Both are hashed; what is stored can be compared but not read.
+ *
+ * Enforced ONLY against a trial. A paying customer who opens a second account, or comes back
+ * after deleting one, must never be told their own brokerage is spoken for — the whole point is
+ * to stop free weeks being farmed, not to stop anybody paying us.
+ */
+async function assertBrokerageNotAlreadyTrialled(
+  uid: string,
+  accounts: { institutionName?: string | null; number?: string | null }[],
+  onTrial: boolean,
+): Promise<void> {
+  for (const account of accounts) {
+    const key = brokerageKey(account.institutionName ?? null, account.number ?? null);
+    if (!key) continue;
+
+    const owner = await brokerageOwner(key);
+    if (!owner) {
+      await claimBrokerage(key, uid);
+      continue;
+    }
+    if (owner === uid) continue;
+
+    if (onTrial) {
+      throw new BrokerRequestError(
+        'This brokerage account has already been used with another Trend Chasers account, so it is not eligible for a second free trial. Subscribe to any paid plan and it will sync straight away.',
+        409,
+      );
+    }
+  }
+}
+
+/** True when what is granting this account its plan right now is a self-serve trial. */
+async function isOnTrial(uid: string): Promise<boolean> {
+  try {
+    const record = await readEntitlement(uid);
+    return record?.comp?.trial === true && compIsLive(record.comp, Date.now());
+  } catch {
+    // Unreadable means "assume they are paying". Blocking a real customer over a Firestore blip
+    // is the more expensive mistake by a distance.
+    return false;
+  }
+}
+
 async function handleSync(uid: string, accountId?: string, startDate?: string, endDate?: string): Promise<BrokerConnectResult> {
   if (!accountId) {
     throw new BrokerRequestError('accountId is required', 400);
@@ -375,6 +426,21 @@ async function handleSync(uid: string, accountId?: string, startDate?: string, e
   if (!creds) {
     throw new BrokerRequestError('No broker connected yet', 400);
   }
+
+  /*
+   * Checked before the allowance is spent, so a refusal never costs somebody a sync.
+   *
+   * The listing is one call SnapTrade does not bill per use, unlike the activity pull below.
+   */
+  const onTrial = await isOnTrial(uid);
+  const listed = await withCredentialRecovery(uid, creds, (c) =>
+    getSnaptrade().accountInformation.listUserAccounts({ userId: c.userId, userSecret: c.userSecret }),
+  );
+  await assertBrokerageNotAlreadyTrialled(
+    uid,
+    listed.data.map((a) => ({ institutionName: a.institution_name, number: a.number })),
+    onTrial,
+  );
 
   // Counted before the pull, not after: a sync that fails halfway still cost the SnapTrade call
   // it was capped for, and counting afterwards would let a retry loop pull for free.

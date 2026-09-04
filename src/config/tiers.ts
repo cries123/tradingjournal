@@ -42,6 +42,8 @@ export interface TierPlan {
   limits: TierLimits;
   /** Creem product id, set per environment. Absent for free, which is never purchased. */
   productIdEnv?: string;
+  /** Creem product id for the yearly price. Absent until annual billing is switched on. */
+  annualProductIdEnv?: string;
 }
 
 /**
@@ -53,6 +55,33 @@ export interface TierPlan {
  * between anticipation and a refund request.
  */
 export const MARKET_REPLAY_LIVE = false;
+
+/**
+ * Annual billing is built but not switched on.
+ *
+ * Same pattern as market replay above: the plans carry their yearly price, the pricing page can
+ * render the toggle, and the only thing standing between here and selling one is three product
+ * ids in Creem. Until those exist the page says "coming soon" rather than opening a checkout
+ * that would fail — flipping this to true is the whole change.
+ */
+export const ANNUAL_BILLING_LIVE = false;
+
+/**
+ * Months charged for on an annual plan. Two free is the usual shape, and it is worth more than it
+ * looks on a $5 plan: Creem's flat fee per charge is $0.40, so twelve monthly charges lose $4.80
+ * to fees where one annual charge loses forty cents.
+ */
+export const ANNUAL_MONTHS_CHARGED = 10;
+
+/** What a year of this plan costs, in whole dollars. */
+export function annualPrice(tier: Tier): number {
+  return TIER_PLANS[tier].price * ANNUAL_MONTHS_CHARGED;
+}
+
+/** What it works out to per month, for the comparison people actually make. */
+export function annualMonthlyEquivalent(tier: Tier): number {
+  return Math.round((annualPrice(tier) / 12) * 100) / 100;
+}
 
 export const TIER_PLANS: Record<Tier, TierPlan> = {
   free: {
@@ -69,6 +98,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     tagline: 'Connect a broker and stop typing trades in.',
     limits: { brokers: 1, syncsPerDay: 1, aiMessagesPerDay: 0, marketReplay: false, performanceAnalytics: true },
     productIdEnv: 'CREEM_PRODUCT_SILVER',
+    annualProductIdEnv: 'CREEM_PRODUCT_SILVER_ANNUAL',
   },
   gold: {
     id: 'gold',
@@ -77,6 +107,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     tagline: 'Two brokers, and an assistant that reads your stats.',
     limits: { brokers: 2, syncsPerDay: 2, aiMessagesPerDay: 15, marketReplay: false, performanceAnalytics: true },
     productIdEnv: 'CREEM_PRODUCT_GOLD',
+    annualProductIdEnv: 'CREEM_PRODUCT_GOLD_ANNUAL',
   },
   diamond: {
     id: 'diamond',
@@ -85,6 +116,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     tagline: 'Everything, with room to actually use it.',
     limits: { brokers: 3, syncsPerDay: 3, aiMessagesPerDay: 50, marketReplay: true, performanceAnalytics: true },
     productIdEnv: 'CREEM_PRODUCT_DIAMOND',
+    annualProductIdEnv: 'CREEM_PRODUCT_DIAMOND_ANNUAL',
   },
 };
 

@@ -7,7 +7,10 @@ import { DayDetailDrawer } from '../components/DayDetailDrawer';
 import { LeaderboardContent } from '../components/LeaderboardContent';
 import { MobileBottomNav, MobileDrawer, MobileHeader } from '../components/MobileNav';
 import { OnboardingOverlay } from '../components/OnboardingOverlay';
-import { hasCompletedOnboarding } from '../utils/onboarding';
+import { hasCompletedOnboarding, hideGettingStarted, isGettingStartedHidden } from '../utils/onboarding';
+import { GettingStartedCard } from '../components/onboarding/GettingStartedCard';
+import { useEntitlement } from '../context/useEntitlement';
+import type { OnboardingStepId } from '../utils/onboardingSteps';
 import { SettingsPage } from '../components/SettingsPage';
 import { ShareCardModal } from '../components/ShareCardModal';
 import { Sidebar, type SidebarAppView } from '../components/Sidebar';
@@ -100,6 +103,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   const [showShareCard, setShowShareCard] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => !hasCompletedOnboarding());
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [gettingStartedHidden, setGettingStartedHidden] = useState(() => isGettingStartedHidden());
 
   const showAuthModal = firebaseEnabled && !loading && !user;
   const showUsernameModal = firebaseEnabled && !loading && !profileLoading && needsUsername;
@@ -132,6 +136,14 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   // fire before the journal finished loading, dedupe against an empty list, and re-import someone's
   // entire history. Anything automatic here needs a much stronger guarantee than that one had.
   const hasBrokerTrades = useMemo(() => everyTrade.some((t) => Boolean(t.sourceId)), [everyTrade]);
+  const { has } = useEntitlement();
+  /* The reflection habit, observed rather than asked about: a trade carrying a note means they
+     came back to it, which is the whole point of keeping a journal. */
+  const hasTradeNote = useMemo(() => everyTrade.some((t) => Boolean(t.notes?.trim())), [everyTrade]);
+  const latestTradeDate = useMemo(
+    () => everyTrade.reduce<string | null>((latest, t) => (!latest || t.date > latest ? t.date : latest), null),
+    [everyTrade],
+  );
 
   const filterSetups = useMemo(
     () => [...new Set([...settings.setupTags, ...setups])].sort(),
@@ -313,32 +325,57 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
             ) : isLoading ? (
               <DashboardSkeleton />
             ) : (
-              <DashboardView
-                everyTrade={everyTrade}
-                onRemoveTrades={removeTrades}
-                onSyncBroker={() => openView('connect-broker')}
-                hasBrokerTrades={hasBrokerTrades}
-                trades={trades}
-                hasAnyTrades={allTrades.length > 0}
-                year={year}
-                month={month}
-                filters={filters}
-                filterSymbols={symbols}
-                filterSetups={filterSetups}
-                onFiltersChange={setFilters}
-                onDayClick={setSelectedDay}
-                onPrevMonth={handlePrevMonth}
-                onNextMonth={handleNextMonth}
-                onMonthChange={handleMonthChange}
-                onPrevYear={() => setYear((y) => y - 1)}
-                onNextYear={() => setYear((y) => y + 1)}
-                onSelectMonth={setMonth}
-                onAddTrade={() => openAddTrade()}
-                onConnectBroker={() => openView('connect-broker')}
-                sampleActive={sampleActive}
-                onLoadSample={loadSampleData}
-                onClearSample={clearSampleData}
-              />
+              <>
+                {/* Above the dashboard, and only while there is something on it left to do. */}
+                {!gettingStartedHidden && (
+                  <GettingStartedCard
+                    tradeCount={everyTrade.length}
+                    brokerConnected={hasBrokerTrades}
+                    hasTradeNote={hasTradeNote}
+                    hasRiskRules={settings.tradingRules.enabled}
+                    canConnectBroker={has('brokerSync')}
+                    onDismiss={() => {
+                      hideGettingStarted();
+                      setGettingStartedHidden(true);
+                    }}
+                    onStep={(step: OnboardingStepId) => {
+                      if (step === 'log-trade') setShowTradeModal(true);
+                      else if (step === 'connect-broker') openView('connect-broker');
+                      else if (step === 'set-rules') openView('settings');
+                      // A day note is written from a day, so send them to the most recent one they
+                      // have — or to logging a trade, since there is no day to open without one.
+                      else if (latestTradeDate) setSelectedDay(latestTradeDate);
+                      else setShowTradeModal(true);
+                    }}
+                  />
+                )}
+                <DashboardView
+                  everyTrade={everyTrade}
+                  onRemoveTrades={removeTrades}
+                  onSyncBroker={() => openView('connect-broker')}
+                  hasBrokerTrades={hasBrokerTrades}
+                  trades={trades}
+                  hasAnyTrades={allTrades.length > 0}
+                  year={year}
+                  month={month}
+                  filters={filters}
+                  filterSymbols={symbols}
+                  filterSetups={filterSetups}
+                  onFiltersChange={setFilters}
+                  onDayClick={setSelectedDay}
+                  onPrevMonth={handlePrevMonth}
+                  onNextMonth={handleNextMonth}
+                  onMonthChange={handleMonthChange}
+                  onPrevYear={() => setYear((y) => y - 1)}
+                  onNextYear={() => setYear((y) => y + 1)}
+                  onSelectMonth={setMonth}
+                  onAddTrade={() => openAddTrade()}
+                  onConnectBroker={() => openView('connect-broker')}
+                  sampleActive={sampleActive}
+                  onLoadSample={loadSampleData}
+                  onClearSample={clearSampleData}
+                />
+              </>
             )}
           </div>
         </main>

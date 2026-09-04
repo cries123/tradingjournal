@@ -1,4 +1,6 @@
+import { sendEmailVerification } from 'firebase/auth';
 import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebase';
+import { getVisitorId } from './visitorAnalytics';
 import { limitsFor, MARKET_REPLAY_LIVE, type Tier, type TierLimits } from '../config/tiers';
 
 export interface EntitlementUsage {
@@ -25,6 +27,9 @@ export interface EntitlementSnapshot {
   complimentaryUntil?: string | null;
   /** This account has never had a free trial and could start one now. */
   trialAvailable?: boolean;
+  /** Why the trial is not on offer, when it isn't. */
+  trialBlockedReason?: string | null;
+  trialBlockedMessage?: string | null;
   /** The live complimentary access is a self-serve trial, not a gift. */
   onTrial?: boolean;
   usage: EntitlementUsage;
@@ -40,6 +45,8 @@ export const FREE_SNAPSHOT: EntitlementSnapshot = {
   currentPeriodEnd: null,
   complimentaryUntil: null,
   trialAvailable: false,
+  trialBlockedReason: null,
+  trialBlockedMessage: null,
   onTrial: false,
   usage: { aiMessagesUsed: 0, aiMessagesRemaining: 0, syncsUsed: 0, syncsRemaining: 0 },
 };
@@ -163,9 +170,18 @@ export async function startFreeTrial(): Promise<{ tier: Tier; until: string; mes
   const user = getFirebaseAuth().currentUser;
   if (!user) throw new Error('Sign in to start your trial.');
 
+  // The browser's own id, the same one the visitor analytics use. Sent so a second trial from
+  // one browser is visible to an admin; it is never a reason to refuse, because a shared browser
+  // is a library computer or a couple at a kitchen table far more often than it is abuse.
+  const visitorId = getVisitorId();
+
   const res = await fetch('/api/start-trial', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${await user.getIdToken()}`, 'Content-Type': 'application/json' },
+    headers: {
+      Authorization: `Bearer ${await user.getIdToken()}`,
+      'Content-Type': 'application/json',
+      ...(visitorId ? { 'X-Visitor-Id': visitorId } : {}),
+    },
   });
 
   const data = (await res.json().catch(() => ({}))) as {
@@ -179,4 +195,42 @@ export async function startFreeTrial(): Promise<{ tier: Tier; until: string; mes
     throw new Error(data.error ?? 'Could not start your trial.');
   }
   return { tier: data.tier, until: data.until, message: data.message ?? 'Your trial has started.' };
+}
+
+/**
+ * Sends the confirmation link, then tells the caller whether it worked.
+ *
+ * Firebase rate-limits this per address, and the error it throws for "you have asked several
+ * times in the last minute" is indistinguishable to a user from a real failure — so that one is
+ * reported as success. The link is already in their inbox; sending another would not help.
+ */
+export async function resendEmailVerification(): Promise<void> {
+  if (!isFirebaseConfigured()) throw new Error('Sign in first.');
+  const user = getFirebaseAuth().currentUser;
+  if (!user) throw new Error('Sign in first.');
+  if (user.emailVerified) return;
+
+  try {
+    await sendEmailVerification(user);
+  } catch (err) {
+    const code = (err as { code?: string }).code ?? '';
+    if (code === 'auth/too-many-requests') return;
+    throw new Error('Could not send the confirmation email. Try again in a minute.', { cause: err });
+  }
+}
+
+/**
+ * Re-reads the account from Firebase so a just-confirmed address is seen as confirmed.
+ *
+ * The verification link is opened in another tab, and nothing tells this one about it — the
+ * cached token still says unverified until it is explicitly reloaded.
+ */
+export async function refreshEmailVerified(): Promise<boolean> {
+  if (!isFirebaseConfigured()) return false;
+  const user = getFirebaseAuth().currentUser;
+  if (!user) return false;
+  await user.reload();
+  // Force a new ID token, or the server keeps seeing the old claims for up to an hour.
+  await user.getIdToken(true);
+  return getFirebaseAuth().currentUser?.emailVerified ?? false;
 }

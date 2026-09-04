@@ -345,3 +345,161 @@ export function brokerLinkRemovedEmail(options: {
     text,
   };
 }
+
+/* ------------------------------------------------------------------ the trial */
+
+export interface TrialProgress {
+  /** Trades imported from a broker since the trial began. The number that makes the case. */
+  imported: number;
+  connected: boolean;
+}
+
+/**
+ * The three notes a trial gets: get started, two days left, last day.
+ *
+ * Each has one job, and none of them is "please buy". Somebody who connected a broker and watched
+ * a month of trades appear already knows what it is worth; somebody who never connected is not
+ * going to be argued into it, but they might be reminded that they never finished setting it up.
+ */
+export function trialEmail(options: {
+  stage: 'started' | 'ending' | 'last-day';
+  daysLeft: number;
+  tierName: string;
+  progress: TrialProgress;
+  siteUrl: string;
+}): TicketReplyEmail {
+  const { stage, daysLeft, tierName, progress, siteUrl } = options;
+  const connect = `${siteUrl}/brokers`;
+  const pricing = `${siteUrl}/pricing`;
+  const days = daysLeft === 1 ? '1 day' : `${daysLeft} days`;
+
+  // What they actually got out of it, or what they have not done yet. The difference decides
+  // every one of these emails.
+  const done = progress.connected
+    ? progress.imported > 0
+      ? `So far it has imported <strong>${progress.imported.toLocaleString()} trades</strong> for you, matched into round trips with the fees worked out.`
+      : 'Your broker is connected — press Sync on the Brokers page and your history will fill the calendar in.'
+    : 'You have not connected a brokerage yet, which is the part worth trying — it takes about a minute and your history fills in on its own.';
+
+  const doneText = done.replace(/<[^>]+>/g, '');
+
+  if (stage === 'started') {
+    return {
+      subject: `Your ${tierName} trial is running`,
+      html: layout({
+        title: `${tierName} is yours for ${days}`,
+        body: `
+          <p style="margin:0 0 12px 0;">${done}</p>
+          <p style="margin:0 0 12px 0;">Nothing to cancel and no card on file — it ends by itself, and your journal stays free either way.</p>`,
+        ctaLabel: progress.connected ? 'Open your journal' : 'Connect your broker',
+        ctaUrl: progress.connected ? `${siteUrl}/app` : connect,
+        footerNote: 'You are getting this because you started a free trial on Trend Chasers.',
+      }),
+      text: [`${tierName} is yours for ${days}.`, '', doneText, '', `Start here: ${progress.connected ? `${siteUrl}/app` : connect}`].join('\n'),
+    };
+  }
+
+  if (stage === 'ending') {
+    return {
+      subject: `${days} left on your ${tierName} trial`,
+      html: layout({
+        title: `${days} left on your trial`,
+        body: `
+          <p style="margin:0 0 12px 0;">${done}</p>
+          <p style="margin:0 0 12px 0;">When the trial ends your journal keeps everything in it — every trade, note and screenshot. What stops is the automatic importing, and the brokerage connection is removed a few days later.</p>
+          <p style="margin:0;">${tierName} is $5 a month if you want to keep it running. Nothing happens if you don't.</p>`,
+        ctaLabel: `Keep ${tierName}`,
+        ctaUrl: pricing,
+        footerNote: 'You are getting this because you started a free trial on Trend Chasers.',
+      }),
+      text: [
+        `${days} left on your ${tierName} trial.`,
+        '',
+        doneText,
+        '',
+        'When it ends your journal keeps everything in it. What stops is the automatic importing.',
+        '',
+        `Keep it: ${pricing}`,
+      ].join('\n'),
+    };
+  }
+
+  return {
+    subject: `Your ${tierName} trial ends today`,
+    html: layout({
+      title: 'Your trial ends today',
+      body: `
+        <p style="margin:0 0 12px 0;">${done}</p>
+        <p style="margin:0 0 12px 0;"><strong>Nothing disappears.</strong> Your journal, your notes and every trade already imported stay exactly where they are, free, for as long as you want them.</p>
+        <p style="margin:0;">What stops today is the automatic importing. If you would rather it kept going, ${tierName} is $5 a month.</p>`,
+      ctaLabel: `Keep ${tierName}`,
+      ctaUrl: pricing,
+      footerNote: 'You are getting this because you started a free trial on Trend Chasers.',
+    }),
+    text: [
+      `Your ${tierName} trial ends today.`,
+      '',
+      doneText,
+      '',
+      'Nothing disappears — your journal and every trade already imported stay, free.',
+      '',
+      `Keep the automatic importing: ${pricing}`,
+    ].join('\n'),
+  };
+}
+
+/* ------------------------------------------------------------------ billing trouble */
+
+/** The card failed. The one email in this product that is worth real money to send well. */
+export function paymentFailedEmail(options: { tierName: string; siteUrl: string }): TicketReplyEmail {
+  const link = `${options.siteUrl}/pricing`;
+  return {
+    subject: 'Your payment did not go through',
+    html: layout({
+      title: 'Your last payment failed',
+      body: `
+        <p style="margin:0 0 12px 0;">The card on your ${escapeHtml(options.tierName)} subscription was declined, so broker sync and the paid features are paused for now.</p>
+        <p style="margin:0 0 12px 0;"><strong>Your journal is not affected.</strong> Every trade, note and screenshot is where you left it, and manual logging keeps working as normal.</p>
+        <p style="margin:0;">Updating your card puts everything back straight away — usually it is an expired card or a bank asking to confirm the charge.</p>`,
+      ctaLabel: 'Update your card',
+      ctaUrl: link,
+      footerNote: 'You are getting this because there is a subscription on your Trend Chasers account.',
+    }),
+    text: [
+      `The card on your ${options.tierName} subscription was declined, so the paid features are paused.`,
+      '',
+      'Your journal is not affected — every trade and note is where you left it.',
+      '',
+      `Update your card: ${link}`,
+    ].join('\n'),
+  };
+}
+
+/** They cancelled. No pleading, no discount — just what happens now, which is mostly nothing. */
+export function subscriptionCanceledEmail(options: {
+  tierName: string;
+  until: string | null;
+  siteUrl: string;
+}): TicketReplyEmail {
+  const runsTo = options.until ? ` You keep it until ${friendlyDate(options.until)}.` : '';
+  return {
+    subject: 'Your subscription is cancelled',
+    html: layout({
+      title: 'Your subscription is cancelled',
+      body: `
+        <p style="margin:0 0 12px 0;">${escapeHtml(options.tierName)} is cancelled and you will not be billed again.${escapeHtml(runsTo)}</p>
+        <p style="margin:0 0 12px 0;"><strong>Your journal stays free.</strong> Every trade you have imported or logged, every note and screenshot, the calendar and the tax export — all of it keeps working with no plan at all.</p>
+        <p style="margin:0;">If something was not right, replying to this email reaches a person.</p>`,
+      ctaLabel: 'Open your journal',
+      ctaUrl: `${options.siteUrl}/app`,
+      footerNote: 'You are getting this because you had a subscription on Trend Chasers.',
+    }),
+    text: [
+      `${options.tierName} is cancelled and you will not be billed again.${runsTo}`,
+      '',
+      'Your journal stays free — every trade, note and screenshot keeps working with no plan at all.',
+      '',
+      'If something was not right, replying to this email reaches a person.',
+    ].join('\n'),
+  };
+}

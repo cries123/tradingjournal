@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, CheckCircle2, ExternalLink, Link2, Loader2, RefreshCw, Unlink } from 'lucide-react';
 import { BrokerLogo } from './BrokerLogo';
 import { useEntitlement } from '../../context/useEntitlement';
+import { StartTrialButton } from '../plan/StartTrialButton';
+import { TRIAL_DAYS } from '../../config/trial';
 import { TIER_PLANS } from '../../config/tiers';
 import { useAuth } from '../../context/useAuth';
 import {
@@ -411,6 +413,26 @@ export function BrokerConnectContent({
             )}
             .
           </p>
+        )}
+
+        {/*
+          * Offered before they press anything.
+          *
+          * A free account can connect nothing, so the old path was: press Connect, wait, read a
+          * 402 telling you to go and buy something. The offer belongs in front of that, at the
+          * moment they are already looking at the button.
+          */}
+        {canConnect && limits.brokers === 0 && (
+          <div className="panel-card p-5 mb-6">
+            <p className="text-sm font-medium text-text-primary mb-1">
+              Broker sync isn&apos;t on your plan yet
+            </p>
+            <p className="text-sm text-text-secondary leading-relaxed mb-4">
+              Connect your brokerage and your fills import themselves, matched into round trips with
+              fees worked out. Try it for {TRIAL_DAYS} days and see your own calendar fill in.
+            </p>
+            <StartTrialButton className="max-w-sm" />
+          </div>
         )}
 
         {!firebaseEnabled ? (

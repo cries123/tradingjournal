@@ -194,3 +194,39 @@ export async function adminEmailUser(
 ): Promise<{ message: string }> {
   return adminApiPost({ action: 'emailUser', targetUid, subject, message });
 }
+
+/* ------------------------------------------------------------------ trial abuse signals */
+
+export interface TrialClaimView {
+  claimedAt: string;
+  /** Signals worth a look. Never a reason the trial was refused — it was granted. */
+  flags: string[];
+}
+
+/**
+ * Whether this account's trial resembled one already claimed.
+ *
+ * Read through the admin function because the claim records are keyed by a hash of the mailbox
+ * and are server-only: a client that could read them could test addresses against them.
+ */
+export async function adminReadTrialClaim(targetUid: string): Promise<TrialClaimView | null> {
+  if (!isFirebaseConfigured()) return null;
+  const user = getFirebaseAuth().currentUser;
+  if (!user) return null;
+
+  try {
+    const res = await fetch('/api/admin-user', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${await user.getIdToken()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'readTrialClaim', targetUid }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { claim?: TrialClaimView | null };
+    return data.claim ?? null;
+  } catch {
+    return null;
+  }
+}

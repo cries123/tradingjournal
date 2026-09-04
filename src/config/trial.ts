@@ -25,7 +25,9 @@ export function trialOffer(): string {
 export type TrialRefusal =
   | 'already-used'
   | 'already-paid'
-  | 'already-comped';
+  | 'already-comped'
+  | 'email-unverified'
+  | 'email-already-used';
 
 /** A record the trial rule can read. `trialStartedAt` is set once and never cleared. */
 export interface TrialRecord extends AccessRecord {
@@ -37,10 +39,12 @@ export type TrialDecision =
   | { eligible: true; tier: Tier; days: number; until: string }
   | { eligible: false; reason: TrialRefusal; message: string };
 
-const REFUSALS: Record<TrialRefusal, string> = {
+export const REFUSALS: Record<TrialRefusal, string> = {
   'already-used': 'You have already had a free trial on this account.',
   'already-paid': 'Your plan already includes broker sync — there is nothing to trial.',
   'already-comped': 'You already have complimentary access, so a trial would give you nothing.',
+  'email-unverified': 'Confirm your email address first — we have sent you a link.',
+  'email-already-used': 'This email address has already been used for a free trial.',
 };
 
 /**
@@ -50,15 +54,19 @@ const REFUSALS: Record<TrialRefusal, string> = {
  * decides whether to show the button. A client that lies about it gets refused by the server
  * running this exact code.
  */
+export function refuse(reason: TrialRefusal): Extract<TrialDecision, { eligible: false }> {
+  return { eligible: false, reason, message: REFUSALS[reason] };
+}
+
 export function decideTrial(record: TrialRecord | null, now: number): TrialDecision {
   // One per account, forever. Checked first so the answer stays the same after the trial has run
   // out and the record looks, from every other angle, like a fresh free account again.
   if (record?.trialStartedAt) {
-    return { eligible: false, reason: 'already-used', message: REFUSALS['already-used'] };
+    return refuse('already-used');
   }
 
   if (record && compIsLive(record.comp, now)) {
-    return { eligible: false, reason: 'already-comped', message: REFUSALS['already-comped'] };
+    return refuse('already-comped');
   }
 
   // Anyone who is paying, or was granted a plan by hand, already has what the trial would give
@@ -71,7 +79,7 @@ export function decideTrial(record: TrialRecord | null, now: number): TrialDecis
       Boolean(record.currentPeriodEnd) &&
       Date.parse(record.currentPeriodEnd as string) > now;
     if (paid || withinPaidPeriod) {
-      return { eligible: false, reason: 'already-paid', message: REFUSALS['already-paid'] };
+      return refuse('already-paid');
     }
   }
 

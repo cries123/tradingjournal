@@ -39,7 +39,8 @@ export type AdminUserAction =
   | 'adjustCredits'
   | 'setSuspended'
   | 'resetBrokerLink'
-  | 'emailUser';
+  | 'emailUser'
+  | 'readTrialClaim';
 
 export interface AdminUserRequestBody {
   action: AdminUserAction;
@@ -224,6 +225,28 @@ async function handleClearTierGrant(targetUid: string) {
 
   await getAdminFirestore().doc(`entitlements/${targetUid}`).delete();
   return { message: 'Grant removed — back to Free' };
+}
+
+/**
+ * What the trial claim for this account looked like when it was made.
+ *
+ * The claim is keyed by a hash of the mailbox, which cannot be worked back from a uid — so it is
+ * found by the uid recorded on it instead. One indexed lookup on a collection with one document
+ * per trial ever granted.
+ */
+async function readTrialClaimFor(targetUid: string) {
+  const snap = await getAdminFirestore()
+    .collection('trialClaims')
+    .where('uid', '==', targetUid)
+    .limit(1)
+    .get();
+  if (snap.empty) return null;
+
+  const data = snap.docs[0].data() as { claimedAt?: string; flags?: unknown };
+  return {
+    claimedAt: typeof data.claimedAt === 'string' ? data.claimedAt : '',
+    flags: Array.isArray(data.flags) ? data.flags.filter((f): f is string => typeof f === 'string') : [],
+  };
 }
 
 /* ------------------------------------------------------------------ complimentary access */
@@ -490,6 +513,10 @@ export async function handleAdminUserRequest(
       case 'resetBrokerLink': {
         const result = await resetBrokerLink(targetUid);
         return { statusCode: 200, body: { ok: true, ...result } };
+      }
+      case 'readTrialClaim': {
+        const claim = await readTrialClaimFor(targetUid);
+        return { statusCode: 200, body: { ok: true, claim } };
       }
       case 'emailUser': {
         const subject = typeof body.subject === 'string' ? body.subject : '';

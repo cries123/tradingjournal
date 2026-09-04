@@ -3,7 +3,7 @@ import { assertCallerUid, BrokerRequestError } from '../../server/snaptradeAuth'
 import { accessSource, complimentaryUntil, effectiveTier, readEntitlement } from '../../server/entitlements';
 import { readUsed, readUserCredits, usageResetsAt } from '../../server/usage';
 import { limitsFor, MARKET_REPLAY_LIVE } from '../../src/config/tiers';
-import { decideTrial } from '../../src/config/trial';
+import { trialEligibility } from '../../server/trialHandler';
 
 /**
  * What the signed-in user's plan currently allows, and how much of today is left.
@@ -31,11 +31,15 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
     const tier = effectiveTier(record);
     const limits = limitsFor(tier);
 
-    const [aiUsed, syncUsed, credits] = await Promise.all([
+    const [aiUsed, syncUsed, credits, eligibility] = await Promise.all([
       readUsed('ai', uid),
       readUsed('sync', uid),
       readUserCredits(uid),
+      // Never allowed to fail the plan lookup: a trial the page cannot offer is a smaller problem
+      // than a page that cannot tell anybody what they are paying for.
+      trialEligibility(uid, Date.now()).catch(() => null),
     ]);
+    const trial = eligibility?.decision ?? { eligible: false as const, reason: null, message: null };
     // Credits only count where the plan includes the feature at all — see decideSpend.
     const aiCredits = limits.aiMessagesPerDay > 0 ? credits.ai : 0;
     const syncCredits = limits.syncsPerDay > 0 ? credits.sync : 0;
@@ -53,7 +57,11 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
         complimentaryUntil: complimentaryUntil(record),
         // Whether to offer the trial at all. The claim endpoint runs this same rule, so this is a
         // hint for the UI and never the thing that decides.
-        trialAvailable: decideTrial(record, Date.now()).eligible,
+        trialAvailable: trial.eligible,
+        // Why not, when not — so the page can offer to resend a confirmation link rather than
+        // just hiding the button and leaving somebody to wonder where their trial went.
+        trialBlockedReason: trial.eligible ? null : trial.reason,
+        trialBlockedMessage: trial.eligible ? null : trial.message,
         onTrial: record?.comp?.trial === true && Boolean(complimentaryUntil(record)),
         usage: {
           aiMessagesUsed: aiUsed,

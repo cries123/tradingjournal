@@ -479,6 +479,22 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    /*
+     * One record per mailbox that has ever started a free trial, and one per brokerage account
+     * that has ever been linked. Both are keyed by a salted hash, and both are server-only.
+     *
+     * Readable by nobody, including the admin panel, which asks the admin function instead. A
+     * client that could read these could test a list of guessed addresses against them and learn
+     * which ones have accounts here — the collection would answer a question it exists to avoid.
+     */
+    match /trialClaims/{mailbox} {
+      allow read, write: if false;
+    }
+
+    match /brokerageClaims/{fingerprint} {
+      allow read, write: if false;
+    }
+
     // What a user has paid for (or been granted). Written ONLY by the Admin SDK — the Creem
     // webhook and the admin panel — because an entitlement the client can write is not an
     // entitlement, it's a suggestion. Users may read their own so the UI knows what to show,

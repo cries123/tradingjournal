@@ -1,6 +1,9 @@
 import type { Handler } from '@netlify/functions';
-import { getAdminFirestore } from '../../server/firebaseAdmin';
+import { getAdminAuth, getAdminFirestore } from '../../server/firebaseAdmin';
 import { applyBillingUpdate } from '../../server/entitlements';
+import { paymentFailedEmail, subscriptionCanceledEmail } from '../../server/emailTemplates';
+import { isMailConfigured, sendEmail, siteUrl } from '../../server/mailer';
+import { TIER_PLANS, type Tier } from '../../src/config/tiers';
 import { parseBillingEvent, verifyWebhookSignature, type CreemWebhookEvent } from '../../server/creemClient';
 import { logServerError } from '../../server/errorReports';
 import { isPaymentEvent, recordCharge } from '../../server/billingLedger';
@@ -51,6 +54,39 @@ async function alreadyHandled(eventId: string): Promise<boolean> {
   }
 }
 
+/**
+ * The two billing states worth writing to somebody about.
+ *
+ * A failed payment is the one email in this product worth real money: most of it is an expired
+ * card, and nobody finds out unless we say so — the features simply stop working. A cancellation
+ * gets a note too, and deliberately not a discount: what it says is that the journal keeps
+ * working for free, which is true, and is the reason people come back.
+ */
+async function tellThem(parsed: {
+  uid: string;
+  tier: Tier;
+  status: string;
+  currentPeriodEnd?: string;
+}): Promise<void> {
+  if (!isMailConfigured()) return;
+  if (parsed.status !== 'past_due' && parsed.status !== 'canceled') return;
+
+  const account = await getAdminAuth().getUser(parsed.uid);
+  if (!account.email) return;
+
+  const tierName = TIER_PLANS[parsed.tier].name;
+  const mail =
+    parsed.status === 'past_due'
+      ? paymentFailedEmail({ tierName, siteUrl: siteUrl() })
+      : subscriptionCanceledEmail({
+          tierName,
+          until: parsed.currentPeriodEnd ?? null,
+          siteUrl: siteUrl(),
+        });
+
+  await sendEmail({ to: account.email, ...mail, tag: `billing-${parsed.status}` });
+}
+
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
@@ -95,6 +131,7 @@ export const handler: Handler = async (event) => {
   }
 
   const parsed = parseBillingEvent(payload);
+
   if (!parsed) {
     // Either an event type this app doesn't act on, or one with no uid in its metadata. Both are
     // "nothing to do" rather than errors — retrying would not produce a uid.
@@ -121,6 +158,10 @@ export const handler: Handler = async (event) => {
         eventType: payload.eventType ?? '',
       });
     }
+
+    // Best effort, and after the entitlement is written: an email that fails must never make a
+    // webhook retry, because the retry would re-apply a billing change that already landed.
+    if (result.applied) await tellThem(parsed).catch(() => undefined);
 
     console.info(
       `[creem-webhook] ${payload.eventType} uid=${parsed.uid} tier=${parsed.tier} status=${parsed.status} applied=${result.applied}${result.reason ? ` (${result.reason})` : ''}`,

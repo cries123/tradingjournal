@@ -3,6 +3,7 @@ import { Lock } from 'lucide-react';
 import { lowestTierWith, TIER_PLANS, type Feature } from '../../config/tiers';
 import { useEntitlement } from '../../context/useEntitlement';
 import { goToPricing } from '../../utils/navigateToPath';
+import { StartTrialButton } from './StartTrialButton';
 
 interface LockedFeatureProps {
   feature: Feature;
@@ -78,14 +79,25 @@ export function LockedFeature({
                 : `Coming soon, and included with ${neededName} when it lands.`}
             </p>
           ) : (
-            <>
-              <button type="button" onClick={goToPricing} className="btn-primary w-full py-2.5 text-sm font-semibold">
-                Unlock with {neededName}
-              </button>
-              <p className="mt-2.5 text-xs text-text-secondary">
-                From ${needed ? TIER_PLANS[needed].price : 5}/month · cancel anytime
-              </p>
-            </>
+            /*
+             * The trial takes the primary position wherever it is still on offer.
+             *
+             * Somebody looking at this card wanted the feature a second ago — that is the moment
+             * the offer is worth the most, and sending them to a pricing page instead is asking
+             * them to want it again later.
+             */
+            <StartTrialButton
+              fallback={
+                <>
+                  <button type="button" onClick={goToPricing} className="btn-primary w-full py-2.5 text-sm font-semibold">
+                    Unlock with {neededName}
+                  </button>
+                  <p className="mt-2.5 text-xs text-text-secondary">
+                    From ${needed ? TIER_PLANS[needed].price : 5}/month · cancel anytime
+                  </p>
+                </>
+              }
+            />
           )}
         </div>
       </div>
