@@ -238,3 +238,110 @@ export function adminMessageEmail(options: {
     ].join('\n'),
   };
 }
+
+/* ------------------------------------------------------------------ broker link */
+
+/**
+ * The day a link goes, written the way a person would say it.
+ *
+ * Eastern because that is the clock everything else in this product runs on — the daily
+ * allowances, the trading day, the reaper's own schedule.
+ */
+export function friendlyDate(iso: string): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return 'shortly';
+  return at.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'America/New_York',
+  });
+}
+
+/** "your Schwab connection" when we know the brokerage, "your broker connection" when we don't. */
+function connectionPhrase(institution: string | null): string {
+  return institution ? `your ${institution} connection` : 'your broker connection';
+}
+
+/*
+ * Both of these are transactional, not marketing: they describe something happening to the
+ * person's account whether they want the news or not. So neither carries an unsubscribe link and
+ * neither checks emailPrefs — a notice that the thing you connected is about to be disconnected
+ * is not something anyone should be able to opt out of and then be surprised by.
+ *
+ * Both say, in the body and not in a footnote, that the journal is untouched. Take away the word
+ * "disconnect" from someone who has a year of trades in here and it reads as "your data is being
+ * deleted", which is the panicked support ticket this is meant to prevent.
+ */
+
+export function brokerLinkEndingEmail(options: {
+  institution: string | null;
+  removesOn: string;
+  siteUrl: string;
+}): TicketReplyEmail {
+  const what = connectionPhrase(options.institution);
+  const when = friendlyDate(options.removesOn);
+  const link = `${options.siteUrl}/pricing`;
+
+  const body = `
+    <p style="margin:0 0 12px 0;">Your plan no longer includes broker sync, so ${escapeHtml(what)} is scheduled to be removed on <strong>${escapeHtml(when)}</strong>.</p>
+    <p style="margin:0 0 12px 0;"><strong>Your trades are not going anywhere.</strong> Everything already in your journal stays exactly where it is — the calendar, your notes, your tags, your screenshots. This only removes the link to your brokerage, which is what stops new fills importing automatically.</p>
+    <p style="margin:0;">Start a plan again before ${escapeHtml(when)} and nothing happens at all — the connection stays and syncing picks up where it left off. After that you would need to reconnect your broker, which takes about a minute.</p>`;
+
+  const text = [
+    `Your plan no longer includes broker sync, so ${what} is scheduled to be removed on ${when}.`,
+    '',
+    'Your trades are not going anywhere. Everything already in your journal stays exactly where it is — the calendar, your notes, your tags, your screenshots. This only removes the link to your brokerage, which is what stops new fills importing automatically.',
+    '',
+    `Start a plan again before ${when} and nothing happens at all — the connection stays and syncing picks up where it left off. After that you would need to reconnect your broker, which takes about a minute.`,
+    '',
+    `Plans: ${link}`,
+  ].join('\n');
+
+  return {
+    subject: `${options.institution ?? 'Broker'} sync ends ${when}`,
+    html: layout({
+      title: `${connectionPhrase(options.institution).replace(/^your /, 'Your ')} ends ${when}`,
+      body,
+      ctaLabel: 'Keep syncing',
+      ctaUrl: link,
+      footerNote: 'You are getting this because you connected a brokerage to Trend Chasers.',
+    }),
+    text,
+  };
+}
+
+export function brokerLinkRemovedEmail(options: {
+  institution: string | null;
+  siteUrl: string;
+}): TicketReplyEmail {
+  const what = connectionPhrase(options.institution);
+  const link = `${options.siteUrl}/app`;
+
+  const body = `
+    <p style="margin:0 0 12px 0;">${escapeHtml(what.charAt(0).toUpperCase() + what.slice(1))} has been removed, because the plan that included broker sync has ended.</p>
+    <p style="margin:0 0 12px 0;"><strong>Your journal is untouched.</strong> Every trade you have imported or logged is still there, with your notes and grading on it, and you can keep journaling by hand for as long as you like — that part is free and always has been.</p>
+    <p style="margin:0;">Whenever you want automatic importing back, start a plan and reconnect your broker. It takes about a minute, and your existing trades will not be duplicated.</p>`;
+
+  const text = [
+    `${what.charAt(0).toUpperCase() + what.slice(1)} has been removed, because the plan that included broker sync has ended.`,
+    '',
+    'Your journal is untouched. Every trade you have imported or logged is still there, with your notes and grading on it, and you can keep journaling by hand for as long as you like — that part is free and always has been.',
+    '',
+    'Whenever you want automatic importing back, start a plan and reconnect your broker. It takes about a minute, and your existing trades will not be duplicated.',
+    '',
+    `Your journal: ${link}`,
+  ].join('\n');
+
+  return {
+    subject: `${options.institution ?? 'Broker'} sync has been turned off`,
+    html: layout({
+      title: 'Your broker connection has been removed',
+      body,
+      ctaLabel: 'Open your journal',
+      ctaUrl: link,
+      footerNote: 'You are getting this because you connected a brokerage to Trend Chasers.',
+    }),
+    text,
+  };
+}

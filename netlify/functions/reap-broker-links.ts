@@ -1,8 +1,10 @@
 import { schedule, type Handler } from '@netlify/functions';
-import { getAdminFirestore } from '../../server/firebaseAdmin';
+import { getAdminAuth, getAdminFirestore } from '../../server/firebaseAdmin';
 import { readEntitlement } from '../../server/entitlements';
 import { resetBrokerLink } from '../../server/adminAccountActions';
 import { logServerError } from '../../server/errorReports';
+import { brokerLinkEndingEmail, brokerLinkRemovedEmail } from '../../server/emailTemplates';
+import { isMailConfigured, sendEmail, siteUrl } from '../../server/mailer';
 import { runReap, DEFAULT_GRACE_DAYS, type ReapSummary } from '../../server/brokerReaper';
 
 /**
@@ -28,6 +30,22 @@ function isDryRun(): boolean {
   return process.env.BROKER_REAP_DRY_RUN === 'true';
 }
 
+/** The brokerage this account linked, for an email that can name it. Null when unrecorded. */
+async function institutionFor(uid: string): Promise<string | null> {
+  const snap = await getAdminFirestore().doc(`brokerConnections/${uid}`).get();
+  const names = (snap.data() as { institutions?: unknown } | undefined)?.institutions;
+  return Array.isArray(names) && typeof names[0] === 'string' && names[0] ? names[0] : null;
+}
+
+async function emailFor(uid: string): Promise<string | null> {
+  try {
+    return (await getAdminAuth().getUser(uid)).email ?? null;
+  } catch {
+    // Deleted from Auth but still holding a connection — reap it, just quietly.
+    return null;
+  }
+}
+
 async function reap(): Promise<ReapSummary> {
   const db = getAdminFirestore();
 
@@ -40,10 +58,14 @@ async function reap(): Promise<ReapSummary> {
     // stopped opening the app keeps its last known state, which is the population being billed for.
     listConnected: async () => {
       const snap = await db.collection('brokerConnections').where('connected', '==', true).get();
-      return snap.docs.map((doc) => ({
-        uid: doc.id,
-        unentitledSince: (doc.data() as { unentitledSince?: string }).unentitledSince ?? null,
-      }));
+      return snap.docs.map((doc) => {
+        const data = doc.data() as { unentitledSince?: string; reapWarnedAt?: string };
+        return {
+          uid: doc.id,
+          unentitledSince: data.unentitledSince ?? null,
+          warnedAt: data.reapWarnedAt ?? null,
+        };
+      });
     },
 
     readEntitlement,
@@ -55,16 +77,52 @@ async function reap(): Promise<ReapSummary> {
     },
 
     markUnentitledSince: async (uid, at) => {
-      await db
-        .collection('brokerConnections')
-        .doc(uid)
-        .set({ unentitledSince: at }, { merge: true });
+      await db.collection('brokerConnections').doc(uid).set({ unentitledSince: at }, { merge: true });
+    },
+
+    markWarned: async (uid, at) => {
+      await db.collection('brokerConnections').doc(uid).set({ reapWarnedAt: at }, { merge: true });
+    },
+
+    /*
+     * Returning true clears the account for removal on a later run.
+     *
+     * No mail provider returns true as well: an install without RESEND_API_KEY would otherwise
+     * never reap anything, and every lapsed connection would bill indefinitely because the notice
+     * it was waiting on could never be sent.
+     */
+    warn: async (uid, removesOn) => {
+      if (!isMailConfigured()) return true;
+      const to = await emailFor(uid);
+      if (!to) return true;
+
+      const mail = brokerLinkEndingEmail({
+        institution: await institutionFor(uid),
+        removesOn,
+        siteUrl: siteUrl(),
+      });
+      const outcome = await sendEmail({ to, ...mail, tag: 'broker-link-ending' });
+      // A refused address is never going to work; waiting on it forever just keeps the meter
+      // running. A provider error might be temporary, so that one is worth another day.
+      return outcome.sent || outcome.reason === 'invalid-recipient';
+    },
+
+    notifyRemoved: async (uid) => {
+      if (!isMailConfigured()) return;
+      const to = await emailFor(uid);
+      if (!to) return;
+
+      const mail = brokerLinkRemovedEmail({
+        institution: await institutionFor(uid),
+        siteUrl: siteUrl(),
+      });
+      await sendEmail({ to, ...mail, tag: 'broker-link-removed' });
     },
   });
 
   console.info(
     `[reap-broker-links] considered=${summary.considered} reaped=${summary.reaped} ` +
-      `waiting=${summary.waiting} kept=${summary.kept} failed=${summary.failed}` +
+      `warned=${summary.warned} waiting=${summary.waiting} kept=${summary.kept} failed=${summary.failed}` +
       (summary.dryRun ? ' (dry run — nothing was removed)' : ''),
   );
   for (const row of summary.details) {

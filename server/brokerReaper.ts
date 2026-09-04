@@ -128,19 +128,41 @@ export interface ReapSummary {
   waiting: number;
   kept: number;
   failed: number;
+  /** Accounts told this run that their link is going. */
+  warned: number;
   dryRun: boolean;
   /** Who lost a link, and why — enough to answer a support ticket about it. */
   details: { uid: string; reason: string; lapsedAt: string }[];
 }
 
+/** One account as the run sees it: the link, and what previous runs recorded about it. */
+export interface ConnectedRow {
+  uid: string;
+  unentitledSince?: string | null;
+  /** When this lapse was announced to them. Absent means they have not been told. */
+  warnedAt?: string | null;
+}
+
 export interface ReapDeps {
-  /** Accounts that currently hold a broker link, with the grace stamp a previous run left. */
-  listConnected: () => Promise<{ uid: string; unentitledSince?: string | null }[]>;
+  listConnected: () => Promise<ConnectedRow[]>;
   readEntitlement: (uid: string) => Promise<Entitlement | null>;
   /** Removes the SnapTrade user, which is what actually ends the monthly charge. */
   removeLink: (uid: string) => Promise<void>;
   /** Persists (or clears) when this account was first seen without an entitlement. */
   markUnentitledSince: (uid: string, at: string | null) => Promise<void>;
+  /** Records (or clears) that this lapse has been announced. */
+  markWarned: (uid: string, at: string | null) => Promise<void>;
+  /**
+   * Tells them the link is going, and on what date.
+   *
+   * Returns whether the account can now be reaped. True for a delivered email, and also true when
+   * there is no mail provider at all — otherwise a deployment without RESEND_API_KEY would keep
+   * every lapsed connection alive and billing forever, which is a worse failure than a silent
+   * removal.
+   */
+  warn: (uid: string, removesOn: string) => Promise<boolean>;
+  /** Tells them it is done. Best effort — a bounced notice must not un-remove the link. */
+  notifyRemoved: (uid: string) => Promise<void>;
   now?: number;
   graceDays?: number;
   /** Decides nothing differently — just doesn't carry it out, so a run can be inspected first. */
@@ -156,12 +178,14 @@ export interface ReapDeps {
 export async function runReap(deps: ReapDeps): Promise<ReapSummary> {
   const now = deps.now ?? Date.now();
   const dryRun = deps.dryRun ?? false;
+  const graceDays = deps.graceDays ?? DEFAULT_GRACE_DAYS;
   const summary: ReapSummary = {
     considered: 0,
     reaped: 0,
     waiting: 0,
     kept: 0,
     failed: 0,
+    warned: 0,
     dryRun,
     details: [],
   };
@@ -177,27 +201,61 @@ export async function runReap(deps: ReapDeps): Promise<ReapSummary> {
         entitlement: await deps.readEntitlement(row.uid),
         unentitledSince: row.unentitledSince,
         now,
-        graceDays: deps.graceDays,
+        graceDays,
       });
 
       if (decision.action === 'keep') {
         summary.kept += 1;
-        if (decision.clearMark && !dryRun) await deps.markUnentitledSince(row.uid, null);
+        // They are entitled again. Both clocks stop, so a future lapse starts from nothing and
+        // gets its own warning rather than inheriting a stale one.
+        if (!dryRun && (decision.clearMark || row.warnedAt)) {
+          await deps.markUnentitledSince(row.uid, null);
+          await deps.markWarned(row.uid, null);
+        }
+        continue;
+      }
+
+      const reapAfter =
+        decision.action === 'wait'
+          ? decision.reapAfter
+          : new Date(Date.parse(decision.lapsedAt) + graceDays * DAY_MS).toISOString();
+
+      /*
+       * Nothing is ever removed from an account that has not been told.
+       *
+       * This is what makes the backlog safe. Every connection that lapsed before any of this
+       * existed is, on the first run, already past its grace period — reaping on the decision
+       * alone would take all of them away in one morning with no warning to anybody. Instead the
+       * first run announces it and the removal waits for a later one, which gives every one of
+       * them the notice period the rule promises.
+       */
+      if (!row.warnedAt) {
+        summary.waiting += 1;
+        if (!dryRun) {
+          if (!row.unentitledSince) await deps.markUnentitledSince(row.uid, decision.lapsedAt);
+          if (await deps.warn(row.uid, reapAfter)) {
+            await deps.markWarned(row.uid, new Date(now).toISOString());
+            summary.warned += 1;
+          }
+        } else {
+          summary.warned += 1;
+        }
         continue;
       }
 
       if (decision.action === 'wait') {
         summary.waiting += 1;
-        // Stamped only when it isn't already, so the clock cannot be pushed forward by a rerun.
-        if (!row.unentitledSince && !dryRun) {
-          await deps.markUnentitledSince(row.uid, decision.lapsedAt);
-        }
         continue;
       }
 
       if (!dryRun) {
         await deps.removeLink(row.uid);
         await deps.markUnentitledSince(row.uid, null);
+        await deps.markWarned(row.uid, null);
+        // After the link is gone, so a mail failure can never leave it standing.
+        await deps.notifyRemoved(row.uid).catch((err) => {
+          console.error(`[reap-broker-links] removal notice failed for ${row.uid}:`, err);
+        });
       }
       summary.reaped += 1;
       summary.details.push({ uid: row.uid, reason: decision.reason, lapsedAt: decision.lapsedAt });
