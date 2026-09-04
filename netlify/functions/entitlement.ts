@@ -3,6 +3,7 @@ import { assertCallerUid, BrokerRequestError } from '../../server/snaptradeAuth'
 import { accessSource, complimentaryUntil, effectiveTier, readEntitlement } from '../../server/entitlements';
 import { readUsed, readUserCredits, usageResetsAt } from '../../server/usage';
 import { limitsFor, MARKET_REPLAY_LIVE } from '../../src/config/tiers';
+import { decideTrial } from '../../src/config/trial';
 
 /**
  * What the signed-in user's plan currently allows, and how much of today is left.
@@ -50,6 +51,10 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
         source: accessSource(record),
         currentPeriodEnd: record?.currentPeriodEnd ?? null,
         complimentaryUntil: complimentaryUntil(record),
+        // Whether to offer the trial at all. The claim endpoint runs this same rule, so this is a
+        // hint for the UI and never the thing that decides.
+        trialAvailable: decideTrial(record, Date.now()).eligible,
+        onTrial: record?.comp?.trial === true && Boolean(complimentaryUntil(record)),
         usage: {
           aiMessagesUsed: aiUsed,
           aiMessagesRemaining: Math.max(0, limits.aiMessagesPerDay - aiUsed) + aiCredits,

@@ -5,11 +5,13 @@ import { REFUND_WINDOW_DAYS } from '../../config/legal';
 import { BROKER_COUNT_PHRASE } from '../../data/brokerCopy';
 import { useAuth } from '../../context/useAuth';
 import { useEntitlement } from '../../context/useEntitlement';
+import { TRIAL_DAYS, TRIAL_TIER } from '../../config/trial';
 import {
   CheckoutError,
   choosePlan,
   fetchPaymentsStatus,
   openBillingPortal,
+  startFreeTrial,
   type PaymentsStatus,
 } from '../../services/entitlement';
 
@@ -65,13 +67,15 @@ export function PricingContent({
   onBrokers,
 }: PricingContentProps) {
   const { user } = useAuth();
-  const { tier: currentTier, loaded, source, refresh } = useEntitlement();
+  const { tier: currentTier, loaded, source, refresh, trialAvailable, onTrial, complimentaryUntil } =
+    useEntitlement();
   const [busy, setBusy] = useState<Tier | null>(null);
   const [error, setError] = useState<string | null>(null);
   /** The payment provider's own words. Only ever populated for the site admin. */
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [portalBusy, setPortalBusy] = useState(false);
+  const [trialBusy, setTrialBusy] = useState(false);
   const [payments, setPayments] = useState<PaymentsStatus | null>(null);
   // Read from the URL at mount rather than set from an effect, so the banner is right on the
   // first paint the buyer sees after being sent back from checkout.
@@ -118,6 +122,24 @@ export function PricingContent({
   const checkoutPaused = payments?.checkoutEnabled === false;
   /** Paying customer with a real subscription — as opposed to free, or a hand-granted tier. */
   const subscribed = Boolean(user) && loaded && source === 'purchase' && currentTier !== 'free';
+
+  const handleTrial = async () => {
+    setError(null);
+    setErrorDetail(null);
+    setNotice(null);
+    setTrialBusy(true);
+    try {
+      const { message } = await startFreeTrial();
+      // The plan the whole page is about has just changed, so nothing on it is right until the
+      // entitlement is re-read.
+      await refresh();
+      setNotice(message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not start your trial.');
+    } finally {
+      setTrialBusy(false);
+    }
+  };
 
   const handlePortal = async () => {
     setError(null);
@@ -316,13 +338,44 @@ export function PricingContent({
                   </button>
                 ) : isCurrent ? (
                   <div className="w-full rounded-lg border border-emerald-400/40 bg-emerald-400/10 px-4 py-2.5 text-center text-sm font-medium text-emerald-300">
-                    {source === 'admin' ? 'Granted to your account' : source === 'comp' ? 'Yours for now, on us' : 'Current plan'}
+                    {source === 'admin'
+                      ? 'Granted to your account'
+                      : onTrial
+                        ? `Free trial — ${plan.name} until ${new Date(complimentaryUntil ?? '').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+                        : source === 'comp'
+                          ? 'Yours for now, on us'
+                          : 'Current plan'}
                   </div>
                 ) : checkoutPaused ? (
                   /* Not a disabled buy button: a disabled control invites clicking to find out
                      why. This says the reason where the button would have been. */
                   <div className="w-full rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-center text-sm font-medium text-amber-200">
                     Temporarily unavailable
+                  </div>
+                ) : tier === TRIAL_TIER && user && loaded && trialAvailable ? (
+                  /*
+                   * Broker sync is the only thing this product charges for, and a free account
+                   * cannot touch it — so the one feature worth paying for is the one nobody has
+                   * ever used. This button is the whole answer to that, which is why it takes the
+                   * primary position on the card and the card's own buy action moves underneath.
+                   */
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      disabled={trialBusy}
+                      onClick={() => void handleTrial()}
+                      className={`w-full rounded-lg px-4 py-2.5 text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${accent.button}`}
+                    >
+                      {trialBusy ? 'Starting your trial…' : `Start ${TRIAL_DAYS} days free`}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => void handleChoose(tier)}
+                      className="w-full rounded-lg px-4 py-2 text-xs text-text-secondary hover:text-text-primary transition-colors disabled:opacity-60"
+                    >
+                      {busy === tier ? 'Opening checkout…' : `Or subscribe now — $${plan.price}/month`}
+                    </button>
                   </div>
                 ) : (
                   <button

@@ -33,6 +33,15 @@ export interface Entitlement {
    * expires on its own because effectiveTier checks the date — nothing has to run to end it.
    */
   comp?: ComplimentaryAccess | null;
+  /**
+   * When this account started its free trial. Set once, never cleared.
+   *
+   * Kept here rather than inferred from `comp`, because a comp expires and is eventually
+   * overwritten — and an account whose trial has run out looks, from every other field, exactly
+   * like one that never had a trial. This is the only thing standing between one free week and
+   * an unlimited supply of them.
+   */
+  trialStartedAt?: string | null;
   updatedAt: string;
 }
 
@@ -120,6 +129,7 @@ export function readComp(value: unknown): ComplimentaryAccess | null {
     grantedBy: typeof c.grantedBy === 'string' ? c.grantedBy : '',
     grantedAt: typeof c.grantedAt === 'string' ? c.grantedAt : '',
     ...(typeof c.reason === 'string' && c.reason ? { reason: c.reason } : {}),
+    ...(c.trial === true ? { trial: true } : {}),
   };
 }
 
@@ -128,7 +138,13 @@ export async function readEntitlement(uid: string): Promise<Entitlement | null> 
   if (!snap.exists) return null;
   const data = snap.data() as Partial<Entitlement>;
   if (!isTier(data.tier)) return null;
-  return { ...DEFAULTS, ...data, tier: data.tier, comp: readComp(data.comp) } as Entitlement;
+  return {
+    ...DEFAULTS,
+    ...data,
+    tier: data.tier,
+    comp: readComp(data.comp),
+    trialStartedAt: typeof data.trialStartedAt === 'string' ? data.trialStartedAt : null,
+  } as Entitlement;
 }
 
 /** The tier and limits to enforce for this request. Falls back to free on any doubt. */

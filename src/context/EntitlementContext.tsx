@@ -87,6 +87,8 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
       source: snapshot.source,
       currentPeriodEnd: snapshot.currentPeriodEnd,
       complimentaryUntil: snapshot.complimentaryUntil ?? null,
+      trialAvailable: snapshot.trialAvailable ?? false,
+      onTrial: snapshot.onTrial ?? false,
       usage: snapshot.usage,
       loading,
       loaded,

@@ -23,6 +23,10 @@ export interface EntitlementSnapshot {
   currentPeriodEnd: string | null;
   /** When complimentary access runs out, if any is live. Absent on older responses. */
   complimentaryUntil?: string | null;
+  /** This account has never had a free trial and could start one now. */
+  trialAvailable?: boolean;
+  /** The live complimentary access is a self-serve trial, not a gift. */
+  onTrial?: boolean;
   usage: EntitlementUsage;
 }
 
@@ -35,6 +39,8 @@ export const FREE_SNAPSHOT: EntitlementSnapshot = {
   source: null,
   currentPeriodEnd: null,
   complimentaryUntil: null,
+  trialAvailable: false,
+  onTrial: false,
   usage: { aiMessagesUsed: 0, aiMessagesRemaining: 0, syncsUsed: 0, syncsRemaining: 0 },
 };
 
@@ -143,4 +149,34 @@ export async function fetchPaymentsStatus(): Promise<PaymentsStatus | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * Starts the free trial for the signed-in user.
+ *
+ * The server decides eligibility; this just asks. A 409 comes back when the account is not in a
+ * state where a trial means anything — already paying, already comped, or has had one before —
+ * and the message it carries is the one to show.
+ */
+export async function startFreeTrial(): Promise<{ tier: Tier; until: string; message: string }> {
+  if (!isFirebaseConfigured()) throw new Error('Sign in to start your trial.');
+  const user = getFirebaseAuth().currentUser;
+  if (!user) throw new Error('Sign in to start your trial.');
+
+  const res = await fetch('/api/start-trial', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${await user.getIdToken()}`, 'Content-Type': 'application/json' },
+  });
+
+  const data = (await res.json().catch(() => ({}))) as {
+    tier?: Tier;
+    until?: string;
+    message?: string;
+    error?: string;
+  };
+
+  if (!res.ok || !data.tier || !data.until) {
+    throw new Error(data.error ?? 'Could not start your trial.');
+  }
+  return { tier: data.tier, until: data.until, message: data.message ?? 'Your trial has started.' };
 }

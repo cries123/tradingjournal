@@ -18,6 +18,10 @@ export interface EntitlementContextValue {
   currentPeriodEnd: string | null;
   /** When complimentary access runs out, if any is live. */
   complimentaryUntil: string | null;
+  /** They have never had a free trial and could start one now. */
+  trialAvailable: boolean;
+  /** What is running is a self-serve trial rather than something granted by hand. */
+  onTrial: boolean;
   usage: EntitlementSnapshot['usage'];
   loading: boolean;
   /** True only once a real answer has come back, so the UI can avoid flashing a locked state. */

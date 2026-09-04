@@ -60,6 +60,14 @@ function resetLabel(resetsAt: string | undefined): string | null {
   return today ? `Resets at ${time}` : `Resets tomorrow at ${time}`;
 }
 
+/** "3 days" / "1 day" / "today" — the shape of it is what makes a trial feel finite. */
+function daysLeft(until: string): string {
+  const ms = Date.parse(until) - Date.now();
+  if (!Number.isFinite(ms) || ms <= 0) return 'no time';
+  const days = Math.ceil(ms / 86_400_000);
+  return days === 1 ? '1 day' : `${days} days`;
+}
+
 /**
  * The plan strip in the sidebar: what you're on, and what's left of today.
  *
@@ -69,7 +77,7 @@ function resetLabel(resetsAt: string | undefined): string | null {
  */
 export function PlanBadge() {
   const { user } = useAuth();
-  const { tier, limits, usage, loaded, source, status, complimentaryUntil } = useEntitlement();
+  const { tier, limits, usage, loaded, source, status, complimentaryUntil, onTrial } = useEntitlement();
 
   if (!user || !loaded) return null;
 
@@ -129,7 +137,18 @@ export function PlanBadge() {
       )}
       {source === 'comp' && complimentaryUntil && (
         <p className="text-[11px] text-text-secondary leading-snug">
-          On us until {new Date(complimentaryUntil).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} — nothing to pay.
+          {onTrial ? (
+            <>
+              {/* Days, not a date: "3 days left" is the number that makes somebody decide, and a
+                  date four weeks out reads as forever. */}
+              Free trial — {daysLeft(complimentaryUntil)} left. Subscribe any time to keep it.
+            </>
+          ) : (
+            <>
+              On us until{' '}
+              {new Date(complimentaryUntil).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} — nothing to pay.
+            </>
+          )}
         </p>
       )}
     </div>

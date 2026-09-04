@@ -215,6 +215,13 @@ async function handleClearTierGrant(targetUid: string) {
     return { message: `Grant removed — their complimentary ${TIER_PLANS[existing.comp.tier].name} still applies` };
   }
 
+  if (existing.trialStartedAt) {
+    // Deleting the record would erase the fact that they have had their free trial, and hand them
+    // another one. Emptied out instead, so it reads as Free but remembers.
+    await writeEntitlement(targetUid, { tier: 'free', source: 'purchase', status: 'active', grantedBy: '' });
+    return { message: 'Grant removed — back to Free' };
+  }
+
   await getAdminFirestore().doc(`entitlements/${targetUid}`).delete();
   return { message: 'Grant removed — back to Free' };
 }
