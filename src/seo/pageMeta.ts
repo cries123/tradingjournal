@@ -119,23 +119,11 @@ export const PAGE_SEO: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guid
   },
 };
 
-const COACH_SEO: PageSeo = {
-  title: 'Coach View — Trend Chasers',
-  description: 'Read-only shared trading journal view on Trend Chasers.',
-  path: '/coach',
-  noindex: true,
-};
-
 export function getPageSeo(
   route: AppRoute,
-  coachToken?: string,
   guideSlug?: string,
   brokerSlug?: string,
 ): PageSeo {
-  if (route === 'coach') {
-    return coachToken ? { ...COACH_SEO, path: `/coach/${coachToken}` } : COACH_SEO;
-  }
-
   if (route === 'guide' && guideSlug) {
     const guide = getGuideBySlug(guideSlug);
     if (guide) {

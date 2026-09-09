@@ -1,30 +1,17 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { ArrowLeft, Copy, Download, EyeOff, FileText, Plus, Share2, Trash2, Trophy, Upload } from 'lucide-react';
+import { ArrowLeft, Download, FileText, Plus, Trash2, Upload } from 'lucide-react';
 import { useSettings } from '../context/useSettings';
 import { DiamondSection } from './settings/DiamondSection';
 import { useAuth } from '../context/useAuth';
 import type { CurrencyCode, ThemeAccent } from '../types/settings';
 import type { Trade } from '../types';
-import { computeStats, type TradingStats } from '../utils/stats';
+import type { TradingStats } from '../utils/stats';
 import { downloadBackup, parseBackup, type ParsedBackup } from '../utils/backup';
 import { exportMonthReport, exportTaxYearCsv, exportTradesCsv } from '../utils/exportTrades';
 import { availableTaxYears, buildTaxReport } from '../utils/taxReport';
 import { formatCurrency } from '../utils/format';
 import { fetchEmailPrefs, setRecapOptIn } from '../services/emailPrefs';
 import { ConfirmDialog } from './ConfirmDialog';
-import { coachShareUrl, createTradeHistoryShare, disableCoachShare } from '../services/coachShare';
-
-function toDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-function defaultRangeEnd(): string {
-  return toDateStr(new Date());
-}
-function defaultRangeStart(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 30);
-  return toDateStr(d);
-}
 
 interface SettingsPageProps {
   trades: Trade[];
@@ -58,18 +45,9 @@ export function SettingsPage({
 }: SettingsPageProps) {
   const { settings, updateSettings, addSetupTag, addStrategy, removeStrategy, addAccount, removeAccount, setActiveAccount } = useSettings();
   const { username, user, firebaseEnabled } = useAuth();
-  // Leaderboards only ever rank broker-synced trades (see sourceId on Trade) — manual entries
-  // can't be faked into a ranking, so opting in requires at least one synced trade to exist first.
-  const hasSyncedTrade = everyTrade.some((t) => Boolean(t.sourceId));
   const [newTag, setNewTag] = useState('');
   const [newAccount, setNewAccount] = useState('');
   const [newStrategy, setNewStrategy] = useState('');
-  const [coachBusy, setCoachBusy] = useState(false);
-  const [coachMessage, setCoachMessage] = useState<string | null>(null);
-  const [coachMessageIsError, setCoachMessageIsError] = useState(false);
-  const [shareStart, setShareStart] = useState(settings.coachShareRangeStart || defaultRangeStart());
-  const [shareEnd, setShareEnd] = useState(settings.coachShareRangeEnd || defaultRangeEnd());
-  const [copied, setCopied] = useState(false);
   const [pendingBackup, setPendingBackup] = useState<ParsedBackup | null>(null);
   const [restoring, setRestoring] = useState(false);
   const [backupMessage, setBackupMessage] = useState<string | null>(null);
@@ -154,80 +132,6 @@ export function SettingsPage({
     } finally {
       setRestoring(false);
     }
-  };
-
-  // Trades within the chosen share range, from the currently active journal — same trade pool the
-  // CSV/report exports below use, so "share" always matches what the user is looking at.
-  const shareTradesInRange = trades.filter((t) => t.date >= shareStart && t.date <= shareEnd);
-  const shareStats = computeStats(shareTradesInRange);
-
-  const handleGenerateShare = async () => {
-    if (!user || !username) {
-      setCoachMessageIsError(true);
-      setCoachMessage('Sign in and set a username to share your trade history.');
-      return;
-    }
-    if (shareStart > shareEnd) {
-      setCoachMessageIsError(true);
-      setCoachMessage('Start date must be on or before the end date.');
-      return;
-    }
-    setCoachBusy(true);
-    setCoachMessage(null);
-    setCoachMessageIsError(false);
-    try {
-      const { token, truncated } = await createTradeHistoryShare(
-        user.uid,
-        username,
-        settings.coachShareToken,
-        shareTradesInRange,
-        shareStats,
-        shareStart,
-        shareEnd,
-      );
-      updateSettings({
-        coachShareEnabled: true,
-        coachShareToken: token,
-        coachShareRangeStart: shareStart,
-        coachShareRangeEnd: shareEnd,
-      });
-      setCoachMessage(
-        truncated
-          ? 'Link ready — this range has a lot of trades, so it shows the most recent ones.'
-          : 'Link ready — share the read-only URL below.',
-      );
-    } catch (err) {
-      setCoachMessageIsError(true);
-      setCoachMessage(err instanceof Error ? err.message : 'Could not create the share link.');
-    } finally {
-      setCoachBusy(false);
-    }
-  };
-
-  const handleRevokeShare = async () => {
-    if (!settings.coachShareToken) {
-      updateSettings({ coachShareEnabled: false });
-      return;
-    }
-    setCoachBusy(true);
-    try {
-      await disableCoachShare(settings.coachShareToken);
-      updateSettings({ coachShareEnabled: false, coachShareToken: undefined });
-      setCoachMessageIsError(false);
-      setCoachMessage('Share link revoked.');
-    } catch (err) {
-      setCoachMessageIsError(true);
-      setCoachMessage(err instanceof Error ? err.message : 'Could not revoke the link.');
-    } finally {
-      setCoachBusy(false);
-    }
-  };
-
-  const copyCoachLink = async () => {
-    if (!settings.coachShareToken) return;
-    await navigator.clipboard.writeText(coachShareUrl(settings.coachShareToken));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -560,153 +464,6 @@ export function SettingsPage({
               </p>
             </div>
           )}
-        </section>
-
-        <section className="panel-card p-5 space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Sharing & charts</h2>
-          <div className="rounded-lg border border-border/60 bg-bg-tertiary/30 p-3 space-y-2">
-            <p className="text-sm font-medium">TradingView / chart replay</p>
-            <p className="text-xs text-text-secondary">
-              Use &quot;Auto-link&quot; in the trade form advanced section, or open chart replay from any trade detail.
-            </p>
-          </div>
-          <div className="rounded-lg border border-border/60 bg-bg-tertiary/30 p-3 space-y-3">
-            <div className="flex items-center gap-2">
-              <Share2 size={14} className="text-text-secondary shrink-0" />
-              <p className="text-sm font-medium">Share trade history</p>
-            </div>
-            <p className="text-xs text-text-secondary leading-relaxed">
-              Pick a date range and get a read-only link — anyone you send it to can browse every
-              trade in that range and click into one to see the full detail: prices, times, fees,
-              notes, all of it. They can&apos;t edit anything, and they don&apos;t need an account
-              to view it.
-            </p>
-
-            <div className="grid grid-cols-2 gap-2">
-              <label className="block">
-                <span className="text-[11px] text-text-secondary mb-1 block">From</span>
-                <input
-                  type="date"
-                  value={shareStart}
-                  max={shareEnd}
-                  onChange={(e) => setShareStart(e.target.value)}
-                  className="input-field text-xs"
-                />
-              </label>
-              <label className="block">
-                <span className="text-[11px] text-text-secondary mb-1 block">To</span>
-                <input
-                  type="date"
-                  value={shareEnd}
-                  min={shareStart}
-                  max={defaultRangeEnd()}
-                  onChange={(e) => setShareEnd(e.target.value)}
-                  className="input-field text-xs"
-                />
-              </label>
-            </div>
-
-            <p className="text-[11px] text-text-secondary">
-              {shareTradesInRange.length} trade{shareTradesInRange.length === 1 ? '' : 's'} in this range
-            </p>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void handleGenerateShare()}
-                disabled={coachBusy || shareTradesInRange.length === 0 || !firebaseEnabled}
-                className="btn-primary px-3 py-2 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {settings.coachShareEnabled ? 'Update link' : 'Create link'}
-              </button>
-              {settings.coachShareEnabled && (
-                <button
-                  type="button"
-                  onClick={() => void handleRevokeShare()}
-                  disabled={coachBusy}
-                  className="btn-secondary px-3 py-2 text-xs text-red-400"
-                >
-                  Revoke
-                </button>
-              )}
-            </div>
-
-            {coachMessage && (
-              <p className={`text-xs ${coachMessageIsError ? 'text-red-400' : 'text-profit-bright'}`}>{coachMessage}</p>
-            )}
-            {settings.coachShareEnabled && settings.coachShareToken && (
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={coachShareUrl(settings.coachShareToken)}
-                  className="input-field flex-1 text-xs"
-                />
-                <button type="button" onClick={() => void copyCoachLink()} className="btn-secondary px-3 py-2 text-xs inline-flex items-center gap-1">
-                  <Copy size={12} />
-                  {copied ? 'Copied' : 'Copy'}
-                </button>
-              </div>
-            )}
-            {!firebaseEnabled && (
-              <p className="text-[10px] text-text-secondary">Requires cloud sign-in.</p>
-            )}
-          </div>
-        </section>
-
-        <section className="panel-card p-5 space-y-4">
-          <div className="flex items-center gap-2.5">
-            <span className="w-7 h-7 rounded-lg bg-accent/10 text-accent flex items-center justify-center shrink-0">
-              <Trophy size={14} />
-            </span>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Leaderboard</h2>
-          </div>
-
-          <div className="rounded-lg border border-border/60 bg-bg-tertiary/30 p-3 space-y-3">
-            <p className="text-xs text-text-secondary leading-relaxed">
-              Only trades synced from a connected broker ever count toward a leaderboard ranking —
-              manually logged trades are never included, and can&apos;t be. You won&apos;t appear on
-              any leaderboard unless you&apos;ve opted in below and have at least one broker-synced trade.
-            </p>
-
-            <label className={`flex items-start gap-2 text-sm ${hasSyncedTrade ? '' : 'opacity-50'}`}>
-              <input
-                type="checkbox"
-                checked={settings.leaderboardOptIn}
-                disabled={!hasSyncedTrade}
-                onChange={(e) =>
-                  updateSettings({
-                    leaderboardOptIn: e.target.checked,
-                    ...(e.target.checked ? {} : { leaderboardAnonymous: false }),
-                  })
-                }
-                className="rounded border-border mt-0.5"
-              />
-              <span>
-                Show me on the public leaderboard
-                {!hasSyncedTrade && (
-                  <span className="block text-[11px] text-text-secondary font-normal mt-0.5">
-                    Sync a broker and complete at least one trade to unlock this.
-                  </span>
-                )}
-              </span>
-            </label>
-
-            {settings.leaderboardOptIn && (
-              <label className="flex items-start gap-2 text-sm pl-0.5">
-                <input
-                  type="checkbox"
-                  checked={settings.leaderboardAnonymous}
-                  onChange={(e) => updateSettings({ leaderboardAnonymous: e.target.checked })}
-                  className="rounded border-border mt-0.5"
-                />
-                <span className="inline-flex items-center gap-1.5">
-                  <EyeOff size={13} className="text-text-secondary" />
-                  Show anonymously — hide my username, use a random display name instead
-                </span>
-              </label>
-            )}
-          </div>
         </section>
 
         <section className="panel-card p-5 space-y-3">

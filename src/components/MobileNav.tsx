@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { LayoutGrid, Menu, MessageCircle, Plus, Trophy } from 'lucide-react';
+import { LayoutGrid, Menu, MessageCircle, Plus } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
 import { useEscapeToClose } from '../hooks/useEscapeToClose';
 import type { SidebarAppView } from './Sidebar';
@@ -9,7 +9,6 @@ interface MobileNavProps {
   onOpenMenu: () => void;
   onAddTrade: () => void;
   onDashboard: () => void;
-  onLeaderboard: () => void;
   onAssistant: () => void;
   assistantOpen: boolean;
 }
@@ -86,7 +85,6 @@ export function MobileBottomNav({
   onOpenMenu,
   onAddTrade,
   onDashboard,
-  onLeaderboard,
   onAssistant,
   assistantOpen,
 }: MobileNavProps) {
@@ -102,13 +100,6 @@ export function MobileBottomNav({
           active={appView === 'dashboard'}
           onClick={onDashboard}
         />
-        <NavItem
-          icon={<Trophy size={18} />}
-          label="Ranks"
-          active={appView === 'leaderboard'}
-          onClick={onLeaderboard}
-        />
-
         <button
           type="button"
           onClick={onAddTrade}

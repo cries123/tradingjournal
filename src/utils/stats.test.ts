@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Trade } from '../types';
-import { computeStats, getDailyPnlForMonth, getWeekdayPnl } from './stats';
+import { computeStats } from './stats';
 
 const trade = (date: string, pnl: number, over: Partial<Trade> = {}): Trade =>
   ({ id: `${date}-${pnl}`, date, symbol: 'SPY', pnl, ...over }) as Trade;
@@ -57,45 +57,3 @@ describe('computeStats', () => {
   });
 });
 
-describe('getDailyPnlForMonth', () => {
-  const trades = [
-    trade('2026-07-31', 999),
-    trade('2026-08-03', 100),
-    trade('2026-08-03', -40),
-    trade('2026-08-14', 25),
-    trade('2026-09-01', 888),
-  ];
-
-  it('keeps only the month asked for', () => {
-    // month is zero-based; 7 is August. An off-by-one here silently charts the wrong month.
-    const days = getDailyPnlForMonth(trades, 2026, 7);
-    expect(days.map((d) => d.date)).toEqual(['2026-08-03', '2026-08-14']);
-  });
-
-  it('sums trades that share a day into one bar', () => {
-    const days = getDailyPnlForMonth(trades, 2026, 7);
-    expect(days[0].pnl).toBe(60);
-  });
-
-  it('returns days in date order', () => {
-    const shuffled = [trade('2026-08-20', 1), trade('2026-08-02', 1), trade('2026-08-11', 1)];
-    const days = getDailyPnlForMonth(shuffled, 2026, 7);
-    expect(days.map((d) => d.date)).toEqual(['2026-08-02', '2026-08-11', '2026-08-20']);
-  });
-
-  it('is empty for a month with no trades', () => {
-    expect(getDailyPnlForMonth(trades, 2026, 0)).toEqual([]);
-  });
-});
-
-describe('getWeekdayPnl', () => {
-  it('does not let a timezone shift a trade onto the wrong weekday', () => {
-    // 2026-08-03 is a Monday. Parsing an ISO date string through the Date constructor treats it as
-    // UTC midnight, which is the previous Sunday for anyone west of Greenwich — this user included.
-    const days = getWeekdayPnl([trade('2026-08-03', 500)], 2026, 7);
-    const monday = days.find((d) => d.label.startsWith('Mon'));
-    const sunday = days.find((d) => d.label.startsWith('Sun'));
-    expect(monday?.pnl).toBe(500);
-    expect(sunday?.pnl ?? 0).toBe(0);
-  });
-});

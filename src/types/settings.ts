@@ -27,8 +27,6 @@ export interface UserSettings {
   remindersEnabled: boolean;
   /** Local HH:MM for end-of-day journal reminder */
   reminderTime: string;
-  coachShareEnabled: boolean;
-  coachShareToken?: string;
   /**
    * Let the journal import from the broker on its own each market morning. Diamond only.
    *
@@ -46,23 +44,6 @@ export interface UserSettings {
   coachEmail?: string;
   /** Told when a risk rule is broken: in the app as it happens, and again the next morning. */
   ruleAlertsEnabled: boolean;
-  /** Last-used date range (YYYY-MM-DD) for the trade-history share link, remembered so the
-   *  share panel and "Update link" both reuse it without asking again. */
-  coachShareRangeStart?: string;
-  coachShareRangeEnd?: string;
-  /** Opt-in — off by default. Even when on, only broker-synced trades ever count toward a
-   *  leaderboard ranking; manual entries are excluded regardless of this setting. */
-  leaderboardOptIn: boolean;
-  /** Show a random placeholder name instead of the real username. Only meaningful when
-   *  leaderboardOptIn is true. */
-  leaderboardAnonymous: boolean;
-  /** Download URLs of custom share-card background images the user has uploaded (Firebase
-   *  Storage), most-recent last. Capped at MAX_SHARE_CARD_BACKGROUNDS — see
-   *  services/shareCardBackgrounds.ts — so re-uploading is never required to pick one again. */
-  shareCardBackgrounds: string[];
-  /** Which background the share card currently uses: a URL from shareCardBackgrounds above, or
-   *  null for the default Milky Way starfield. */
-  shareCardBackgroundId: string | null;
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -78,11 +59,6 @@ export const DEFAULT_SETTINGS: UserSettings = {
   accountSize: 0,
   remindersEnabled: false,
   reminderTime: '16:00',
-  coachShareEnabled: false,
   autoSyncEnabled: true,
   ruleAlertsEnabled: true,
-  leaderboardOptIn: false,
-  leaderboardAnonymous: false,
-  shareCardBackgrounds: [],
-  shareCardBackgroundId: null,
 };

@@ -310,10 +310,6 @@ export function AdminUserDetailModal({
                   : '—'}
               </dd>
             </div>
-            <div>
-              <dt className="text-xs text-text-secondary uppercase tracking-wider">Coach share</dt>
-              <dd className="mt-0.5">{user.coachShareEnabled ? 'On' : 'Off'}</dd>
-            </div>
             {trialClaim && (
               <div>
                 <dt className="text-xs text-text-secondary uppercase tracking-wider">Free trial</dt>

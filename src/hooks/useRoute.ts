@@ -9,7 +9,6 @@ export type AppRoute =
   | 'privacy'
   | 'terms'
   | 'refunds'
-  | 'coach'
   | 'report-bug'
   | 'request-broker'
   | 'admin'
@@ -24,7 +23,7 @@ export type AppRoute =
 
 /** Nav destinations reachable from the header dropdown and the footer — the "coming soon" and
  *  changelog pages, plus the two support pages the footer links to. Kept as its own union so a
- *  nav handler can't be passed a route like 'coach' that needs a token. */
+ *  nav handler can't be passed a route that needs a slug. */
 export type ExtraNavRoute =
   | 'refunds'
   | 'market-simulator'
@@ -36,7 +35,7 @@ export type ExtraNavRoute =
   | 'support'
   | 'request-broker';
 
-const ROUTE_PATHS: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>, string> = {
+const ROUTE_PATHS: Record<Exclude<AppRoute, 'guide' | 'broker-guide'>, string> = {
   landing: '/',
   app: '/app',
   brokers: '/brokers',
@@ -57,15 +56,12 @@ const ROUTE_PATHS: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>,
 
 interface RouteState {
   route: AppRoute;
-  coachToken?: string;
   guideSlug?: string;
   brokerSlug?: string;
 }
 
 function readRoute(): RouteState {
   const path = window.location.pathname;
-  const coachMatch = path.match(/^\/coach\/([a-zA-Z0-9]+)/);
-  if (coachMatch) return { route: 'coach', coachToken: coachMatch[1] };
 
   if (path.startsWith('/guides/')) {
     const slug = path.slice('/guides/'.length).replace(/\/$/, '');
@@ -97,7 +93,7 @@ function readRoute(): RouteState {
 
 export function useRoute() {
   const [state, setState] = useState<RouteState>(readRoute);
-  const { route, coachToken, guideSlug, brokerSlug } = state;
+  const { route, guideSlug, brokerSlug } = state;
 
   useEffect(() => {
     const onPopState = () => setState(readRoute());
@@ -132,7 +128,7 @@ export function useRoute() {
     return () => mobileQuery.removeEventListener('change', applyRouteStyles);
   }, [route]);
 
-  const navigate = useCallback((next: Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>) => {
+  const navigate = useCallback((next: Exclude<AppRoute, 'guide' | 'broker-guide'>) => {
     pushAppHistory(ROUTE_PATHS[next]);
     setState({ route: next });
     if (next !== 'app') window.scrollTo(0, 0);
@@ -150,5 +146,5 @@ export function useRoute() {
     window.scrollTo(0, 0);
   }, []);
 
-  return { route, coachToken, guideSlug, brokerSlug, navigate, navigateGuide, navigateBrokerGuide };
+  return { route, guideSlug, brokerSlug, navigate, navigateGuide, navigateBrokerGuide };
 }

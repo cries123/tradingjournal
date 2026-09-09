@@ -13,19 +13,6 @@ export interface TradingStats {
   tradingDays: number;
 }
 
-export interface DailyPnlPoint {
-  date: string;
-  pnl: number;
-  label: string;
-}
-
-export interface WeekdayPnlPoint {
-  label: string;
-  pnl: number;
-}
-
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
 export function computeStats(trades: Trade[]): TradingStats {
   if (trades.length === 0) {
     return {
@@ -63,37 +50,6 @@ export function computeStats(trades: Trade[]): TradingStats {
     avgProfitPerDay: tradingDays > 0 ? netPnl / tradingDays : 0,
     tradingDays,
   };
-}
-
-export function getDailyPnlForMonth(trades: Trade[], year: number, month: number): DailyPnlPoint[] {
-  const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
-  const byDay = new Map<string, number>();
-
-  for (const trade of trades) {
-    if (!trade.date.startsWith(prefix)) continue;
-    byDay.set(trade.date, (byDay.get(trade.date) ?? 0) + trade.pnl);
-  }
-
-  return [...byDay.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, pnl]) => ({
-      date,
-      pnl,
-      label: date.slice(5),
-    }));
-}
-
-export function getWeekdayPnl(trades: Trade[], year: number, month: number): WeekdayPnlPoint[] {
-  const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
-  const totals = new Array(7).fill(0);
-
-  for (const trade of trades) {
-    if (!trade.date.startsWith(prefix)) continue;
-    const day = new Date(trade.date + 'T12:00:00').getDay();
-    totals[day] += trade.pnl;
-  }
-
-  return WEEKDAYS.map((label, i) => ({ label, pnl: totals[i] }));
 }
 
 export function getMonthTrades(trades: Trade[], year: number, month: number): Trade[] {
@@ -146,62 +102,3 @@ export function getYearTrades(trades: Trade[], year: number): Trade[] {
   return trades.filter((t) => t.date.startsWith(prefix));
 }
 
-/** Cumulative net P&L by trading day in month — for sparklines. */
-export function getCumulativePnlSeries(trades: Trade[], year: number, month: number): number[] {
-  const daily = getDailyPnlForMonth(trades, year, month);
-  let running = 0;
-  return daily.map((d) => {
-    running += d.pnl;
-    return running;
-  });
-}
-
-/** Daily win rate trend (rolling %) for sparklines. */
-export function getWinRateSeries(trades: Trade[], year: number, month: number): number[] {
-  const monthTrades = getMonthTrades(trades, year, month).sort((a, b) => a.date.localeCompare(b.date));
-  const byDay = new Map<string, Trade[]>();
-  for (const t of monthTrades) {
-    const list = byDay.get(t.date) ?? [];
-    list.push(t);
-    byDay.set(t.date, list);
-  }
-
-  const series: number[] = [];
-  let wins = 0;
-  let total = 0;
-  for (const [, dayTrades] of [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    for (const t of dayTrades) {
-      total += 1;
-      if (t.pnl > 0) wins += 1;
-    }
-    series.push(total > 0 ? (wins / total) * 100 : 0);
-  }
-  return series;
-}
-
-export interface EquityPoint {
-  date: string;
-  equity: number;
-}
-
-/**
- * Cumulative net P&L per trading session, carrying the date with it.
- *
- * getCumulativePnlSeries above returns bare numbers, which is all a sparkline needs. The full
- * equity curve also has to label its axis and its hover readout, so it needs the dates that
- * produced each point rather than just their order.
- */
-export function getEquityCurve(trades: Trade[]): EquityPoint[] {
-  const byDay = new Map<string, number>();
-  for (const trade of trades) {
-    byDay.set(trade.date, (byDay.get(trade.date) ?? 0) + trade.pnl);
-  }
-
-  let running = 0;
-  return [...byDay.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, pnl]) => {
-      running += pnl;
-      return { date, equity: running };
-    });
-}

@@ -53,10 +53,6 @@ export interface Trade {
   grade?: TradeGrade;
   /** 0–100 checklist adherence */
   checklistScore?: number;
-  /** Base64 JPEG chart screenshots */
-  imageUrls?: string[];
-  /** TradingView or external chart replay URL */
-  chartUrl?: string;
   roundTripId?: string;
   assetClass?: AssetClass;
   tickValue?: number;

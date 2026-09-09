@@ -2,8 +2,6 @@ import { useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 import { useSettings } from '../context/useSettings';
 import type { Trade, TradeGrade, TradeSide, AssetClass } from '../types';
-import { compressImage } from '../utils/compressImage';
-import { buildTradingViewReplayUrl } from '../utils/tradingView';
 import { useEscapeToClose } from '../hooks/useEscapeToClose';
 import { readTradeForm } from '../utils/tradeFormValues';
 
@@ -44,8 +42,6 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
   const [checklistScore, setChecklistScore] = useState(trade?.checklistScore != null ? String(trade.checklistScore) : '');
   const [assetClass, setAssetClass] = useState<AssetClass | ''>(trade?.assetClass ?? '');
   const [ivRank, setIvRank] = useState(trade?.ivRank != null ? String(trade.ivRank) : '');
-  const [imageUrls, setImageUrls] = useState<string[]>(trade?.imageUrls ?? []);
-  const [chartUrl, setChartUrl] = useState(trade?.chartUrl ?? '');
   /* Errors appear only once someone has tried to save. Marking a field red while it is still
      being typed into is nagging, not help. */
   const [submitAttempted, setSubmitAttempted] = useState(false);
@@ -63,28 +59,12 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
   /** So collapsing Advanced does not hide the fact that something is in there. */
   const advancedFilled = [
     extraTags, strategyId, grossPnl, fees, entryTime, exitTime,
-    mae, mfe, rMultiple, grade, checklistScore, assetClass, chartUrl,
-  ].filter((v) => String(v).trim()).length + imageUrls.length;
+    mae, mfe, rMultiple, grade, checklistScore, assetClass,
+  ].filter((v) => String(v).trim()).length;
 
   /* Errors stay quiet until someone has actually tried to save. Marking a field red while it is
      still being typed into is nagging, not help. */
   const show = (error?: string) => (submitAttempted ? error : undefined);
-
-  const handleImageUpload = async (files: FileList | null) => {
-    if (!files?.length) return;
-    const next: string[] = [...imageUrls];
-    for (const file of Array.from(files).slice(0, 3 - imageUrls.length)) {
-      const compressed = await compressImage(file, 960, 0.75);
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(compressed);
-      });
-      next.push(dataUrl);
-    }
-    setImageUrls(next.slice(0, 3));
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,8 +107,6 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
       checklistScore: reading.values.checklistScore,
       assetClass: assetClass || undefined,
       ivRank: reading.values.ivRank,
-      imageUrls: imageUrls.length ? imageUrls : undefined,
-      chartUrl: chartUrl.trim() || undefined,
       accountId: trade?.accountId,
       contract: trade?.contract,
       assetType: trade?.assetType,
@@ -309,34 +287,6 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
                     <option key={a} value={a}>{a}</option>
                   ))}
                 </select>
-              </Field>
-              <Field label="Chart screenshots (max 3)">
-                <input type="file" accept="image/*" multiple onChange={(e) => void handleImageUpload(e.target.files)} className="text-xs text-text-secondary" />
-                {imageUrls.length > 0 && (
-                  <div className="flex gap-2 mt-2 flex-wrap">
-                    {imageUrls.map((url, i) => (
-                      <img key={i} src={url} alt="" className="w-16 h-16 object-cover rounded border border-border/60" />
-                    ))}
-                  </div>
-                )}
-              </Field>
-              <Field label="TradingView / chart replay URL">
-                <div className="flex gap-2">
-                  <input
-                    type="url"
-                    value={chartUrl}
-                    onChange={(e) => setChartUrl(e.target.value)}
-                    className="input-field flex-1"
-                    placeholder="https://www.tradingview.com/chart/…"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setChartUrl(buildTradingViewReplayUrl({ symbol, date, side }))}
-                    className="btn-secondary px-3 py-2 text-xs shrink-0"
-                  >
-                    Auto-link
-                  </button>
-                </div>
               </Field>
             </div>
           )}

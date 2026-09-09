@@ -20,7 +20,7 @@ export function useVisitorTracking(route: AppRoute, guideSlug?: string, brokerSl
 
   useEffect(() => {
     if (!firebaseEnabled || loading || user) return;
-    if (route === 'admin' || route === 'coach') return;
+    if (route === 'admin') return;
 
     const path =
       route === 'guide' && guideSlug

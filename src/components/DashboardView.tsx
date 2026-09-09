@@ -1,37 +1,23 @@
 import { useMemo, useState } from 'react';
-import { Calendar, Grid3X3, RefreshCw, Share2 } from 'lucide-react';
+import { Calendar, Grid3X3, RefreshCw } from 'lucide-react';
 import type { Filters, Trade } from '../types';
-import {
-  computeStats,
-  getCumulativePnlSeries,
-  getDailyPnlForMonth,
-  getEquityCurve,
-  getMonthTrades,
-  getWeekdayPnl,
-  getWinRateSeries,
-  getYearTrades,
-} from '../utils/stats';
+import { computeStats, getMonthTrades, getYearTrades } from '../utils/stats';
 import { formatCurrency, formatMonthYear } from '../utils/format';
 import { computeJournalingStreak, computeTradingInsights } from '../utils/insights';
 import { computeTakeaway } from '../utils/takeaway';
 import { useSettings } from '../context/useSettings';
 import { AccountSwitcher } from './AccountSwitcher';
 import { useAiTakeaway } from '../hooks/useAiTakeaway';
-import { useMediaQuery } from '../hooks/useMediaQuery';
 import { SiteAnnouncement } from './SiteAnnouncement';
 import { DuplicateTradesBanner } from './DuplicateTradesBanner';
 import { WeeklyRecapCard } from './WeeklyRecapCard';
-import { DailyPnlChart } from './DailyPnlChart';
 import { DashboardCalendar } from './DashboardCalendar';
 import { EmptyDashboard } from './EmptyDashboard';
 import { FiltersBar } from './FiltersBar';
-import { ShareCardModal } from './ShareCardModal';
 import { StatsCards } from './StatsCards';
-import { WeekdayChart } from './WeekdayChart';
-import { YearHeatmap } from './YearHeatmap';
+import { YearMonths } from './YearMonths';
 import { TradingInsightsSection } from './analytics/TradingInsightsSection';
 import { DirectionPanel } from './analytics/DirectionPanel';
-import { EquityCurve } from './analytics/EquityCurve';
 import { TakeawayBanner } from './analytics/TakeawayBanner';
 
 type DashboardMode = 'month' | 'year';
@@ -94,23 +80,15 @@ export function DashboardView({
 }: DashboardViewProps) {
   const { settings } = useSettings();
   const [mode, setMode] = useState<DashboardMode>('month');
-  const [showShare, setShowShare] = useState(false);
-  const isCompact = useMediaQuery('(max-width: 767px)');
 
   const monthTrades = useMemo(() => getMonthTrades(trades, year, month), [trades, year, month]);
   const yearTrades = useMemo(() => getYearTrades(trades, year), [trades, year]);
   const stats = useMemo(() => computeStats(monthTrades), [monthTrades]);
   const yearStats = useMemo(() => computeStats(yearTrades), [yearTrades]);
-  const dailyPnl = useMemo(() => getDailyPnlForMonth(trades, year, month), [trades, year, month]);
-  const weekdayPnl = useMemo(() => getWeekdayPnl(trades, year, month), [trades, year, month]);
-  const cumulativeSeries = useMemo(() => getCumulativePnlSeries(trades, year, month), [trades, year, month]);
-  const winRateSeries = useMemo(() => getWinRateSeries(trades, year, month), [trades, year, month]);
-
   const hasFilters = Boolean(filters.symbol || filters.setup || filters.side || filters.tag);
   const analyticsTrades = mode === 'month' ? monthTrades : yearTrades;
   const streakDays = useMemo(() => computeJournalingStreak(trades), [trades]);
 
-  const equityPoints = useMemo(() => getEquityCurve(analyticsTrades), [analyticsTrades]);
   const takeaway = useMemo(() => {
     const insights = computeTradingInsights(analyticsTrades);
     if (!insights) return null;
@@ -189,17 +167,6 @@ export function DashboardView({
             Sync broker
           </button>
         )}
-
-        {(mode === 'month' ? monthTrades.length > 0 : yearTrades.length > 0) && (
-          <button
-            type="button"
-            onClick={() => setShowShare(true)}
-            className={`${hasBrokerTrades && onSyncBroker ? '' : 'ml-auto '}flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border/60 text-text-secondary hover:text-text-primary hover:border-accent/30 transition-colors focus-ring`}
-          >
-            <Share2 size={14} />
-            {mode === 'month' ? 'Share month' : 'Share year'}
-          </button>
-        )}
       </div>
 
       {!hasAnyTrades && (
@@ -230,8 +197,6 @@ export function DashboardView({
       {hasAnyTrades && (
         <StatsCards
           stats={mode === 'month' ? stats : yearStats}
-          cumulativeSeries={mode === 'month' ? cumulativeSeries : []}
-          winRateSeries={mode === 'month' ? winRateSeries : []}
           periodLabel={mode === 'month' ? formatMonthYear(year, month) : String(year)}
           streakDays={streakDays}
           goalPnl={mode === 'month' ? settings.monthlyGoalPnl : 0}
@@ -261,7 +226,7 @@ export function DashboardView({
             onMonthChange={onMonthChange}
           />
         ) : (
-          <YearHeatmap
+          <YearMonths
             trades={trades}
             year={year}
             onPrevYear={onPrevYear}
@@ -275,46 +240,7 @@ export function DashboardView({
         </div>
 
         <div className="flex flex-col gap-2 md:gap-3 min-w-0 ultra:order-2">
-          {hasAnyTrades && equityPoints.length >= 2 && (
-          <div className="panel-card p-3 md:p-4">
-            <div className="flex items-start justify-between gap-2 mb-1 md:mb-2">
-              <div>
-                <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
-                  Equity
-                </p>
-                <h3 className="text-[10px] md:text-sm font-semibold text-text-primary">
-                  Cumulative P&amp;L {mode === 'month' ? formatMonthYear(year, month) : year}
-                </h3>
-              </div>
-              <span className="text-[9px] md:text-[10px] text-text-secondary shrink-0 pt-0.5 hidden sm:block">
-                Shaded area = drawdown from your running high
-              </span>
-            </div>
-            {/* 200px was over half a phone screen for one line. */}
-            <EquityCurve points={equityPoints} height={isCompact ? 120 : 170} />
-          </div>
-          )}
-
           {hasAnyTrades && <WeeklyRecapCard trades={trades} />}
-
-          {/* Weekday sits here rather than in the row below because it is a short list of bars in
-              a tall card — exactly the shape that fills the space the calendar leaves beside it,
-              and exactly the shape that looked stretched at full width. */}
-          {hasAnyTrades && (
-            <div className="panel-card p-3 md:p-4 flex flex-col flex-1 min-h-[140px]">
-              <div className="mb-1.5 md:mb-3 shrink-0">
-                <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
-                  Rhythm
-                </p>
-                <h3 className="text-[10px] md:text-sm font-semibold text-text-primary">
-                  Performance by Weekday
-                </h3>
-              </div>
-              <div className="flex-1 min-h-[80px]">
-                <WeekdayChart data={weekdayPnl} />
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -322,63 +248,25 @@ export function DashboardView({
         <FiltersBar filters={filters} symbols={filterSymbols} setups={filterSetups} onChange={onFiltersChange} />
       )}
 
-      {/* Days and Direction share one row.
-
-          Both render from a plain date/symbol/side/P&L trade, so the row can no longer collapse to
-          a single card stranded in a third of the width — which is what happened when it also
-          carried Timing and Execution, panels that need an entry time and MAE/MFE respectively and
-          get neither from a broker sync. Two panels, two columns, no conditional column count. */}
+      {/* Direction on its own row now that Gross Daily P&L, which was the other half of it, has
+          gone with the rest of the charts. Full width rather than a half-width card stranded
+          beside an empty column. */}
       {hasAnyTrades && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
-          <div className="panel-card p-3 md:p-4 flex flex-col min-h-[160px]">
-            <div className="flex items-start justify-between mb-1.5 md:mb-3 shrink-0 gap-2">
-              <div>
-                <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
-                  Days
-                </p>
-                <h3 className="text-[10px] md:text-sm font-semibold whitespace-nowrap text-text-primary">Gross Daily P&L</h3>
-              </div>
-              <div className="flex gap-2 text-[9px] md:text-[10px] shrink-0 pt-0.5">
-                <span className="flex items-center gap-1 text-profit-bright">
-                  <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-sm bg-profit-bright" /> Win
-                </span>
-                <span className="flex items-center gap-1 text-loss-bright">
-                  <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-sm bg-loss-bright" /> Loss
-                </span>
-              </div>
-            </div>
-            <div className="flex-1 min-h-[80px]">
-              <DailyPnlChart data={dailyPnl} />
-            </div>
+        <div className="panel-card p-3 md:p-4 flex flex-col min-h-[160px]">
+          <div className="mb-1.5 md:mb-3 shrink-0">
+            <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
+              Direction
+            </p>
+            <h3 className="text-[10px] md:text-sm font-semibold text-text-primary">Long vs Short</h3>
           </div>
-
-          <div className="panel-card p-3 md:p-4 flex flex-col min-h-[160px]">
-            <div className="mb-1.5 md:mb-3 shrink-0">
-              <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
-                Direction
-              </p>
-              <h3 className="text-[10px] md:text-sm font-semibold text-text-primary">
-                Long vs Short
-              </h3>
-            </div>
-            <div className="flex-1 min-h-[80px]">
-              <DirectionPanel trades={analyticsTrades} currency={settings.currency} />
-            </div>
+          <div className="flex-1 min-h-[80px]">
+            <DirectionPanel trades={analyticsTrades} currency={settings.currency} />
           </div>
         </div>
       )}
 
       {hasAnyTrades && <TradingInsightsSection trades={analyticsTrades} />}
 
-      {showShare && (
-        <ShareCardModal
-          period={mode === 'month' ? 'month' : 'year'}
-          stats={mode === 'month' ? stats : yearStats}
-          year={year}
-          month={month}
-          onClose={() => setShowShare(false)}
-        />
-      )}
     </div>
   );
 }

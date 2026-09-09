@@ -174,7 +174,6 @@ const sidebar = (appView: Parameters<typeof Sidebar>[0]['appView']) =>
     onSettings: noop,
     onSupport: noop,
     onCoach: noop,
-    onLeaderboard: noop,
     onAdmin: noop,
     onHome: noop,
   });
@@ -183,11 +182,15 @@ describe('Sidebar', () => {
   it('paints the six destinations and nothing that used to scroll', () => {
     const html = renderToString(sidebar('dashboard'));
 
-    for (const label of ['Overview', 'Performance', 'Assistant', 'Leaderboard', 'Connect broker', 'Settings', 'Support']) {
+    for (const label of ['Overview', 'Performance', 'Assistant', 'Connect broker', 'Settings', 'Support']) {
       expect(html).toContain(label);
     }
-    // The three that moved into Support, and the two that moved out of the nav entirely.
-    for (const gone of ['Supported brokers', 'Report a bug', 'Request broker', 'Share month', 'Clear journal']) {
+    // The three that moved into Support, the two that moved out of the nav, and the two
+    // features that were removed outright.
+    for (const gone of [
+      'Supported brokers', 'Report a bug', 'Request broker', 'Share month', 'Clear journal',
+      'Leaderboard',
+    ]) {
       expect(html).not.toContain(gone);
     }
   });

@@ -4,7 +4,6 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { DashboardView } from '../components/DashboardView';
 import { DashboardSkeleton } from '../components/DashboardSkeleton';
 import { DayDetailDrawer } from '../components/DayDetailDrawer';
-import { LeaderboardContent } from '../components/LeaderboardContent';
 import { MobileBottomNav, MobileDrawer, MobileHeader } from '../components/MobileNav';
 import { OnboardingOverlay } from '../components/OnboardingOverlay';
 import { hasCompletedOnboarding, hideGettingStarted, isGettingStartedHidden } from '../utils/onboarding';
@@ -31,7 +30,6 @@ import { useAuth } from '../context/useAuth';
 import { useSettings } from '../context/useSettings';
 import { useIsDesktop } from '../hooks/useMediaQuery';
 import { useJournalReminder } from '../hooks/useJournalReminder';
-import { useLeaderboardSync } from '../hooks/useLeaderboardSync';
 import { useTrades } from '../hooks/useTrades';
 import type { Trade } from '../types';
 import { computeStats, getMonthTrades, getYearTrades } from '../utils/stats';
@@ -130,9 +128,6 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   );
 
   useJournalReminder(settings.remindersEnabled, settings.reminderTime, allTrades);
-  // Every journal's trades, not just the active one — a trader's leaderboard standing is about
-  // them, not whichever journal happens to be selected right now.
-  useLeaderboardSync(everyTrade);
   // Broker syncing is manual: it happens on the Connect Broker screen when the trader presses the
   // button, and nowhere else. An automatic version shipped briefly and had to be pulled — it could
   // fire before the journal finished loading, dedupe against an empty list, and re-import someone's
@@ -223,10 +218,6 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
     },
     onCoach: () => {
       openView('coach');
-      closeMobileMenu();
-    },
-    onLeaderboard: () => {
-      openView('leaderboard');
       closeMobileMenu();
     },
     onAdmin,
@@ -330,8 +321,6 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
               <ReportBugContent onBack={goBackView} />
             ) : appView === 'request-broker' ? (
               <RequestBrokerContent onBack={goBackView} />
-            ) : appView === 'leaderboard' ? (
-              <LeaderboardContent onBack={goBackView} />
             ) : isLoading ? (
               <DashboardSkeleton />
             ) : (
@@ -400,7 +389,6 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
             onOpenMenu={() => setMobileMenuOpen(true)}
             onAddTrade={() => openAddTrade()}
             onDashboard={() => openView('dashboard')}
-            onLeaderboard={() => openView('leaderboard')}
             onAssistant={() => openView('assistant')}
             assistantOpen={assistantOpen}
           />

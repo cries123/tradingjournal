@@ -11,7 +11,6 @@ import { setPendingAppView } from './utils/pendingAppView';
 const AdminPage = lazy(() => import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })));
 const BrokerGuidePage = lazy(() => import('./pages/BrokerGuidePage').then((m) => ({ default: m.BrokerGuidePage })));
 const BrokersPage = lazy(() => import('./pages/BrokersPage').then((m) => ({ default: m.BrokersPage })));
-const CoachViewPage = lazy(() => import('./pages/CoachViewPage').then((m) => ({ default: m.CoachViewPage })));
 const ComingSoonPage = lazy(() => import('./pages/ComingSoonPage').then((m) => ({ default: m.ComingSoonPage })));
 const AiAssistantPage = lazy(() => import('./pages/AiAssistantPage').then((m) => ({ default: m.AiAssistantPage })));
 const GuidePage = lazy(() => import('./pages/GuidePage').then((m) => ({ default: m.GuidePage })));
@@ -41,9 +40,9 @@ function RouteLoading() {
 }
 
 export default function App() {
-  const { route, coachToken, guideSlug, brokerSlug, navigate, navigateGuide, navigateBrokerGuide } =
+  const { route, guideSlug, brokerSlug, navigate, navigateGuide, navigateBrokerGuide } =
     useRoute();
-  usePageMeta(getPageSeo(route, coachToken, guideSlug, brokerSlug));
+  usePageMeta(getPageSeo(route, guideSlug, brokerSlug));
   useStructuredData(route, guideSlug, brokerSlug);
   useVisitorTracking(route, guideSlug, brokerSlug);
 
@@ -90,10 +89,7 @@ export default function App() {
   let content;
   let routeKey: string = route;
 
-  if (route === 'coach' && coachToken) {
-    routeKey = `coach-${coachToken}`;
-    content = <CoachViewPage token={coachToken} onHome={goHome} />;
-  } else if (route === 'guides') {
+  if (route === 'guides') {
     content = <GuidesIndexPage {...publicPageProps} />;
   } else if (route === 'guide' && guideSlug) {
     routeKey = `guide-${guideSlug}`;

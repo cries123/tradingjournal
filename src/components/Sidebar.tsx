@@ -8,7 +8,6 @@ import {
   LifeBuoy,
   ShieldCheck,
   Sparkles,
-  Trophy,
 } from 'lucide-react';
 import { PlanBadge } from './plan/PlanBadge';
 import { BrandLogo } from './BrandLogo';
@@ -28,8 +27,7 @@ export type SidebarAppView =
   | 'report-bug'
   | 'request-broker'
   | 'support'
-  | 'coach'
-  | 'leaderboard';
+  | 'coach';
 
 interface SidebarProps {
   appView: SidebarAppView;
@@ -41,7 +39,6 @@ interface SidebarProps {
   onSettings: () => void;
   onSupport: () => void;
   onCoach: () => void;
-  onLeaderboard: () => void;
   onAdmin?: () => void;
   onHome?: () => void;
   variant?: 'desktop' | 'drawer';
@@ -127,7 +124,6 @@ export function Sidebar({
   onSettings,
   onSupport,
   onCoach,
-  onLeaderboard,
   onAdmin,
   onHome,
   variant = 'desktop',
@@ -207,12 +203,6 @@ export function Sidebar({
             onClick={wrap(onAssistant)}
             icon={<Sparkles size={16} />}
             label="Assistant"
-          />
-          <NavItem
-            active={appView === 'leaderboard'}
-            onClick={wrap(onLeaderboard)}
-            icon={<Trophy size={16} />}
-            label="Leaderboard"
           />
           {/* Only for the people who are actually somebody's coach — which is almost nobody, and a
               permanent row saying "nobody has invited you" is a nav item advertising a feature

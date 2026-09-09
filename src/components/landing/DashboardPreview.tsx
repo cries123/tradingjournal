@@ -1,5 +1,4 @@
 import { Flame } from 'lucide-react';
-import { Sparkline } from '../Sparkline';
 
 export function DashboardPreview() {
   const days = [
@@ -18,11 +17,6 @@ export function DashboardPreview() {
     23: { v: '$396', win: true, trades: 1, intensity: 1 },
     24: { v: '-$359', win: false, trades: 8, intensity: 0.95 },
   };
-
-  // A rough cumulative-equity trend for the sparkline — same shape of data
-  // StatsCards feeds into its own Sparkline from the real month's running P&L.
-  const cumulativeSeries = [0, 142, 118, 214, 358, 358, -1];
-  const netTrend = cumulativeSeries.slice(0, -1);
 
   return (
     <div className="glass-card glow-border-brand relative overflow-hidden rounded-2xl p-4 shadow-2xl shadow-black/40 md:p-5">
@@ -44,7 +38,6 @@ export function DashboardPreview() {
         <div className="text-right">
           <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-secondary">Net P&amp;L</p>
           <div className="flex items-center justify-end gap-2 mt-0.5">
-            <Sparkline values={netTrend} positive width={52} height={20} className="hidden sm:block" />
             <span className="hero-value-profit text-xl md:text-2xl font-extrabold leading-none">+$358.00</span>
           </div>
         </div>

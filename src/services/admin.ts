@@ -91,7 +91,6 @@ export interface AdminUserSummary {
   tradesSavedLast7Days: number;
   /** Trades with a session date in the last 7 calendar days. */
   tradesSessionLast7Days: number;
-  coachShareEnabled: boolean;
   /** Sign-in blocked by an admin. Mirrored from Auth onto the user document; Auth is what holds. */
   suspended: boolean;
 }
@@ -219,7 +218,6 @@ export async function fetchSignedUpUsers(): Promise<AdminUserSummary[]> {
       winRate: null,
       tradesSavedLast7Days: 0,
       tradesSessionLast7Days: 0,
-      coachShareEnabled: false,
       suspended: data.suspended === true,
     });
   }
@@ -250,8 +248,7 @@ export async function fetchSignedUpUsers(): Promise<AdminUserSummary[]> {
         winRate: null,
         tradesSavedLast7Days: 0,
         tradesSessionLast7Days: 0,
-        coachShareEnabled: false,
-        suspended: false,
+          suspended: false,
       });
     }
   }
@@ -388,23 +385,10 @@ export function computePlatformStats(users: AdminUserSummary[]): AdminPlatformSt
   };
 }
 
-async function fetchCoachShareEnabled(uid: string): Promise<boolean> {
-  try {
-    const snap = await getDoc(doc(getFirebaseDb(), 'users', uid, 'settings', 'preferences'));
-    if (!snap.exists()) return false;
-    return Boolean((snap.data() as { coachShareEnabled?: boolean }).coachShareEnabled);
-  } catch {
-    return false;
-  }
-}
-
 async function enrichUsersWithActivity(users: AdminUserSummary[]): Promise<void> {
   await Promise.all(
     users.map(async (user) => {
-      const [tradeStats, coachShareEnabled] = await Promise.all([
-        fetchUserTradeStats(user.uid),
-        fetchCoachShareEnabled(user.uid),
-      ]);
+      const tradeStats = await fetchUserTradeStats(user.uid);
       user.tradeCount = tradeStats.tradeCount;
       user.lastTradeDate = maxDateKey(user.lastTradeDate, tradeStats.lastTradeDate);
       user.lastTradeActivityAt = maxIsoTimestamp(
@@ -416,7 +400,6 @@ async function enrichUsersWithActivity(users: AdminUserSummary[]): Promise<void>
       user.winRate = tradeStats.winRate;
       user.tradesSavedLast7Days = tradeStats.tradesSavedLast7Days;
       user.tradesSessionLast7Days = tradeStats.tradesSessionLast7Days;
-      user.coachShareEnabled = coachShareEnabled;
     }),
   );
 }

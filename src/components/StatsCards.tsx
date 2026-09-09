@@ -5,12 +5,9 @@ import type { TradingStats } from '../utils/stats';
 import { formatCurrency } from '../utils/format';
 import { breakevenWinRate } from '../utils/metricVerdict';
 import { BenchmarkChip } from './analytics/BenchmarkChip';
-import { Sparkline } from './Sparkline';
 
 interface StatsCardsProps {
   stats: TradingStats;
-  cumulativeSeries?: number[];
-  winRateSeries?: number[];
   periodLabel?: string;
   /** Consecutive days journaled (weekends don't break it). */
   streakDays?: number;
@@ -23,8 +20,6 @@ interface StatsCardsProps {
 
 export function StatsCards({
   stats,
-  cumulativeSeries = [],
-  winRateSeries = [],
   periodLabel,
   streakDays = 0,
   goalPnl = 0,
@@ -63,15 +58,6 @@ export function StatsCards({
             >
               {hasTrades ? fmt(stats.netPnl) : '—'}
             </span>
-            {cumulativeSeries.length >= 2 && (
-              <Sparkline
-                values={cumulativeSeries}
-                positive={isProfit}
-                width={96}
-                height={34}
-                className="hidden sm:block mb-0.5"
-              />
-            )}
           </div>
           <p className="text-[10px] md:text-xs text-text-secondary mt-1.5 md:mt-2">
             {hasTrades
@@ -115,9 +101,6 @@ export function StatsCards({
                 <span className="text-[10px] text-text-secondary">
                   need {breakeven.toFixed(0)}%
                 </span>
-              )}
-              {winRateSeries.length >= 2 && (
-                <Sparkline values={winRateSeries} positive={winPct >= 50} width={36} height={12} />
               )}
             </span>
             <span className="stat-chip">

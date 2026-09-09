@@ -55,7 +55,6 @@ export function exportUsersCsv(users: AdminUserSummary[], notes?: Map<string, Ad
         u.lastTradeActivityAt ? new Date(u.lastTradeActivityAt).toISOString() : '',
         u.firstTradeDate ?? '',
         u.lastTradeDate ?? '',
-        u.coachShareEnabled ? 'yes' : 'no',
         note?.flagged ? 'yes' : 'no',
         note?.note ?? '',
       ];

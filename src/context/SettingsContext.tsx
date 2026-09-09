@@ -15,7 +15,7 @@ import { deleteField, doc, getDoc, setDoc } from 'firebase/firestore';
 // rgba(var(--color-*-rgb), alpha) — see index.css). Every button, banner, focus ring, chart bar,
 // and nav highlight across the app reads these two var pairs, so switching accent here recolors
 // the whole authenticated app — including the share card's nebula glow, badge and username (see
-// utils/shareCard.ts's resolveShareCardAccent). Only the landing page and the "TREND CHASERS"
+// the theme accent). Only the landing page and the "TREND CHASERS"
 // wordmark itself (everywhere it appears, share card included) intentionally stay fixed brand
 // emerald, same as the logo.
 const ACCENT_VARS: Record<ThemeAccent, { profit: string; profitRgb: string; accent: string; accentRgb: string }> = {

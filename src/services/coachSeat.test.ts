@@ -157,7 +157,6 @@ describe('forCoach', () => {
       accountId: 'live',
       accountType: 'margin',
       sourceId: 'snaptrade:a:b',
-      imageUrls: ['data:image/jpeg;base64,AAAA'],
       strategyId: 's1',
       savedAt: '2026-08-03T20:00:00.000Z',
     } as Trade);
@@ -167,7 +166,7 @@ describe('forCoach', () => {
     expect(shared.grade).toBe('D');
     expect(shared.pnl).toBe(-120);
 
-    for (const hidden of ['accountId', 'accountType', 'sourceId', 'imageUrls', 'strategyId', 'savedAt']) {
+    for (const hidden of ['accountId', 'accountType', 'sourceId', 'strategyId', 'savedAt']) {
       expect(hidden in shared).toBe(false);
     }
   });

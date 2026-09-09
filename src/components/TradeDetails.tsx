@@ -1,7 +1,6 @@
 import type { Trade } from '../types';
 import { formatCurrency } from '../utils/format';
 import { marketSessionFromTime, tradeTags } from '../utils/tradeHelpers';
-import { buildTradingViewReplayUrl } from '../utils/tradingView';
 
 interface TradeDetailsProps {
   trade: Partial<Trade>;
@@ -78,23 +77,6 @@ export function TradeDetails({ trade, compact }: TradeDetailsProps) {
       ))}
       {trade.notes && (
         <p className="text-xs text-text-secondary mt-1">{trade.notes}</p>
-      )}
-      {trade.imageUrls && trade.imageUrls.length > 0 && (
-        <div className="flex gap-2 mt-2 flex-wrap">
-          {trade.imageUrls.map((url, i) => (
-            <img key={i} src={url} alt="Trade chart" className="w-20 h-20 object-cover rounded border border-border/60" />
-          ))}
-        </div>
-      )}
-      {(trade.chartUrl || trade.symbol) && (
-        <a
-          href={trade.chartUrl || buildTradingViewReplayUrl(trade)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex text-xs text-accent hover:text-accent/80 mt-2"
-        >
-          Open chart replay →
-        </a>
       )}
     </div>
   );

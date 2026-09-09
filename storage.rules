@@ -1,26 +1,20 @@
 rules_version = '2';
 
-// Firebase Storage security rules for the share-card custom background feature
-// (src/services/shareCardBackgrounds.ts). Paste this into Firebase Console → Storage → Rules
-// (there's no firebase.json/storage config in this repo yet, so this file isn't auto-deployed —
-// it's a reference to copy in by hand, same as firestore.rules already is).
+// Firebase Storage security rules. Paste this into Firebase Console → Storage → Rules — there is
+// no firebase.json/storage config in this repo, so this file is a reference to copy in by hand,
+// the same way firestore.rules is.
 //
-// Layout: shareCardBackgrounds/{uid}/{timestamp}.jpg — one folder per user. Only that user's own
-// signed-in client may write or delete inside their own folder; anyone can read, since a share
-// card background is only ever used as a public-facing image (a card someone is about to share
-// publicly), never sensitive data.
+// Nothing is stored in Storage any more. The only thing that ever used it was the share card's
+// custom backgrounds (shareCardBackgrounds/{uid}/…), and share cards have been removed along with
+// the rest of the sharing features. This file stays, closed, rather than being deleted: an
+// unmanaged bucket with no rules file to point at is how a permissive default gets left in place
+// the next time something needs to upload.
+//
+// Publishing this also revokes access to any backgrounds still sitting in the bucket. Deleting
+// those objects is a separate job in the Firebase console, and worth doing — they are public
+// images nobody can reach from the product any more.
 service firebase.storage {
   match /b/{bucket}/o {
-    match /shareCardBackgrounds/{userId}/{fileName} {
-      allow read: if true;
-      allow write: if request.auth != null
-        && request.auth.uid == userId
-        && request.resource.size < 8 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
-      allow delete: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // Everything else stays closed by default.
     match /{allPaths=**} {
       allow read, write: if false;
     }

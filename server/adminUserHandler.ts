@@ -109,13 +109,6 @@ async function deleteUserFirestoreData(uid: string): Promise<void> {
     await batch.commit();
   }
 
-  const shares = await db.collection('coachShares').where('ownerUid', '==', uid).get();
-  if (!shares.empty) {
-    const batch = db.batch();
-    shares.docs.forEach((doc) => batch.delete(doc.ref));
-    await batch.commit();
-  }
-
   await db.doc(`users/${uid}`).delete().catch(() => undefined);
 }
 

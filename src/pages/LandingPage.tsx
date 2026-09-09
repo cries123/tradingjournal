@@ -8,7 +8,6 @@ import {
   Link2,
   Lock,
   Pencil,
-  Trophy,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
@@ -76,12 +75,6 @@ const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
     title: 'Optional Cloud Sync',
     description:
       'Sign in with Google or email to sync across devices — or stay local-only. One-click backup puts your entire journal in a file you own.',
-  },
-  {
-    icon: Trophy,
-    title: 'Leaderboard & Share Cards',
-    description:
-      'Opt in to a public leaderboard ranked by profit, consistency, or risk management — or keep it private and just export a share card of your month.',
   },
 ];
 

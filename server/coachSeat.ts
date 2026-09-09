@@ -141,10 +141,10 @@ export function coachWindowStart(today: string, days = COACH_WINDOW_DAYS): strin
  * their trading. Written notes stay — a coach who cannot read why the trade was taken is being
  * asked to review a spreadsheet.
  */
-export type CoachTrade = Omit<Trade, 'accountId' | 'accountType' | 'sourceId' | 'imageUrls' | 'strategyId' | 'savedAt'>;
+export type CoachTrade = Omit<Trade, 'accountId' | 'accountType' | 'sourceId' | 'strategyId' | 'savedAt'>;
 
 export function forCoach(trade: Trade): CoachTrade {
   /* eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to drop these */
-  const { accountId, accountType, sourceId, imageUrls, strategyId, savedAt, ...rest } = trade;
+  const { accountId, accountType, sourceId, strategyId, savedAt, ...rest } = trade;
   return rest;
 }

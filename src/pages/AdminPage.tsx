@@ -1923,11 +1923,6 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                                     Suspended
                                   </span>
                                 )}
-                                {entry.coachShareEnabled && (
-                                  <span className="ml-2 inline-flex px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400 text-[9px] font-medium uppercase tracking-wide">
-                                    Coach share
-                                  </span>
-                                )}
                                 {ready.userNotes.get(entry.uid)?.flagged && (
                                   <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 text-[9px] font-medium uppercase tracking-wide">
                                     <Flag size={9} />

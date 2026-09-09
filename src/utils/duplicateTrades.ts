@@ -57,8 +57,6 @@ export const EMPTY_DUPLICATE_REPORT: DuplicateReport = {
 function annotationWeight(trade: Trade): number {
   let score = 0;
   if (trade.notes?.trim()) score += 4;
-  if (trade.imageUrls?.length) score += 4;
-  if (trade.chartUrl?.trim()) score += 3;
   if (trade.tags?.length) score += 2;
   if (trade.setup?.trim()) score += 2;
   if (trade.grade) score += 2;

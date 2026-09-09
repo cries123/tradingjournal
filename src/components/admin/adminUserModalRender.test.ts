@@ -56,7 +56,6 @@ const user: AdminUserSummary = {
   winRate: 41,
   tradesSavedLast7Days: 3,
   tradesSessionLast7Days: 3,
-  coachShareEnabled: false,
   suspended: true,
 };
 

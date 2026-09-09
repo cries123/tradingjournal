@@ -14,27 +14,6 @@ import { getFirebaseAuth, getFirebaseDb, isFirebaseConfigured } from '../lib/fir
 
 const BATCH_SIZE = 400;
 
-async function deleteCollection(path: string, field?: string, value?: string): Promise<void> {
-  const db = getFirebaseDb();
-  const col = collection(db, path);
-
-  while (true) {
-    const snap = field && value !== undefined
-      ? await getDocs(query(col, where(field, '==', value), limit(BATCH_SIZE)))
-      : await getDocs(query(col, limit(BATCH_SIZE)));
-
-    if (snap.empty) break;
-
-    const batch = writeBatch(db);
-    for (const docSnap of snap.docs) {
-      batch.delete(docSnap.ref);
-    }
-    await batch.commit();
-
-    if (snap.size < BATCH_SIZE) break;
-  }
-}
-
 async function deleteUserSubcollection(uid: string, name: 'trades' | 'settings' | 'dayNotes'): Promise<void> {
   const db = getFirebaseDb();
 
@@ -67,10 +46,6 @@ async function deleteUsernamesForUid(uid: string): Promise<void> {
   await batch.commit();
 }
 
-async function deleteCoachSharesForUid(uid: string): Promise<void> {
-  await deleteCollection('coachShares', 'ownerUid', uid);
-}
-
 /** Removes a user's Firestore data and blocks future app access (no Admin SDK required). */
 export async function deleteUserViaFirestore(targetUid: string): Promise<{ message: string }> {
   if (!isFirebaseConfigured()) {
@@ -98,7 +73,6 @@ export async function deleteUserViaFirestore(targetUid: string): Promise<{ messa
   await deleteUserSubcollection(targetUid, 'trades');
   await deleteUserSubcollection(targetUid, 'settings');
   await deleteUserSubcollection(targetUid, 'dayNotes');
-  await deleteCoachSharesForUid(targetUid);
   await deleteUsernamesForUid(targetUid);
   await markAccountDeleted(targetUid);
   await deleteDoc(doc(getFirebaseDb(), 'users', targetUid)).catch(() => undefined);
