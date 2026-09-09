@@ -171,6 +171,15 @@ export interface SizingStats {
   biggestQuarterTrades: number;
   restNet: number;
   restTrades: number;
+  /**
+   * The same split per trade.
+   *
+   * The totals alone mislead on a journal where both halves lose: "biggest quarter -$3,040, rest
+   * -$1,790" reads as the small trades being the bigger problem, when there are three times as
+   * many of them and each large position is costing five times as much.
+   */
+  biggestQuarterPerTrade: number;
+  restPerTrade: number;
 }
 
 /**
@@ -202,16 +211,20 @@ export function sizingStats(trades: Trade[]): SizingStats | null {
   const quarter = Math.max(1, Math.round(bySize.length / 4));
   const biggest = bySize.slice(0, quarter);
   const rest = bySize.slice(quarter);
+  const biggestNet = biggest.reduce((sum, r) => sum + r.pnl, 0);
+  const restNet = rest.reduce((sum, r) => sum + r.pnl, 0);
 
   return {
     covered: sized.length,
     avgWinnerSize,
     avgLoserSize,
     ratio: avgLoserSize / avgWinnerSize,
-    biggestQuarterNet: biggest.reduce((sum, r) => sum + r.pnl, 0),
+    biggestQuarterNet: biggestNet,
     biggestQuarterTrades: biggest.length,
-    restNet: rest.reduce((sum, r) => sum + r.pnl, 0),
+    restNet,
     restTrades: rest.length,
+    biggestQuarterPerTrade: biggest.length > 0 ? biggestNet / biggest.length : 0,
+    restPerTrade: rest.length > 0 ? restNet / rest.length : 0,
   };
 }
 

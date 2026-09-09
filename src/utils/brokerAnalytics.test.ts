@@ -188,6 +188,30 @@ describe('sizingStats', () => {
     expect(stats!.restNet).toBeCloseTo(40, 6);
   });
 
+  it('reports the split per trade as well as in total', () => {
+    // Both halves losing is the case the totals mislead on: eight small losses add up to more than
+    // two large ones, so the totals accuse the small trades while the per-trade figures show each
+    // large position costing ten times as much.
+    const stats = sizingStats([
+      sized(-100, 900),
+      sized(-100, 1000),
+      ...Array.from({ length: 4 }, () => sized(-25, 10)),
+      sized(10, 11),
+      sized(10, 12),
+      sized(10, 13),
+    ]);
+
+    // Nine trades, so the biggest quarter is the two large positions.
+    expect(stats!.biggestQuarterTrades).toBe(2);
+    expect(stats!.biggestQuarterNet).toBeCloseTo(-200, 6);
+    expect(stats!.restNet).toBeCloseTo(-70, 6);
+    // The totals make the two large trades look like three quarters of the damage; per trade, each
+    // one costs ten times what a small one does.
+    expect(stats!.biggestQuarterPerTrade).toBeCloseTo(-100, 6);
+    expect(stats!.restPerTrade).toBeCloseTo(-10, 6);
+    expect(stats!.biggestQuarterPerTrade).toBeLessThan(stats!.restPerTrade);
+  });
+
   it('ignores trades with no size on them', () => {
     const stats = sizingStats([
       sized(50, 100),

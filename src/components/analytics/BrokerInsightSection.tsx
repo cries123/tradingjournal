@@ -100,7 +100,11 @@ function BreakevenPanel({ data }: { data: BreakevenStats }) {
 
 function SizingPanel({ data, currency }: { data: SizingStats; currency: Currency }) {
   const backwards = data.ratio > 1.15;
-  const concentrated = data.biggestQuarterNet < 0 && data.restNet > 0;
+  /* Per trade, not in total. On a journal where both halves lose money, comparing the totals says
+     the small trades are the bigger problem purely because there are three times as many of them,
+     which is the opposite of the truth. */
+  const bigOnesCostMore =
+    data.biggestQuarterPerTrade < 0 && data.biggestQuarterPerTrade < data.restPerTrade * 1.5;
 
   return (
     <PanelShell eyebrow="Size" title="Where the money goes" icon={<Scale size={14} />}>
@@ -116,6 +120,10 @@ function SizingPanel({ data, currency }: { data: SizingStats; currency: Currency
           </span>
           <span className={`text-xs font-semibold tabular-nums ${pnlClass(data.biggestQuarterNet)}`}>
             {formatCurrency(data.biggestQuarterNet, currency)}
+            <span className="text-text-secondary font-normal">
+              {' '}
+              · {formatCurrency(data.biggestQuarterPerTrade, currency)}/t
+            </span>
           </span>
         </div>
         <div className="flex items-center justify-between gap-3 mt-1">
@@ -124,18 +132,41 @@ function SizingPanel({ data, currency }: { data: SizingStats; currency: Currency
           </span>
           <span className={`text-xs font-semibold tabular-nums ${pnlClass(data.restNet)}`}>
             {formatCurrency(data.restNet, currency)}
+            <span className="text-text-secondary font-normal">
+              {' '}
+              · {formatCurrency(data.restPerTrade, currency)}/t
+            </span>
           </span>
         </div>
       </div>
 
       <Note>
-        {concentrated
-          ? 'The rest of your trading is profitable and your biggest positions are what take it back. That is a sizing problem, not a strategy one.'
-          : backwards
-            ? `You put ${data.ratio.toFixed(2)}× more on the trades that lose than the ones that win. Conviction is pointing the wrong way.`
-            : data.ratio < 0.87
-              ? `Your winners carry ${(1 / data.ratio).toFixed(2)}× the size of your losers — size is following the edge, which is the way round it should be.`
-              : 'Winners and losers are sized about the same, so the result is coming from the trades themselves rather than from how much you bet.'}
+        {bigOnesCostMore ? (
+          <>
+            Your largest quarter of positions loses{' '}
+            <span className="text-loss-bright font-medium">
+              {formatCurrency(Math.abs(data.biggestQuarterPerTrade), currency)}
+            </span>{' '}
+            a trade against{' '}
+            {formatCurrency(Math.abs(data.restPerTrade), currency)} on the rest. Whatever the average
+            size says, the big ones are where the damage is.
+          </>
+        ) : backwards ? (
+          <>
+            You put {data.ratio.toFixed(2)}× more on the trades that lose than the ones that win.
+            Conviction is pointing the wrong way.
+          </>
+        ) : data.ratio < 0.87 ? (
+          <>
+            Your winners carry {(1 / data.ratio).toFixed(2)}× the size of your losers — size is
+            following the edge, which is the way round it should be.
+          </>
+        ) : (
+          <>
+            Winners and losers are sized about the same, so the result is coming from the trades
+            themselves rather than from how much you bet.
+          </>
+        )}
       </Note>
     </PanelShell>
   );
