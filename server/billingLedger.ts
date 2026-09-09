@@ -35,13 +35,39 @@ export function isPaymentEvent(eventType: string | undefined): boolean {
   return type.includes('paid') || type.includes('completed');
 }
 
+/**
+ * What to book for a charge, in dollars.
+ *
+ * A number from the event is the truth, INCLUDING zero — a trial starting, or a fully discounted
+ * first month, collected nothing and must book nothing. Only null means the event did not say, and
+ * only then is the plan's list price the best guess available.
+ *
+ * Written as its own function because `amountPaid || listPrice` reads correctly and is wrong: zero
+ * is falsy, so the one case this exists to handle would fall straight through to the list price
+ * and invent the revenue anyway.
+ */
+export function chargeAmount(tier: Tier, amountPaid?: number | null): number {
+  if (typeof amountPaid === 'number' && Number.isFinite(amountPaid)) return amountPaid;
+  return TIER_PLANS[tier]?.price ?? 0;
+}
+
 export async function recordCharge(input: {
   eventId: string;
   uid: string;
   tier: Tier;
   eventType: string;
+  /**
+   * What was actually collected, when the event said. Null means it did not say.
+   *
+   * The distinction is the whole point. A trial starting, or a fully discounted first month, is a
+   * real charge of ZERO and booking the list price for it invents revenue that never arrived —
+   * which is exactly what happens the moment a Creem product has a free trial on it, because the
+   * checkout completes for $0 and the event still names the tier. Null is different: the event
+   * carried no amount, and the plan's price is the best guess available.
+   */
+  amountPaid?: number | null;
 }): Promise<void> {
-  const amount = TIER_PLANS[input.tier]?.price ?? 0;
+  const amount = chargeAmount(input.tier, input.amountPaid);
   if (amount <= 0 || !input.eventId) return;
 
   try {

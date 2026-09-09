@@ -4,7 +4,12 @@ import { applyBillingUpdate } from '../../server/entitlements';
 import { paymentFailedEmail, subscriptionCanceledEmail } from '../../server/emailTemplates';
 import { isMailConfigured, sendEmail, siteUrl } from '../../server/mailer';
 import { TIER_PLANS, type Tier } from '../../src/config/tiers';
-import { parseBillingEvent, verifyWebhookSignature, type CreemWebhookEvent } from '../../server/creemClient';
+import {
+  amountFromEvent,
+  parseBillingEvent,
+  verifyWebhookSignature,
+  type CreemWebhookEvent,
+} from '../../server/creemClient';
 import { logServerError } from '../../server/errorReports';
 import { isPaymentEvent, recordCharge } from '../../server/billingLedger';
 
@@ -156,6 +161,8 @@ export const handler: Handler = async (event) => {
         uid: parsed.uid,
         tier: parsed.tier,
         eventType: payload.eventType ?? '',
+        // Read off the event rather than assumed from the plan, so a $0 trial start books nothing.
+        amountPaid: amountFromEvent(payload),
       });
     }
 

@@ -263,12 +263,53 @@ export interface CreemWebhookEvent {
     customer?: { id?: string; email?: string } | string | null;
     current_period_end_date?: string | null;
     subscription?: { id?: string; metadata?: Record<string, unknown> | null } | string | null;
+    /*
+     * What was actually collected, in the smallest currency unit — cents, for USD.
+     *
+     * Creem spells this differently depending on the object, so every place it is known to appear
+     * is read. Absent on plenty of events, which is why the caller has to decide what an unknown
+     * amount means rather than assuming a number.
+     */
+    amount?: number | null;
+    amount_paid?: number | null;
+    amount_total?: number | null;
+    total?: number | null;
+    order?: { amount?: number | null; amount_paid?: number | null; amount_total?: number | null } | string | null;
   } | null;
 }
 
 function readId(value: { id?: string } | string | null | undefined): string | undefined {
   if (!value) return undefined;
   return typeof value === 'string' ? value : value.id;
+}
+
+/**
+ * The money on an event, in dollars, or null when the payload does not say.
+ *
+ * Null and zero mean very different things to the ledger: zero is a real charge of nothing — a
+ * trial starting, a fully discounted first month — and must never be booked as revenue, while
+ * null only means this event did not carry an amount and the caller may fall back to the list
+ * price. Collapsing the two is how a month reads higher than the bank.
+ */
+export function amountFromEvent(event: CreemWebhookEvent): number | null {
+  const obj = event.object;
+  if (!obj) return null;
+
+  const order = obj.order && typeof obj.order !== 'string' ? obj.order : null;
+  const candidates = [
+    obj.amount_paid,
+    obj.amount_total,
+    obj.amount,
+    obj.total,
+    order?.amount_paid,
+    order?.amount_total,
+    order?.amount,
+  ];
+
+  for (const value of candidates) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value / 100;
+  }
+  return null;
 }
 
 export interface ParsedBillingEvent {
