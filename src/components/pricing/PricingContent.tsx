@@ -14,7 +14,7 @@ import { REFUND_WINDOW_DAYS } from '../../config/legal';
 import { BROKER_COUNT_PHRASE } from '../../data/brokerCopy';
 import { useAuth } from '../../context/useAuth';
 import { useEntitlement } from '../../context/useEntitlement';
-import { TRIAL_TIER } from '../../config/trial';
+import { TRIAL_DAYS, TRIAL_TIER } from '../../config/trial';
 import {
   CheckoutError,
   choosePlan,
@@ -81,10 +81,8 @@ export function PricingContent({
     loaded,
     source,
     refresh,
-    trialAvailable,
     onTrial,
     complimentaryUntil,
-    trialBlockedReason,
   } = useEntitlement();
   const [busy, setBusy] = useState<Tier | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -101,9 +99,6 @@ export function PricingContent({
    */
   const [yearly, setYearly] = useState(false);
 
-  /** The trial is on offer while it is available, or while only a confirmation stands in the way. */
-  const trialOnOffer =
-    Boolean(user) && loaded && (trialAvailable || trialBlockedReason === 'email-unverified');
   const [payments, setPayments] = useState<PaymentsStatus | null>(null);
   // Read from the URL at mount rather than set from an effect, so the banner is right on the
   // first paint the buyer sees after being sent back from checkout.
@@ -150,6 +145,13 @@ export function PricingContent({
   const checkoutPaused = payments?.checkoutEnabled === false;
   /** Paying customer with a real subscription — as opposed to free, or a hand-granted tier. */
   const subscribed = Boolean(user) && loaded && source === 'purchase' && currentTier !== 'free';
+
+  /*
+   * The trial rides on Creem's checkout, so it is offered to anybody who could buy this plan —
+   * Creem is the one that decides whether a given customer is owed a trial, and it knows things
+   * this page does not, like whether they have had one on a card before.
+   */
+  const trialOnOffer = Boolean(user) && loaded && !subscribed && currentTier !== TRIAL_TIER;
 
   const handlePortal = async () => {
     setError(null);
@@ -341,6 +343,11 @@ export function PricingContent({
               <div className={`flex items-center gap-2 ${accent.text}`}>
                 <Icon className="w-4 h-4" aria-hidden />
                 <h2 className="text-sm font-semibold uppercase tracking-[0.14em]">{plan.name}</h2>
+                {tier === TRIAL_TIER && !yearly && (
+                  <span className="ml-auto rounded-full bg-emerald-400/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
+                    {TRIAL_DAYS}-day free trial
+                  </span>
+                )}
               </div>
 
               <p className="mt-4 flex items-baseline gap-1">
@@ -415,20 +422,11 @@ export function PricingContent({
                   /*
                    * Broker sync is the only thing this product charges for, and a free account
                    * cannot touch it — so the one feature worth paying for is the one nobody has
-                   * ever used. The trial takes the primary position, and the card's own buy action
-                   * moves underneath it.
+                   * ever used. On this plan the trial IS the buy action: it is the same checkout,
+                   * with Creem's trial on the front of it, so a second "subscribe now" underneath
+                   * would send them to exactly the same place while implying it skipped the trial.
                    */
-                  <div className="space-y-2">
-                    <StartTrialButton showTerms={false} onStarted={() => setNotice(null)} />
-                    <button
-                      type="button"
-                      disabled={busy !== null}
-                      onClick={() => void handleChoose(tier)}
-                      className="w-full rounded-lg px-4 py-2 text-xs text-text-secondary hover:text-text-primary transition-colors disabled:opacity-60"
-                    >
-                      {busy === tier ? 'Opening checkout…' : `Or subscribe now — $${plan.price}/month`}
-                    </button>
-                  </div>
+                  <StartTrialButton showTerms={false} />
                 ) : (
                   <button
                     type="button"

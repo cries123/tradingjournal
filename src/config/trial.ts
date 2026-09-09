@@ -9,9 +9,14 @@ import { TIER_PLANS, type Tier } from './tiers';
  * funnel shows exactly that: plenty of signups, almost no connections. A trial is the shortest
  * path from "sounds useful" to "my calendar filled itself in".
  *
- * It is a complimentary grant with a date on it, which the entitlement system already
- * understands: effectiveTier honours it, the reaper spares it, and it ends on its own with
- * nothing scheduled to end it.
+ * The trial itself belongs to CREEM, attached to the Silver product, so it is redeemed by going
+ * through checkout: the card is taken up front and the person becomes a real subscriber straight
+ * away, which is why nothing here needs a special case for them — the reaper, the plan badge and
+ * effectiveTier all see an ordinary subscription.
+ *
+ * TRIAL_DAYS therefore has to MATCH the Creem product's own trial setting. It is the number the
+ * site promises, and Creem is the one that honours it; if the two disagree the site is lying, and
+ * nothing in this codebase can detect that. Change one, change the other.
  */
 
 export const TRIAL_TIER: Tier = 'silver';

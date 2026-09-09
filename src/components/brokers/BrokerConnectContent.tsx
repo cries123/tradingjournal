@@ -429,9 +429,9 @@ export function BrokerConnectContent({
             </p>
             <p className="text-sm text-text-secondary leading-relaxed mb-4">
               Connect your brokerage and your fills import themselves, matched into round trips with
-              fees worked out. Try it for {TRIAL_DAYS} days and see your own calendar fill in.
+              fees worked out. Try it free for {TRIAL_DAYS} days and see your own calendar fill in.
             </p>
-            <StartTrialButton className="max-w-sm" />
+            <StartTrialButton viaPricing className="max-w-sm" />
           </div>
         )}
 

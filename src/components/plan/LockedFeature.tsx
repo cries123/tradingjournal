@@ -87,6 +87,7 @@ export function LockedFeature({
              * them to want it again later.
              */
             <StartTrialButton
+              viaPricing
               fallback={
                 <>
                   <button type="button" onClick={goToPricing} className="btn-primary w-full py-2.5 text-sm font-semibold">
