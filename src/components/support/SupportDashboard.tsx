@@ -10,7 +10,7 @@ import {
   Plug,
   Sparkles,
 } from 'lucide-react';
-import { syncsUnlimited, TIER_PLANS } from '../../config/tiers';
+import { TIER_PLANS } from '../../config/tiers';
 import { useAuth } from '../../context/useAuth';
 import { useEntitlement } from '../../context/useEntitlement';
 import { goToPricing } from '../../utils/navigateToPath';
@@ -174,17 +174,9 @@ export function SupportDashboard({ onBack, onBrokers, onRequestBroker }: Support
               <Fact icon={<CreditCard size={11} />} label="Plan" value={plan.name} hint={planHint} />
               <Fact
                 icon={<Plug size={11} />}
-                label={syncsUnlimited(limits) ? 'Broker syncs' : 'Syncs left today'}
-                value={
-                  limits.syncsPerDay <= 0 ? '—' : syncsUnlimited(limits) ? 'Unlimited' : String(syncsLeft)
-                }
-                hint={
-                  limits.syncsPerDay <= 0
-                    ? 'Not on this plan'
-                    : syncsUnlimited(limits)
-                      ? `${usage.syncsUsed} used today`
-                      : `of ${limits.syncsPerDay} a day`
-                }
+                label="Syncs left today"
+                value={limits.syncsPerDay > 0 ? String(syncsLeft) : '—'}
+                hint={limits.syncsPerDay > 0 ? `of ${limits.syncsPerDay} a day` : 'Not on this plan'}
               />
               <Fact
                 icon={<Sparkles size={11} />}

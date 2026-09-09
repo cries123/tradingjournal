@@ -4,7 +4,7 @@ import { BrokerLogo } from './BrokerLogo';
 import { useEntitlement } from '../../context/useEntitlement';
 import { StartTrialButton } from '../plan/StartTrialButton';
 import { TRIAL_DAYS } from '../../config/trial';
-import { brokersLabel, syncsLabel, syncsUnlimited, TIER_PLANS } from '../../config/tiers';
+import { brokersLabel, syncsLabel, TIER_PLANS } from '../../config/tiers';
 import { useAuth } from '../../context/useAuth';
 import {
   BrokerApiError,
@@ -248,18 +248,11 @@ export function BrokerConnectContent({
       // count, so they come out before the day's own allowance is worked back.
       if (typeof syncsRemaining === 'number' && typeof syncsPerDay === 'number') {
         const bonus = syncCredits ?? 0;
-        noteUsage(
-          // Nothing to subtract from on an unlimited plan: working "used" back out of a remaining
-          // count that started at MAX_SAFE_INTEGER produces a tally in the quadrillions. Counted
-          // up instead of down.
-          syncsUnlimited(limits)
-            ? { syncsUsed: usage.syncsUsed + 1, syncsRemaining, syncCredits: bonus }
-            : {
-                syncsUsed: Math.max(0, syncsPerDay - (syncsRemaining - bonus)),
-                syncsRemaining,
-                syncCredits: bonus,
-              },
-        );
+        noteUsage({
+          syncsUsed: Math.max(0, syncsPerDay - (syncsRemaining - bonus)),
+          syncsRemaining,
+          syncCredits: bonus,
+        });
       }
 
       // See dedupeIncomingTrades for why the rules live in one place rather than here.
@@ -332,15 +325,11 @@ export function BrokerConnectContent({
       if (err instanceof BrokerApiError && typeof err.syncsRemaining === 'number') {
         const perDay = err.syncsPerDay ?? limits.syncsPerDay;
         const bonus = err.syncCredits ?? usage.syncCredits ?? 0;
-        noteUsage(
-          syncsUnlimited(limits)
-            ? { syncsUsed: usage.syncsUsed + 1, syncsRemaining: err.syncsRemaining, syncCredits: bonus }
-            : {
-                syncsUsed: Math.max(0, perDay - (err.syncsRemaining - bonus)),
-                syncsRemaining: err.syncsRemaining,
-                syncCredits: bonus,
-              },
-        );
+        noteUsage({
+          syncsUsed: Math.max(0, perDay - (err.syncsRemaining - bonus)),
+          syncsRemaining: err.syncsRemaining,
+          syncCredits: bonus,
+        });
       }
       reportError(err, 'Sync failed');
     } finally {
@@ -412,15 +401,12 @@ export function BrokerConnectContent({
             <span className="text-text-primary font-medium">{brokersLabel(limits).toLowerCase()}</span>{' '}
             and{' '}
             <span className="text-text-primary font-medium">{syncsLabel(limits).toLowerCase()}</span>
-            {/* Only where there is a ceiling to count down from. "9007199254740986 left today" is
-                what a sentinel looks like when it reaches the screen. */}
-            {!syncsUnlimited(limits) &&
-              (usage.syncsRemaining < limits.syncsPerDay || (usage.syncCredits ?? 0) > 0) && (
-                <>
-                  {' '}— {usage.syncsRemaining} left today
-                  {(usage.syncCredits ?? 0) > 0 && <> (including {usage.syncCredits} bonus)</>}
-                </>
-              )}
+            {(usage.syncsRemaining < limits.syncsPerDay || (usage.syncCredits ?? 0) > 0) && (
+              <>
+                {' '}— {usage.syncsRemaining} left today
+                {(usage.syncCredits ?? 0) > 0 && <> (including {usage.syncCredits} bonus)</>}
+              </>
+            )}
             .
           </p>
         )}

@@ -9,7 +9,6 @@ import {
   TIER_ORDER,
   tierHas,
   syncsLabel,
-  syncsUnlimited,
   UNLIMITED_BROKERS,
   type Feature,
 } from '../config/tiers';
@@ -124,13 +123,23 @@ describe('the emails', () => {
 });
 
 describe('connections and syncs', () => {
-  it('gives the top tier no ceiling on either', () => {
-    // Both are free to us: SnapTrade bills per connected PERSON, and reading trade activity comes
-    // out of a cache included in that fee. Neither number was ever rationing a cost.
+  it('gives the top tier no ceiling on connections, because there is no cost to cap', () => {
     expect(brokersUnlimited(limitsFor('diamond'))).toBe(true);
-    expect(syncsUnlimited(limitsFor('diamond'))).toBe(true);
     expect(brokersLabel(limitsFor('diamond'))).toBe('Unlimited broker connections');
-    expect(syncsLabel(limitsFor('diamond'))).toBe('Unlimited trade syncs');
+  });
+
+  it('keeps a real sync ceiling on every plan, the top one included', () => {
+    // Syncs cost nothing, but unlimited would leave nothing between a scripted client and
+    // SnapTrade's API. 24 a day is an hourly sync around the clock — a rate limit no person
+    // trading a US session reaches, which is what a rate limit should be.
+    for (const tier of PAID_TIERS) {
+      const limits = limitsFor(tier);
+      expect(Number.isSafeInteger(limits.syncsPerDay)).toBe(true);
+      expect(limits.syncsPerDay).toBeGreaterThan(0);
+      expect(limits.syncsPerDay).toBeLessThanOrEqual(24);
+    }
+    expect(limitsFor('diamond').syncsPerDay).toBe(24);
+    expect(syncsLabel(limitsFor('diamond'))).toBe('24 trade syncs a day');
   });
 
   it('gives the paid tiers a ladder that goes up', () => {
@@ -149,18 +158,17 @@ describe('connections and syncs', () => {
     expect(limitsFor('free').brokers).toBe(0);
     expect(limitsFor('free').syncsPerDay).toBe(0);
     expect(brokersUnlimited(limitsFor('free'))).toBe(false);
-    expect(syncsUnlimited(limitsFor('free'))).toBe(false);
     expect(tierHas('free', 'brokerSync')).toBe(false);
   });
 
   it('survives the trip through JSON that the entitlement endpoint makes', () => {
-    // Infinity would arrive as null and read as a plan with no limit at all — which for brokers
-    // locks everybody out of connecting, and for syncs renders as a NaN meter. This is the whole
-    // reason both sentinels are finite numbers.
+    // Infinity would arrive as null and read as a plan with no broker limit at all, locking
+    // everybody out of connecting. This is the whole reason the sentinel is a finite number.
     const limits = JSON.parse(JSON.stringify(limitsFor('diamond'))) as never;
     expect(brokersUnlimited(limits)).toBe(true);
-    expect(syncsUnlimited(limits)).toBe(true);
     expect((limits as { brokers: number }).brokers).toBe(UNLIMITED_BROKERS);
+    // The sync ceiling is an ordinary number and must survive the trip as one.
+    expect((limits as { syncsPerDay: number }).syncsPerDay).toBe(24);
   });
 
   it('gives the performance screen to every paid plan, including the cheapest', () => {
@@ -176,6 +184,7 @@ describe('connections and syncs', () => {
       expect(lines).toContain(brokersLabel(limitsFor(tier)));
       expect(lines).toContain(syncsLabel(limitsFor(tier)));
     }
-    expect(featureLines('diamond').map((l) => l.text)).toContain('Unlimited trade syncs');
+    expect(featureLines('diamond').map((l) => l.text)).toContain('24 trade syncs a day');
+    expect(featureLines('diamond').map((l) => l.text)).toContain('Unlimited broker connections');
   });
 });

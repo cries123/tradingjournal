@@ -1,5 +1,5 @@
 import { Crown, Gem, Medal, Notebook } from 'lucide-react';
-import { syncsUnlimited, TIER_PLANS, type Tier } from '../../config/tiers';
+import { TIER_PLANS, type Tier } from '../../config/tiers';
 import { lowestPaidPrice } from '../../seo/pricingClaims';
 import { useEntitlement } from '../../context/useEntitlement';
 import { useAuth } from '../../context/useAuth';
@@ -113,28 +113,14 @@ export function PlanBadge() {
 
       {showSyncs || showAi ? (
         <div className="space-y-2">
-          {showSyncs &&
-            (syncsUnlimited(limits) ? (
-              /* A meter that can never fill is a progress bar for a thing with no end. The count
-                 still matters — it is the honest answer to "did my sync actually run" — so it is
-                 shown as a tally rather than as a fraction of a ceiling that does not exist. */
-              <div className="flex items-baseline justify-between gap-2 text-[11px]">
-                <span className="text-text-secondary">Broker syncs</span>
-                <span className="tabular-nums font-medium text-text-primary">
-                  Unlimited
-                  {usage.syncsUsed > 0 && (
-                    <span className="text-text-secondary font-normal"> · {usage.syncsUsed} today</span>
-                  )}
-                </span>
-              </div>
-            ) : (
-              <Meter
-                label="Broker syncs today"
-                used={usage.syncsUsed}
-                limit={limits.syncsPerDay}
-                bonus={usage.syncCredits ?? 0}
-              />
-            ))}
+          {showSyncs && (
+            <Meter
+              label="Broker syncs today"
+              used={usage.syncsUsed}
+              limit={limits.syncsPerDay}
+              bonus={usage.syncCredits ?? 0}
+            />
+          )}
           {showAi && (
             <Meter label="AI messages today" used={usage.aiMessagesUsed} limit={limits.aiMessagesPerDay} bonus={usage.aiCredits ?? 0} />
           )}

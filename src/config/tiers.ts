@@ -25,15 +25,6 @@ export const TIER_ORDER: Tier[] = ['free', 'silver', 'gold', 'diamond'];
  */
 export const UNLIMITED_BROKERS = Number.MAX_SAFE_INTEGER;
 
-/**
- * The sync allowance that means "as many as you like", for the same reason and with the same
- * caveat as UNLIMITED_BROKERS above: it crosses to the browser as JSON, so it cannot be Infinity.
- *
- * Kept as a number rather than a boolean because everything downstream — the daily counter, the
- * spend decision, the meter — is arithmetic on a limit, and a special case threaded through all
- * three is how one of them ends up disagreeing with the other two.
- */
-export const UNLIMITED_SYNCS = Number.MAX_SAFE_INTEGER;
 
 export interface TierLimits {
   /**
@@ -51,9 +42,13 @@ export interface TierLimits {
    *
    * This used to be a cost control and is not one. SnapTrade meters a manual holdings refresh,
    * which this app never performs; reading trade activity comes out of a cache included in the
-   * per-user fee, so a sync costs nothing however often it runs. What remains is a rate limit —
-   * a ceiling on how hard one account can hammer somebody else's API — which is why the numbers
-   * are now generous rather than scarce, and unlimited at the top.
+   * per-user fee, so a sync costs nothing however often it runs.
+   *
+   * What remains is a rate limit — a ceiling on how hard one account can hammer somebody else's
+   * API — which is why the numbers are generous rather than scarce. Every plan keeps a real
+   * ceiling, including the top one: unlimited would leave nothing at all between a scripted
+   * client and SnapTrade, and 24 a day is an hourly sync around the clock, which no person
+   * trading a US session will ever reach.
    */
   syncsPerDay: number;
   /** Assistant questions per market day. 0 means the assistant is not included. */
@@ -207,7 +202,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     price: 39,
     tagline: 'Everything, with room to actually use it.',
     limits: {
-      brokers: UNLIMITED_BROKERS, syncsPerDay: UNLIMITED_SYNCS, aiMessagesPerDay: 40, marketReplay: true,
+      brokers: UNLIMITED_BROKERS, syncsPerDay: 24, aiMessagesPerDay: 40, marketReplay: true,
       performanceAnalytics: true, autoSync: true, coachSeat: true, ruleAlerts: true, aiReview: true,
     },
     productIdEnv: 'CREEM_PRODUCT_DIAMOND',
@@ -230,15 +225,9 @@ export function brokersUnlimited(limits: TierLimits): boolean {
   return limits.brokers >= UNLIMITED_BROKERS;
 }
 
-/** True when a plan places no ceiling on daily syncs. */
-export function syncsUnlimited(limits: TierLimits): boolean {
-  return limits.syncsPerDay >= UNLIMITED_SYNCS;
-}
-
-/** "Unlimited trade syncs" / "5 trade syncs a day", for anywhere the allowance is shown. */
+/** "24 trade syncs a day", for anywhere the allowance is shown. */
 export function syncsLabel(limits: TierLimits): string {
   if (limits.syncsPerDay <= 0) return 'No trade syncs';
-  if (syncsUnlimited(limits)) return 'Unlimited trade syncs';
   return `${limits.syncsPerDay} trade sync${limits.syncsPerDay === 1 ? '' : 's'} a day`;
 }
 
