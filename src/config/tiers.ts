@@ -25,6 +25,16 @@ export const TIER_ORDER: Tier[] = ['free', 'silver', 'gold', 'diamond'];
  */
 export const UNLIMITED_BROKERS = Number.MAX_SAFE_INTEGER;
 
+/**
+ * The sync allowance that means "as many as you like", for the same reason and with the same
+ * caveat as UNLIMITED_BROKERS above: it crosses to the browser as JSON, so it cannot be Infinity.
+ *
+ * Kept as a number rather than a boolean because everything downstream — the daily counter, the
+ * spend decision, the meter — is arithmetic on a limit, and a special case threaded through all
+ * three is how one of them ends up disagreeing with the other two.
+ */
+export const UNLIMITED_SYNCS = Number.MAX_SAFE_INTEGER;
+
 export interface TierLimits {
   /**
    * How many brokerage connections may be live at once. 0 means broker sync is not included.
@@ -36,7 +46,15 @@ export interface TierLimits {
    * account is not an edge case.
    */
   brokers: number;
-  /** Broker imports permitted per market day (midnight Eastern). Each one costs a SnapTrade call, hence the cap. */
+  /**
+   * Broker imports permitted per market day (midnight Eastern).
+   *
+   * This used to be a cost control and is not one. SnapTrade meters a manual holdings refresh,
+   * which this app never performs; reading trade activity comes out of a cache included in the
+   * per-user fee, so a sync costs nothing however often it runs. What remains is a rate limit —
+   * a ceiling on how hard one account can hammer somebody else's API — which is why the numbers
+   * are now generous rather than scarce, and unlimited at the top.
+   */
   syncsPerDay: number;
   /** Assistant questions per market day. 0 means the assistant is not included. */
   aiMessagesPerDay: number;
@@ -165,7 +183,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     price: 9,
     tagline: 'Connect a broker and stop typing trades in.',
     limits: {
-      brokers: UNLIMITED_BROKERS, syncsPerDay: 1, aiMessagesPerDay: 0, marketReplay: false,
+      brokers: 5, syncsPerDay: 5, aiMessagesPerDay: 0, marketReplay: false,
       performanceAnalytics: true, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
     },
     productIdEnv: 'CREEM_PRODUCT_SILVER',
@@ -175,9 +193,9 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     id: 'gold',
     name: 'Gold',
     price: 19,
-    tagline: 'Three brokers, and an assistant that reads your stats.',
+    tagline: 'Ten brokers, and an assistant that reads your stats.',
     limits: {
-      brokers: UNLIMITED_BROKERS, syncsPerDay: 3, aiMessagesPerDay: 15, marketReplay: false,
+      brokers: 10, syncsPerDay: 10, aiMessagesPerDay: 15, marketReplay: false,
       performanceAnalytics: true, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
     },
     productIdEnv: 'CREEM_PRODUCT_GOLD',
@@ -189,7 +207,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     price: 39,
     tagline: 'Everything, with room to actually use it.',
     limits: {
-      brokers: UNLIMITED_BROKERS, syncsPerDay: 5, aiMessagesPerDay: 40, marketReplay: true,
+      brokers: UNLIMITED_BROKERS, syncsPerDay: UNLIMITED_SYNCS, aiMessagesPerDay: 40, marketReplay: true,
       performanceAnalytics: true, autoSync: true, coachSeat: true, ruleAlerts: true, aiReview: true,
     },
     productIdEnv: 'CREEM_PRODUCT_DIAMOND',
@@ -210,6 +228,18 @@ export function limitsFor(tier: Tier): TierLimits {
 /** True when a plan places no ceiling on brokerage connections. */
 export function brokersUnlimited(limits: TierLimits): boolean {
   return limits.brokers >= UNLIMITED_BROKERS;
+}
+
+/** True when a plan places no ceiling on daily syncs. */
+export function syncsUnlimited(limits: TierLimits): boolean {
+  return limits.syncsPerDay >= UNLIMITED_SYNCS;
+}
+
+/** "Unlimited trade syncs" / "5 trade syncs a day", for anywhere the allowance is shown. */
+export function syncsLabel(limits: TierLimits): string {
+  if (limits.syncsPerDay <= 0) return 'No trade syncs';
+  if (syncsUnlimited(limits)) return 'Unlimited trade syncs';
+  return `${limits.syncsPerDay} trade sync${limits.syncsPerDay === 1 ? '' : 's'} a day`;
 }
 
 /** "Unlimited broker connections" / "1 broker connection", for anywhere the count is shown. */
@@ -283,14 +313,17 @@ export function featureLines(tier: Tier): { text: string; soon?: boolean }[] {
 
   lines.push({ text: 'Everything in ' + TIER_PLANS[TIER_ORDER[TIER_ORDER.indexOf(tier) - 1]].name });
   lines.push({ text: brokersLabel(l) });
-  lines.push({
-    text: `${l.syncsPerDay} trade sync${l.syncsPerDay === 1 ? '' : 's'} per day`,
-  });
+  lines.push({ text: syncsLabel(l) });
   // True of broker import and not of manual entry, so it earns its place on every paid card —
   // and it stops Silver reading as three thin bullets next to Gold's five.
   lines.push({ text: 'Round-trip trades matched for you' });
   if (l.performanceAnalytics) {
-    lines.push({ text: 'Performance screen — time of day, setups, expectancy, excursions' });
+    /* Named after what the screen actually draws from an import, not after the panels that need
+       hand-entered fields. The old line — "time of day, setups, expectancy, excursions" — listed
+       four things a Schwab feed cannot fill in, which is a pricing card selling the empty half. */
+    lines.push({
+      text: 'Performance screen — the win rate you need, position sizing, tilt, costs',
+    });
   }
   if (l.aiMessagesPerDay > 0) {
     lines.push({ text: `AI trade analysis — ${l.aiMessagesPerDay} messages per day` });

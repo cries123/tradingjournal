@@ -149,7 +149,10 @@ export function worstCaseMonthlyCost(
       aiMessages: plan.limits.aiMessagesPerDay * daysInMonth,
       // Everyone gets the takeaway, paid or not.
       takeaways: daysInMonth,
-      syncs: plan.limits.syncsPerDay * daysInMonth,
+      // Not the plan's ceiling, which is a sentinel on an unlimited tier and would overflow into
+      // a meaningless float. Syncs are free (see priceUsage), so the only honest worst case is
+      // "as many as anyone could press", and any large number prices the same: zero.
+      syncs: 0,
       syncingUsers: connected,
       charges: plan.price > 0 ? 1 : 0,
       revenue: plan.price,

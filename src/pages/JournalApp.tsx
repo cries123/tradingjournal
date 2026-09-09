@@ -294,7 +294,10 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
               <LockedFeature
                 feature="performanceAnalytics"
                 title="Performance analysis is a paid feature"
-                description="See what time of day you actually make money, which setups pay, your expectancy in R, and whether following your own rules is worth anything."
+                /* Describes the half that draws from an import alone. The previous copy promised
+                   time of day, setups and R multiples — three things a broker feed does not carry,
+                   which is a paywall selling the panels a synced trader cannot fill. */
+                description="See the win rate your payoff ratio actually needs, whether your losing trades are the bigger ones, what the trade after a loss costs you, and how much of your gross went to commissions."
               >
                 <PerformanceContent
                   trades={allTrades}

@@ -8,6 +8,8 @@ import {
   PAID_TIERS,
   TIER_ORDER,
   tierHas,
+  syncsLabel,
+  syncsUnlimited,
   UNLIMITED_BROKERS,
   type Feature,
 } from '../config/tiers';
@@ -121,33 +123,59 @@ describe('the emails', () => {
   });
 });
 
-describe('broker connections', () => {
-  it('is unlimited on every paid plan, because connections are free to us', () => {
-    // SnapTrade bills per connected PERSON, not per connection, so a cap bought nothing and cost
-    // the product a reason to say yes to somebody with a brokerage account and a Roth.
-    for (const tier of PAID_TIERS) {
-      expect(brokersUnlimited(limitsFor(tier))).toBe(true);
-      expect(brokersLabel(limitsFor(tier))).toBe('Unlimited broker connections');
+describe('connections and syncs', () => {
+  it('gives the top tier no ceiling on either', () => {
+    // Both are free to us: SnapTrade bills per connected PERSON, and reading trade activity comes
+    // out of a cache included in that fee. Neither number was ever rationing a cost.
+    expect(brokersUnlimited(limitsFor('diamond'))).toBe(true);
+    expect(syncsUnlimited(limitsFor('diamond'))).toBe(true);
+    expect(brokersLabel(limitsFor('diamond'))).toBe('Unlimited broker connections');
+    expect(syncsLabel(limitsFor('diamond'))).toBe('Unlimited trade syncs');
+  });
+
+  it('gives the paid tiers a ladder that goes up', () => {
+    const ladder = PAID_TIERS.map((t) => limitsFor(t));
+    for (let i = 1; i < ladder.length; i++) {
+      expect(ladder[i].brokers).toBeGreaterThan(ladder[i - 1].brokers);
+      expect(ladder[i].syncsPerDay).toBeGreaterThan(ladder[i - 1].syncsPerDay);
     }
+    expect(limitsFor('silver').brokers).toBe(5);
+    expect(limitsFor('silver').syncsPerDay).toBe(5);
+    expect(limitsFor('gold').brokers).toBe(10);
+    expect(limitsFor('gold').syncsPerDay).toBe(10);
   });
 
   it('still gates the free plan out of broker sync entirely', () => {
     expect(limitsFor('free').brokers).toBe(0);
+    expect(limitsFor('free').syncsPerDay).toBe(0);
     expect(brokersUnlimited(limitsFor('free'))).toBe(false);
+    expect(syncsUnlimited(limitsFor('free'))).toBe(false);
     expect(tierHas('free', 'brokerSync')).toBe(false);
   });
 
   it('survives the trip through JSON that the entitlement endpoint makes', () => {
-    // Infinity would arrive as null and read as a plan with no broker limit at all, locking
-    // everybody out of connecting. This is the whole reason the sentinel is a finite number.
-    const roundTripped = JSON.parse(JSON.stringify(limitsFor('gold'))) as { brokers: number };
-    expect(roundTripped.brokers).toBe(UNLIMITED_BROKERS);
-    expect(brokersUnlimited(roundTripped as never)).toBe(true);
+    // Infinity would arrive as null and read as a plan with no limit at all — which for brokers
+    // locks everybody out of connecting, and for syncs renders as a NaN meter. This is the whole
+    // reason both sentinels are finite numbers.
+    const limits = JSON.parse(JSON.stringify(limitsFor('diamond'))) as never;
+    expect(brokersUnlimited(limits)).toBe(true);
+    expect(syncsUnlimited(limits)).toBe(true);
+    expect((limits as { brokers: number }).brokers).toBe(UNLIMITED_BROKERS);
   });
 
-  it('advertises it on every paid card', () => {
+  it('gives the performance screen to every paid plan, including the cheapest', () => {
     for (const tier of PAID_TIERS) {
-      expect(featureLines(tier).some((l) => l.text === 'Unlimited broker connections')).toBe(true);
+      expect(tierHas(tier, 'performanceAnalytics')).toBe(true);
     }
+    expect(tierHas('free', 'performanceAnalytics')).toBe(false);
+  });
+
+  it('advertises both on every paid card, in that plan\'s own words', () => {
+    for (const tier of PAID_TIERS) {
+      const lines = featureLines(tier).map((l) => l.text);
+      expect(lines).toContain(brokersLabel(limitsFor(tier)));
+      expect(lines).toContain(syncsLabel(limitsFor(tier)));
+    }
+    expect(featureLines('diamond').map((l) => l.text)).toContain('Unlimited trade syncs');
   });
 });
