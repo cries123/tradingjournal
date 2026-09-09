@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Trade } from '../types';
 import {
+  accountsPerRun,
   decideAutoSync,
   journalForImports,
   lookbackStart,
@@ -221,5 +222,32 @@ describe('runAutoSync', () => {
 
     expect(importFor).not.toHaveBeenCalled();
     expect(summary.failed).toBe(1);
+  });
+});
+
+describe('accountsPerRun', () => {
+  const withEnv = (value: string | undefined, run: () => void) => {
+    const original = process.env.AUTO_SYNC_MAX_ACCOUNTS;
+    if (value === undefined) delete process.env.AUTO_SYNC_MAX_ACCOUNTS;
+    else process.env.AUTO_SYNC_MAX_ACCOUNTS = value;
+    try {
+      run();
+    } finally {
+      if (original === undefined) delete process.env.AUTO_SYNC_MAX_ACCOUNTS;
+      else process.env.AUTO_SYNC_MAX_ACCOUNTS = original;
+    }
+  };
+
+  it('caps the accounts one morning refreshes', () => {
+    // Connections are unlimited because SnapTrade bills per person; activity pulls are billed per
+    // call. Both cannot be true at once, so the cap is where they are reconciled.
+    withEnv(undefined, () => expect(accountsPerRun()).toBe(3));
+    withEnv('8', () => expect(accountsPerRun()).toBe(8));
+  });
+
+  it('ignores a value that would turn the cap off or make it absurd', () => {
+    for (const bad of ['0', '-1', 'lots', '', '2.5', '400']) {
+      withEnv(bad, () => expect(accountsPerRun()).toBe(3));
+    }
   });
 });

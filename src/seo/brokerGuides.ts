@@ -1,5 +1,5 @@
 import { BROKER_REGISTRY, THINKORSWIM_DISPLAY, type BrokerRegistryEntry } from '../data/brokerRegistry';
-import { TIER_PLANS } from '../config/tiers';
+import { brokersUnlimited, TIER_PLANS } from '../config/tiers';
 import { BROKER_GUIDE_NOTES, THINKORSWIM_NOTE, type BrokerGuideNote } from './brokerGuideNotes';
 
 export interface BrokerGuide {
@@ -31,7 +31,7 @@ const SILVER = TIER_PLANS.silver;
 function priceSentence(): string {
   return (
     `Broker sync is a paid feature — ${SILVER.name} is $${SILVER.price} a month and connects `
-    + `${SILVER.limits.brokers === 1 ? 'one broker' : `${SILVER.limits.brokers} brokers`}. `
+    + `${brokersUnlimited(SILVER.limits) ? 'as many brokers as you like' : `${SILVER.limits.brokers} brokers`}. `
     + 'Journaling by hand is free and always will be: the calendar, tags, notes, screenshots and '
     + 'stats are all in the free plan.'
   );

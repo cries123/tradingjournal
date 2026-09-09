@@ -39,6 +39,25 @@ export const MAX_USERS_PER_RUN = 40;
  */
 export const LOOKBACK_DAYS = 10;
 
+/**
+ * Connected accounts refreshed by one automatic run.
+ *
+ * Connections are unlimited on every paid plan, because SnapTrade bills per person. Activity
+ * pulls are not: one goes out per account per morning, so "unlimited connections" and "we refresh
+ * all of them for free every day" cannot both be true. Three covers a brokerage account, a
+ * retirement account and a futures account, which is as far as almost anybody goes; past that the
+ * remaining accounts are refreshed the way they always were, by pressing Sync.
+ *
+ * Overridable without a deploy, the same way the cost rates are, because the right number here
+ * depends on what SnapTrade actually charges for the call.
+ */
+export const MAX_ACCOUNTS_PER_RUN = 3;
+
+export function accountsPerRun(): number {
+  const raw = Number(process.env.AUTO_SYNC_MAX_ACCOUNTS);
+  return Number.isInteger(raw) && raw >= 1 && raw <= 25 ? raw : MAX_ACCOUNTS_PER_RUN;
+}
+
 const DAY_MS = 86_400_000;
 
 export interface AutoSyncSubject {

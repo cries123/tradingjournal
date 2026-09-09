@@ -4,7 +4,7 @@ import { BrokerLogo } from './BrokerLogo';
 import { useEntitlement } from '../../context/useEntitlement';
 import { StartTrialButton } from '../plan/StartTrialButton';
 import { TRIAL_DAYS } from '../../config/trial';
-import { TIER_PLANS } from '../../config/tiers';
+import { brokersLabel, TIER_PLANS } from '../../config/tiers';
 import { useAuth } from '../../context/useAuth';
 import {
   BrokerApiError,
@@ -398,9 +398,7 @@ export function BrokerConnectContent({
         {limits.brokers > 0 && (
           <p className="text-sm text-text-secondary max-w-2xl mb-8 -mt-4">
             {TIER_PLANS[tier].name} includes{' '}
-            <span className="text-text-primary font-medium">
-              {limits.brokers} broker connection{limits.brokers === 1 ? '' : 's'}
-            </span>{' '}
+            <span className="text-text-primary font-medium">{brokersLabel(limits).toLowerCase()}</span>{' '}
             and{' '}
             <span className="text-text-primary font-medium">
               {limits.syncsPerDay} sync{limits.syncsPerDay === 1 ? '' : 's'} a day

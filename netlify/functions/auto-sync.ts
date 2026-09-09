@@ -7,6 +7,7 @@ import { pullRecentActivityForUser } from '../../server/brokerConnectHandler';
 import { recordAutomatic, usageDay } from '../../server/usage';
 import { dedupeIncomingTrades } from '../../src/utils/duplicateTrades';
 import {
+  accountsPerRun,
   journalForImports,
   lookbackStart,
   runAutoSync,
@@ -45,7 +46,16 @@ async function recentTrades(uid: string, since: string): Promise<Trade[]> {
 
 async function importFor(uid: string, activeAccountId: string, today: string) {
   const since = lookbackStart(today);
-  const { accounts, trades, pulls } = await pullRecentActivityForUser(uid, since);
+  const { accounts, trades, pulls, skippedAccounts } = await pullRecentActivityForUser(
+    uid,
+    since,
+    accountsPerRun(),
+  );
+  if (skippedAccounts > 0) {
+    console.info(
+      `[auto-sync] ${uid}: refreshed ${pulls} of ${accounts} accounts; ${skippedAccounts} left for a manual sync.`,
+    );
+  }
 
   // Recorded whatever comes back, including nothing: the calls were made and the bill will show
   // them, so the cost report has to as well.

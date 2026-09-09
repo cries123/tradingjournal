@@ -16,7 +16,7 @@ import { brokerageKey, brokerageOwner, claimBrokerage } from './trialGuards';
 import { compIsLive } from '../src/config/accessExtension';
 import { consumeDaily, refundDaily } from './usage';
 import { describeHttpError, isRejectedCredential, isUpstreamOutage } from './upstreamErrors';
-import { lowestTierWith, TIER_PLANS, type Tier } from '../src/config/tiers';
+import { brokersUnlimited, lowestTierWith, TIER_PLANS, type Tier } from '../src/config/tiers';
 
 export type SupportedBroker = string;
 
@@ -275,17 +275,27 @@ async function handleConnect(uid: string, broker?: string): Promise<BrokerConnec
 
   const creds = await getOrRegisterCreds(uid);
 
-  // Checked against live connections rather than a stored count, because a connection can also be
-  // removed from the broker's own side and a stale counter would lock someone out of a slot they
-  // no longer occupy.
-  const existing = await countConnections(creds).catch(() => 0);
-  if (existing >= limits.brokers) {
-    throw new BrokerRequestError(
-      limits.brokers === 1
-        ? `${TIER_PLANS[tier].name} includes one broker connection, and you already have one. Disconnect it first, or upgrade for more.`
-        : `${TIER_PLANS[tier].name} includes ${limits.brokers} broker connections and you're using all of them. Disconnect one first, or upgrade for more.`,
-      402,
-    );
+  /*
+   * Only counted when there is a ceiling to count against.
+   *
+   * Every paid plan is unlimited now — SnapTrade bills per person, not per connection — so this is
+   * one SnapTrade round trip saved on every connect for every paying user. The branch stays
+   * because the free plan still has a ceiling of zero, and because a future plan with a real cap
+   * should not need this rediscovered.
+   */
+  if (!brokersUnlimited(limits)) {
+    // Checked against live connections rather than a stored count, because a connection can also
+    // be removed from the broker's own side and a stale counter would lock someone out of a slot
+    // they no longer occupy.
+    const existing = await countConnections(creds).catch(() => 0);
+    if (existing >= limits.brokers) {
+      throw new BrokerRequestError(
+        limits.brokers === 1
+          ? `${TIER_PLANS[tier].name} includes one broker connection, and you already have one. Disconnect it first, or upgrade for more.`
+          : `${TIER_PLANS[tier].name} includes ${limits.brokers} broker connections and you're using all of them. Disconnect one first, or upgrade for more.`,
+        402,
+      );
+    }
   }
 
   const snaptrade = getSnaptrade();
@@ -674,9 +684,17 @@ async function isSiteAdmin(uid: string): Promise<boolean> {
 export async function pullRecentActivityForUser(
   uid: string,
   startDate: string,
-): Promise<{ accounts: number; trades: ParsedTradeInput[]; pulls: number }> {
+  /**
+   * How many connected accounts to pull.
+   *
+   * Connections are unlimited on every paid plan because SnapTrade bills per person; activity
+   * pulls are billed per call, so the two facts have to be reconciled somewhere and this is where.
+   * The caller sets it — see accountsPerRun in autoSync.ts.
+   */
+  maxAccounts = Infinity,
+): Promise<{ accounts: number; trades: ParsedTradeInput[]; pulls: number; skippedAccounts: number }> {
   const creds = await getCredsIfRegistered(uid);
-  if (!creds) return { accounts: 0, trades: [], pulls: 0 };
+  if (!creds) return { accounts: 0, trades: [], pulls: 0, skippedAccounts: 0 };
 
   const snaptrade = getSnaptrade();
   let active = creds;
@@ -691,6 +709,7 @@ export async function pullRecentActivityForUser(
 
   for (const account of listed.data) {
     if (!account.id) continue;
+    if (pulls >= maxAccounts) break;
 
     const res = await withCredentialRecovery(uid, active, (c) => {
       active = c;
@@ -717,7 +736,12 @@ export async function pullRecentActivityForUser(
     trades.push(...mapSnapTradeActivities(activities).trades);
   }
 
-  return { accounts: listed.data.length, trades, pulls };
+  return {
+    accounts: listed.data.length,
+    trades,
+    pulls,
+    skippedAccounts: Math.max(0, listed.data.length - pulls),
+  };
 }
 
 export async function handleBrokerConnectRequest(

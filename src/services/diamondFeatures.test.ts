@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { featureLines, lowestTierWith, TIER_ORDER, tierHas, type Feature } from '../config/tiers';
+import {
+  brokersLabel,
+  brokersUnlimited,
+  featureLines,
+  limitsFor,
+  lowestTierWith,
+  PAID_TIERS,
+  TIER_ORDER,
+  tierHas,
+  UNLIMITED_BROKERS,
+  type Feature,
+} from '../config/tiers';
 import { reviewToHtml, ruleAlertEmail, aiRecapEmail } from '../../server/emailTemplates';
 
 const DIAMOND_ONLY: Feature[] = ['autoSync', 'coachSeat', 'ruleAlerts', 'aiReview'];
@@ -107,5 +118,36 @@ describe('the emails', () => {
     expect(mail.html).toContain('Net P&amp;L');
     expect(mail.text).toContain('Trades: 18');
     expect(mail.text).toContain('vs last week');
+  });
+});
+
+describe('broker connections', () => {
+  it('is unlimited on every paid plan, because connections are free to us', () => {
+    // SnapTrade bills per connected PERSON, not per connection, so a cap bought nothing and cost
+    // the product a reason to say yes to somebody with a brokerage account and a Roth.
+    for (const tier of PAID_TIERS) {
+      expect(brokersUnlimited(limitsFor(tier))).toBe(true);
+      expect(brokersLabel(limitsFor(tier))).toBe('Unlimited broker connections');
+    }
+  });
+
+  it('still gates the free plan out of broker sync entirely', () => {
+    expect(limitsFor('free').brokers).toBe(0);
+    expect(brokersUnlimited(limitsFor('free'))).toBe(false);
+    expect(tierHas('free', 'brokerSync')).toBe(false);
+  });
+
+  it('survives the trip through JSON that the entitlement endpoint makes', () => {
+    // Infinity would arrive as null and read as a plan with no broker limit at all, locking
+    // everybody out of connecting. This is the whole reason the sentinel is a finite number.
+    const roundTripped = JSON.parse(JSON.stringify(limitsFor('gold'))) as { brokers: number };
+    expect(roundTripped.brokers).toBe(UNLIMITED_BROKERS);
+    expect(brokersUnlimited(roundTripped as never)).toBe(true);
+  });
+
+  it('advertises it on every paid card', () => {
+    for (const tier of PAID_TIERS) {
+      expect(featureLines(tier).some((l) => l.text === 'Unlimited broker connections')).toBe(true);
+    }
   });
 });

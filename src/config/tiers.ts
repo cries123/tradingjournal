@@ -14,8 +14,27 @@ export type Tier = 'free' | 'silver' | 'gold' | 'diamond';
 /** Ascending, so `TIER_ORDER.indexOf(a) >= TIER_ORDER.indexOf(b)` answers "at least this tier". */
 export const TIER_ORDER: Tier[] = ['free', 'silver', 'gold', 'diamond'];
 
+/**
+ * The connection count that means "as many as you like".
+ *
+ * A sentinel rather than Infinity, because this number is JSON-serialised to the browser by the
+ * entitlement endpoint and `JSON.stringify(Infinity)` is `null` — which would arrive as a plan
+ * with no broker limit at all and lock everybody out of connecting. MAX_SAFE_INTEGER survives the
+ * round trip, keeps every `>` and `>=` comparison working unchanged, and reads as unlimited to
+ * anything that asks.
+ */
+export const UNLIMITED_BROKERS = Number.MAX_SAFE_INTEGER;
+
 export interface TierLimits {
-  /** How many brokerage connections may be live at once. 0 means broker sync is not included. */
+  /**
+   * How many brokerage connections may be live at once. 0 means broker sync is not included.
+   *
+   * Every paid plan is UNLIMITED_BROKERS, and that is a pricing decision rather than generosity:
+   * SnapTrade charges per connected PERSON per month, not per connection, so somebody with five
+   * brokerages costs exactly what somebody with one costs. Capping it bought nothing and cost the
+   * product a real reason to say yes — a trader with a Schwab account, a Roth and a futures
+   * account is not an edge case.
+   */
   brokers: number;
   /** Broker imports permitted per market day (midnight Eastern). Each one costs a SnapTrade call, hence the cap. */
   syncsPerDay: number;
@@ -134,7 +153,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     price: 9,
     tagline: 'Connect a broker and stop typing trades in.',
     limits: {
-      brokers: 1, syncsPerDay: 1, aiMessagesPerDay: 0, marketReplay: false,
+      brokers: UNLIMITED_BROKERS, syncsPerDay: 1, aiMessagesPerDay: 0, marketReplay: false,
       performanceAnalytics: true, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
     },
     productIdEnv: 'CREEM_PRODUCT_SILVER',
@@ -146,7 +165,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     price: 19,
     tagline: 'Three brokers, and an assistant that reads your stats.',
     limits: {
-      brokers: 3, syncsPerDay: 3, aiMessagesPerDay: 15, marketReplay: false,
+      brokers: UNLIMITED_BROKERS, syncsPerDay: 3, aiMessagesPerDay: 15, marketReplay: false,
       performanceAnalytics: true, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
     },
     productIdEnv: 'CREEM_PRODUCT_GOLD',
@@ -158,7 +177,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     price: 39,
     tagline: 'Everything, with room to actually use it.',
     limits: {
-      brokers: 5, syncsPerDay: 5, aiMessagesPerDay: 40, marketReplay: true,
+      brokers: UNLIMITED_BROKERS, syncsPerDay: 5, aiMessagesPerDay: 40, marketReplay: true,
       performanceAnalytics: true, autoSync: true, coachSeat: true, ruleAlerts: true, aiReview: true,
     },
     productIdEnv: 'CREEM_PRODUCT_DIAMOND',
@@ -174,6 +193,18 @@ export function isTier(value: unknown): value is Tier {
 
 export function limitsFor(tier: Tier): TierLimits {
   return TIER_PLANS[tier].limits;
+}
+
+/** True when a plan places no ceiling on brokerage connections. */
+export function brokersUnlimited(limits: TierLimits): boolean {
+  return limits.brokers >= UNLIMITED_BROKERS;
+}
+
+/** "Unlimited broker connections" / "1 broker connection", for anywhere the count is shown. */
+export function brokersLabel(limits: TierLimits): string {
+  if (limits.brokers <= 0) return 'No broker connections';
+  if (brokersUnlimited(limits)) return 'Unlimited broker connections';
+  return `${limits.brokers} broker connection${limits.brokers === 1 ? '' : 's'}`;
 }
 
 /** True when `tier` is at least `required`. */
@@ -239,9 +270,7 @@ export function featureLines(tier: Tier): { text: string; soon?: boolean }[] {
   }
 
   lines.push({ text: 'Everything in ' + TIER_PLANS[TIER_ORDER[TIER_ORDER.indexOf(tier) - 1]].name });
-  lines.push({
-    text: `${l.brokers} broker connection${l.brokers === 1 ? '' : 's'}`,
-  });
+  lines.push({ text: brokersLabel(l) });
   lines.push({
     text: `${l.syncsPerDay} trade sync${l.syncsPerDay === 1 ? '' : 's'} per day`,
   });
