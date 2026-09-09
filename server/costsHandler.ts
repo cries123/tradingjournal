@@ -306,7 +306,9 @@ export async function buildCostReport(): Promise<CostReport> {
     .map(([uid, row]) => ({
       uid,
       ...row,
-      cost: row.aiMessages * COST_RATES.aiMessage + row.syncs * COST_RATES.syncCall,
+      // Assistant messages only: syncs are free (see priceUsage), so adding them here would rank
+      // the heaviest syncers as the most expensive users when they cost the same as everybody else.
+      cost: row.aiMessages * COST_RATES.aiMessage,
     }))
     .sort((a, b) => b.cost - a.cost)
     .slice(0, 10);

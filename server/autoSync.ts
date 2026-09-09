@@ -4,11 +4,11 @@ import { tierHas, type Tier } from '../src/config/tiers';
 /**
  * The automatic morning import — Diamond's reason to exist.
  *
- * Every other difference between Gold and Diamond is a bigger number, and two of those numbers do
- * not mean much: broker connections cost nothing to give away (SnapTrade bills per person), and a
- * sync allowance buys impatience rather than freshness, because the daily refresh behind it is
- * already paid for. This is the one that changes what the product does — the journal is up to date
- * before the trader opens it, and there is no button.
+ * Every other difference between Gold and Diamond is a bigger number, and neither of those numbers
+ * means much: broker connections cost nothing to give away (SnapTrade bills per person), and a
+ * sync allowance buys impatience rather than freshness, because the pull is free and the data is a
+ * day old either way. This is the one that changes what the product does — the journal is up to
+ * date before the trader opens it, and there is no button.
  *
  * The decision logic lives here, apart from the Netlify function, for the same reason the reaper's
  * does: what this job is about to do to somebody's journal should be testable without Firestore,
@@ -20,8 +20,9 @@ import { tierHas, type Tier } from '../src/config/tiers';
  *   same pure function the manual sync uses, so an automatic import can never disagree with a
  *   manual one about what "already imported" means.
  *
- *   Never spend a user's allowance. The pull costs the same as a manual sync and is recorded as
- *   such for the cost report, but it must not eat a sync the trader was saving — see
+ *   Never spend a user's allowance. The pull is free (SnapTrade bills per person, and only a
+ *   manual holdings refresh is metered) but it is still recorded, because a count of what the
+ *   product did on somebody's behalf is worth having whether or not it costs anything — see
  *   recordAutomatic in usage.ts.
  */
 
@@ -42,14 +43,14 @@ export const LOOKBACK_DAYS = 10;
 /**
  * Connected accounts refreshed by one automatic run.
  *
- * Connections are unlimited on every paid plan, because SnapTrade bills per person. Activity
- * pulls are not: one goes out per account per morning, so "unlimited connections" and "we refresh
- * all of them for free every day" cannot both be true. Three covers a brokerage account, a
+ * A time budget, not a cost one — the pulls are free. A scheduled function has a wall-clock limit
+ * and each account is a round trip to SnapTrade, so a user with fifteen connections would spend
+ * the whole run and starve everybody behind them in the list. Three covers a brokerage account, a
  * retirement account and a futures account, which is as far as almost anybody goes; past that the
  * remaining accounts are refreshed the way they always were, by pressing Sync.
  *
- * Overridable without a deploy, the same way the cost rates are, because the right number here
- * depends on what SnapTrade actually charges for the call.
+ * Overridable without a deploy, so this can be raised once there is evidence about how long a run
+ * actually takes.
  */
 export const MAX_ACCOUNTS_PER_RUN = 3;
 

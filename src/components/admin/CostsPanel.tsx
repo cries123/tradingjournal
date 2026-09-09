@@ -287,7 +287,8 @@ export function CostsPanel({ report, error, loading }: CostsPanelProps) {
 
       <p className="text-[11px] text-text-secondary leading-relaxed">
         Rates in use: ${report.rates.connectedUserMonth.toFixed(2)} per connected user/month, $
-        {report.rates.syncCall.toFixed(2)} per sync, ${report.rates.aiMessage.toFixed(4)} per
+        {report.rates.manualRefresh.toFixed(2)} per manual refresh (none performed), $
+        {report.rates.aiMessage.toFixed(4)} per
         assistant message, ${report.rates.takeaway.toFixed(4)} per takeaway,{' '}
         {(report.rates.creemPercent * 100).toFixed(1)}% + ${report.rates.creemFlat.toFixed(2)} per
         charge. Change any of them with the COST_* environment variables — no deploy needed.

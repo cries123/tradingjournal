@@ -19,22 +19,36 @@ function num(name: string, fallback: number): number {
 export interface CostRates {
   /**
    * SnapTrade, per connected user per month. One charge per PERSON — not per broker, not per
-   * account, so somebody on Diamond with three brokerages costs exactly the same as somebody on
-   * Silver with one.
+   * account, so somebody on Diamond with ten brokerages costs exactly the same as somebody on
+   * Silver with one. This is why broker connections are unlimited on every paid plan.
    *
    * Two things about it that the arithmetic elsewhere depends on. It is NOT prorated: a user is
    * billable for the whole month if they had a connection at any point in it, so a connection
    * left standing over the 1st costs a full month for a day of it. And an INACTIVE connection
    * still counts — a link SnapTrade has stopped being able to use is billed exactly like a
-   * working one until it is deleted.
+   * working one until it is deleted. That is what the broker reaper exists for.
    *
-   * $2.00 is Commercial's default flat rate; it tiers down to $1.75 above 100 users and $1.50
-   * above 500, by negotiation. Checked Sep 2026 against SnapTrade's billing documentation.
+   * $1.00 is the rate on the production client id (TREND-CHASERS-TNNCU), read off the SnapTrade
+   * billing dashboard in Sep 2026 — not off their public pricing page, which quotes a higher
+   * Commercial default. The dashboard is the authority; it is the thing that generates the
+   * invoice.
    */
   connectedUserMonth: number;
-  /** SnapTrade, per manual sync. Every press of Sync costs this; the daily refresh is included in
-   *  the per-user fee. Checked Sep 2026. */
-  syncCall: number;
+  /**
+   * SnapTrade, per successful MANUAL REFRESH — and this app has never performed one.
+   *
+   * The distinction is worth writing down because it was wrong here for a month and cost a
+   * pricing decision. A manual refresh is refreshBrokerageAuthorization: forcing a brokerage to
+   * hand over intraday holdings, ahead of the daily sync. Reading trades is not that. Trade
+   * activity is cached by SnapTrade, refreshed once a day as part of the per-user fee above, and
+   * delivered a day behind — so getAccountActivities, which is the only call behind the Sync
+   * button and behind the automatic morning import, costs nothing per call.
+   *
+   * Kept at the dashboard's rate rather than deleted, because the moment this app calls
+   * refreshBrokerageAuthorization the number becomes live again. Nothing currently multiplies by
+   * it: see priceUsage.
+   */
+  manualRefresh: number;
   /** One assistant message, all-in. gpt-5-mini at $0.25/M in and $2.00/M out, assuming a full
    *  3,000-token completion budget and ~3,000 tokens of facts and history going in. Deliberately
    *  the pessimistic end: gpt-5-mini is a reasoning model, so hidden thinking is billed as output
@@ -50,8 +64,8 @@ export interface CostRates {
 }
 
 export const COST_RATES: CostRates = {
-  connectedUserMonth: num('COST_CONNECTED_USER', 2.0),
-  syncCall: num('COST_SYNC', 0.05),
+  connectedUserMonth: num('COST_CONNECTED_USER', 1.0),
+  manualRefresh: num('COST_MANUAL_REFRESH', 0.05),
   aiMessage: num('COST_AI_MESSAGE', 0.0068),
   takeaway: num('COST_TAKEAWAY', 0.0045),
   creemPercent: num('COST_CREEM_PERCENT', 0.039),
@@ -78,6 +92,13 @@ export interface UsageCounts {
 export interface CostBreakdown {
   ai: number;
   takeaways: number;
+  /**
+   * What syncing cost. Zero, and kept in the shape so the admin panel can say so.
+   *
+   * A line reading $0.00 next to a count of nine thousand syncs is worth more than no line at
+   * all: it is the answer to "should I be charging more for syncs", and the absence of the row
+   * is how that question gets re-asked every quarter.
+   */
   syncs: number;
   connectedUsers: number;
   processor: number;
@@ -88,7 +109,15 @@ export interface CostBreakdown {
 export function priceUsage(counts: UsageCounts, rates: CostRates = COST_RATES): CostBreakdown {
   const ai = counts.aiMessages * rates.aiMessage;
   const takeaways = counts.takeaways * rates.takeaway;
-  const syncs = counts.syncs * rates.syncCall;
+  /*
+   * Not multiplied by anything.
+   *
+   * Reading trade activity is included in the per-user fee — SnapTrade caches transactions and
+   * refreshes them daily, and the only thing they bill per call is a manual holdings refresh this
+   * app never performs. This used to be `counts.syncs * 0.05`, which invented a cost that has
+   * never appeared on an invoice and made every plan look worse than it is.
+   */
+  const syncs = 0;
   const connectedUsers = counts.syncingUsers * rates.connectedUserMonth;
   const processor = counts.revenue * rates.creemPercent + counts.charges * rates.creemFlat;
 

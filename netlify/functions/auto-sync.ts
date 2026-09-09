@@ -19,8 +19,10 @@ import {
  *
  * Runs Tuesday to Saturday at 11:00 UTC — six or seven in the morning Eastern, after a US session
  * has closed and before the trader opens the app. Saturday is what catches Friday; Sunday and
- * Monday are skipped because nothing traded, and a pull on a day with no fills is a SnapTrade
- * charge for nothing.
+ * Monday are skipped because nothing traded and there is nothing new to find.
+ *
+ * A day behind is not a bug here, it is SnapTrade: transactions are cached and delivered one day
+ * late on every plan they sell. Running this hourly would return the same rows every time.
  *
  * The decision logic is in server/autoSync.ts and tested there. This file is the plumbing: who to
  * ask, how to write, and how to say what happened.
@@ -57,8 +59,10 @@ async function importFor(uid: string, activeAccountId: string, today: string) {
     );
   }
 
-  // Recorded whatever comes back, including nothing: the calls were made and the bill will show
-  // them, so the cost report has to as well.
+  // Recorded whatever comes back, including nothing. The pulls are free — SnapTrade meters a
+  // manual holdings refresh, not a read — so this is a count of what the product did on somebody's
+  // behalf rather than a bill. Worth keeping either way: "the morning import ran and found
+  // nothing" and "the morning import never ran" are different problems.
   await recordAutomatic('sync', uid, pulls);
   if (trades.length === 0) return { imported: 0, accounts };
 

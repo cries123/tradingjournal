@@ -4,7 +4,7 @@ import { TIER_PLANS } from './tiers';
 
 const RATES: CostRates = {
   connectedUserMonth: 1,
-  syncCall: 0.05,
+  manualRefresh: 0.05,
   aiMessage: 0.0068,
   takeaway: 0.0045,
   creemPercent: 0.039,
@@ -18,14 +18,26 @@ describe('priceUsage', () => {
       RATES,
     );
     expect(out.ai).toBeCloseTo(0.68);
-    expect(out.syncs).toBeCloseTo(10);
     expect(out.connectedUsers).toBeCloseTo(12);
     // 3.9% of 120 = 4.68, plus 12 x 0.40 = 4.80
     expect(out.processor).toBeCloseTo(9.48);
-    expect(out.total).toBeCloseTo(0.68 + 0.18 + 10 + 12 + 9.48);
+    expect(out.total).toBeCloseTo(0.68 + 0.18 + 12 + 9.48);
   });
 
-  it('charges the connection fee per person, not per sync', () => {
+  it('charges nothing at all for syncing', () => {
+    // SnapTrade caches transactions and refreshes them daily inside the per-user fee. The $0.05
+    // on the billing dashboard is per successful MANUAL REFRESH — refreshBrokerageAuthorization,
+    // which this app has never called. Pricing syncs at $0.05 invented a cost that has never
+    // appeared on an invoice, and it made every plan look worse than it is.
+    const busy = priceUsage(
+      { aiMessages: 0, takeaways: 0, syncs: 9000, syncingUsers: 1, charges: 0, revenue: 0 },
+      RATES,
+    );
+    expect(busy.syncs).toBe(0);
+    expect(busy.total).toBe(1);
+  });
+
+  it('charges the connection fee per person, not per connection or per sync', () => {
     const busy = priceUsage(
       { aiMessages: 0, takeaways: 0, syncs: 300, syncingUsers: 1, charges: 0, revenue: 0 },
       RATES,

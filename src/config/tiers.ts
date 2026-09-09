@@ -46,8 +46,9 @@ export interface TierLimits {
    * The journal keeps itself up to date — an automatic import every market morning, no button.
    *
    * This is the difference between Diamond and "Gold with bigger numbers". A sync allowance buys
-   * impatience, as the note below says; this buys not having to remember. It costs a pull a day
-   * per user (see COST_RATES.syncCall), which is why it is one tier rather than all of them.
+   * impatience — the pull is free and the data is a day old either way — while this buys not
+   * having to remember. It is one tier rather than all of them because it is worth paying for,
+   * not because it costs anything to run.
    */
   autoSync: boolean;
   /**
@@ -122,19 +123,30 @@ export function annualMonthlyEquivalent(tier: Tier): number {
 }
 
 /*
- * How these numbers were arrived at, because the last set were not.
+ * How these numbers were arrived at, because the last two sets were not.
  *
- * Three costs decide everything here. SnapTrade charges $2.00 per connected PERSON per month —
- * not per brokerage, so broker count is free to give away and is pure differentiation. A manual
- * sync is $0.05, and the daily automatic refresh is already inside the per-user fee, so a sync
- * allowance buys impatience rather than freshness. An assistant message is about $0.0068, which
- * looks like nothing until a daily cap is multiplied by thirty: 50 a day is 1,500 a month and
- * $10.20 of it.
+ * Two costs decide everything here, and one that used to be on the list is not a cost at all.
  *
- * Add Creem's 3.9% plus $0.40 a charge and the old ladder left, at full use of every cap, 18% on
- * Silver, 11% on Gold and 29% on Diamond — which is to say the most engaged customers, the ones
- * who never churn, were worth almost nothing. These are set so the WORST case is still healthy
- * (roughly 63% / 54% / 58%), because a plan you resent your best users for using is priced wrong.
+ * SnapTrade charges $1.00 per connected PERSON per month — not per brokerage, not per account —
+ * which is why broker connections are unlimited on every paid plan. Giving away connections costs
+ * nothing and answers the trader with a brokerage account, a Roth and a futures account, who is
+ * not an edge case.
+ *
+ * Syncing trades is free. SnapTrade caches transactions, refreshes them once a day as part of
+ * that per-user fee, and delivers them a day behind. The $0.05 on their billing dashboard is per
+ * successful MANUAL REFRESH — refreshBrokerageAuthorization, forcing intraday holdings out of a
+ * brokerage — and this app has never called it. Pricing a sync at $0.05 was an assumption written
+ * into costs.ts and never checked against an invoice; it made every plan look worse than it is
+ * and it is the reason the per-day sync caps exist at all. Those caps are now a rate limit, not a
+ * cost control, and should be read that way when they are next revisited.
+ *
+ * An assistant message is about $0.0068, which looks like nothing until a daily cap is multiplied
+ * by thirty: 40 a day is 1,200 a month and $8.16 of it. That is the only usage-driven cost in the
+ * product, and it is the one worth capping.
+ *
+ * Add Creem's 3.9% plus $0.40 a charge and, at full use of every cap every day, these leave 79%
+ * on Silver, 72% on Gold and 71% on Diamond. The earlier ladder left 18% / 11% / 29% — which is
+ * to say the most engaged customers, the ones who never churn, were worth almost nothing.
  */
 export const TIER_PLANS: Record<Tier, TierPlan> = {
   free: {
