@@ -10,6 +10,7 @@ import {
 import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
+  sendEmailVerification,
   onAuthStateChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
@@ -243,6 +244,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         console.error('[auth] could not write the user profile after sign-up:', err);
       }
+
+      /*
+       * The confirmation email, sent once and never waited on.
+       *
+       * Not a gate on anything. Verification stopped being an anti-abuse measure when the trial
+       * moved onto Creem's checkout — a card proves far more than a reachable inbox — so blocking
+       * anything on it now would only cost sign-ups. What it still buys is delivery: the
+       * trial-ending notes, the failed-payment email and the weekly recap all go to this address,
+       * and a typo means silence rather than a bounce anybody notices.
+       *
+       * Deliberately after the profile write and outside its try: an account exists and the person
+       * is signed in by this point, and a mail provider having a bad minute must not surface as a
+       * failed sign-up over an account that was created perfectly.
+       */
+      sendEmailVerification(result.user, { url: `${window.location.origin}/app` }).catch((err) => {
+        console.error('[auth] could not send the confirmation email after sign-up:', err);
+      });
     },
     [],
   );
