@@ -34,6 +34,15 @@ interface SettingsPageProps {
   month: number;
   onBack: () => void;
   onRestoreTrades: (trades: Trade[]) => Promise<void>;
+  /**
+   * Wipe the journal.
+   *
+   * It used to be a grey line of 10px text at the bottom of the sidebar, one click away on every
+   * screen in the app, directly under "+ Log Trade". Destructive things belong where the rest of
+   * the destructive things are, behind a deliberate trip to Settings — and under the backup
+   * button, so the offer to save a copy comes before the offer to delete everything.
+   */
+  onClearAll: () => void;
 }
 
 export function SettingsPage({
@@ -44,6 +53,7 @@ export function SettingsPage({
   month,
   onBack,
   onRestoreTrades,
+  onClearAll,
 }: SettingsPageProps) {
   const { settings, updateSettings, addSetupTag, addStrategy, removeStrategy, addAccount, removeAccount, setActiveAccount } = useSettings();
   const { username, user, firebaseEnabled } = useAuth();
@@ -803,6 +813,23 @@ export function SettingsPage({
               {backupMessage}
             </p>
           )}
+        </section>
+
+        <section className="panel-card p-5 space-y-3 border-red-500/25">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-red-400/90">Danger zone</h2>
+          <p className="text-xs text-text-secondary leading-relaxed">
+            Deletes every trade in this journal on every device signed into this account. Download a
+            backup first — this is not undoable, and a re-sync only brings back what your broker
+            still has.
+          </p>
+          <button
+            type="button"
+            onClick={onClearAll}
+            className="w-full flex items-center justify-center gap-2 py-2.5 text-sm rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10 transition-colors focus-ring"
+          >
+            <Trash2 size={16} />
+            Clear this journal
+          </button>
         </section>
         </div>
       </div>

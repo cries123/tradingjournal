@@ -3,6 +3,8 @@ import { CandlestickChart, Clock, Crosshair, ListChecks, Ruler, Tags } from 'luc
 import type { Trade } from '../../types';
 import { useSettings } from '../../context/useSettings';
 import { formatCurrency } from '../../utils/format';
+import { PanelShell } from './PanelShell';
+import { pnlClass } from '../../utils/pnlTone';
 import {
   executionCoverage,
   hasAnyExecutionData,
@@ -19,56 +21,17 @@ type Currency = Parameters<typeof formatCurrency>[1];
  * The panels for data the journal collects and never showed back.
  *
  * Each one renders only when it has a real sample behind it, and the section as a whole renders
- * nothing when none of them do. That rule is the reason this exists at all: the old Timing and
- * Execution cards were pulled because they showed an empty state to every broker-sync user, who
- * has no entry price risk, no MAE and no self-assigned grade. Empty cards are worse than absent
- * ones — they make a full product look broken.
+ * nothing when none of them do. The empty version of a panel is not a panel: the Performance
+ * screen used to draw five dashed cards for the five fields a Schwab import doesn't carry, which
+ * is a paid page mostly made of things it can't do. What to record instead is still said — it is
+ * said once, compactly, at the bottom, by ExecutionPrompts.
  *
- * Entry times are the exception and the reason the time panel usually appears: the SnapTrade
- * importer records them, so hour-of-day works for synced traders without them typing anything.
+ * Entry times were meant to be the exception here, since the SnapTrade importer records them when
+ * the brokerage sends one. Several brokerages send a date with no clock on it at all, so for their
+ * users this panel is in the same position as the rest, and the prompt says so honestly.
  */
 interface ExecutionSectionProps {
   trades: Trade[];
-  /**
-   * Show a panel that has no data yet, as a prompt for what to record.
-   *
-   * Off on any surface somebody landed on for another reason — that is what made the old Timing
-   * and Execution cards read as a broken dashboard. On a screen you navigated to in order to look
-   * at your execution, the opposite is true: a missing panel is the most useful thing on the page,
-   * because it names the one field that would unlock it.
-   */
-  showPrompts?: boolean;
-}
-
-function PanelShell({
-  eyebrow,
-  title,
-  icon,
-  children,
-}: {
-  eyebrow: string;
-  title: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="panel-card p-3 md:p-4 flex flex-col min-h-[160px]">
-      <div className="mb-2 md:mb-3 shrink-0 flex items-start gap-2">
-        <span className="text-accent/80 mt-0.5 shrink-0">{icon}</span>
-        <div>
-          <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
-            {eyebrow}
-          </p>
-          <h3 className="text-[10px] md:text-sm font-semibold text-text-primary">{title}</h3>
-        </div>
-      </div>
-      <div className="flex-1 flex flex-col justify-center">{children}</div>
-    </div>
-  );
-}
-
-function pnlClass(value: number): string {
-  return value >= 0 ? 'text-profit-bright' : 'text-loss-bright';
 }
 
 /* ------------------------------------------------------------------ time of day */
@@ -322,60 +285,18 @@ function TagPanel({
 
 /* ------------------------------------------------------------------ section */
 
-function LockedPanel({
-  eyebrow,
-  title,
-  icon,
-  needs,
-}: {
-  eyebrow: string;
-  title: string;
-  icon: React.ReactNode;
-  needs: string;
-}) {
-  return (
-    <div className="rounded-xl border border-dashed border-border/60 p-3 md:p-4 flex flex-col min-h-[160px]">
-      <div className="mb-2 md:mb-3 shrink-0 flex items-start gap-2 opacity-60">
-        <span className="text-text-secondary mt-0.5 shrink-0">{icon}</span>
-        <div>
-          <p className="text-[10px] uppercase tracking-widest text-text-secondary font-medium mb-0.5">
-            {eyebrow}
-          </p>
-          <h3 className="text-[10px] md:text-sm font-semibold text-text-secondary">{title}</h3>
-        </div>
-      </div>
-      <div className="flex-1 flex items-center">
-        <p className="text-xs text-text-secondary leading-relaxed">{needs}</p>
-      </div>
-    </div>
-  );
-}
-
-export function ExecutionSection({ trades, showPrompts = false }: ExecutionSectionProps) {
+export function ExecutionSection({ trades }: ExecutionSectionProps) {
   const { settings } = useSettings();
   const coverage = useMemo(() => executionCoverage(trades), [trades]);
 
-  if (!showPrompts && !hasAnyExecutionData(coverage)) return null;
+  if (!hasAnyExecutionData(coverage)) return null;
 
   const currency = settings.currency;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
-      {coverage.hourly ? (
-        <HourPanel data={coverage.hourly} currency={currency} />
-      ) : (
-        showPrompts && (
-          <LockedPanel
-            eyebrow="Timing"
-            title="P&L by hour entered"
-            icon={<Clock size={14} />}
-            needs="Needs an entry time on at least five trades. Broker imports fill this in automatically — for hand-typed trades it is the time field on the trade form."
-          />
-        )
-      )}
-
-      {/* Symbols first among the always-available panels: it needs nothing but a ticker and a
-          P&L, so it is the one thing on this screen that draws for every journal. */}
+      {/* Symbols first: it needs nothing but a ticker and a P&L, so it is the one panel here that
+          draws for every journal from every source. */}
       {coverage.symbols.length > 0 && (
         <TagPanel
           rows={coverage.symbols}
@@ -386,58 +307,110 @@ export function ExecutionSection({ trades, showPrompts = false }: ExecutionSecti
           noun="ticker"
         />
       )}
+      {coverage.hourly && <HourPanel data={coverage.hourly} currency={currency} />}
+      {coverage.tags.length > 0 && <TagPanel rows={coverage.tags} currency={currency} />}
+      {coverage.expectancy && <ExpectancyPanel data={coverage.expectancy} />}
+      {coverage.excursions && <ExcursionPanel data={coverage.excursions} currency={currency} />}
+      {coverage.discipline && <DisciplinePanel data={coverage.discipline} currency={currency} />}
+    </div>
+  );
+}
 
-      {coverage.tags.length > 0 ? (
-        <TagPanel rows={coverage.tags} currency={currency} />
-      ) : (
-        showPrompts && (
-          <LockedPanel
-            eyebrow="Setups"
-            title="Which setups make money"
-            icon={<Tags size={14} />}
-            needs="Needs a setup or tag on at least three trades of the same kind. Tag them as you review and this fills in within a week."
-          />
-        )
-      )}
+interface Prompt {
+  id: string;
+  eyebrow: string;
+  title: string;
+  icon: React.ReactNode;
+  needs: string;
+}
 
-      {coverage.expectancy ? (
-        <ExpectancyPanel data={coverage.expectancy} />
-      ) : (
-        showPrompts && (
-          <LockedPanel
-            eyebrow="Edge"
-            title="Expectancy in R"
-            icon={<Crosshair size={14} />}
-            needs="Needs the R multiple on at least five trades — what the result was in units of the risk you took. It is the number that says whether the edge is real."
-          />
-        )
-      )}
+/**
+ * What is still missing, and what one field would unlock it.
+ *
+ * These used to be five full dashed cards sitting in the same grid as the real panels, which is
+ * how a screen with one filled panel and five empty ones reads as a broken product rather than an
+ * incomplete journal. They are prompts, so they are drawn as prompts — small, at the bottom, under
+ * a heading that says what they are, and only for the fields that are actually absent.
+ */
+export function ExecutionPrompts({ trades }: ExecutionSectionProps) {
+  const coverage = useMemo(() => executionCoverage(trades), [trades]);
 
-      {coverage.excursions ? (
-        <ExcursionPanel data={coverage.excursions} currency={currency} />
-      ) : (
-        showPrompts && (
-          <LockedPanel
-            eyebrow="Excursion"
-            title="How far trades ran"
-            icon={<Ruler size={14} />}
-            needs="Needs MAE and MFE — how far a trade went against you, and how far it ran in your favour. Together they say whether the stop or the exit is what is costing you."
-          />
-        )
-      )}
+  const prompts: Prompt[] = [];
+  if (!coverage.hourly) {
+    prompts.push({
+      id: 'hourly',
+      eyebrow: 'Timing',
+      title: 'P&L by hour entered',
+      icon: <Clock size={14} />,
+      needs:
+        'Needs a clock time on at least five entries. Some brokers send it with the fill and some send only the date — where yours does not, the time field on the trade form fills this in.',
+    });
+  }
+  if (coverage.tags.length === 0) {
+    prompts.push({
+      id: 'tags',
+      eyebrow: 'Setups',
+      title: 'Which setups make money',
+      icon: <Tags size={14} />,
+      needs:
+        'Needs a setup or tag on at least three trades of the same kind. Tag them as you review and this fills in within a week.',
+    });
+  }
+  if (!coverage.expectancy) {
+    prompts.push({
+      id: 'expectancy',
+      eyebrow: 'Edge',
+      title: 'Expectancy in R',
+      icon: <Crosshair size={14} />,
+      needs:
+        'Needs the R multiple on at least five trades — the result in units of the risk you took. Your breakeven win rate above is the version of this that needs nothing.',
+    });
+  }
+  if (!coverage.excursions) {
+    prompts.push({
+      id: 'excursions',
+      eyebrow: 'Excursion',
+      title: 'How far trades ran',
+      icon: <Ruler size={14} />,
+      needs:
+        'Needs MAE and MFE — how far a trade went against you, and how far it ran in your favour. Together they say whether the stop or the exit is what is costing you.',
+    });
+  }
+  if (!coverage.discipline) {
+    prompts.push({
+      id: 'discipline',
+      eyebrow: 'Discipline',
+      title: 'Did following the plan pay?',
+      icon: <ListChecks size={14} />,
+      needs:
+        'Needs a grade or a checklist score on at least five trades. Grading takes a second per trade and answers the hardest question there is: whether your rules make money.',
+    });
+  }
 
-      {coverage.discipline ? (
-        <DisciplinePanel data={coverage.discipline} currency={currency} />
-      ) : (
-        showPrompts && (
-          <LockedPanel
-            eyebrow="Discipline"
-            title="Did following the plan pay?"
-            icon={<ListChecks size={14} />}
-            needs="Needs a grade or a checklist score on at least five trades. Grading takes a second per trade and answers the hardest question there is: whether your rules make money."
-          />
-        )
-      )}
+  if (prompts.length === 0) return null;
+
+  return (
+    <div className="panel-card p-3 md:p-4">
+      <p className="text-[10px] uppercase tracking-widest text-text-secondary/70 font-medium mb-0.5">
+        Record these and more opens up
+      </p>
+      <h3 className="text-sm font-semibold mb-3">
+        {prompts.length} more panel{prompts.length === 1 ? '' : 's'} the journal can draw
+      </h3>
+      <ul className="grid gap-2 md:grid-cols-2">
+        {prompts.map((prompt) => (
+          <li
+            key={prompt.id}
+            className="rounded-lg border border-dashed border-border/60 p-2.5 flex gap-2.5"
+          >
+            <span className="text-text-secondary/70 mt-0.5 shrink-0">{prompt.icon}</span>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-text-primary">{prompt.title}</p>
+              <p className="text-[11px] text-text-secondary leading-relaxed mt-0.5">{prompt.needs}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

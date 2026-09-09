@@ -466,6 +466,25 @@ details.glass-card > p {
   animation: fade-up 0.3s ease-out;
 }
 
+/**
+ * A pane that still scrolls, without a rail down the side of it.
+ *
+ * Only for panes narrow enough that the scrollbar is most of the ornament in them — the sidebar,
+ * where a 15px rail sat permanently beside a nav of eight items and made the panel look like a
+ * frame with a leak. The content still scrolls by wheel, trackpad, touch and keyboard; what is
+ * gone is the drawn track. Never put this on a long document, where the bar is the only thing
+ * telling a reader how much is left.
+ */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 .focus-ring:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--color-bg-primary), 0 0 0 4px rgba(var(--color-accent-rgb), 0.55);

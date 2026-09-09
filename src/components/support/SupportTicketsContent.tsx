@@ -26,6 +26,16 @@ interface SupportTicketsContentProps {
   initialCategory?: TicketCategory;
   heading?: string;
   intro?: string;
+  /**
+   * Render just the tickets, with no back link, title or page padding.
+   *
+   * The Support dashboard already draws all three, and stacking two headings — one saying
+   * "Support" above another saying "Support" — is how a hosted panel announces that it was
+   * bolted on rather than designed in.
+   */
+  embedded?: boolean;
+  /** Open straight into the new-ticket form, for an entry point that is already "report a bug". */
+  autoCompose?: boolean;
 }
 
 /** A stable empty array, so "no tickets" is the same reference every render. */
@@ -339,11 +349,13 @@ export function SupportTicketsContent({
   initialCategory,
   heading = 'Support',
   intro = 'Open a ticket and talk to us directly. Replies land right here.',
+  embedded = false,
+  autoCompose = false,
 }: SupportTicketsContentProps) {
   const { user, loading, firebaseEnabled } = useAuth();
   const uid = user?.uid ?? null;
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [composing, setComposing] = useState(false);
+  const [composing, setComposing] = useState(autoCompose);
   const [listError, setListError] = useState<string | null>(null);
 
   /* Stored with the uid they belong to rather than cleared on sign-out. Nothing is reset inside
@@ -385,29 +397,33 @@ export function SupportTicketsContent({
   const unansweredCount = tickets.filter((t) => t.unreadForUser).length;
 
   return (
-    <div className="pb-6">
-      <div className="max-w-2xl mx-auto p-4 md:p-6">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors mb-8 focus-ring rounded-lg px-1 py-1"
-        >
-          <ArrowLeft size={16} />
-          {backLabel}
-        </button>
+    <div className={embedded ? '' : 'pb-6'}>
+      <div className={embedded ? '' : 'max-w-2xl mx-auto p-4 md:p-6'}>
+        {!embedded && (
+          <>
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors mb-8 focus-ring rounded-lg px-1 py-1"
+            >
+              <ArrowLeft size={16} />
+              {backLabel}
+            </button>
 
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-accent/10 text-accent">
-            <LifeBuoy size={22} />
-          </div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{heading}</h1>
-          {unansweredCount > 0 && (
-            <span className="text-[11px] font-semibold rounded-full px-2 py-0.5 bg-accent/15 text-accent">
-              {unansweredCount} new {unansweredCount === 1 ? 'reply' : 'replies'}
-            </span>
-          )}
-        </div>
-        <p className="text-text-secondary mb-8 leading-relaxed">{intro}</p>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-lg bg-accent/10 text-accent">
+                <LifeBuoy size={22} />
+              </div>
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{heading}</h1>
+              {unansweredCount > 0 && (
+                <span className="text-[11px] font-semibold rounded-full px-2 py-0.5 bg-accent/15 text-accent">
+                  {unansweredCount} new {unansweredCount === 1 ? 'reply' : 'replies'}
+                </span>
+              )}
+            </div>
+            <p className="text-text-secondary mb-8 leading-relaxed">{intro}</p>
+          </>
+        )}
 
         {!firebaseEnabled ? (
           <div className="panel-card p-6 text-sm text-text-secondary">

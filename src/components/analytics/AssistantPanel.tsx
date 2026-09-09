@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUp, Check, Copy, GitCompare, Lock, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowUp, Check, Copy, GitCompare, Lock, RotateCcw, Sparkles, SquarePen } from 'lucide-react';
 import type { Trade } from '../../types';
 import { buildJournalFacts, suggestedQuestions } from '../../utils/journalFacts';
 import { AssistantError, streamAssistant, type AssistantMessage } from '../../services/aiAssistant';
-import { useAssistantThread } from '../../hooks/useAssistantThread';
+import { useAssistantThreads } from '../../hooks/useAssistantThreads';
 import { useEntitlement } from '../../context/useEntitlement';
 import { AnswerBody } from './AnswerBody';
 
@@ -22,6 +22,15 @@ interface AssistantPanelProps {
   rules?: { enabled: boolean; maxDailyLoss?: number; maxTradesPerDay?: number; maxDailyGain?: number };
   /** Drops the card chrome when the dock already provides a frame and a title bar. */
   bare?: boolean;
+  /**
+   * Where this is being rendered.
+   *
+   * 'page' drops the panel's own title block, because the Assistant tab draws a bigger one above
+   * it along with the thread list — two headings stacked is how a hosted panel announces it was
+   * bolted on. Everything else about the panel is the same on both surfaces, deliberately: the
+   * dock and the tab are the same assistant reading the same conversations.
+   */
+  layout?: 'dock' | 'page';
 }
 
 /** Max height for the textarea before it starts scrolling instead of growing. */
@@ -48,8 +57,8 @@ function readNotesOptIn(): boolean {
  * Every number it sees is computed by the app first (see utils/journalFacts.ts), so its answers
  * cannot disagree with the dashboard sitting above it.
  */
-export function AssistantPanel({ periods, rules, bare = false }: AssistantPanelProps) {
-  const { messages, append, rollbackTo, clear } = useAssistantThread();
+export function AssistantPanel({ periods, rules, bare = false, layout = 'dock' }: AssistantPanelProps) {
+  const { messages, append, rollbackTo, startNew } = useAssistantThreads();
   const { limits, noteUsage } = useEntitlement();
   const [scope, setScope] = useState<AssistantScope>(periods[0]?.scope ?? 'month');
   const [input, setInput] = useState('');
@@ -184,40 +193,50 @@ export function AssistantPanel({ periods, rules, bare = false }: AssistantPanelP
   return (
     <div className={bare ? 'flex flex-col h-full min-h-0' : 'panel-card p-3 md:p-4 flex flex-col'}>
       <div className="shrink-0 px-1 pb-2.5">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-accent/15 text-accent">
-              <Sparkles size={13} />
-            </span>
-            <div className="min-w-0">
-              <h3 className="text-sm font-semibold text-text-primary leading-tight">
-                Ask about your trading
-              </h3>
-              <p className="text-[10px] text-text-secondary mt-0.5">
-                Reads your stats · no trade advice
-              </p>
+        {layout === 'dock' && (
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-accent/15 text-accent">
+                <Sparkles size={13} />
+              </span>
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-text-primary leading-tight">
+                  Ask about your trading
+                </h3>
+                <p className="text-[10px] text-text-secondary mt-0.5">
+                  Reads your stats · no trade advice
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {remaining !== null && remaining <= 5 && (
+                <span className="text-[10px] text-amber-400 tabular-nums">{remaining} left</span>
+              )}
+              {/* Starts a conversation rather than deleting one. The old control here was a bin
+                  that wiped the only thread there was; now that threads are kept, the thing
+                  somebody actually wants at this moment is a fresh one. */}
+              {messages.length > 0 && (
+                <button
+                  type="button"
+                  onClick={startNew}
+                  aria-label="New chat"
+                  title="New chat"
+                  className="p-1.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60 transition-colors focus-ring"
+                >
+                  <SquarePen size={13} />
+                </button>
+              )}
             </div>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
-            {remaining !== null && remaining <= 5 && (
-              <span className="text-[10px] text-amber-400 tabular-nums">{remaining} left</span>
-            )}
-            {messages.length > 0 && (
-              <button
-                type="button"
-                onClick={clear}
-                aria-label="Clear conversation"
-                title="Clear conversation"
-                className="p-1.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60 transition-colors focus-ring"
-              >
-                <Trash2 size={13} />
-              </button>
-            )}
-          </div>
-        </div>
+        )}
 
         {periods.length > 1 && (
-          <PeriodTabs periods={periods} scope={scope} onChange={setScope} className="mt-2.5" />
+          <PeriodTabs
+            periods={periods}
+            scope={scope}
+            onChange={setScope}
+            className={layout === 'page' ? '' : 'mt-2.5'}
+          />
         )}
 
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -267,7 +286,7 @@ export function AssistantPanel({ periods, rules, bare = false }: AssistantPanelP
 
       <div
         ref={scrollRef}
-        className={`flex-1 min-h-0 overflow-y-auto px-1 ${bare ? '' : 'max-h-[340px]'}`}
+        className={`flex-1 min-h-0 overflow-y-auto px-1 ${bare || layout === 'page' ? '' : 'max-h-[340px]'}`}
       >
         {messages.length === 0 ? (
           <div className="py-1">

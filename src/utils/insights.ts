@@ -51,7 +51,52 @@ export interface TradingInsights {
   priorNet: number | null;
   /** Cumulative equity by trading day — for the sparkline. */
   equitySeries: number[];
+
+  /* ---- the numbers the bigger journals lead with, which this one was missing ---- */
+
+  tradeCount: number;
+  netPnl: number;
+  /** Sum of the winners, before the losers are taken off. */
+  grossProfit: number;
+  /** Sum of the losers, as a positive number. */
+  grossLoss: number;
+  /** avgWin ÷ avgLoss. 0 when there are no losses to divide by. */
+  payoff: number;
+  /**
+   * The win rate this payoff needs just to break even.
+   *
+   * The single most clarifying number a losing journal can be shown: "you win 37%" says nothing
+   * until it sits next to "and you need 44%". 0 when there is nothing to compute it from.
+   */
+  requiredWinRate: number;
+  /** winRate − requiredWinRate. Negative is the whole problem, in one figure. */
+  edgeGap: number;
+  /**
+   * Net profit ÷ the deepest drawdown.
+   *
+   * How much the account made for the worst stretch it had to sit through. Below 1 means the
+   * drawdown was bigger than the year's profit, which is the number that decides whether somebody
+   * can actually keep trading a system, not whether it makes money on paper.
+   */
+  recoveryFactor: number;
+  /** Share of gross profit that came from the single best day, in percent. */
+  bestDayShare: number;
+  /** Share of gross profit that came from the three biggest trades, in percent. */
+  topTradesShare: number;
+  /** Expectancy per trade over the most recent window (see EXPECTANCY_WINDOW). */
+  recentExpectancy: number;
+  /** The same window immediately before it, or null when there isn't one. */
+  priorExpectancy: number | null;
 }
+
+/**
+ * Trades in a rolling expectancy window.
+ *
+ * Twenty is small enough that a change shows up inside a fortnight of active trading and large
+ * enough that one outsized trade doesn't invent a trend. The point of the pair is that a single
+ * all-time expectancy hides a working system that stopped working a month ago.
+ */
+export const EXPECTANCY_WINDOW = 20;
 
 export function computeTradingInsights(trades: Trade[]): TradingInsights | null {
   if (trades.length === 0) return null;
@@ -151,12 +196,33 @@ export function computeTradingInsights(trades: Trade[]): TradingInsights | null 
     if (dd > maxDrawdown) maxDrawdown = dd;
   }
 
+  const avgWin = winners.length > 0 ? grossProfit / winners.length : 0;
+  const avgLoss = losers.length > 0 ? grossLoss / losers.length : 0;
+  const winRate = (winners.length / trades.length) * 100;
+  const payoff = avgLoss > 0 ? avgWin / avgLoss : 0;
+  const requiredWinRate = avgWin + avgLoss > 0 ? (avgLoss / (avgWin + avgLoss)) * 100 : 0;
+
+  /* Chronological, so "the last twenty trades" means the last twenty rather than whichever twenty
+     the caller's array happened to end with. Sorted by date only: a same-day ordering would need a
+     clock time that plenty of brokerages never send. */
+  const chronological = [...trades].sort((a, b) => a.date.localeCompare(b.date));
+  const recentWindow = chronological.slice(-EXPECTANCY_WINDOW);
+  const priorWindow = chronological.slice(-EXPECTANCY_WINDOW * 2, -EXPECTANCY_WINDOW);
+  const windowExpectancy = (window: Trade[]) =>
+    window.length > 0 ? window.reduce((s, t) => s + t.pnl, 0) / window.length : 0;
+
+  const biggestWins = winners
+    .map((t) => t.pnl)
+    .sort((a, b) => b - a)
+    .slice(0, 3)
+    .reduce((a, b) => a + b, 0);
+
   return {
     expectancyPerTrade: netPnl / trades.length,
     profitFactor: grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : 0,
-    avgWin: winners.length > 0 ? grossProfit / winners.length : 0,
-    avgLoss: losers.length > 0 ? grossLoss / losers.length : 0,
-    winRate: (winners.length / trades.length) * 100,
+    avgWin,
+    avgLoss,
+    winRate,
     maxDrawdown,
     greenDays,
     redDays,
@@ -171,6 +237,20 @@ export function computeTradingInsights(trades: Trade[]): TradingInsights | null 
     recentNet,
     priorNet,
     equitySeries,
+    tradeCount: trades.length,
+    netPnl,
+    grossProfit,
+    grossLoss,
+    payoff,
+    requiredWinRate,
+    edgeGap: winRate - requiredWinRate,
+    // Zero rather than Infinity when nothing was ever given back: a drawdown-free period is not
+    // infinitely good, it is a period too short or too lucky to have a recovery factor yet.
+    recoveryFactor: maxDrawdown > 0 ? netPnl / maxDrawdown : 0,
+    bestDayShare: grossProfit > 0 && bestDay ? (bestDay.pnl / grossProfit) * 100 : 0,
+    topTradesShare: grossProfit > 0 ? (biggestWins / grossProfit) * 100 : 0,
+    recentExpectancy: windowExpectancy(recentWindow),
+    priorExpectancy: priorWindow.length >= EXPECTANCY_WINDOW ? windowExpectancy(priorWindow) : null,
   };
 }
 

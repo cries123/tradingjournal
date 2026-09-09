@@ -120,10 +120,13 @@ export function MobileBottomNav({
           </span>
         </button>
 
+        {/* Goes to the Assistant tab, not the sheet. On a phone the dock filled the screen
+            anyway, so the sheet was a full-page view pretending not to be one — and it had no
+            room for the saved conversations. */}
         <NavItem
           icon={<MessageCircle size={18} />}
           label="Ask"
-          active={assistantOpen}
+          active={assistantOpen || appView === 'assistant'}
           onClick={onAssistant}
         />
         <NavItem icon={<Menu size={18} />} label="More" onClick={onOpenMenu} />

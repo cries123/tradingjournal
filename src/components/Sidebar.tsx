@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react';
 import {
-  Building2,
-  HelpCircle,
   LayoutDashboard,
   Link2,
-  MessageSquarePlus,
   Settings,
-  Share2,
   Gauge,
   LifeBuoy,
   ShieldCheck,
+  Sparkles,
   Trophy,
 } from 'lucide-react';
 import { PlanBadge } from './plan/PlanBadge';
@@ -25,6 +22,7 @@ export type SidebarAppView =
   | 'brokers'
   | 'connect-broker'
   | 'performance'
+  | 'assistant'
   | 'report-bug'
   | 'request-broker'
   | 'support'
@@ -36,42 +34,95 @@ interface SidebarProps {
   onAddTrade: () => void;
   onConnectBroker: () => void;
   onPerformance: () => void;
-  onClearAll: () => void;
+  onAssistant: () => void;
   onSettings: () => void;
-  onBrokers: () => void;
-  onReportBug: () => void;
   onSupport: () => void;
-  onRequestBroker: () => void;
   onLeaderboard: () => void;
-  onShareCard?: () => void;
-  shareCardEnabled?: boolean;
   onAdmin?: () => void;
   onHome?: () => void;
   variant?: 'desktop' | 'drawer';
   onNavigate?: () => void;
 }
 
-function navItemClass(active: boolean): string {
-  return active
-    ? 'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm bg-accent/10 text-accent border border-accent/20 font-medium focus-ring'
-    : 'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60 transition-colors focus-ring';
+/**
+ * One row of the nav.
+ *
+ * The active state is a filled pill with a bar down its left edge rather than a full outline. An
+ * outlined box on every selected row made the panel read as a stack of separate cards; the bar
+ * says "you are here" with one element instead of four borders, and it lines up down the column so
+ * the eye finds the current view without reading any of the labels.
+ */
+function NavItem({
+  active,
+  onClick,
+  icon,
+  label,
+  badge,
+  tone = 'default',
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  badge?: number;
+  tone?: 'default' | 'admin';
+}) {
+  const base =
+    'group relative w-full flex items-center gap-2.5 pl-3 pr-2.5 py-2 rounded-lg text-[13px] transition-colors focus-ring';
+  const state = active
+    ? 'bg-accent/10 text-accent font-medium'
+    : tone === 'admin'
+      ? 'text-amber-300/80 hover:text-amber-200 hover:bg-amber-500/10'
+      : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60';
+
+  return (
+    <button type="button" onClick={onClick} className={`${base} ${state}`} aria-current={active ? 'page' : undefined}>
+      {active && (
+        <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-accent" aria-hidden />
+      )}
+      <span className={`shrink-0 ${active ? 'text-accent' : ''}`}>{icon}</span>
+      <span className="flex-1 text-left truncate">{label}</span>
+      {badge != null && badge > 0 && (
+        <span className="shrink-0 text-[10px] font-semibold tabular-nums rounded-full px-1.5 py-0.5 bg-accent/20 text-accent">
+          {badge}
+        </span>
+      )}
+    </button>
+  );
 }
 
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-text-secondary/45">
+      {children}
+    </p>
+  );
+}
+
+/**
+ * The journal's navigation.
+ *
+ * It used to carry eleven destinations, which is what put a scrollbar down the side of a 224px
+ * panel on any laptop screen — and a rail beside eight items is most of the ornament in the panel.
+ * The fix was not a shorter scroll but fewer places: supported brokers, reporting a bug and
+ * requesting a broker were three separate rows for three halves of the same errand, and they now
+ * live as sections inside Support. Clearing the journal moved to Settings, where the rest of the
+ * destructive controls already are, and Share month was always a duplicate of the button in the
+ * dashboard toolbar.
+ *
+ * What's left is grouped by what a row is for: the four places you look at your trading, then the
+ * journal you're looking at, then the three places you go to change something about the account.
+ */
 export function Sidebar({
   appView,
   onDashboard,
   onAddTrade,
   onConnectBroker,
   onPerformance,
-  onClearAll,
+  onAssistant,
   onSettings,
-  onBrokers,
-  onReportBug,
   onSupport,
-  onRequestBroker,
   onLeaderboard,
-  onShareCard,
-  shareCardEnabled = false,
   onAdmin,
   onHome,
   variant = 'desktop',
@@ -129,120 +180,72 @@ export function Sidebar({
         )}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain">
-        <nav className="px-3 pt-3 space-y-1">
-          <button
-            type="button"
+      {/* Still scrollable — a 600px-tall window or a drawer on a small phone will always be able
+          to run out of room — but without the drawn rail. See .no-scrollbar in index.css. */}
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain no-scrollbar">
+        <nav className="px-2.5 pt-3 space-y-0.5">
+          <NavItem
+            active={appView === 'dashboard'}
             onClick={wrap(onDashboard)}
-            className={navItemClass(appView === 'dashboard')}
-          >
-            <LayoutDashboard size={16} className={appView === 'dashboard' ? 'text-accent' : undefined} />
-            Overview
-          </button>
-          <button
-            type="button"
-            onClick={wrap(onConnectBroker)}
-            className={navItemClass(appView === 'connect-broker')}
-          >
-            <Link2 size={16} className={appView === 'connect-broker' ? 'text-accent' : undefined} />
-            Connect broker
-          </button>
-          <button
-            type="button"
+            icon={<LayoutDashboard size={16} />}
+            label="Overview"
+          />
+          <NavItem
+            active={appView === 'performance'}
             onClick={wrap(onPerformance)}
-            className={navItemClass(appView === 'performance')}
-          >
-            <Gauge size={16} className={appView === 'performance' ? 'text-accent' : undefined} />
-            Performance
-          </button>
-          <button
-            type="button"
-            onClick={wrap(onSettings)}
-            className={navItemClass(appView === 'settings')}
-          >
-            <Settings size={16} />
-            Settings
-          </button>
-          <button
-            type="button"
+            icon={<Gauge size={16} />}
+            label="Performance"
+          />
+          <NavItem
+            active={appView === 'assistant'}
+            onClick={wrap(onAssistant)}
+            icon={<Sparkles size={16} />}
+            label="Assistant"
+          />
+          <NavItem
+            active={appView === 'leaderboard'}
             onClick={wrap(onLeaderboard)}
-            className={navItemClass(appView === 'leaderboard')}
-          >
-            <Trophy size={16} className={appView === 'leaderboard' ? 'text-accent' : undefined} />
-            Leaderboard
-          </button>
-          {onShareCard && (
-            <button
-              type="button"
-              onClick={wrap(onShareCard)}
-              disabled={!shareCardEnabled}
-              /* Separated from the links above it: everything else in this nav is a place you go,
-                 this is a thing you do. Sitting flush in the same list made it read as a fifth
-                 destination, and it already exists as a button in the toolbar. */
-              className={`${navItemClass(false)} mt-2 pt-3 border-t border-border/40 disabled:opacity-40 disabled:cursor-not-allowed`}
-            >
-              <Share2 size={16} />
-              Share month
-            </button>
-          )}
+            icon={<Trophy size={16} />}
+            label="Leaderboard"
+          />
         </nav>
 
-        <div className="px-3 pt-4">
+        {/* No section label above this one: the picker draws its own "Journal" heading. */}
+        <div className="px-2.5 pt-4">
           <SidebarJournalPicker onNavigate={onNavigate} />
         </div>
 
-        <div className="px-3 pt-4 pb-3 mt-1 border-t border-border/40">
-          <p className="px-3 pb-1.5 pt-1 text-[10px] font-medium uppercase tracking-[0.12em] text-text-secondary/60">
-            Help
-          </p>
+        <div className="px-2.5 pt-4 pb-3">
+          <SectionLabel>Account</SectionLabel>
           <div className="space-y-0.5">
-            <button
-              type="button"
-              onClick={wrap(onBrokers)}
-              className={navItemClass(appView === 'brokers')}
-            >
-              <Building2 size={15} />
-              Supported brokers
-            </button>
-            <button
-              type="button"
+            <NavItem
+              active={appView === 'connect-broker'}
+              onClick={wrap(onConnectBroker)}
+              icon={<Link2 size={16} />}
+              label="Connect broker"
+            />
+            <NavItem
+              active={appView === 'settings'}
+              onClick={wrap(onSettings)}
+              icon={<Settings size={16} />}
+              label="Settings"
+            />
+            <NavItem
+              active={appView === 'support' || appView === 'brokers' || appView === 'report-bug' || appView === 'request-broker'}
               onClick={wrap(onSupport)}
-              className={navItemClass(appView === 'support')}
-            >
-              <LifeBuoy size={15} />
-              <span className="flex-1 text-left">Support</span>
-              {/* A reply nobody opens is the same as no reply, and there is no email going out. */}
-              {supportUnread > 0 && (
-                <span className="ml-auto text-[10px] font-semibold tabular-nums rounded-full px-1.5 py-0.5 bg-accent/20 text-accent">
-                  {supportUnread}
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={wrap(onReportBug)}
-              className={navItemClass(appView === 'report-bug')}
-            >
-              <HelpCircle size={15} />
-              Report a bug
-            </button>
-            <button
-              type="button"
-              onClick={wrap(onRequestBroker)}
-              className={navItemClass(appView === 'request-broker')}
-            >
-              <MessageSquarePlus size={15} />
-              Request broker
-            </button>
+              icon={<LifeBuoy size={16} />}
+              label="Support"
+              /* A reply nobody opens is the same as no reply, and there is no email going out. */
+              badge={supportUnread}
+            />
             {isAdmin && onAdmin && (
-              <button
-                type="button"
+              <NavItem
+                active={false}
                 onClick={wrap(onAdmin)}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-amber-300/90 hover:text-amber-200 hover:bg-amber-500/10 transition-colors focus-ring"
-              >
-                <ShieldCheck size={15} />
-                Admin
-              </button>
+                icon={<ShieldCheck size={16} />}
+                label="Admin"
+                tone="admin"
+              />
             )}
           </div>
         </div>
@@ -250,6 +253,10 @@ export function Sidebar({
 
       <div className="p-3 border-t border-border/60 shrink-0 space-y-3">
         <PlanBadge />
+
+        <button type="button" onClick={wrap(onAddTrade)} className="w-full py-2.5 btn-primary text-sm font-semibold">
+          + Log Trade
+        </button>
 
         {firebaseEnabled && !loading && user && (
           <div className="flex items-center gap-2 px-1 min-w-0">
@@ -279,18 +286,6 @@ export function Sidebar({
             Trades saved locally in this browser
           </p>
         )}
-
-        <button type="button" onClick={wrap(onAddTrade)} className="w-full py-2.5 btn-primary text-sm font-semibold">
-          + Log Trade
-        </button>
-
-        <button
-          type="button"
-          onClick={wrap(onClearAll)}
-          className="w-full py-1 text-[10px] text-text-secondary/70 hover:text-red-400 transition-colors focus-ring rounded"
-        >
-          Clear journal
-        </button>
       </div>
     </aside>
   );

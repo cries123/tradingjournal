@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
-import { Flame, Snowflake, TrendingDown, TrendingUp } from 'lucide-react';
+import { Flame, Gauge, Snowflake, TrendingDown, TrendingUp } from 'lucide-react';
 import type { Trade } from '../../types';
 import { useSettings } from '../../context/useSettings';
 import { formatCurrency } from '../../utils/format';
-import { computeTradingInsights } from '../../utils/insights';
+import { computeTradingInsights, EXPECTANCY_WINDOW, type TradingInsights } from '../../utils/insights';
+import { computeTradingScore, type TradingScore } from '../../utils/tradingScore';
 import type { Verdict } from '../../utils/metricVerdict';
 import {
   drawdownVerdict,
@@ -26,6 +27,7 @@ function formatDayLabel(iso: string): string {
 export function TradingInsightsSection({ trades }: TradingInsightsSectionProps) {
   const { settings } = useSettings();
   const insights = useMemo(() => computeTradingInsights(trades), [trades]);
+  const score = useMemo(() => (insights ? computeTradingScore(insights) : null), [insights]);
   const violations = useMemo(
     () => checkRuleViolations(trades, settings.tradingRules),
     [trades, settings.tradingRules],
@@ -47,6 +49,8 @@ export function TradingInsightsSection({ trades }: TradingInsightsSectionProps) 
         </p>
         <h3 className="text-sm md:text-base font-semibold">What's working, what's not</h3>
       </div>
+
+      {score && <ScoreCard score={score} insights={insights} />}
 
       {settings.tradingRules.enabled && violations.length > 0 && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 space-y-1">
@@ -156,6 +160,61 @@ export function TradingInsightsSection({ trades }: TradingInsightsSectionProps) 
           label="Win rate"
           value={`${insights.winRate.toFixed(0)}%`}
           verdict={winRateVerdict(insights.winRate, insights.avgWin, insights.avgLoss)}
+        />
+      </div>
+
+      {/* The four the bigger journals lead with and this one never showed. Each says something the
+          row above it cannot: what the payoff ratio demands, whether the drawdown was worth
+          sitting through, how much of the year rode on one day, and whether any of it still
+          holds. */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+        <Metric
+          label="Breakeven win rate"
+          value={insights.requiredWinRate > 0 ? `${insights.requiredWinRate.toFixed(0)}%` : '—'}
+          tone={insights.edgeGap >= 0 ? 'profit' : 'loss'}
+          hint={
+            insights.requiredWinRate > 0
+              ? insights.edgeGap >= 0
+                ? `You win ${insights.winRate.toFixed(0)}% — ${insights.edgeGap.toFixed(0)} points clear`
+                : `You win ${insights.winRate.toFixed(0)}% — ${Math.abs(insights.edgeGap).toFixed(0)} points short`
+              : undefined
+          }
+        />
+        <Metric
+          label="Recovery factor"
+          value={insights.recoveryFactor !== 0 ? `${insights.recoveryFactor.toFixed(2)}×` : '—'}
+          tone={insights.recoveryFactor >= 1 ? 'profit' : insights.recoveryFactor < 0 ? 'loss' : undefined}
+          hint={
+            insights.recoveryFactor !== 0
+              ? insights.recoveryFactor >= 1
+                ? 'Profit clears the deepest drawdown'
+                : 'The drawdown was bigger than the profit'
+              : 'No drawdown to recover from yet'
+          }
+        />
+        <Metric
+          label="Best day's share"
+          value={insights.bestDayShare > 0 ? `${insights.bestDayShare.toFixed(0)}%` : '—'}
+          tone={insights.bestDayShare >= 40 ? 'loss' : undefined}
+          hint={
+            insights.bestDayShare >= 40
+              ? 'Most of the profit is one session — fragile'
+              : 'Of everything you made gross'
+          }
+        />
+        <Metric
+          label={`Last ${EXPECTANCY_WINDOW} trades`}
+          value={formatCurrency(insights.recentExpectancy, currency)}
+          tone={insights.recentExpectancy >= 0 ? 'profit' : 'loss'}
+          hint={
+            insights.priorExpectancy == null
+              ? 'Per trade, most recent window'
+              : insights.recentExpectancy === insights.priorExpectancy
+                ? // "Up from $25.90" when it is still $25.90 is the kind of small lie that makes
+                  // somebody stop trusting the rest of the panel.
+                  `Level with the ${EXPECTANCY_WINDOW} before`
+                : `${insights.recentExpectancy > insights.priorExpectancy ? 'Up from' : 'Down from'} ${formatCurrency(insights.priorExpectancy, currency)} per trade`
+          }
         />
       </div>
 
@@ -282,6 +341,7 @@ function Metric({
   value,
   tone,
   verdict,
+  hint,
 }: {
   label: string;
   value: string;
@@ -289,6 +349,8 @@ function Metric({
   /** Short read on whether this number is good. Omitted for metrics that can't be honestly
    *  graded on their own — "best day" isn't good or bad, it's just a fact. */
   verdict?: Verdict;
+  /** A plain sentence under the figure, for metrics whose meaning isn't in the number itself. */
+  hint?: string;
 }) {
   const valueClass =
     tone === 'profit' ? 'text-profit-bright' : tone === 'loss' ? 'text-loss-bright' : 'text-text-primary';
@@ -301,6 +363,65 @@ function Metric({
           {verdict.label}
         </p>
       )}
+      {!verdict && hint && (
+        <p className="text-[9px] mt-0.5 leading-snug text-text-secondary">{hint}</p>
+      )}
+    </div>
+  );
+}
+
+const BAND_CLASS: Record<TradingScore['band'], string> = {
+  Strong: 'text-profit-bright',
+  Solid: 'text-profit-bright',
+  Developing: 'text-amber-300',
+  'Needs work': 'text-loss-bright',
+};
+
+/**
+ * The score, and the five things it is made of.
+ *
+ * Never the number on its own. A composite that cannot be taken apart is a horoscope, and the
+ * component bars are what turn "62" into "your payoff is fine and your consistency is not" — which
+ * is the sentence somebody can actually act on.
+ */
+function ScoreCard({ score, insights }: { score: TradingScore; insights: TradingInsights }) {
+  return (
+    <div className="rounded-xl border border-border/50 bg-bg-tertiary/30 p-3">
+      <div className="flex items-start gap-4">
+        <div className="shrink-0 text-center w-20">
+          <p className="text-[9px] uppercase tracking-wide text-text-secondary">Score</p>
+          <p className={`text-3xl font-bold tabular-nums leading-none mt-1 ${BAND_CLASS[score.band]}`}>
+            {score.total}
+          </p>
+          <p className={`text-[10px] font-medium mt-1 ${BAND_CLASS[score.band]}`}>{score.band}</p>
+        </div>
+
+        <div className="flex-1 min-w-0 space-y-1">
+          {score.components.map((component) => (
+            <div key={component.id} className="flex items-center gap-2">
+              <span className="text-[10px] text-text-secondary w-[4.5rem] shrink-0">
+                {component.label}
+              </span>
+              <div className="flex-1 h-1.5 rounded-full bg-bg-primary overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-accent/80 transition-[width]"
+                  style={{ width: `${Math.max(component.score, 2)}%` }}
+                />
+              </div>
+              <span className="text-[9px] text-text-secondary/80 w-[8.5rem] shrink-0 text-right truncate">
+                {component.detail}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <p className="text-[10px] text-text-secondary leading-relaxed mt-2.5 flex items-start gap-1.5">
+        <Gauge size={11} className="mt-0.5 shrink-0 text-text-secondary/60" />
+        {score.thin
+          ? `Five equally weighted measures of edge, payoff, profit factor, recovery and consistency — over ${insights.tradeCount} trades, which is a small sample to read hard.`
+          : 'Five equally weighted measures: edge against the win rate your payoff demands, payoff, profit factor, recovery from drawdown, and how evenly the profit arrived.'}
+      </p>
     </div>
   );
 }

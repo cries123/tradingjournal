@@ -12,14 +12,14 @@ import { GettingStartedCard } from '../components/onboarding/GettingStartedCard'
 import { useEntitlement } from '../context/useEntitlement';
 import type { OnboardingStepId } from '../utils/onboardingSteps';
 import { SettingsPage } from '../components/SettingsPage';
-import { ShareCardModal } from '../components/ShareCardModal';
 import { Sidebar, type SidebarAppView } from '../components/Sidebar';
 import { Starfield } from '../components/Starfield';
 import { BrokerConnectContent } from '../components/brokers/BrokerConnectContent';
 import { LockedFeature } from '../components/plan/LockedFeature';
 import { BrokersContent } from '../components/support/BrokersContent';
 import { ReportBugContent } from '../components/support/ReportBugContent';
-import { SupportTicketsContent } from '../components/support/SupportTicketsContent';
+import { SupportDashboard } from '../components/support/SupportDashboard';
+import { AssistantContent } from '../components/analytics/AssistantContent';
 import { PerformanceContent } from '../components/PerformanceContent';
 import { RequestBrokerContent } from '../components/support/RequestBrokerContent';
 import { TradeModal } from '../components/TradeModal';
@@ -100,7 +100,6 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [clearConfirmStage, setClearConfirmStage] = useState<0 | 1 | 2>(0);
   const [clearError, setClearError] = useState<string | null>(null);
-  const [showShareCard, setShowShareCard] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => !hasCompletedOnboarding());
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [gettingStartedHidden, setGettingStartedHidden] = useState(() => isGettingStartedHidden());
@@ -203,17 +202,8 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
       openView('connect-broker');
       closeMobileMenu();
     },
-    onClearAll: () => setClearConfirmStage(1),
     onSettings: () => {
       openView('settings');
-      closeMobileMenu();
-    },
-    onBrokers: () => {
-      openView('brokers');
-      closeMobileMenu();
-    },
-    onReportBug: () => {
-      openView('report-bug');
       closeMobileMenu();
     },
     onSupport: () => {
@@ -224,20 +214,14 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
       openView('performance');
       closeMobileMenu();
     },
-    onRequestBroker: () => {
-      openView('request-broker');
+    onAssistant: () => {
+      openView('assistant');
       closeMobileMenu();
     },
     onLeaderboard: () => {
       openView('leaderboard');
       closeMobileMenu();
     },
-    onShareCard: () => {
-      openView('dashboard');
-      setShowShareCard(true);
-      closeMobileMenu();
-    },
-    shareCardEnabled: monthStats.totalTrades > 0,
     onAdmin,
   };
 
@@ -275,6 +259,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 month={month}
                 onBack={goBackView}
                 onRestoreTrades={restoreTrades}
+                onClearAll={() => setClearConfirmStage(1)}
               />
             ) : appView === 'brokers' ? (
               <BrokersContent
@@ -311,10 +296,23 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                   onBack={goBackView}
                 />
               </LockedFeature>
+            ) : appView === 'assistant' ? (
+              <LockedFeature
+                feature="aiAssistant"
+                title="The trading assistant is a paid feature"
+                description="Ask your journal why a setup keeps losing, whether you cut winners early, or what changed since last month. It reads the stats your dashboard already computed."
+              >
+                <AssistantContent
+                  periods={assistantPeriods}
+                  rules={settings.tradingRules}
+                  onBack={goBackView}
+                />
+              </LockedFeature>
             ) : appView === 'support' ? (
-              <SupportTicketsContent
+              <SupportDashboard
                 onBack={goBackView}
-                intro="Open a ticket and talk to us directly — billing, memberships, broker connections, anything. Replies show up here, and the sidebar tells you when one lands."
+                onBrokers={() => openView('brokers')}
+                onRequestBroker={() => openView('request-broker')}
               />
             ) : appView === 'report-bug' ? (
               <ReportBugContent onBack={goBackView} />
@@ -387,7 +385,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
             onAddTrade={() => openAddTrade()}
             onDashboard={() => openView('dashboard')}
             onLeaderboard={() => openView('leaderboard')}
-            onAssistant={() => setAssistantOpen((v) => !v)}
+            onAssistant={() => openView('assistant')}
             assistantOpen={assistantOpen}
           />
         )}
@@ -398,23 +396,15 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
         onOpenChange={setAssistantOpen}
         periods={assistantPeriods}
         rules={settings.tradingRules}
-        showLauncher={isDesktop}
+        /* No floating bubble while the Assistant tab is open — it would sit on top of the very
+           panel it opens. */
+        showLauncher={isDesktop && appView !== 'assistant'}
       />
 
       {!isDesktop && (
         <MobileDrawer open={mobileMenuOpen} onClose={closeMobileMenu}>
           <Sidebar variant="drawer" onHome={onHome} {...sidebarActions} onNavigate={closeMobileMenu} />
         </MobileDrawer>
-      )}
-
-      {showShareCard && (
-        <ShareCardModal
-          period="month"
-          stats={monthStats}
-          year={year}
-          month={month}
-          onClose={() => setShowShareCard(false)}
-        />
       )}
 
       {showOnboarding && !showAuthModal && !showUsernameModal && appView === 'dashboard' && (
