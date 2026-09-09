@@ -31,6 +31,23 @@ vi.mock('../hooks/useSupportUnread', () => ({
   useSupportUnread: () => 2,
 }));
 
+vi.mock('../hooks/useCoachingCount', () => ({
+  useCoachingCount: () => 1,
+}));
+
+// The coach seat is entirely server-mediated, so every one of these is a fetch the render must
+// not make. Effects do not run under renderToString, but the module still has to import.
+vi.mock('../services/coachSeat', () => ({
+  fetchSeat: async () => ({ state: 'none', coachEmail: null, invitedAt: null, acceptedAt: null }),
+  inviteCoach: async () => ({ state: 'pending', coachEmail: 'coach@example.com' }),
+  revokeCoach: async () => ({ state: 'none' }),
+  fetchCoaching: async () => ({ journals: [] }),
+  fetchCoachedJournal: async () => ({ trades: [], since: '2026-05-12', notes: [] }),
+  postCoachNote: async () => ({}),
+  fetchMyCoachNotes: async () => ({ notes: [] }),
+  markCoachNotesRead: async () => ({ cleared: 0 }),
+}));
+
 vi.mock('../context/useAuth', () => ({
   useAuth: () => ({
     user: { uid: 'u1', email: 'trader@example.com' },
@@ -51,6 +68,8 @@ vi.mock('../context/useSettings', () => ({
       tradingRules: { enabled: true, maxDailyLoss: 500, maxTradesPerDay: 4 },
       remindersEnabled: false,
       reminderTime: '17:00',
+      autoSyncEnabled: true,
+      ruleAlertsEnabled: true,
     },
     updateSettings: () => undefined,
     addSetupTag: () => undefined,
@@ -87,6 +106,10 @@ import { BrokerInsightSection } from './analytics/BrokerInsightSection';
 import { ExecutionPrompts, ExecutionSection } from './analytics/ExecutionSection';
 import { TradingInsightsSection } from './analytics/TradingInsightsSection';
 import { PerformanceContent } from './PerformanceContent';
+import { DiamondSection } from './settings/DiamondSection';
+import { RuleStandingBanner } from './RuleStandingBanner';
+import { CoachNotesPanel } from './coach/CoachNotesPanel';
+import { CoachInboxContent } from './coach/CoachInboxContent';
 
 const noop = () => undefined;
 
@@ -150,6 +173,7 @@ const sidebar = (appView: Parameters<typeof Sidebar>[0]['appView']) =>
     onAssistant: noop,
     onSettings: noop,
     onSupport: noop,
+    onCoach: noop,
     onLeaderboard: noop,
     onAdmin: noop,
     onHome: noop,
@@ -329,5 +353,55 @@ describe('PerformanceContent', () => {
       createElement(PerformanceContent, { trades: [], year: 2026, month: 7, onBack: noop }),
     );
     expect(html).toContain('Nothing to analyse yet');
+  });
+});
+
+describe('DiamondSection', () => {
+  it('names the three things the top plan buys', () => {
+    const html = paint(createElement(DiamondSection));
+
+    expect(html).toContain('Import my trades automatically');
+    expect(html).toContain('Tell me when I break my own rules');
+    expect(html).toContain('Your coach');
+    // The promise that makes auto-sync worth having rather than a bigger number.
+    expect(html).toContain('does not spend one');
+  });
+});
+
+describe('RuleStandingBanner', () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const on = (pnl: number, n = 1) =>
+    Array.from({ length: n }, () => trade({ date: today, pnl: pnl / n }));
+
+  it('says nothing on a quiet day inside every limit', () => {
+    expect(renderToString(createElement(RuleStandingBanner, { trades: on(-20) }))).toBe('');
+  });
+
+  it('warns before the daily stop rather than after it', () => {
+    const html = paint(createElement(RuleStandingBanner, { trades: on(-450) }));
+    expect(html).toContain('close to a limit');
+    expect(html).toContain('90% of the way');
+  });
+
+  it('names the breach once a limit has actually gone', () => {
+    const html = paint(createElement(RuleStandingBanner, { trades: on(-900) }));
+    expect(html).toContain('broken one of your own rules');
+  });
+
+  it('counts only today', () => {
+    const yesterday = trade({ date: '2020-01-02', pnl: -99999 });
+    expect(renderToString(createElement(RuleStandingBanner, { trades: [yesterday] }))).toBe('');
+  });
+});
+
+describe('the coach surfaces', () => {
+  it('paints the coach inbox with nothing loaded yet', () => {
+    const html = paint(createElement(CoachInboxContent, { onBack: noop }));
+    expect(html).toContain('Coaching');
+    expect(html).toContain('Loading');
+  });
+
+  it('draws nothing for a trader whose coach has written nothing', () => {
+    expect(renderToString(createElement(CoachNotesPanel))).toBe('');
   });
 });

@@ -310,6 +310,28 @@ async function askModel(
   return outcome.answer;
 }
 
+/**
+ * One written review of a period, for a job rather than a person.
+ *
+ * The weekly recap email has always been a stats table, and a stats table is exactly what the
+ * dashboard already shows — which is why the recap's job is retention and not insight. This asks
+ * the same assistant the same way a trader would, from the same JournalFacts, so the words in the
+ * email cannot disagree with the numbers underneath them.
+ *
+ * Returns null rather than throwing on any failure. Nobody is waiting on this: a model outage at
+ * two in the morning must degrade to the templated recap that has always worked, not cancel
+ * everybody's Sunday email.
+ */
+export async function writeReview(facts: unknown, question: string): Promise<string | null> {
+  if (!AI_CONFIGURED) return null;
+  try {
+    return await askModel(facts, question, []);
+  } catch (err) {
+    console.warn('[ai-assistant] review generation failed, falling back:', err);
+    return null;
+  }
+}
+
 export interface StreamPreflight {
   ok: boolean;
   /** Set when the request should be refused outright — status and message for the response. */

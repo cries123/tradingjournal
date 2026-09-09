@@ -29,6 +29,23 @@ export interface UserSettings {
   reminderTime: string;
   coachShareEnabled: boolean;
   coachShareToken?: string;
+  /**
+   * Let the journal import from the broker on its own each market morning. Diamond only.
+   *
+   * On by default, because it is the feature people upgrade for and a capability nobody switches
+   * on is a capability nobody bought. Off is still worth offering: somebody reconciling a month by
+   * hand needs the journal to stop changing under them.
+   */
+  autoSyncEnabled: boolean;
+  /**
+   * The coach invited to read this journal and write on it, as a lowercased email. Diamond only.
+   *
+   * One coach, not a list. A second seat is a different product — a team plan — and pretending
+   * otherwise with an array would put the access rules in a shape nothing else here is ready for.
+   */
+  coachEmail?: string;
+  /** Told when a risk rule is broken: in the app as it happens, and again the next morning. */
+  ruleAlertsEnabled: boolean;
   /** Last-used date range (YYYY-MM-DD) for the trade-history share link, remembered so the
    *  share panel and "Update link" both reuse it without asking again. */
   coachShareRangeStart?: string;
@@ -62,6 +79,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   remindersEnabled: false,
   reminderTime: '16:00',
   coachShareEnabled: false,
+  autoSyncEnabled: true,
+  ruleAlertsEnabled: true,
   leaderboardOptIn: false,
   leaderboardAnonymous: false,
   shareCardBackgrounds: [],

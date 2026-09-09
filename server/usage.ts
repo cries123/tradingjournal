@@ -46,9 +46,19 @@ export interface UsageDay {
   count: number;
   bonus: number;
   forgiven: number;
+  /**
+   * Calls the product made on the user's behalf, which they did not ask for and must not pay for.
+   *
+   * Diamond's automatic morning import is a real SnapTrade pull and costs exactly what a manual
+   * one does, so it belongs in `count` — the cost report would otherwise under-report the bill by
+   * one call per user per market day. What it must not do is eat an allowance the user never
+   * spent, so it is subtracted again below. Same reasoning as `forgiven`, different reason, and
+   * kept apart from it so "how many did an admin hand back" stays an answerable question.
+   */
+  automatic: number;
 }
 
-const EMPTY_DAY: UsageDay = { count: 0, bonus: 0, forgiven: 0 };
+const EMPTY_DAY: UsageDay = { count: 0, bonus: 0, forgiven: 0, automatic: 0 };
 
 function wholeNumber(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
@@ -56,12 +66,17 @@ function wholeNumber(value: unknown): number {
 
 export function readUsageDay(data: unknown): UsageDay {
   const d = (data ?? {}) as Partial<Record<keyof UsageDay, unknown>>;
-  return { count: wholeNumber(d.count), bonus: wholeNumber(d.bonus), forgiven: wholeNumber(d.forgiven) };
+  return {
+    count: wholeNumber(d.count),
+    bonus: wholeNumber(d.bonus),
+    forgiven: wholeNumber(d.forgiven),
+    automatic: wholeNumber(d.automatic),
+  };
 }
 
 /** The units that count against today's cap. */
 export function dailyUnitsSpent(day: UsageDay): number {
-  return Math.max(0, day.count - day.bonus - day.forgiven);
+  return Math.max(0, day.count - day.bonus - day.forgiven - day.automatic);
 }
 
 /**
@@ -336,4 +351,39 @@ export async function adjustCredits(kind: CreditKind, uid: string, delta: number
     tx.set(bank, { uid, [kind]: next, updatedAt: new Date().toISOString() }, { merge: true });
     return next;
   });
+}
+
+/**
+ * Records a call the product made for the user, without spending their allowance.
+ *
+ * The cost report reads `count`, so an automatic import that skipped this would be a call the
+ * bill knows about and the dashboard does not — one per Diamond user per market day, which is the
+ * kind of gap that makes a costs panel worth less than no panel.
+ *
+ * Best-effort: a failure here is a reporting gap, never a reason to fail the import the user is
+ * actually getting.
+ */
+export async function recordAutomatic(kind: UsageKind, uid: string, units = 1): Promise<void> {
+  if (units <= 0) return;
+  const day = usageDay();
+  const ref = usageDoc(kind, uid, day);
+
+  try {
+    await getAdminFirestore().runTransaction(async (tx) => {
+      const today = readUsageDay((await tx.get(ref)).data());
+      tx.set(
+        ref,
+        {
+          uid,
+          day,
+          count: today.count + units,
+          automatic: today.automatic + units,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true },
+      );
+    });
+  } catch (err) {
+    console.warn(`[usage] could not record an automatic ${kind} for ${uid}:`, err);
+  }
 }

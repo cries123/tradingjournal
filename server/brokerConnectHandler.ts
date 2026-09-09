@@ -4,6 +4,7 @@ import { logServerError } from './errorReports';
 import { getSnaptrade, resolveBrokerSlug, SNAPTRADE_CONFIGURED } from './snaptradeClient';
 import { getAdminFirestore } from './firebaseAdmin';
 import { mapSnapTradeActivities, type SnapTradeActivityLike } from './mapSnapTradeActivities';
+import type { ParsedTradeInput } from '../src/types';
 import { BROKER_REGISTRY, brokerRegistryEntry, isBrokerRegistryKey } from '../src/data/brokerRegistry';
 import {
   BROKER_STATUS_DOC,
@@ -656,6 +657,67 @@ async function isSiteAdmin(uid: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Pulls and matches every account's recent activity for one user, for the automatic import.
+ *
+ * Deliberately inside this module rather than beside the scheduled job: registering, recovering a
+ * rejected secret, paging the activity feed and matching round trips are all solved here, and a
+ * second implementation of any of them would be a second set of bugs. What it does NOT do is any
+ * of the gating a manual sync does — no allowance is consumed and no trial guard runs, because
+ * nobody pressed anything. The caller records the cost separately.
+ *
+ * Returns the mapped trades unwritten. Dedupe and the journal write belong to the caller, which is
+ * the only part of this that differs from a manual sync.
+ */
+export async function pullRecentActivityForUser(
+  uid: string,
+  startDate: string,
+): Promise<{ accounts: number; trades: ParsedTradeInput[]; pulls: number }> {
+  const creds = await getCredsIfRegistered(uid);
+  if (!creds) return { accounts: 0, trades: [], pulls: 0 };
+
+  const snaptrade = getSnaptrade();
+  let active = creds;
+
+  const listed = await withCredentialRecovery(uid, active, (c) => {
+    active = c;
+    return snaptrade.accountInformation.listUserAccounts({ userId: c.userId, userSecret: c.userSecret });
+  });
+
+  const trades: ParsedTradeInput[] = [];
+  let pulls = 0;
+
+  for (const account of listed.data) {
+    if (!account.id) continue;
+
+    const res = await withCredentialRecovery(uid, active, (c) => {
+      active = c;
+      return snaptrade.accountInformation.getAccountActivities({
+        userId: c.userId,
+        userSecret: c.userSecret,
+        accountId: account.id,
+        // A window, not the whole history: this is topping up a journal that a manual sync already
+        // backfilled, and a full pull every morning would be slower and no more complete.
+        startDate,
+        limit: 1000,
+      });
+    });
+    pulls += 1;
+
+    const activities = (res.data.data ?? []) as SnapTradeActivityLike[];
+    /*
+     * Matched per account, never across accounts.
+     *
+     * The matcher pairs opens with closes by contract, and two accounts holding the same contract
+     * would otherwise have a buy in one closed by a sell in the other — a fabricated round trip
+     * with a P&L that never happened to anybody.
+     */
+    trades.push(...mapSnapTradeActivities(activities).trades);
+  }
+
+  return { accounts: listed.data.length, trades, pulls };
 }
 
 export async function handleBrokerConnectRequest(

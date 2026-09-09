@@ -31,6 +31,10 @@ const FEATURE_NAMES: Record<Feature, string> = {
   performanceAnalytics: 'the performance screen',
   aiAssistant: 'the AI assistant',
   marketReplay: 'market replay',
+  autoSync: 'automatic daily imports',
+  coachSeat: 'coach comments',
+  ruleAlerts: 'risk-rule alerts',
+  aiReview: 'the weekly AI review',
 };
 
 /** Every feature a free account does not get, named — and only the ones that actually work. */

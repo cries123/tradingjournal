@@ -3,7 +3,12 @@ import type { Trade } from '../../src/types';
 import { computeWeeklyRecap } from '../../src/utils/insights';
 import { getAdminAuth, getAdminFirestore } from '../../server/firebaseAdmin';
 import { logServerError } from '../../server/errorReports';
-import { weeklyRecapEmail } from '../../server/emailTemplates';
+import { aiRecapEmail, weeklyRecapEmail } from '../../server/emailTemplates';
+import { writeReview } from '../../server/aiAssistantHandler';
+import { effectiveTier, readEntitlement } from '../../server/entitlements';
+import { tierHas } from '../../src/config/tiers';
+import { buildJournalFacts } from '../../src/utils/journalFacts';
+import { recordAutomatic } from '../../server/usage';
 import { isMailConfigured, sendEmail, siteUrl } from '../../server/mailer';
 import { unsubscribeUrl } from '../../server/unsubscribeToken';
 
@@ -54,6 +59,44 @@ async function recentTrades(uid: string): Promise<Trade[]> {
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Trade, 'id'>) }));
 }
 
+/**
+ * The assistant's version of the week, for the tier that pays for it.
+ *
+ * Null for everybody else, and null on any failure — the caller falls back to the templated recap
+ * that has always worked. A model outage on a Sunday morning must cost Diamond users the better
+ * email, never the email.
+ *
+ * Notes are deliberately not included. The opt-in for sending written notes to the model is a
+ * choice made in the assistant panel, by a person, for a conversation they are watching; a
+ * scheduled job cannot inherit that consent.
+ */
+async function diamondReview(uid: string, trades: Trade[]): Promise<string | null> {
+  try {
+    const tier = effectiveTier(await readEntitlement(uid), Date.now());
+    if (!tierHas(tier, 'aiReview')) return null;
+
+    const facts = buildJournalFacts(trades, 'the last 7 days', { includeNotes: false });
+    if (!facts) return null;
+
+    const review = await writeReview(
+      facts,
+      'Write my weekly review. Three short paragraphs, no headings, no lists. Say what actually ' +
+        'happened this week, the one thing most worth changing, and what to watch next week. ' +
+        'Quote only figures from the stats given. If the sample is too thin to conclude ' +
+        'anything, say so plainly instead of inventing a pattern.',
+    );
+    if (!review) return null;
+
+    // The call was made and will appear on the bill, so the cost report has to see it — without
+    // taking a message out of an allowance the trader never spent.
+    await recordAutomatic('ai', uid, 1);
+    return review;
+  } catch (err) {
+    console.warn(`[weekly-recap] could not write a review for ${uid}:`, err);
+    return null;
+  }
+}
+
 async function runRecap(): Promise<{ considered: number; sent: number; skipped: number }> {
   const db = getAdminFirestore();
   const stats = { considered: 0, sent: 0, skipped: 0 };
@@ -85,7 +128,8 @@ async function runRecap(): Promise<{ considered: number; sent: number; skipped: 
         continue;
       }
 
-      const recap = computeWeeklyRecap(await recentTrades(uid));
+      const trades = await recentTrades(uid);
+      const recap = computeWeeklyRecap(trades);
       if (!recap) {
         stats.skipped += 1;
         continue;
@@ -97,11 +141,19 @@ async function runRecap(): Promise<{ considered: number; sent: number; skipped: 
         continue;
       }
 
-      const mail = weeklyRecapEmail({
-        recap,
-        siteUrl: siteUrl(),
-        unsubscribeUrl: unsubscribeUrl(siteUrl(), uid),
-      });
+      const review = await diamondReview(uid, trades);
+      const mail = review
+        ? aiRecapEmail({
+            recap,
+            review,
+            siteUrl: siteUrl(),
+            unsubscribeUrl: unsubscribeUrl(siteUrl(), uid),
+          })
+        : weeklyRecapEmail({
+            recap,
+            siteUrl: siteUrl(),
+            unsubscribeUrl: unsubscribeUrl(siteUrl(), uid),
+          });
 
       const outcome = await sendEmail({
         to: user.email,

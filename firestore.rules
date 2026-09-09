@@ -510,6 +510,24 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    /*
+     * Coach seats and the notes a coach leaves. Server-only, both of them.
+     *
+     * This is the collection that decides whether one account may read another's entire trade
+     * history, so nothing here is granted to a client — not even the owner reading their own seat.
+     * Everything goes through /api/coach-seat, which checks the seat in code on every call (see
+     * server/coachSeat.ts). A rule permissive enough to let the coach read the trades directly
+     * would have to say "this account may read that account's journal if a field over there says
+     * so", and a rule that subtle is one edit away from being wrong for everybody.
+     */
+    match /coachSeats/{ownerId} {
+      allow read, write: if false;
+    }
+
+    match /coachSeats/{ownerId}/notes/{noteId} {
+      allow read, write: if false;
+    }
+
     // Written only by the broker-connect serverless function via the Admin SDK (which bypasses
     // these rules). No client ever needs to read or write it, so nothing is granted here.
     match /brokerConnections/{userId} {

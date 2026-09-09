@@ -24,6 +24,25 @@ export interface TierLimits {
   /** Market replay. Built but not shipped — see MARKET_REPLAY_LIVE. */
   marketReplay: boolean;
   /**
+   * The journal keeps itself up to date — an automatic import every market morning, no button.
+   *
+   * This is the difference between Diamond and "Gold with bigger numbers". A sync allowance buys
+   * impatience, as the note below says; this buys not having to remember. It costs a pull a day
+   * per user (see COST_RATES.syncCall), which is why it is one tier rather than all of them.
+   */
+  autoSync: boolean;
+  /**
+   * Invite a coach to read the journal and comment on it, with their own free account.
+   *
+   * Every tier can already hand out a read-only link. What this adds is the coach writing back —
+   * a note on a day or a trade that the trader sees in the app.
+   */
+  coachSeat: boolean;
+  /** Told when a risk rule is broken: in the app as it happens, and again the next morning. */
+  ruleAlerts: boolean;
+  /** The weekly recap is written by the assistant from the journal rather than templated. */
+  aiReview: boolean;
+  /**
    * The Performance screen: hour-of-day, setup breakdown, expectancy in R, excursions, discipline.
    *
    * A flag rather than a count because it is one screen you either have or don't. Free keeps the
@@ -104,14 +123,20 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     name: 'Free',
     price: 0,
     tagline: 'Log trades by hand and keep the full journal.',
-    limits: { brokers: 0, syncsPerDay: 0, aiMessagesPerDay: 0, marketReplay: false, performanceAnalytics: false },
+    limits: {
+      brokers: 0, syncsPerDay: 0, aiMessagesPerDay: 0, marketReplay: false,
+      performanceAnalytics: false, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
+    },
   },
   silver: {
     id: 'silver',
     name: 'Silver',
     price: 9,
     tagline: 'Connect a broker and stop typing trades in.',
-    limits: { brokers: 1, syncsPerDay: 1, aiMessagesPerDay: 0, marketReplay: false, performanceAnalytics: true },
+    limits: {
+      brokers: 1, syncsPerDay: 1, aiMessagesPerDay: 0, marketReplay: false,
+      performanceAnalytics: true, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
+    },
     productIdEnv: 'CREEM_PRODUCT_SILVER',
     annualProductIdEnv: 'CREEM_PRODUCT_SILVER_ANNUAL',
   },
@@ -120,7 +145,10 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     name: 'Gold',
     price: 19,
     tagline: 'Three brokers, and an assistant that reads your stats.',
-    limits: { brokers: 3, syncsPerDay: 3, aiMessagesPerDay: 15, marketReplay: false, performanceAnalytics: true },
+    limits: {
+      brokers: 3, syncsPerDay: 3, aiMessagesPerDay: 15, marketReplay: false,
+      performanceAnalytics: true, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
+    },
     productIdEnv: 'CREEM_PRODUCT_GOLD',
     annualProductIdEnv: 'CREEM_PRODUCT_GOLD_ANNUAL',
   },
@@ -129,7 +157,10 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     name: 'Diamond',
     price: 39,
     tagline: 'Everything, with room to actually use it.',
-    limits: { brokers: 5, syncsPerDay: 5, aiMessagesPerDay: 40, marketReplay: true, performanceAnalytics: true },
+    limits: {
+      brokers: 5, syncsPerDay: 5, aiMessagesPerDay: 40, marketReplay: true,
+      performanceAnalytics: true, autoSync: true, coachSeat: true, ruleAlerts: true, aiReview: true,
+    },
     productIdEnv: 'CREEM_PRODUCT_DIAMOND',
     annualProductIdEnv: 'CREEM_PRODUCT_DIAMOND_ANNUAL',
   },
@@ -150,7 +181,24 @@ export function tierAtLeast(tier: Tier, required: Tier): boolean {
   return TIER_ORDER.indexOf(tier) >= TIER_ORDER.indexOf(required);
 }
 
-export type Feature = 'brokerSync' | 'aiAssistant' | 'marketReplay' | 'performanceAnalytics';
+export type Feature =
+  | 'brokerSync'
+  | 'aiAssistant'
+  | 'marketReplay'
+  | 'performanceAnalytics'
+  | 'autoSync'
+  | 'coachSeat'
+  | 'ruleAlerts'
+  | 'aiReview';
+
+/** The limits flag each boolean feature reads, so the three functions below can't disagree. */
+const BOOLEAN_FEATURES: Partial<Record<Feature, keyof TierLimits>> = {
+  performanceAnalytics: 'performanceAnalytics',
+  autoSync: 'autoSync',
+  coachSeat: 'coachSeat',
+  ruleAlerts: 'ruleAlerts',
+  aiReview: 'aiReview',
+};
 
 /** The lowest tier that includes each feature, derived from the limits rather than hardcoded. */
 export function lowestTierWith(feature: Feature): Tier | null {
@@ -159,8 +207,8 @@ export function lowestTierWith(feature: Feature): Tier | null {
       const l = limitsFor(t);
       if (feature === 'brokerSync') return l.brokers > 0;
       if (feature === 'aiAssistant') return l.aiMessagesPerDay > 0;
-      if (feature === 'performanceAnalytics') return l.performanceAnalytics;
-      return l.marketReplay;
+      if (feature === 'marketReplay') return l.marketReplay;
+      return Boolean(l[BOOLEAN_FEATURES[feature]!]);
     }) ?? null
   );
 }
@@ -169,9 +217,9 @@ export function tierHas(tier: Tier, feature: Feature): boolean {
   const l = limitsFor(tier);
   if (feature === 'brokerSync') return l.brokers > 0;
   if (feature === 'aiAssistant') return l.aiMessagesPerDay > 0;
-  if (feature === 'performanceAnalytics') return l.performanceAnalytics;
   // Sold with Diamond, but withheld until it actually works.
-  return l.marketReplay && MARKET_REPLAY_LIVE;
+  if (feature === 'marketReplay') return l.marketReplay && MARKET_REPLAY_LIVE;
+  return Boolean(l[BOOLEAN_FEATURES[feature]!]);
 }
 
 /** What each plan lists on the pricing page. Kept beside the limits so they can't disagree. */
@@ -206,6 +254,15 @@ export function featureLines(tier: Tier): { text: string; soon?: boolean }[] {
   if (l.aiMessagesPerDay > 0) {
     lines.push({ text: `AI trade analysis — ${l.aiMessagesPerDay} messages per day` });
   }
+
+  /* The four that make the top tier a different product rather than a bigger one. Listed after
+     the counted limits because a count is what somebody compares and a capability is what they
+     buy — the eye should arrive at these last and stop. */
+  if (l.autoSync) lines.push({ text: 'Trades import themselves every morning — no syncing' });
+  if (l.coachSeat) lines.push({ text: 'Invite a coach to read your journal and comment on it' });
+  if (l.ruleAlerts) lines.push({ text: 'Risk-rule alerts the moment you break your own limits' });
+  if (l.aiReview) lines.push({ text: 'A weekly review written by the assistant, emailed to you' });
+
   if (l.marketReplay) lines.push({ text: 'Market replay', soon: !MARKET_REPLAY_LIVE });
   return lines;
 }

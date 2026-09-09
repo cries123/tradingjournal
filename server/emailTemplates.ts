@@ -503,3 +503,146 @@ export function subscriptionCanceledEmail(options: {
     ].join('\n'),
   };
 }
+
+/**
+ * The morning after a rule was broken.
+ *
+ * Deliberately not a scolding and deliberately not a summary — it names the limit, what it was,
+ * and what actually happened, and then stops. A trader who set a $500 stop and lost $1,400 does
+ * not need a paragraph about discipline; they need to see the two numbers next to each other
+ * before the market opens again.
+ *
+ * Only sent when something was broken. A daily email that says "you kept to your rules" is a
+ * daily email somebody will unsubscribe from on the third clear day, taking the useful ones with
+ * it.
+ */
+export function ruleAlertEmail(options: {
+  date: string;
+  breaches: { message: string }[];
+  dayPnl: number;
+  tradeCount: number;
+  siteUrl: string;
+  unsubscribeUrl?: string | null;
+}): TicketReplyEmail {
+  const { breaches, dayPnl, tradeCount } = options;
+  const when = friendlyDate(options.date);
+  const one = breaches.length === 1;
+
+  const list = breaches
+    .map(
+      (b) =>
+        `<tr><td style="padding:6px 0;font-size:14px;color:#b91c1c;">${escapeHtml(b.message)}</td></tr>`,
+    )
+    .join('');
+
+  const body = `
+    <p style="margin:0 0 14px 0;">On ${escapeHtml(when)} you went past ${one ? 'a limit' : 'limits'} you set for yourself.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+      ${list}
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:14px;">
+      ${statRow('That day', `${tradeCount} trade${tradeCount === 1 ? '' : 's'} · ${money(dayPnl)}`, dayPnl >= 0 ? '#047857' : '#b91c1c')}
+    </table>
+    <p style="margin:16px 0 0 0;font-size:14px;color:#6b7280;">Your limits are in Settings if they are the wrong ones. Keeping a rule you have outgrown is its own problem.</p>`;
+
+  const text = [
+    `On ${when} you went past ${one ? 'a limit' : 'limits'} you set for yourself.`,
+    '',
+    ...breaches.map((b) => `- ${b.message}`),
+    '',
+    `That day: ${tradeCount} trade${tradeCount === 1 ? '' : 's'}, ${money(dayPnl)}`,
+    '',
+    'Your limits are in Settings if they are the wrong ones.',
+  ].join('\n');
+
+  return {
+    subject: one ? `You broke a rule on ${when}` : `You broke ${breaches.length} rules on ${when}`,
+    html: layout({
+      title: one ? 'A rule you set was broken' : 'Rules you set were broken',
+      body,
+      ctaLabel: 'Open your journal',
+      ctaUrl: `${options.siteUrl}/app`,
+      footerNote: 'You get this because risk-rule alerts are on for your account.',
+      unsubscribeUrl: options.unsubscribeUrl,
+    }),
+    text,
+  };
+}
+
+/**
+ * Turns the assistant's answer into email HTML, without trusting a word of it.
+ *
+ * The model's output is escaped before anything else happens, so a stray angle bracket in a
+ * ticker name cannot become markup in somebody's inbox. What is added back afterwards is
+ * deliberately thin — paragraphs, and the bold the assistant uses for headings — because a
+ * rich-text renderer here would be a second, worse Markdown parser maintained for one email.
+ */
+export function reviewToHtml(review: string): string {
+  return escapeHtml(review.trim())
+    .split(/\n{2,}/)
+    .map((para) => {
+      const withBold = para.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      return `<p style="margin:0 0 12px 0;">${withBold.replace(/\n/g, '<br>')}</p>`;
+    })
+    .join('');
+}
+
+/**
+ * The weekly recap, written rather than tabulated. Diamond only.
+ *
+ * The numbers stay — they are the thing that can be checked, and dropping them would make the
+ * email a paragraph of assertions with nothing behind it. What changes is that the assistant says
+ * what they mean first, which is the difference between a report and a review.
+ */
+export function aiRecapEmail(options: {
+  recap: WeeklyRecap;
+  review: string;
+  siteUrl: string;
+  unsubscribeUrl?: string | null;
+}): TicketReplyEmail {
+  const { recap } = options;
+  const color = recap.net >= 0 ? '#047857' : '#b91c1c';
+  const delta = recap.prevNet === null ? null : recap.net - recap.prevNet;
+
+  const rows = [
+    statRow('Net P&L', money(recap.net), color),
+    statRow('Trades', String(recap.tradeCount)),
+    statRow('Green / red days', `${recap.greenDays} / ${recap.redDays}`),
+    delta !== null
+      ? statRow('vs last week', `${delta >= 0 ? '+' : ''}${money(delta)}`, delta >= 0 ? '#047857' : '#b91c1c')
+      : '',
+  ]
+    .filter(Boolean)
+    .join('');
+
+  const body = `
+    ${reviewToHtml(options.review)}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:18px;border-top:1px solid #eef0f3;padding-top:8px;">
+      ${rows}
+    </table>
+    <p style="margin:14px 0 0 0;font-size:13px;color:#6b7280;">Every figure above came out of your journal — the assistant reads them, it doesn't compute them.</p>`;
+
+  const text = [
+    options.review.trim(),
+    '',
+    `Net P&L: ${money(recap.net)}`,
+    `Trades: ${recap.tradeCount}`,
+    `Green/red days: ${recap.greenDays}/${recap.redDays}`,
+    delta !== null ? `vs last week: ${delta >= 0 ? '+' : ''}${money(delta)}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return {
+    subject: `Your week in review — ${money(recap.net)}`,
+    html: layout({
+      title: 'Your week, reviewed',
+      body,
+      ctaLabel: 'Open your journal',
+      ctaUrl: `${options.siteUrl}/app`,
+      footerNote: 'You get this because the weekly review is on for your account.',
+      unsubscribeUrl: options.unsubscribeUrl,
+    }),
+    text,
+  };
+}

@@ -20,6 +20,9 @@ import { BrokersContent } from '../components/support/BrokersContent';
 import { ReportBugContent } from '../components/support/ReportBugContent';
 import { SupportDashboard } from '../components/support/SupportDashboard';
 import { AssistantContent } from '../components/analytics/AssistantContent';
+import { RuleStandingBanner } from '../components/RuleStandingBanner';
+import { CoachNotesPanel } from '../components/coach/CoachNotesPanel';
+import { CoachInboxContent } from '../components/coach/CoachInboxContent';
 import { PerformanceContent } from '../components/PerformanceContent';
 import { RequestBrokerContent } from '../components/support/RequestBrokerContent';
 import { TradeModal } from '../components/TradeModal';
@@ -218,6 +221,10 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
       openView('assistant');
       closeMobileMenu();
     },
+    onCoach: () => {
+      openView('coach');
+      closeMobileMenu();
+    },
     onLeaderboard: () => {
       openView('leaderboard');
       closeMobileMenu();
@@ -308,6 +315,8 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                   onBack={goBackView}
                 />
               </LockedFeature>
+            ) : appView === 'coach' ? (
+              <CoachInboxContent onBack={goBackView} />
             ) : appView === 'support' ? (
               <SupportDashboard
                 onBack={goBackView}
@@ -324,6 +333,10 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
               <DashboardSkeleton />
             ) : (
               <>
+                {/* Above everything: a limit you are about to break outranks a checklist. */}
+                <RuleStandingBanner trades={everyTrade} />
+                <CoachNotesPanel />
+
                 {/* Above the dashboard, and only while there is something on it left to do. */}
                 {!gettingStartedHidden && (
                   <GettingStartedCard

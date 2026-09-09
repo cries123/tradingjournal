@@ -4,6 +4,7 @@ import {
   Link2,
   Settings,
   Gauge,
+  UserRoundCheck,
   LifeBuoy,
   ShieldCheck,
   Sparkles,
@@ -15,6 +16,7 @@ import { SidebarJournalPicker } from './SidebarJournalPicker';
 import { useAuth } from '../context/useAuth';
 import { isCurrentUserAdmin } from '../services/admin';
 import { useSupportUnread } from '../hooks/useSupportUnread';
+import { useCoachingCount } from '../hooks/useCoachingCount';
 
 export type SidebarAppView =
   | 'dashboard'
@@ -26,6 +28,7 @@ export type SidebarAppView =
   | 'report-bug'
   | 'request-broker'
   | 'support'
+  | 'coach'
   | 'leaderboard';
 
 interface SidebarProps {
@@ -37,6 +40,7 @@ interface SidebarProps {
   onAssistant: () => void;
   onSettings: () => void;
   onSupport: () => void;
+  onCoach: () => void;
   onLeaderboard: () => void;
   onAdmin?: () => void;
   onHome?: () => void;
@@ -122,6 +126,7 @@ export function Sidebar({
   onAssistant,
   onSettings,
   onSupport,
+  onCoach,
   onLeaderboard,
   onAdmin,
   onHome,
@@ -131,6 +136,7 @@ export function Sidebar({
   const { user, loading, firebaseEnabled, logout, username } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const supportUnread = useSupportUnread();
+  const coaching = useCoachingCount();
 
   useEffect(() => {
     if (!user?.uid || !firebaseEnabled) {
@@ -208,6 +214,18 @@ export function Sidebar({
             icon={<Trophy size={16} />}
             label="Leaderboard"
           />
+          {/* Only for the people who are actually somebody's coach — which is almost nobody, and a
+              permanent row saying "nobody has invited you" is a nav item advertising a feature
+              rather than doing anything. */}
+          {coaching > 0 && (
+            <NavItem
+              active={appView === 'coach'}
+              onClick={wrap(onCoach)}
+              icon={<UserRoundCheck size={16} />}
+              label="Coaching"
+              badge={coaching > 1 ? coaching : undefined}
+            />
+          )}
         </nav>
 
         {/* No section label above this one: the picker draws its own "Journal" heading. */}

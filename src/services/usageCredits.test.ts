@@ -8,15 +8,28 @@ import { dailyUnitsSpent, decideSpend, MAX_CREDITS, readCredits, readUsageDay } 
  * back, and forgiving a day never rewrites what was actually called.
  */
 describe('reading a day', () => {
-  it('counts against the cap only what was neither bonus nor forgiven', () => {
+  it('counts against the cap only what was neither bonus, forgiven nor automatic', () => {
     expect(dailyUnitsSpent(readUsageDay({ count: 5, bonus: 2, forgiven: 1 }))).toBe(2);
     expect(dailyUnitsSpent(readUsageDay({ count: 3 }))).toBe(3);
     expect(dailyUnitsSpent(readUsageDay(undefined))).toBe(0);
   });
 
+  it('does not spend an allowance on a call the product made for the user', () => {
+    // The automatic morning import is a real SnapTrade pull, so it belongs in `count` where the
+    // cost report reads it — and nowhere near the allowance the trader was saving.
+    const withAuto = readUsageDay({ count: 3, automatic: 2 });
+    expect(withAuto.count).toBe(3);
+    expect(dailyUnitsSpent(withAuto)).toBe(1);
+  });
+
   it('never goes negative, whatever a hand-edited document says', () => {
     expect(dailyUnitsSpent(readUsageDay({ count: 1, forgiven: 4 }))).toBe(0);
-    expect(readUsageDay({ count: -3, bonus: 'two', forgiven: null })).toEqual({ count: 0, bonus: 0, forgiven: 0 });
+    expect(readUsageDay({ count: -3, bonus: 'two', forgiven: null, automatic: NaN })).toEqual({
+      count: 0,
+      bonus: 0,
+      forgiven: 0,
+      automatic: 0,
+    });
   });
 });
 
@@ -29,7 +42,12 @@ describe('the bank', () => {
 });
 
 describe('deciding one request', () => {
-  const day = (count: number, bonus = 0, forgiven = 0) => ({ count, bonus, forgiven });
+  const day = (count: number, bonus = 0, forgiven = 0, automatic = 0) => ({
+    count,
+    bonus,
+    forgiven,
+    automatic,
+  });
 
   it('spends the daily allowance first, and reports what is left including the bank', () => {
     expect(decideSpend(day(0), 2, 3)).toEqual({ allowed: true, source: 'daily', remaining: 4, credits: 3 });

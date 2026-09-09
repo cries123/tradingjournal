@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { ArrowLeft, Copy, Download, EyeOff, FileText, Plus, Share2, Trash2, Trophy, Upload } from 'lucide-react';
 import { useSettings } from '../context/useSettings';
+import { DiamondSection } from './settings/DiamondSection';
 import { useAuth } from '../context/useAuth';
 import type { CurrencyCode, ThemeAccent } from '../types/settings';
 import type { Trade } from '../types';
@@ -814,6 +815,8 @@ export function SettingsPage({
             </p>
           )}
         </section>
+
+        <DiamondSection />
 
         <section className="panel-card p-5 space-y-3 border-red-500/25">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-red-400/90">Danger zone</h2>
