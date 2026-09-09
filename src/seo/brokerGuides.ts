@@ -32,7 +32,7 @@ function priceSentence(): string {
   return (
     `Broker sync is a paid feature — ${SILVER.name} is $${SILVER.price} a month and connects `
     + `${brokersUnlimited(SILVER.limits) ? 'as many brokers as you like' : `${SILVER.limits.brokers} brokers`}. `
-    + 'Journaling by hand is free and always will be: the calendar, tags, notes, screenshots and '
+    + 'Journaling by hand is free and always will be: the calendar, tags, notes and '
     + 'stats are all in the free plan.'
   );
 }
@@ -84,7 +84,7 @@ function buildGuide(name: string, brokerId: string, note: BrokerGuideNote, statu
         `${name} tells you what your account is worth. It does not tell you which setup is `
         + 'actually paying, what time of day you give money back, or whether the rule you broke on '
         + 'Tuesday is the one costing you the most. That is what a journal is for: tags, notes, '
-        + 'screenshots, and a calendar where a losing streak is visible at a glance.',
+        + 'and a calendar where a losing streak is visible at a glance.',
         'The connection is read-only: it can read your trade history, and it cannot place an order, '
         + 'move money, or change a setting. Disconnect whenever you like — the trades already '
         + 'imported stay in your journal.',

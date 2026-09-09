@@ -292,9 +292,9 @@ export function featureLines(tier: Tier): { text: string; soon?: boolean }[] {
   if (tier === 'free') {
     lines.push(
       { text: 'Unlimited manual trade logging' },
-      { text: 'P&L calendar, equity curve and dashboard stats' },
-      { text: 'Notes, tags, screenshots and grading' },
-      { text: 'Share a read-only journal link with a coach' },
+      { text: 'P&L calendar and dashboard stats' },
+      { text: 'Notes, tags and grading' },
+      { text: 'Multiple journals in one account' },
       { text: 'Year-end realized P&L export for your accountant' },
     );
     return lines;
