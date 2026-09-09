@@ -17,8 +17,20 @@ function num(name: string, fallback: number): number {
 }
 
 export interface CostRates {
-  /** SnapTrade, per connected user per month. One charge per PERSON — not per broker, not per
-   *  account. Checked Sep 2026 against the Daily Data plan. */
+  /**
+   * SnapTrade, per connected user per month. One charge per PERSON — not per broker, not per
+   * account, so somebody on Diamond with three brokerages costs exactly the same as somebody on
+   * Silver with one.
+   *
+   * Two things about it that the arithmetic elsewhere depends on. It is NOT prorated: a user is
+   * billable for the whole month if they had a connection at any point in it, so a connection
+   * left standing over the 1st costs a full month for a day of it. And an INACTIVE connection
+   * still counts — a link SnapTrade has stopped being able to use is billed exactly like a
+   * working one until it is deleted.
+   *
+   * $2.00 is Commercial's default flat rate; it tiers down to $1.75 above 100 users and $1.50
+   * above 500, by negotiation. Checked Sep 2026 against SnapTrade's billing documentation.
+   */
   connectedUserMonth: number;
   /** SnapTrade, per manual sync. Every press of Sync costs this; the daily refresh is included in
    *  the per-user fee. Checked Sep 2026. */
@@ -38,7 +50,7 @@ export interface CostRates {
 }
 
 export const COST_RATES: CostRates = {
-  connectedUserMonth: num('COST_CONNECTED_USER', 1.0),
+  connectedUserMonth: num('COST_CONNECTED_USER', 2.0),
   syncCall: num('COST_SYNC', 0.05),
   aiMessage: num('COST_AI_MESSAGE', 0.0068),
   takeaway: num('COST_TAKEAWAY', 0.0045),
