@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { TIER_PLANS } from '../../config/tiers';
 import { TRIAL_DAYS, TRIAL_TIER } from '../../config/trial';
@@ -46,6 +46,23 @@ export function StartTrialButton({
   // other refusal is final for this account, so the offer is simply not made.
   const unverified = trialBlockedReason === 'email-unverified';
   const offer = Boolean(user) && loaded && (trialAvailable || unverified);
+
+  /*
+   * Catches the address that was confirmed a moment ago somewhere else.
+   *
+   * The confirmation link returns them here, and it opens in whatever tab Firebase used — so the
+   * session this button is rendering in still holds a token that says unverified, and would go on
+   * asking them to confirm an address they just confirmed. One reload, once per mount, and only
+   * while it would change something.
+   */
+  const rechecked = useRef(false);
+  useEffect(() => {
+    if (!unverified || rechecked.current) return;
+    rechecked.current = true;
+    void refreshEmailVerified().then((verified) => {
+      if (verified) void refresh();
+    });
+  }, [unverified, refresh]);
 
   if (!offer) return <>{fallback}</>;
 

@@ -204,6 +204,20 @@ export async function startFreeTrial(): Promise<{ tier: Tier; until: string; mes
  * times in the last minute" is indistinguishable to a user from a real failure — so that one is
  * reported as success. The link is already in their inbox; sending another would not help.
  */
+/**
+ * Where Firebase sends them once the link is clicked.
+ *
+ * Without it they finish on Firebase's own "your email has been verified" page — a firebaseapp.com
+ * URL with none of this site on it — and have to find their own way back to the thing they were
+ * doing. Pricing, because confirming an address is only ever a step on the way to the trial.
+ *
+ * Built from the current origin rather than a constant, so a local build returns to localhost
+ * instead of sending the developer to production.
+ */
+function verificationReturnUrl(): string {
+  return `${window.location.origin}/pricing`;
+}
+
 export async function resendEmailVerification(): Promise<void> {
   if (!isFirebaseConfigured()) throw new Error('Sign in first.');
   const user = getFirebaseAuth().currentUser;
@@ -211,10 +225,29 @@ export async function resendEmailVerification(): Promise<void> {
   if (user.emailVerified) return;
 
   try {
-    await sendEmailVerification(user);
+    await sendEmailVerification(user, { url: verificationReturnUrl() });
   } catch (err) {
     const code = (err as { code?: string }).code ?? '';
+    // Firebase rate-limits this per address, and "you asked three times in the last minute" is
+    // indistinguishable to a user from a real failure. The link is already in their inbox.
     if (code === 'auth/too-many-requests') return;
+
+    /*
+     * A return address on a domain nobody has authorised in Firebase — a Netlify preview deploy,
+     * usually, since only the real domains are on that list. The plain link still works and still
+     * verifies them, so send that rather than leaving the account unable to verify at all.
+     */
+    if (code === 'auth/unauthorized-continue-uri' || code === 'auth/invalid-continue-uri') {
+      try {
+        await sendEmailVerification(user);
+        return;
+      } catch (retryErr) {
+        throw new Error('Could not send the confirmation email. Try again in a minute.', {
+          cause: retryErr,
+        });
+      }
+    }
+
     throw new Error('Could not send the confirmation email. Try again in a minute.', { cause: err });
   }
 }
