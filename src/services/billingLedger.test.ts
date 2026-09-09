@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { chargeAmount, isPaymentEvent } from '../../server/billingLedger';
 import { TIER_PLANS } from '../config/tiers';
-import { amountFromEvent } from '../../server/creemClient';
+import { amountFromEvent, parseBillingEvent } from '../../server/creemClient';
 
 /**
  * Which webhook events count as money.
@@ -103,5 +103,53 @@ describe('what gets booked', () => {
 
   it('books nothing at all for free, which is never a sale', () => {
     expect(chargeAmount('free')).toBe(0);
+  });
+});
+
+/*
+ * Every event Creem is actually configured to send, mapped.
+ *
+ * This list is the 14 enabled in the dashboard. The failure it guards against is silent: an event
+ * that maps to null is ignored, so getting one wrong does not throw or log — it just leaves
+ * somebody on the wrong plan until they complain.
+ */
+describe('the events Creem sends', () => {
+  const map = (eventType: string) =>
+    parseBillingEvent({ eventType, object: { id: 'x', metadata: { uid: 'u1', tier: 'silver' } } } as never)
+      ?.status ?? null;
+
+  it('treats a trial as active, which is the whole trial path now', () => {
+    // A trial subscription sits in this state for its entire first week. Left unmapped, somebody
+    // who just handed over a card would be looking at the paywall they paid to get past.
+    expect(map('subscription.trialing')).toBe('active');
+  });
+
+  it('grants access for every event that means they are paid up', () => {
+    expect(map('checkout.completed')).toBe('active');
+    expect(map('subscription.active')).toBe('active');
+    expect(map('subscription.paid')).toBe('active');
+  });
+
+  it('revokes for every event that means they are not', () => {
+    expect(map('subscription.canceled')).toBe('canceled');
+    expect(map('subscription.expired')).toBe('expired');
+    expect(map('subscription.past_due')).toBe('past_due');
+    expect(map('subscription.unpaid')).toBe('past_due');
+  });
+
+  it('ends a paused subscription at the period, not on the spot', () => {
+    expect(map('subscription.paused')).toBe('canceled');
+  });
+
+  it('leaves a scheduled cancellation alone — they are still paying today', () => {
+    // The trap in matching 'cancel' instead of 'canceled': this fires the moment somebody clicks
+    // cancel, and would take the plan away weeks before the period they paid for runs out.
+    expect(map('subscription.scheduled_cancel')).toBeNull();
+  });
+
+  it('ignores the bookkeeping ones rather than guessing', () => {
+    for (const type of ['subscription.update', 'refund.created', 'dispute.created', 'customer_credits.exhausted']) {
+      expect(map(type)).toBeNull();
+    }
   });
 });

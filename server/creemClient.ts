@@ -334,15 +334,36 @@ export function parseBillingEvent(event: CreemWebhookEvent): ParsedBillingEvent 
 
   const type = (event.eventType ?? '').toLowerCase();
 
+  /*
+   * Order matters, and so does matching the WHOLE word.
+   *
+   * 'canceled' rather than 'cancel', because subscription.scheduled_cancel means somebody has
+   * asked to leave at the end of the period and is still a paying customer today — matching it
+   * here would revoke access the moment they clicked cancel, weeks early.
+   *
+   * 'paused' is read as a cancellation rather than an immediate cut-off: billing has stopped, so
+   * access should eventually stop too, but they keep the period already paid for. Ignoring it, as
+   * this did, left somebody on a paused subscription with the plan forever.
+   *
+   * 'trialing' is active, and this is the one that matters most now that the trial lives on the
+   * Creem product. It is the state a trial subscription sits in for its whole first week, and it
+   * used to fall through to null — so a triallist would have been left on Free, having handed
+   * over a card, looking at the paywall they just paid to get past.
+   */
   const status: ParsedBillingEvent['status'] | null = type.includes('canceled')
     ? 'canceled'
-    : type.includes('expired')
-      ? 'expired'
-      : type.includes('past_due') || type.includes('unpaid')
-        ? 'past_due'
-        : type.includes('paid') || type.includes('active') || type.includes('completed')
-          ? 'active'
-          : null;
+    : type.includes('paused')
+      ? 'canceled'
+      : type.includes('expired')
+        ? 'expired'
+        : type.includes('past_due') || type.includes('unpaid')
+          ? 'past_due'
+          : type.includes('trialing') ||
+              type.includes('paid') ||
+              type.includes('active') ||
+              type.includes('completed')
+            ? 'active'
+            : null;
 
   if (!status) return null;
 
