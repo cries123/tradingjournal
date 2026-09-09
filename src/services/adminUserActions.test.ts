@@ -80,6 +80,7 @@ vi.mock('../../server/mailer', () => ({
 import { endOfDayEastern, handleAdminUserRequest, type AdminUserRequestBody } from '../../server/adminUserHandler';
 import { usageDay } from '../../server/usage';
 import { DAY_MS } from '../config/accessExtension';
+import { TIER_PLANS } from '../config/tiers';
 
 const HEADERS = { authorization: 'Bearer test-token' };
 const TARGET = 'user-7';
@@ -223,7 +224,15 @@ describe("today's allowance and the bank", () => {
 
     const usage = await call({ action: 'readUsage' });
     const report = usage.body.usage as { today: { sync: { used: number; limit: number; count: number; forgiven: number } } };
-    expect(report.today.sync).toMatchObject({ used: 0, limit: 2, count: 2, forgiven: 2 });
+    // Read from the plan, not written down again here: this assertion is about the forgiving,
+    // and pinning Gold's sync allowance in a second place only means breaking it from a distance
+    // the next time the plans change.
+    expect(report.today.sync).toMatchObject({
+      used: 0,
+      limit: TIER_PLANS.gold.limits.syncsPerDay,
+      count: 2,
+      forgiven: 2,
+    });
   });
 
   it('says so when there is nothing to give back', async () => {

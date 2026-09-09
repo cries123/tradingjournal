@@ -83,6 +83,21 @@ export function annualMonthlyEquivalent(tier: Tier): number {
   return Math.round((annualPrice(tier) / 12) * 100) / 100;
 }
 
+/*
+ * How these numbers were arrived at, because the last set were not.
+ *
+ * Three costs decide everything here. SnapTrade charges $2.00 per connected PERSON per month —
+ * not per brokerage, so broker count is free to give away and is pure differentiation. A manual
+ * sync is $0.05, and the daily automatic refresh is already inside the per-user fee, so a sync
+ * allowance buys impatience rather than freshness. An assistant message is about $0.0068, which
+ * looks like nothing until a daily cap is multiplied by thirty: 50 a day is 1,500 a month and
+ * $10.20 of it.
+ *
+ * Add Creem's 3.9% plus $0.40 a charge and the old ladder left, at full use of every cap, 18% on
+ * Silver, 11% on Gold and 29% on Diamond — which is to say the most engaged customers, the ones
+ * who never churn, were worth almost nothing. These are set so the WORST case is still healthy
+ * (roughly 63% / 54% / 58%), because a plan you resent your best users for using is priced wrong.
+ */
 export const TIER_PLANS: Record<Tier, TierPlan> = {
   free: {
     id: 'free',
@@ -94,7 +109,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
   silver: {
     id: 'silver',
     name: 'Silver',
-    price: 5,
+    price: 9,
     tagline: 'Connect a broker and stop typing trades in.',
     limits: { brokers: 1, syncsPerDay: 1, aiMessagesPerDay: 0, marketReplay: false, performanceAnalytics: true },
     productIdEnv: 'CREEM_PRODUCT_SILVER',
@@ -103,18 +118,18 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
   gold: {
     id: 'gold',
     name: 'Gold',
-    price: 10,
-    tagline: 'Two brokers, and an assistant that reads your stats.',
-    limits: { brokers: 2, syncsPerDay: 2, aiMessagesPerDay: 15, marketReplay: false, performanceAnalytics: true },
+    price: 19,
+    tagline: 'Three brokers, and an assistant that reads your stats.',
+    limits: { brokers: 3, syncsPerDay: 3, aiMessagesPerDay: 15, marketReplay: false, performanceAnalytics: true },
     productIdEnv: 'CREEM_PRODUCT_GOLD',
     annualProductIdEnv: 'CREEM_PRODUCT_GOLD_ANNUAL',
   },
   diamond: {
     id: 'diamond',
     name: 'Diamond',
-    price: 25,
+    price: 39,
     tagline: 'Everything, with room to actually use it.',
-    limits: { brokers: 3, syncsPerDay: 3, aiMessagesPerDay: 50, marketReplay: true, performanceAnalytics: true },
+    limits: { brokers: 5, syncsPerDay: 5, aiMessagesPerDay: 40, marketReplay: true, performanceAnalytics: true },
     productIdEnv: 'CREEM_PRODUCT_DIAMOND',
     annualProductIdEnv: 'CREEM_PRODUCT_DIAMOND_ANNUAL',
   },

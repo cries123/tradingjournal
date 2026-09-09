@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { lowestPaidPrice } from '../seo/pricingClaims';
 import {
   BarChart3,
   Calendar,
@@ -188,7 +189,7 @@ export function LandingPage({
               {/* Says what's free and what isn't. "Free — no credit card" sitting next to "broker
                   sync" read as though the sync were free too, which stopped being true the day
                   plans shipped — and a pricing surprise after signup is how you earn a chargeback. */}
-              {['Journal free — no credit card', 'Broker sync from $5/month', 'Read-only broker connections'].map((item) => (
+              {['Journal free — no credit card', `Broker sync from $${lowestPaidPrice()}/month`, 'Read-only broker connections'].map((item) => (
                 <span key={item} className="flex items-center gap-2">
                   <Check size={14} className="text-emerald-400" />
                   {item}

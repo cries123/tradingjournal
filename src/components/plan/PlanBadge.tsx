@@ -1,5 +1,6 @@
 import { Crown, Gem, Medal, Notebook } from 'lucide-react';
 import { TIER_PLANS, type Tier } from '../../config/tiers';
+import { lowestPaidPrice } from '../../seo/pricingClaims';
 import { useEntitlement } from '../../context/useEntitlement';
 import { useAuth } from '../../context/useAuth';
 import { goToPricing } from '../../utils/navigateToPath';
@@ -128,7 +129,7 @@ export function PlanBadge() {
         </div>
       ) : (
         <p className="text-[11px] text-text-secondary leading-snug">
-          Manual logging, unlimited. Add broker sync from $5/month.
+          Manual logging, unlimited. Add broker sync from ${lowestPaidPrice()}/month.
         </p>
       )}
 

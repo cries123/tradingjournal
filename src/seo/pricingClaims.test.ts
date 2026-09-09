@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync, readdirSync } from 'fs';
+import { join } from 'path';
 import {
   FREE_INCLUSIONS, MARKET_REPLAY_IS_LIVE, freeAnswer, lowestPaidPrice, paidFeatureNames, priceOf,
 } from './pricingClaims';
@@ -78,5 +80,41 @@ describe('published pricing claims', () => {
   it('still says the paid features are paid, rather than going quiet about them', () => {
     expect(paidFeatureNames()).toContain('broker sync');
     expect(paidFeatureNames()).toContain('the performance screen');
+  });
+});
+
+
+/*
+ * Prices belong in one place.
+ *
+ * "Broker sync from $5/month" survived a repricing in two components because it was typed out
+ * rather than read from the plan. This walks the source for a dollar amount that looks like a
+ * plan price and is not one, which is the shape that goes stale silently.
+ */
+describe('no plan price is written down twice', () => {
+  const roots = ['src/components', 'src/pages', 'src/data', 'src/seo'];
+  const current = new Set(Object.values(TIER_PLANS).map((p) => p.price));
+
+  const sourceFiles = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) return sourceFiles(full);
+      return /\.tsx?$/.test(entry.name) && !entry.name.includes('.test.') ? [full] : [];
+    });
+
+  it('never states a plan price as a literal in user-facing copy', () => {
+    const offenders: string[] = [];
+
+    for (const file of roots.flatMap(sourceFiles)) {
+      // tiers.ts is where the prices live, and costs.ts talks about them in comments.
+      if (file.includes('config/tiers') || file.includes('config/costs')) continue;
+      const text = readFileSync(file, 'utf8');
+
+      for (const match of text.matchAll(/\$(\d+)\s*(?:\/|\s?(?:a|per)\s)\s*month/gi)) {
+        if (current.has(Number(match[1]))) offenders.push(`${file}: ${match[0]}`);
+      }
+    }
+
+    expect(offenders).toEqual([]);
   });
 });
