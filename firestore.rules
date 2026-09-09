@@ -466,8 +466,10 @@ service cloud.firestore {
     }
 
     // Same deal for broker syncs per day. Read it through /api/entitlement, which counts it
-    // server-side; a client that could edit this could sync as often as it liked, and every sync
-    // costs a paid SnapTrade call.
+    // server-side; a client that could edit this could sync as often as it liked. Not a cost
+    // control any more — SnapTrade meters a manual holdings refresh, which this app never
+    // performs, and reading trade activity comes out of a cache inside the per-user fee — but
+    // still the ceiling on how hard one account can hammer somebody else's API.
     match /syncUsage/{docId} {
       allow read, write: if false;
     }
