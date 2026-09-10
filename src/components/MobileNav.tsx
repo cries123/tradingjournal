@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { LayoutGrid, Menu, MessageCircle, Plus } from 'lucide-react';
+import { Gauge, LayoutGrid, Menu, MessageCircle, Plus } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
 import { useEscapeToClose } from '../hooks/useEscapeToClose';
 import type { SidebarAppView } from './Sidebar';
@@ -9,6 +9,7 @@ interface MobileNavProps {
   onOpenMenu: () => void;
   onAddTrade: () => void;
   onDashboard: () => void;
+  onPerformance: () => void;
   onAssistant: () => void;
   assistantOpen: boolean;
 }
@@ -59,7 +60,12 @@ function NavItem({ icon, label, active = false, onClick }: NavItemProps) {
           answer the first question a nav bar exists to answer: where am I? */}
       {active && <span className="absolute top-0 h-0.5 w-8 rounded-full bg-accent" />}
       {icon}
-      <span className="text-[9px] font-medium">{label}</span>
+      {/* Truncating rather than wrapping: a two-line label in a 56px-tall bar pushes the icon
+          out of alignment with its neighbours, and one column growing taller than the rest is
+          more noticeable than a clipped word. */}
+      <span className="w-full px-0.5 text-center text-[9px] font-medium leading-none truncate">
+        {label}
+      </span>
     </button>
   );
 }
@@ -85,6 +91,7 @@ export function MobileBottomNav({
   onOpenMenu,
   onAddTrade,
   onDashboard,
+  onPerformance,
   onAssistant,
   assistantOpen,
 }: MobileNavProps) {
@@ -93,12 +100,24 @@ export function MobileBottomNav({
       aria-label="Primary"
       className="shrink-0 z-40 border-t border-border/60 bg-bg-secondary/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]"
     >
+      {/* Five columns, five children. It briefly had four in a five-column grid — a leftover
+          from removing the leaderboard — which pushed "+" off centre and left a visible hole
+          somebody reasonably read as a missing button. */}
       <div className="grid grid-cols-5 h-14">
         <NavItem
           icon={<LayoutGrid size={18} />}
           label="Overview"
           active={appView === 'dashboard'}
           onClick={onDashboard}
+        />
+        {/* Performance, not something quieter, because it is the screen the paid plans are for —
+            and because the two destinations either side of "+" are the ones a thumb reaches
+            without moving, so they should be the two people open most. */}
+        <NavItem
+          icon={<Gauge size={18} />}
+          label="Performance"
+          active={appView === 'performance'}
+          onClick={onPerformance}
         />
         <button
           type="button"

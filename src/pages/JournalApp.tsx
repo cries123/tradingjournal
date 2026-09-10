@@ -389,6 +389,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
             onOpenMenu={() => setMobileMenuOpen(true)}
             onAddTrade={() => openAddTrade()}
             onDashboard={() => openView('dashboard')}
+            onPerformance={() => openView('performance')}
             onAssistant={() => openView('assistant')}
             assistantOpen={assistantOpen}
           />

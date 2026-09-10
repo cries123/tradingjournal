@@ -110,6 +110,7 @@ import { DiamondSection } from './settings/DiamondSection';
 import { RuleStandingBanner } from './RuleStandingBanner';
 import { CoachNotesPanel } from './coach/CoachNotesPanel';
 import { CoachInboxContent } from './coach/CoachInboxContent';
+import { MobileBottomNav } from './MobileNav';
 
 const noop = () => undefined;
 
@@ -407,5 +408,46 @@ describe('the coach surfaces', () => {
 
   it('draws nothing for a trader whose coach has written nothing', () => {
     expect(renderToString(createElement(CoachNotesPanel))).toBe('');
+  });
+});
+
+describe('MobileBottomNav', () => {
+  const bar = (appView: Parameters<typeof MobileBottomNav>[0]['appView'] = 'dashboard') =>
+    createElement(MobileBottomNav, {
+      appView,
+      onOpenMenu: noop,
+      onAddTrade: noop,
+      onDashboard: noop,
+      onPerformance: noop,
+      onAssistant: noop,
+      assistantOpen: false,
+    });
+
+  it('fills every column of its grid', () => {
+    /* The bug this exists for: removing the leaderboard left four children in a five-column grid,
+       which pushed the "+" button off centre and left a hole that read as a missing button. A
+       count is a cheap way to catch the next one. */
+    const html = paint(bar());
+    const grid = /<div class="grid grid-cols-(\d+) h-14">(.*)<\/div><\/nav>/s.exec(html);
+    expect(grid).not.toBeNull();
+
+    const columns = Number(grid![1]);
+    const children = (grid![2].match(/<button/g) ?? []).length;
+    expect(children).toBe(columns);
+  });
+
+  it('puts the menu last and the add button in the middle', () => {
+    const html = paint(bar());
+    const order = ['Overview', 'Performance', 'Log a trade', 'Ask', 'More'];
+    let cursor = -1;
+    for (const label of order) {
+      const at = html.indexOf(label);
+      expect(at).toBeGreaterThan(cursor);
+      cursor = at;
+    }
+  });
+
+  it('lights the row for the view you are on', () => {
+    expect(paint(bar('performance'))).toContain('aria-current="page"');
   });
 });
