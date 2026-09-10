@@ -14,9 +14,14 @@ export interface SettingsContextValue {
   addSetupTag: (tag: string) => void;
   addStrategy: (name: string, description?: string) => void;
   removeStrategy: (id: string) => void;
-  addAccount: (name: string) => void;
+  /** Adds a journal. False when the name was blank or the plan's allowance is full. */
+  addAccount: (name: string) => boolean;
   removeAccount: (id: string) => void;
   setActiveAccount: (id: string) => void;
+  /** How many journals this plan allows. */
+  journalLimit: number;
+  /** Room for another — read this to say so before the click rather than after it. */
+  canAddJournal: boolean;
 }
 
 export const SettingsContext = createContext<SettingsContextValue | null>(null);

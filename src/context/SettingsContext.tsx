@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { SettingsContext } from './useSettings';
 import { useAuth } from './useAuth';
+import { useEntitlement } from './useEntitlement';
+import { hasJournalRoom } from '../config/tiers';
 import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
 import type { ThemeAccent, UserSettings } from '../types/settings';
 import { DEFAULT_SETTINGS } from '../types/settings';
@@ -33,6 +35,7 @@ function applyThemeAccent(accent: ThemeAccent) {
 }
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
+  const { limits } = useEntitlement();
   const { user } = useAuth();
   const [settings, setSettings] = useState<UserSettings>(() => loadSettings(user?.uid));
 
@@ -147,18 +150,31 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [settings, persist],
   );
 
+  /**
+   * The plan's journal allowance, and whether there is room for another.
+   *
+   * Checked here rather than at each of the three places that offer to add one — the sidebar
+   * picker, the account switcher and Settings — because a limit enforced in three places is a
+   * limit that will eventually disagree with itself. The callers read `canAddJournal` to say so
+   * before the click, which is the half that makes it feel like a boundary rather than a bug.
+   */
+  const journalLimit = limits.journals;
+  const canAddJournal = hasJournalRoom(limits, settings.accounts.length);
+
   const addAccount = useCallback(
-    (name: string) => {
+    (name: string): boolean => {
       const trimmed = name.trim();
-      if (!trimmed) return;
+      if (!trimmed) return false;
+      if (!hasJournalRoom(limits, settings.accounts.length)) return false;
       const id = crypto.randomUUID();
       persist({
         ...settings,
         accounts: [...settings.accounts, { id, name: trimmed }],
         activeAccountId: id,
       });
+      return true;
     },
-    [settings, persist],
+    [settings, persist, limits],
   );
 
   const removeAccount = useCallback(
@@ -193,8 +209,21 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       addAccount,
       removeAccount,
       setActiveAccount,
+      journalLimit,
+      canAddJournal,
     }),
-    [settings, updateSettings, addSetupTag, addStrategy, removeStrategy, addAccount, removeAccount, setActiveAccount],
+    [
+      settings,
+      updateSettings,
+      addSetupTag,
+      addStrategy,
+      removeStrategy,
+      addAccount,
+      removeAccount,
+      setActiveAccount,
+      journalLimit,
+      canAddJournal,
+    ],
   );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

@@ -3,6 +3,9 @@ import { ArrowLeft, Download, FileText, Plus, Trash2, Upload } from 'lucide-reac
 import { useSettings } from '../context/useSettings';
 import { DiamondSection } from './settings/DiamondSection';
 import { useAuth } from '../context/useAuth';
+import { useEntitlement } from '../context/useEntitlement';
+import { journalsUnlimited, TIER_PLANS } from '../config/tiers';
+import { goToPricing } from '../utils/navigateToPath';
 import type { CurrencyCode, ThemeAccent } from '../types/settings';
 import type { Trade } from '../types';
 import type { TradingStats } from '../utils/stats';
@@ -43,8 +46,12 @@ export function SettingsPage({
   onRestoreTrades,
   onClearAll,
 }: SettingsPageProps) {
-  const { settings, updateSettings, addSetupTag, addStrategy, removeStrategy, addAccount, removeAccount, setActiveAccount } = useSettings();
+  const {
+    settings, updateSettings, addSetupTag, addStrategy, removeStrategy,
+    addAccount, removeAccount, setActiveAccount, journalLimit, canAddJournal,
+  } = useSettings();
   const { username, user, firebaseEnabled } = useAuth();
+  const { tier, limits } = useEntitlement();
   const [newTag, setNewTag] = useState('');
   const [newAccount, setNewAccount] = useState('');
   const [newStrategy, setNewStrategy] = useState('');
@@ -290,20 +297,43 @@ export function SettingsPage({
               type="text"
               value={newAccount}
               onChange={(e) => setNewAccount(e.target.value)}
-              placeholder="New account name"
-              className="input-field flex-1"
+              placeholder="New journal name"
+              disabled={!canAddJournal}
+              className="input-field flex-1 disabled:opacity-50"
             />
             <button
               type="button"
+              disabled={!canAddJournal}
               onClick={() => {
                 addAccount(newAccount);
                 setNewAccount('');
               }}
-              className="btn-secondary px-4 py-2 text-sm"
+              className="btn-secondary px-4 py-2 text-sm disabled:opacity-50"
             >
               Add
             </button>
           </div>
+          <p className="text-xs text-text-secondary">
+            {canAddJournal ? (
+              <>
+                {settings.accounts.length} of{' '}
+                {journalsUnlimited(limits) ? 'unlimited' : journalLimit} journals used on{' '}
+                {TIER_PLANS[tier].name}.
+              </>
+            ) : (
+              <>
+                You are using all {journalLimit} journals on {TIER_PLANS[tier].name}.{' '}
+                <button
+                  type="button"
+                  onClick={goToPricing}
+                  className="text-emerald-400 hover:text-emerald-300 transition-colors focus-ring rounded"
+                >
+                  See plans
+                </button>{' '}
+                for more, or remove one above.
+              </>
+            )}
+          </p>
         </section>
 
         <section className="panel-card p-5 space-y-4">

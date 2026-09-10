@@ -8,6 +8,9 @@ import {
   PAID_TIERS,
   TIER_ORDER,
   tierHas,
+  hasJournalRoom,
+  journalsLabel,
+  journalsUnlimited,
   syncsLabel,
   UNLIMITED_BROKERS,
   type Feature,
@@ -186,5 +189,64 @@ describe('connections and syncs', () => {
     }
     expect(featureLines('diamond').map((l) => l.text)).toContain('24 trade syncs a day');
     expect(featureLines('diamond').map((l) => l.text)).toContain('Unlimited broker connections');
+  });
+});
+
+describe('journals', () => {
+  it('climbs with the plan and is unlimited at the top', () => {
+    expect(limitsFor('free').journals).toBe(2);
+    expect(limitsFor('silver').journals).toBe(3);
+    expect(limitsFor('gold').journals).toBe(5);
+    expect(journalsUnlimited(limitsFor('diamond'))).toBe(true);
+  });
+
+  it('never steps backwards across the ladder', () => {
+    for (let i = 1; i < TIER_ORDER.length; i++) {
+      expect(limitsFor(TIER_ORDER[i]).journals).toBeGreaterThan(
+        limitsFor(TIER_ORDER[i - 1]).journals,
+      );
+    }
+  });
+
+  it('gives the free plan more than one, so journals are discoverable without paying', () => {
+    // A cap of one is not a limit, it is an absent feature — nobody finds out journals exist.
+    expect(limitsFor('free').journals).toBeGreaterThan(1);
+  });
+
+  it('names the allowance in words the card can print', () => {
+    expect(journalsLabel(limitsFor('free'))).toBe('2 journals');
+    expect(journalsLabel(limitsFor('gold'))).toBe('5 journals');
+    expect(journalsLabel(limitsFor('diamond'))).toBe('Unlimited journals');
+  });
+
+  it('survives the trip through JSON the entitlement endpoint makes', () => {
+    const limits = JSON.parse(JSON.stringify(limitsFor('diamond'))) as never;
+    expect(journalsUnlimited(limits)).toBe(true);
+  });
+
+  it('is on every card, including free', () => {
+    for (const tier of TIER_ORDER) {
+      expect(featureLines(tier).map((l) => l.text)).toContain(journalsLabel(limitsFor(tier)));
+    }
+  });
+});
+
+describe('hasJournalRoom', () => {
+  it('allows up to the cap and not past it', () => {
+    const silver = limitsFor('silver');
+    expect(hasJournalRoom(silver, 0)).toBe(true);
+    expect(hasJournalRoom(silver, 2)).toBe(true);
+    // Three journals on a three-journal plan is full, not "room for one more".
+    expect(hasJournalRoom(silver, 3)).toBe(false);
+    expect(hasJournalRoom(silver, 9)).toBe(false);
+  });
+
+  it('never runs out on the unlimited plan', () => {
+    expect(hasJournalRoom(limitsFor('diamond'), 500)).toBe(true);
+  });
+
+  it('lets a free account have its second journal', () => {
+    expect(hasJournalRoom(limitsFor('free'), 1)).toBe(true);
+    expect(hasJournalRoom(limitsFor('free'), 2)).toBe(false);
   });
 });

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { BookOpen, Check, Plus, X } from 'lucide-react';
 import { useSettings } from '../context/useSettings';
+import { goToPricing } from '../utils/navigateToPath';
 
 export function AccountSwitcher() {
-  const { settings, setActiveAccount, addAccount } = useSettings();
+  const { settings, setActiveAccount, addAccount, journalLimit, canAddJournal } = useSettings();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
 
@@ -81,6 +82,14 @@ export function AccountSwitcher() {
               <X size={14} />
             </button>
           </div>
+        ) : !canAddJournal ? (
+          <button
+            type="button"
+            onClick={goToPricing}
+            className="text-[11px] text-text-secondary hover:text-accent transition-colors focus-ring rounded px-1"
+          >
+            {journalLimit} journals on your plan — upgrade for more
+          </button>
         ) : (
           <button
             type="button"

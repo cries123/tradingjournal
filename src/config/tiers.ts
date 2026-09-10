@@ -25,6 +25,12 @@ export const TIER_ORDER: Tier[] = ['free', 'silver', 'gold', 'diamond'];
  */
 export const UNLIMITED_BROKERS = Number.MAX_SAFE_INTEGER;
 
+/**
+ * The journal count that means "as many as you like". Finite for the same reason as the others:
+ * these limits cross to the browser as JSON, and Infinity arrives as null.
+ */
+export const UNLIMITED_JOURNALS = Number.MAX_SAFE_INTEGER;
+
 
 export interface TierLimits {
   /**
@@ -55,6 +61,17 @@ export interface TierLimits {
   aiMessagesPerDay: number;
   /** Market replay. Built but not shipped — see MARKET_REPLAY_LIVE. */
   marketReplay: boolean;
+  /**
+   * Separate journals in one account — a live account and a paper one, or one per strategy.
+   *
+   * Costs nothing to allow, like broker connections, so this is differentiation rather than
+   * rationing. It is also the one limit here the server does not enforce: journals live in the
+   * user's own settings document, which they can write directly, and the worst case if somebody
+   * edits past the cap is that they own more folders. Every limit that guards a real bill — syncs,
+   * assistant messages, broker links — is checked server-side. This one is a product boundary, and
+   * it is worth being clear about the difference rather than implying otherwise.
+   */
+  journals: number;
   /**
    * The journal keeps itself up to date — an automatic import every market morning, no button.
    *
@@ -168,7 +185,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     price: 0,
     tagline: 'Log trades by hand and keep the full journal.',
     limits: {
-      brokers: 0, syncsPerDay: 0, aiMessagesPerDay: 0, marketReplay: false,
+      brokers: 0, syncsPerDay: 0, aiMessagesPerDay: 0, marketReplay: false, journals: 2,
       performanceAnalytics: false, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
     },
   },
@@ -178,7 +195,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     price: 9,
     tagline: 'Connect a broker and stop typing trades in.',
     limits: {
-      brokers: 5, syncsPerDay: 5, aiMessagesPerDay: 0, marketReplay: false,
+      brokers: 5, syncsPerDay: 5, aiMessagesPerDay: 0, marketReplay: false, journals: 3,
       performanceAnalytics: true, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
     },
     productIdEnv: 'CREEM_PRODUCT_SILVER',
@@ -190,7 +207,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     price: 19,
     tagline: 'Ten brokers, and an assistant that reads your stats.',
     limits: {
-      brokers: 10, syncsPerDay: 10, aiMessagesPerDay: 15, marketReplay: false,
+      brokers: 10, syncsPerDay: 10, aiMessagesPerDay: 15, marketReplay: false, journals: 5,
       performanceAnalytics: true, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
     },
     productIdEnv: 'CREEM_PRODUCT_GOLD',
@@ -203,6 +220,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     tagline: 'Everything, with room to actually use it.',
     limits: {
       brokers: UNLIMITED_BROKERS, syncsPerDay: 24, aiMessagesPerDay: 40, marketReplay: true,
+      journals: UNLIMITED_JOURNALS,
       performanceAnalytics: true, autoSync: true, coachSeat: true, ruleAlerts: true, aiReview: true,
     },
     productIdEnv: 'CREEM_PRODUCT_DIAMOND',
@@ -223,6 +241,29 @@ export function limitsFor(tier: Tier): TierLimits {
 /** True when a plan places no ceiling on brokerage connections. */
 export function brokersUnlimited(limits: TierLimits): boolean {
   return limits.brokers >= UNLIMITED_BROKERS;
+}
+
+/** True when a plan places no ceiling on journals. */
+export function journalsUnlimited(limits: TierLimits): boolean {
+  return limits.journals >= UNLIMITED_JOURNALS;
+}
+
+/**
+ * Whether there is room for another journal.
+ *
+ * A function rather than a comparison written at the call site, so the one place that enforces it
+ * and the three places that grey out a button cannot end up disagreeing about whether "5 journals"
+ * means five or six.
+ */
+export function hasJournalRoom(limits: TierLimits, current: number): boolean {
+  return current < limits.journals;
+}
+
+/** "Unlimited journals" / "3 journals", for anywhere the allowance is shown. */
+export function journalsLabel(limits: TierLimits): string {
+  if (limits.journals <= 1) return 'One journal';
+  if (journalsUnlimited(limits)) return 'Unlimited journals';
+  return `${limits.journals} journals`;
 }
 
 /** "24 trade syncs a day", for anywhere the allowance is shown. */
@@ -294,7 +335,7 @@ export function featureLines(tier: Tier): { text: string; soon?: boolean }[] {
       { text: 'Unlimited manual trade logging' },
       { text: 'P&L calendar and dashboard stats' },
       { text: 'Notes, tags and grading' },
-      { text: 'Multiple journals in one account' },
+      { text: journalsLabel(l) },
       { text: 'Year-end realized P&L export for your accountant' },
     );
     return lines;
@@ -302,6 +343,7 @@ export function featureLines(tier: Tier): { text: string; soon?: boolean }[] {
 
   lines.push({ text: 'Everything in ' + TIER_PLANS[TIER_ORDER[TIER_ORDER.indexOf(tier) - 1]].name });
   lines.push({ text: brokersLabel(l) });
+  lines.push({ text: journalsLabel(l) });
   lines.push({ text: syncsLabel(l) });
   // True of broker import and not of manual entry, so it earns its place on every paid card —
   // and it stops Silver reading as three thin bullets next to Gold's five.

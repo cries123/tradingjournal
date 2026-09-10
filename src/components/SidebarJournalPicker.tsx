@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { BookOpen, Check, Plus, X } from 'lucide-react';
 import { useSettings } from '../context/useSettings';
+import { goToPricing } from '../utils/navigateToPath';
 
 interface SidebarJournalPickerProps {
   onNavigate?: () => void;
 }
 
 export function SidebarJournalPicker({ onNavigate }: SidebarJournalPickerProps) {
-  const { settings, setActiveAccount, addAccount } = useSettings();
+  const { settings, setActiveAccount, addAccount, journalLimit, canAddJournal } = useSettings();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
 
@@ -80,7 +81,7 @@ export function SidebarJournalPicker({ onNavigate }: SidebarJournalPickerProps) 
             <X size={12} />
           </button>
         </div>
-      ) : (
+      ) : canAddJournal ? (
         <button
           type="button"
           onClick={() => setAdding(true)}
@@ -88,6 +89,16 @@ export function SidebarJournalPicker({ onNavigate }: SidebarJournalPickerProps) 
         >
           <Plus size={12} />
           New journal
+        </button>
+      ) : (
+        /* Said before the click, not after it. A "New journal" button that silently does nothing
+           is the version of this that reads as a bug. */
+        <button
+          type="button"
+          onClick={goToPricing}
+          className="mt-2 w-full py-1.5 rounded-md text-[10px] leading-snug text-text-secondary hover:text-accent transition-colors focus-ring"
+        >
+          {journalLimit} journals on your plan — upgrade for more
         </button>
       )}
     </div>
