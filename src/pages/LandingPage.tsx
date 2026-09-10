@@ -8,6 +8,7 @@ import {
   Link2,
   Lock,
   Pencil,
+  Share2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
@@ -75,6 +76,12 @@ const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
     title: 'Optional Cloud Sync',
     description:
       'Sign in with Google or email to sync across devices — or stay local-only. One-click backup puts your entire journal in a file you own.',
+  },
+  {
+    icon: Share2,
+    title: 'Share Cards',
+    description:
+      'Export your session, month or year as an image built for a story slot — your stats on a Milky Way background, or a photo of your own. Nothing is published anywhere: you get a file and decide where it goes.',
   },
 ];
 

@@ -185,8 +185,9 @@ describe('Sidebar', () => {
     for (const label of ['Overview', 'Performance', 'Assistant', 'Connect broker', 'Settings', 'Support']) {
       expect(html).toContain(label);
     }
-    // The three that moved into Support, the two that moved out of the nav, and the two
-    // features that were removed outright.
+    /* The three that moved into Support, the two that moved out of the nav, and the leaderboard,
+       which was removed outright. Share month is still a feature — it lives in the dashboard
+       toolbar, which is why it must not also be a nav row. */
     for (const gone of [
       'Supported brokers', 'Report a bug', 'Request broker', 'Share month', 'Clear journal',
       'Leaderboard',

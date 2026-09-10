@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pencil, Plus, X } from 'lucide-react';
+import { Pencil, Plus, Share2, X } from 'lucide-react';
 import { TradeListItem } from './TradeListItem';
 import type { Trade } from '../types';
 import { useAuth } from '../context/useAuth';
@@ -7,6 +7,7 @@ import { useSettings } from '../context/useSettings';
 import { fetchDayNote, saveDayNote } from '../services/dayNotes';
 import { formatCurrency } from '../utils/format';
 import { computeStats } from '../utils/stats';
+import { ShareCardModal } from './ShareCardModal';
 import { useEscapeToClose } from '../hooks/useEscapeToClose';
 
 interface DayDetailDrawerProps {
@@ -79,9 +80,11 @@ export function DayDetailDrawer({
     setTimeout(onClose, 280);
   };
 
+  const [showShare, setShowShare] = useState(false);
   const dayTrades = trades.filter((t) => t.date === date);
   const dayStats = useMemo(() => computeStats(dayTrades), [dayTrades]);
   const totalPnl = dayStats.netPnl;
+  const [year, month] = date.split('-').map(Number);
   const formattedDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
@@ -125,6 +128,19 @@ export function DayDetailDrawer({
             <X size={20} />
           </button>
         </div>
+
+        {dayTrades.length > 0 && (
+          <div className="px-5 pb-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowShare(true)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium border border-accent/30 text-accent bg-accent/10 hover:bg-accent/15 transition-colors focus-ring"
+            >
+              <Share2 size={16} />
+              Share session
+            </button>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto p-5">
           <div className="mb-5 pb-5 border-b border-border/50">
@@ -230,6 +246,17 @@ export function DayDetailDrawer({
           </button>
         </div>
       </aside>
+
+      {showShare && dayTrades.length > 0 && (
+        <ShareCardModal
+          period="day"
+          stats={dayStats}
+          dateKey={date}
+          year={year}
+          month={month - 1}
+          onClose={() => setShowShare(false)}
+        />
+      )}
 
     </>
   );

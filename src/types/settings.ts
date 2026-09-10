@@ -44,6 +44,13 @@ export interface UserSettings {
   coachEmail?: string;
   /** Told when a risk rule is broken: in the app as it happens, and again the next morning. */
   ruleAlertsEnabled: boolean;
+  /** Download URLs of custom share-card background images the user has uploaded (Firebase
+   *  Storage), most-recent last. Capped at MAX_SHARE_CARD_BACKGROUNDS — see
+   *  services/shareCardBackgrounds.ts — so re-uploading is never required to pick one again. */
+  shareCardBackgrounds: string[];
+  /** Which background the share card currently uses: a URL from shareCardBackgrounds above, or
+   *  null for the default Milky Way starfield. */
+  shareCardBackgroundId: string | null;
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -61,4 +68,6 @@ export const DEFAULT_SETTINGS: UserSettings = {
   reminderTime: '16:00',
   autoSyncEnabled: true,
   ruleAlertsEnabled: true,
+  shareCardBackgrounds: [],
+  shareCardBackgroundId: null,
 };

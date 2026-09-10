@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Calendar, Grid3X3, RefreshCw } from 'lucide-react';
+import { Calendar, Grid3X3, RefreshCw, Share2 } from 'lucide-react';
 import type { Filters, Trade } from '../types';
 import { computeStats, getMonthTrades, getYearTrades } from '../utils/stats';
 import { formatCurrency, formatMonthYear } from '../utils/format';
@@ -14,6 +14,7 @@ import { WeeklyRecapCard } from './WeeklyRecapCard';
 import { DashboardCalendar } from './DashboardCalendar';
 import { EmptyDashboard } from './EmptyDashboard';
 import { FiltersBar } from './FiltersBar';
+import { ShareCardModal } from './ShareCardModal';
 import { StatsCards } from './StatsCards';
 import { YearMonths } from './YearMonths';
 import { TradingInsightsSection } from './analytics/TradingInsightsSection';
@@ -80,6 +81,7 @@ export function DashboardView({
 }: DashboardViewProps) {
   const { settings } = useSettings();
   const [mode, setMode] = useState<DashboardMode>('month');
+  const [showShare, setShowShare] = useState(false);
 
   const monthTrades = useMemo(() => getMonthTrades(trades, year, month), [trades, year, month]);
   const yearTrades = useMemo(() => getYearTrades(trades, year), [trades, year]);
@@ -165,6 +167,17 @@ export function DashboardView({
           >
             <RefreshCw size={11} />
             Sync broker
+          </button>
+        )}
+
+        {(mode === 'month' ? monthTrades.length > 0 : yearTrades.length > 0) && (
+          <button
+            type="button"
+            onClick={() => setShowShare(true)}
+            className={`${hasBrokerTrades && onSyncBroker ? '' : 'ml-auto '}flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border/60 text-text-secondary hover:text-text-primary hover:border-accent/30 transition-colors focus-ring`}
+          >
+            <Share2 size={14} />
+            {mode === 'month' ? 'Share month' : 'Share year'}
           </button>
         )}
       </div>
@@ -267,6 +280,15 @@ export function DashboardView({
 
       {hasAnyTrades && <TradingInsightsSection trades={analyticsTrades} />}
 
+      {showShare && (
+        <ShareCardModal
+          period={mode === 'month' ? 'month' : 'year'}
+          stats={mode === 'month' ? stats : yearStats}
+          year={year}
+          month={month}
+          onClose={() => setShowShare(false)}
+        />
+      )}
     </div>
   );
 }

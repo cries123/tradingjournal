@@ -15,9 +15,9 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'September 2026',
-    title: 'Share cards, the leaderboard and the charts have gone',
+    title: 'The leaderboard and the charts have gone \u2014 share cards stayed',
     description:
-      'Three things have been taken out of the journal, on purpose. Share cards and the public leaderboard are both gone, along with the read-only coach link — every way a journal used to leave the account it belongs to. The dashboard charts have gone too: the equity curve, the daily P&L bars, the weekday breakdown, the year heatmap and the sparklines on the stat cards.\n\nWhat is left is the part that was doing the work. The calendar, every stat, Trading Insights and the whole Performance screen are untouched — and the Performance screen is where the real analysis lives now: the win rate your payoff ratio actually needs, whether your losing trades are the bigger ones, what the trade after a loss costs you, and how much of your gross went to commissions. Numbers you can act on rather than a shape to look at.\n\nThe year view is still there, as twelve figures rather than a heatmap — click a month to open it, same as before. Trade screenshots and the TradingView chart link have been removed from the trade form. If you shared a coach link, it no longer opens; the Diamond coach seat, where an invited coach reads your journal and writes back, is unaffected.',
+      'Two things have been taken out of the journal, on purpose. The public leaderboard is gone, along with the read-only coach link. And the dashboard charts have gone: the equity curve, the daily P&L bars, the weekday breakdown, the year heatmap and the sparklines on the stat cards.\n\nShare cards are staying. Session, month and year, custom backgrounds and all \u2014 they were briefly removed alongside the rest and are back.\n\nWhat is left is the part that was doing the work. The calendar, every stat, Trading Insights and the whole Performance screen are untouched \u2014 and the Performance screen is where the real analysis lives now: the win rate your payoff ratio actually needs, whether your losing trades are the bigger ones, what the trade after a loss costs you, and how much of your gross went to commissions. Numbers you can act on rather than a shape to look at.\n\nThe year view is still there, as twelve figures rather than a heatmap \u2014 click a month to open it, same as before. Trade screenshots and the TradingView chart link have been removed from the trade form. If you shared a coach link, it no longer opens; the Diamond coach seat, where an invited coach reads your journal and writes back, is unaffected.',
   },
   {
     date: 'September 2026',
@@ -57,6 +57,12 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     date: 'August 2026',
+    title: 'Share cards: sharper, logo fixed, and Share sends the image',
+    description:
+      'Cards now export at full resolution \u2014 1080\u00d71920 for the phone format, which is exactly the size a story slot wants, so nothing gets blown up and softened on the way in. Two bugs fixed alongside it. The logo was missing from every downloaded card \u2014 the export renders the card through a blob URL, where the logo\u2019s relative path had nothing to resolve against, so it silently never loaded. And the Share button was sending a line of text instead of the card itself; it now shares the actual image with the stats as its caption. The card was redesigned too: your three stats sit in one row under a win/loss bar instead of three stacked boxes.',
+  },
+  {
+    date: 'August 2026',
     title: 'The dashboard now tells you what to fix',
     description:
       'A new line at the top of your dashboard names the single biggest thing costing you money this period \u2014 a setup that keeps bleeding, a part of the day you should stop trading, or winners you\u2019re exiting too early. Below it, a full equity curve with your drawdown shaded in, so you can see the ride and not just the result.',
@@ -72,6 +78,12 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'Metrics that tell you if they\u2019re good',
     description:
       'Profit factor, expectancy and drawdown now come with a plain-language read instead of a bare number. Win rate is judged against the rate your own average win and loss actually require to break even \u2014 so a 45% win rate with big winners reads as healthy, which it is. Add your trading capital in Settings and you\u2019ll also see your return next to SPY\u2019s.',
+  },
+  {
+    date: 'August 2026',
+    title: 'Share cards got a redesign',
+    description:
+      'Your session/month/year share card now has a denser Milky Way background that matches your theme accent, and rounded corners that export as real transparency in the downloaded PNG. You can also upload your own photo as the card background instead — it\'s saved to your account, so next time you can just pick it from your saved photos instead of uploading again.',
   },
   {
     date: 'August 2026',
