@@ -1,3 +1,5 @@
+import { CHUNK_LOAD_ERROR_PATTERN } from '../utils/chunkError';
+
 /**
  * Turning a stream of crashes into a short list of problems.
  *
@@ -18,6 +20,15 @@ export type ErrorKind = 'render' | 'window' | 'promise' | 'server';
 export interface FingerprintInput {
   kind: ErrorKind;
   message: string;
+  /**
+   * The error's constructor name, when there is one.
+   *
+   * Needed because `message` does not contain it. A browser prints "AbortError: The connection was
+   * closed", but `err.message` is only the half after the colon — so an ignore rule written as
+   * /^AbortError/ matched nothing, ever, and the family of errors it was added to silence went on
+   * filling the feed. The filter reads the two joined back together.
+   */
+  name?: string | null;
   stack?: string | null;
   /** Server-side only: which handler this came from, so two handlers failing the same way stay apart. */
   scope?: string | null;
@@ -34,17 +45,40 @@ export interface FingerprintInput {
  *  - Extension schemes are somebody's ad blocker or wallet crashing inside our page.
  *  - Chunk-load failures are already handled by ErrorBoundary, which reloads the page and fixes
  *    them. Reporting them too would mean the feed's loudest entry is the one thing that self-heals.
+ *    The pattern is imported rather than restated, so this list and the one that decides to reload
+ *    cannot disagree about what counts as one.
  *  - The abort/cancel family is a request the user themselves ended by navigating away.
  */
 const IGNORED_MESSAGE_PATTERNS: RegExp[] = [
   /^Script error\.?$/i,
   /ResizeObserver loop/i,
-  /Failed to fetch dynamically imported module/i,
-  /error loading dynamically imported module/i,
-  /Importing a module script failed/i,
-  /Loading chunk .* failed/i,
+  CHUNK_LOAD_ERROR_PATTERN,
   /^AbortError/i,
   /The operation was aborted/i,
+  /*
+   * Safari's and Chrome's words for the same chunk failure the four patterns above describe.
+   *
+   * When a chunk hash is gone from the CDN, Netlify's SPA rewrite answers the request with
+   * index.html rather than a 404 — so the browser does not report a missing module, it reports a
+   * module served as text/html. Safari says the MIME type is not valid, Chrome says it expected a
+   * module script. Both are a stale tab pointing at a previous deploy, both are fixed by the
+   * reload ErrorBoundary already does, and neither looked like a chunk error to either list.
+   */
+  /*
+   * Firestore failing to OPEN its IndexedDB cache.
+   *
+   * Distinct from a write failing. When the store cannot be opened at all — a full disk, a
+   * corrupted database, a browser in a mode that refuses one — the SDK logs it, gives up on
+   * persistence and runs against its in-memory cache instead, talking to the server exactly as
+   * before. Nothing is lost and the journal behaves normally, apart from a cold start next time.
+   *
+   * These arrive as a small family from one browser at once: the quota error, the internal error,
+   * the aborted createOrUpgrade transaction that follows, and the closed connection after it. One
+   * person with a full hard drive produced four rows in this feed, none of them ours to fix.
+   */
+  /(backing store for|opening) indexedDB\.open/i,
+  /IndexedDB transaction '(createOrUpgrade|getHighestListenSequenceNumber)' failed/i,
+  /^The connection was closed\.?$/i,
   /*
    * Firestore's own IndexedDB layer, on a tab that is going away.
    *
@@ -73,7 +107,20 @@ const IGNORED_STACK_PATTERNS: RegExp[] = [
 export function shouldReport(input: FingerprintInput): boolean {
   const message = (input.message ?? '').trim();
   if (!message) return false;
-  if (IGNORED_MESSAGE_PATTERNS.some((re) => re.test(message))) return false;
+
+  /*
+   * Every pattern is tried against the message on its own AND against the message with its name in
+   * front — "AbortError: The user aborted a request" — because the two halves live in separate
+   * fields and the rules here are written in both shapes.
+   *
+   * Both, not just the joined form: several patterns are anchored to the start of the message, and
+   * "Script error." with its default name in front would be "Error: Script error.", which /^Script
+   * error\.?$/ does not match. Testing the joined form alone silently un-ignored the noisiest rule
+   * in the list.
+   */
+  const name = (input.name ?? '').trim();
+  const subject = name ? `${name}: ${message}` : message;
+  if (IGNORED_MESSAGE_PATTERNS.some((re) => re.test(message) || re.test(subject))) return false;
 
   const stack = input.stack ?? '';
   if (stack && IGNORED_STACK_PATTERNS.some((re) => re.test(stack))) return false;

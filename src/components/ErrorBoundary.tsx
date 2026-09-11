@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { reportErrorSilently } from '../services/errorReporting';
+import { isChunkLoadError } from '../utils/chunkError';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -16,9 +17,6 @@ interface ErrorBoundaryState {
 // one-off network blip on that one request. A plain reload almost always fixes it because the
 // retry hits the current deploy — so we do that reload automatically instead of making the user
 // find the button themselves.
-const CHUNK_LOAD_ERROR_PATTERN =
-  /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Loading chunk .* failed/i;
-
 const RELOAD_GUARD_KEY = 'tc-chunk-reload-at';
 const RELOAD_GUARD_WINDOW_MS = 15_000;
 
@@ -52,7 +50,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     // errorFingerprint decides which of these are worth a row, not this call site.
     reportErrorSilently(error, 'render');
 
-    if (CHUNK_LOAD_ERROR_PATTERN.test(error?.message ?? '') && shouldAutoReload()) {
+    if (isChunkLoadError(error?.message) && shouldAutoReload()) {
       window.location.reload();
     }
   }

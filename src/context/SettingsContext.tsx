@@ -10,6 +10,7 @@ import type { Strategy } from '../types/strategy';
 import { loadSettings, saveSettings } from '../utils/settingsStorage';
 import { stripUndefinedDeep } from '../utils/firestoreData';
 import { deleteField, doc, getDoc, setDoc } from 'firebase/firestore';
+import { reportErrorSilently } from '../services/errorReporting';
 
 
 
@@ -93,6 +94,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
          * deleteField() is the sentinel that removes a key under a merge, so an explicitly
          * undefined setting is now explicitly deleted.
          */
+        /*
+         * Caught, not floating.
+         *
+         * An unguarded promise here rejects into window.onunhandledrejection, which reports it
+         * with no idea what it was — "FirebaseError: Missing or insufficient permissions" against
+         * a stack of minified SDK frames, which is unreadable and unattributable. The same shape
+         * of bug has been fixed twice already in the trade-write paths. The setting is saved
+         * locally either way, so the user loses nothing until they open the app elsewhere.
+         */
         void setDoc(
           doc(getFirebaseDb(), 'users', user.uid, 'settings', 'preferences'),
           {
@@ -100,7 +110,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             ...Object.fromEntries(clearedKeys.map((key) => [key, deleteField()])),
           },
           { merge: true },
-        );
+        ).catch((error: unknown) => {
+          console.warn('[settings] could not save to the cloud; kept locally.', error);
+          reportErrorSilently(error, 'promise', 'settings-save');
+        });
       }
     },
     [user],

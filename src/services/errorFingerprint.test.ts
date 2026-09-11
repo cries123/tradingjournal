@@ -22,6 +22,99 @@ describe('shouldReport', () => {
     expect(shouldReport({ kind: 'promise', message: 'The operation was aborted.' })).toBe(false);
   });
 
+  /*
+   * These four came off the live feed together, from one Windows machine with a full disk, and
+   * every one of them slipped the filter. The name is the reason: normalizeError keeps it in its
+   * own field, so a rule written against "AbortError: ..." was testing "The connection was
+   * closed." and never matched.
+   */
+  it('drops the family a browser throws when Firestore cannot open its cache', () => {
+    expect(
+      shouldReport({
+        kind: 'promise',
+        name: 'QuotaExceededError',
+        message: 'Encountered full disk while opening backing store for indexedDB.open.',
+      }),
+    ).toBe(false);
+    expect(
+      shouldReport({
+        kind: 'promise',
+        name: 'UnknownError',
+        message: 'Internal error opening backing store for indexedDB.open.',
+      }),
+    ).toBe(false);
+    expect(
+      shouldReport({
+        kind: 'promise',
+        name: 'IndexedDbTransactionError',
+        message:
+          "IndexedDB transaction 'createOrUpgrade' failed: AbortError: The transaction was aborted, so the request cannot be fulfilled.",
+      }),
+    ).toBe(false);
+    expect(
+      shouldReport({ kind: 'promise', name: 'AbortError', message: 'The connection was closed.' }),
+    ).toBe(false);
+  });
+
+  it('still reports a quota failure that is not the cache opening', () => {
+    // The distinction the ignore list turns on: a store that will not open costs a cold start,
+    // a write that will not land costs the trade.
+    expect(
+      shouldReport({
+        kind: 'promise',
+        name: 'QuotaExceededError',
+        message: 'The quota has been exceeded.',
+      }),
+    ).toBe(true);
+  });
+
+  it("drops Safari's and Chrome's words for a stale chunk", () => {
+    // A chunk request answered with index.html by the SPA rewrite. Same failure as the patterns
+    // above, described from the MIME end, and equally fixed by ErrorBoundary's reload.
+    expect(
+      shouldReport({
+        kind: 'render',
+        name: 'TypeError',
+        message: "'text/html' is not a valid JavaScript MIME type.",
+      }),
+    ).toBe(false);
+    expect(
+      shouldReport({
+        kind: 'render',
+        name: 'TypeError',
+        message:
+          'Failed to load module script: Expected a JavaScript module script but the server responded with a MIME type of "text/html".',
+      }),
+    ).toBe(false);
+  });
+
+  it('matches a rule written against the name even when the message alone says nothing', () => {
+    // The whole reason the filter reads the name: every AbortError is the user navigating away,
+    // and only one of the many messages they carry is worth writing a pattern for.
+    expect(
+      shouldReport({ kind: 'promise', name: 'AbortError', message: 'The user aborted a request.' }),
+    ).toBe(false);
+  });
+
+  it('keeps ignoring a message whose own pattern is anchored, name or no name', () => {
+    // normalizeError defaults a nameless throw to 'Error', so the commonest noise in the feed
+    // arrives as name 'Error' + message 'Script error.'. Prefixing before matching un-ignored it.
+    expect(shouldReport({ kind: 'window', name: 'Error', message: 'Script error.' })).toBe(false);
+    expect(
+      shouldReport({ kind: 'promise', name: 'AbortError', message: 'AbortError: The connection was closed.' }),
+    ).toBe(false);
+  });
+
+  it('reports a permissions failure, which is ours to fix', () => {
+    expect(
+      shouldReport({
+        kind: 'promise',
+        name: 'FirebaseError',
+        message: 'Missing or insufficient permissions.',
+      }),
+    ).toBe(true);
+  });
+
   it('drops anything thrown from a browser extension', () => {
     expect(
       shouldReport({

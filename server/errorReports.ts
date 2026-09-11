@@ -62,7 +62,7 @@ function utcDay(now: Date = new Date()): string {
  * stop growing at some point rather than expanding a document until Firestore refuses it.
  */
 export async function recordErrorEvent(input: ErrorReportInput): Promise<RecordOutcome> {
-  if (!shouldReport({ kind: input.kind, message: input.message, stack: input.stack, scope: input.scope })) {
+  if (!shouldReport({ kind: input.kind, message: input.message, name: input.name, stack: input.stack, scope: input.scope })) {
     return 'ignored';
   }
 
