@@ -275,7 +275,9 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
           not somewhere else on the screen.
         */}
         {isDesktop && (
-          <div className="sticky top-0 z-30 flex justify-end px-5 pt-3 pb-1">{accountMenu}</div>
+          /* z-40 for the same reason the mobile header carries one — see MobileNav. The open
+             dropdown overhangs <main>, and main is the later sibling. */
+          <div className="sticky top-0 z-40 flex justify-end px-5 pt-3 pb-1">{accountMenu}</div>
         )}
 
         <main

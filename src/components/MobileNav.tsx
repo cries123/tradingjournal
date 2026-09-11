@@ -32,7 +32,14 @@ export function MobileHeader({
   account?: ReactNode;
 }) {
   return (
-    <header className="md:hidden shrink-0 flex items-center gap-2 px-3 py-1.5 pt-[max(0.375rem,env(safe-area-inset-top))] border-b border-border/60 bg-bg-secondary/90 backdrop-blur-md">
+    /*
+      relative z-40 is load-bearing, not decoration. The account dropdown is absolutely positioned
+      inside this header and hangs down over <main>, which is a LATER sibling in the flex column —
+      so without a stacking context here the dashboard's panel-cards paint over it and the open
+      menu shows up as a ghost behind the calendar. The panel's own z-50 cannot fix that from
+      inside; the header is what has to out-rank main.
+    */
+    <header className="md:hidden relative z-40 shrink-0 flex items-center gap-2 px-3 py-1.5 pt-[max(0.375rem,env(safe-area-inset-top))] border-b border-border/60 bg-bg-secondary/90 backdrop-blur-md">
       {onHome ? (
         <button type="button" onClick={onHome} className="min-w-0 text-left focus-ring rounded">
           <BrandLogo size="sm" variant="compact" />
