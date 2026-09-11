@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Lock } from 'lucide-react';
-import { lowestTierWith, TIER_PLANS, type Feature } from '../../config/tiers';
+import { lowestTierWith, TIER_PLANS, tierHas, type Feature } from '../../config/tiers';
+import { TRIAL_TIER } from '../../config/trial';
 import { useEntitlement } from '../../context/useEntitlement';
 import { goToPricing } from '../../utils/navigateToPath';
 import { StartTrialButton } from './StartTrialButton';
@@ -48,6 +49,29 @@ export function LockedFeature({
   const needed = lowestTierWith(feature);
   const neededName = needed ? TIER_PLANS[needed].name : 'a paid plan';
 
+  /*
+   * Whether the trial would actually hand them the thing this card is describing.
+   *
+   * The trial is Creem's and it is attached to the Silver product, so it grants Silver and only
+   * Silver. Broker sync and the Performance screen are Silver features and the offer is honest
+   * there. The assistant is Gold; auto-sync, the coach seat, rule alerts and the weekly review
+   * are Diamond. On those, a "Try Silver free for 7 days" under a description of the feature is
+   * a card that promises one plan and sells another — somebody takes the trial, lands back on
+   * the same lock, and has been charged $9 for it.
+   */
+  const trialUnlocksThis = tierHas(TRIAL_TIER, feature);
+
+  const buyCta = (
+    <>
+      <button type="button" onClick={goToPricing} className="btn-primary w-full py-2.5 text-sm font-semibold">
+        Unlock with {neededName}
+      </button>
+      <p className="mt-2.5 text-xs text-text-secondary">
+        From ${needed ? TIER_PLANS[needed].price : 5}/month · cancel anytime
+      </p>
+    </>
+  );
+
   return (
     /* Grid-stacked rather than absolutely positioned. Both children occupy the same cell, so the
        wrapper is as tall as the TALLER of them — which means the lock card can never overflow a
@@ -78,27 +102,18 @@ export function LockedFeature({
                 ? "It's included in your plan — we'll turn it on here the moment it's ready."
                 : `Coming soon, and included with ${neededName} when it lands.`}
             </p>
-          ) : (
+          ) : trialUnlocksThis ? (
             /*
-             * The trial takes the primary position wherever it is still on offer.
+             * The trial takes the primary position wherever it is still on offer AND would
+             * actually unlock this feature.
              *
              * Somebody looking at this card wanted the feature a second ago — that is the moment
              * the offer is worth the most, and sending them to a pricing page instead is asking
              * them to want it again later.
              */
-            <StartTrialButton
-              viaPricing
-              fallback={
-                <>
-                  <button type="button" onClick={goToPricing} className="btn-primary w-full py-2.5 text-sm font-semibold">
-                    Unlock with {neededName}
-                  </button>
-                  <p className="mt-2.5 text-xs text-text-secondary">
-                    From ${needed ? TIER_PLANS[needed].price : 5}/month · cancel anytime
-                  </p>
-                </>
-              }
-            />
+            <StartTrialButton viaPricing fallback={buyCta} />
+          ) : (
+            buyCta
           )}
         </div>
       </div>
