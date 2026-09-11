@@ -219,15 +219,18 @@ export function DashboardView({
 
       {hasAnyTrades && <TakeawayBanner takeaway={takeaway} aiText={aiTakeawayText} aiPending={aiTakeawayPending} />}
 
-      {/* Calendar beside its context, not above it.
-          Stacked, the equity curve and the week recap pushed the calendar most of a screen down
-          and left ~540px of empty gutter either side of everything. Side by side they occupy space
-          that was already being paid for, and the page loses roughly a screen of scrolling.
-          The breakpoint is 1800px, not xl. The calendar needs about 950px before its day cells
-          start truncating dollar amounts — at 1280 the split left it 620px and "$162.00" became
-          "$162…", which is worse than scrolling. Below that it stays full width. */}
-      <div className="grid gap-2 md:gap-3 ultra:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] ultra:items-start">
-        <div className="min-w-0 ultra:order-1">
+      {/* The week recap goes above the calendar at full width, not in a column beside it.
+          It shared an 1800px-and-up split with the calendar back when the equity curve was
+          stacked in that column too. With the charts gone the column held one short strip of a
+          card, so on a wide screen the split handed ~620px to a single line of text and left the
+          rest blank — and computeWeeklyRecap returns null on any week with no trades yet, which
+          rendered the column empty and pinned the calendar to the left edge with a third of the
+          screen dead beside it. Stacking costs one short row and the calendar gets every pixel,
+          which it wants: its day cells start truncating dollar amounts under about 950px. */}
+      {hasAnyTrades && <WeeklyRecapCard trades={trades} />}
+
+      <div className="grid gap-2 md:gap-3">
+        <div className="min-w-0">
         {mode === 'month' ? (
           <DashboardCalendar
             year={year}
@@ -250,10 +253,6 @@ export function DashboardView({
             }}
           />
         )}
-        </div>
-
-        <div className="flex flex-col gap-2 md:gap-3 min-w-0 ultra:order-2">
-          {hasAnyTrades && <WeeklyRecapCard trades={trades} />}
         </div>
       </div>
 

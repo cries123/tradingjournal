@@ -8,7 +8,6 @@
      the utility carries `!`. Worth knowing before adding a `wide:` class that silently does
      nothing. */
   --breakpoint-wide: 1500px;
-  --breakpoint-ultra: 1800px;
 
   --color-bg-primary: #07090f;
   --color-bg-secondary: #0d111a;
