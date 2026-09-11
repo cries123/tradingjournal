@@ -34,6 +34,16 @@ interface SettingsPageProps {
    * button, so the offer to save a copy comes before the offer to delete everything.
    */
   onClearAll: () => void;
+  /**
+   * Where the plan and the cancel button actually live.
+   *
+   * Settings has never had either, but the terms of service and the refund policy have both told
+   * people for months that cancelling happens "from Settings" — so somebody following our own
+   * written promise arrived here and found nothing. This is the route that makes those two pages
+   * true rather than the pages being reworded to match the gap.
+   */
+  onSubscription: () => void;
+  onAccount: () => void;
 }
 
 export function SettingsPage({
@@ -45,6 +55,8 @@ export function SettingsPage({
   onBack,
   onRestoreTrades,
   onClearAll,
+  onSubscription,
+  onAccount,
 }: SettingsPageProps) {
   const {
     settings, updateSettings, addSetupTag, addStrategy, removeStrategy,
@@ -171,6 +183,34 @@ export function SettingsPage({
           * card being split down the middle across a column boundary.
           */}
         <div className="columns-1 lg:columns-2 2xl:columns-3 gap-6 [&>section]:mb-6 [&>section]:break-inside-avoid">
+        {firebaseEnabled && user && (
+          <section className="panel-card p-5 space-y-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+              Account &amp; billing
+            </h2>
+            <p className="text-sm text-text-secondary leading-relaxed">
+              You are on {TIER_PLANS[tier].name}. Your plan, your payment history and the cancel
+              button live on their own screens.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={onSubscription}
+                className="btn-primary px-3.5 py-2 text-sm font-semibold"
+              >
+                Subscription &amp; billing
+              </button>
+              <button
+                type="button"
+                onClick={onAccount}
+                className="px-3.5 py-2 text-sm font-medium rounded-lg border border-border text-text-secondary hover:text-text-primary transition-colors focus-ring"
+              >
+                Account settings
+              </button>
+            </div>
+          </section>
+        )}
+
         <section className="panel-card p-5 space-y-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Display</h2>
 

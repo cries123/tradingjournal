@@ -273,6 +273,8 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 onBack={goBackView}
                 onRestoreTrades={restoreTrades}
                 onClearAll={() => setClearConfirmStage(1)}
+                onSubscription={() => openView('subscription')}
+                onAccount={() => openView('account')}
               />
             ) : appView === 'brokers' ? (
               <BrokersContent
