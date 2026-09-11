@@ -28,7 +28,7 @@ const BENEFITS = [
 ];
 
 export function AuthModal() {
-  const { signInWithGoogle, signInWithEmail, createAccount, resetPassword } = useAuth();
+  const { signInWithGoogle, signInWithIdentifier, createAccount, resetPassword } = useAuth();
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -72,7 +72,8 @@ export function AuthModal() {
       if (mode === 'signup') {
         await createAccount(email.trim(), password, username);
       } else {
-        await signInWithEmail(email.trim(), password);
+        // Either an address or a handle — signInWithIdentifier picks the route on the "@".
+        await signInWithIdentifier(email.trim(), password);
       }
     } catch (err) {
       if (err instanceof UsernameTakenError) {
@@ -213,16 +214,23 @@ export function AuthModal() {
           <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
             <label className="block">
               <span className="text-xs font-medium text-text-secondary mb-1.5 block uppercase tracking-wide">
-                Email address
+                {mode === 'signup' ? 'Email address' : 'Email or username'}
               </span>
+              {/*
+                type="email" only on signup. On the login form it would make the browser reject a
+                username outright — a required email input with "jay" in it never submits, and the
+                validation bubble says "include an @", which is precisely the thing we just stopped
+                requiring. Signing up still takes an address, because that is where the
+                confirmation and every later email has to go.
+              */}
               <input
-                type="email"
+                type={mode === 'signup' ? 'email' : 'text'}
                 required
-                autoComplete="email"
+                autoComplete={mode === 'signup' ? 'email' : 'username'}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="input-field py-3"
-                placeholder="you@example.com"
+                placeholder={mode === 'signup' ? 'you@example.com' : 'you@example.com or yourhandle'}
               />
             </label>
             <label className="block">

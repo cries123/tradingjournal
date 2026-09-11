@@ -21,6 +21,13 @@ export interface AuthContextValue {
   claimUsername: (username: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Email address or username, whichever they typed. See AuthContext for why the two differ. */
+  signInWithIdentifier: (identifier: string, password: string) => Promise<void>;
+  /** Sends a confirmation link to the new address; nothing changes until it is clicked. */
+  changeEmail: (newEmail: string, currentPassword: string) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  /** Resolves to the normalised name that was actually taken. */
+  renameUsername: (requested: string) => Promise<string>;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

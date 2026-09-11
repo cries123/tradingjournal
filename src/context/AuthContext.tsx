@@ -8,20 +8,26 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  EmailAuthProvider,
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
   sendEmailVerification,
   onAuthStateChanged,
+  reauthenticateWithCredential,
   sendPasswordResetEmail,
+  signInWithCustomToken,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
+  updatePassword,
+  verifyBeforeUpdateEmail,
   type User,
 } from 'firebase/auth';
 import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebase';
 import { isAccountDeleted } from '../services/deletedAccounts';
 import { ensureUserProfile } from '../services/userProfile';
 import { UsernameTakenError, claimUsername as claimUsernameDoc, cacheUsername, clearCachedUsername, fetchUsername, readCachedUsername } from '../services/username';
+import { renameUsername as renameUsernameRemote, usernameLoginToken } from '../services/account';
 import { validateUsername } from '../utils/usernameValidation';
 
 
@@ -270,6 +276,91 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await sendPasswordResetEmail(auth, email.trim());
   }, []);
 
+  /**
+   * Sign in with either an email address or a username.
+   *
+   * The "@" decides, and an email address takes exactly the path it always did — straight from the
+   * browser to Firebase. Only a username detours through /api/username-login, which resolves the
+   * handle and hands back a custom token. That asymmetry is deliberate: the server route exists so
+   * that a public @handle cannot be turned into the email address behind it, and there is no
+   * reason to route a password through it for people who typed their email in the first place.
+   */
+  const signInWithIdentifier = useCallback(
+    async (identifier: string, password: string) => {
+      const trimmed = identifier.trim();
+      if (trimmed.includes('@')) {
+        await signInWithEmail(trimmed, password);
+        return;
+      }
+
+      const token = await usernameLoginToken(trimmed, password);
+      const result = await signInWithCustomToken(getFirebaseAuth(), token);
+      await completeSignIn(result.user, false);
+    },
+    [completeSignIn, signInWithEmail],
+  );
+
+  /**
+   * Firebase requires a recent sign-in before an email or password change, and "recent" expires.
+   *
+   * Rather than let the person fill in a form and only then be told to sign in again, every change
+   * below takes their current password and re-authenticates first. That is also the security
+   * property worth having: someone who walks up to an unlocked laptop cannot change the password
+   * without knowing the old one.
+   */
+  const reauthenticate = useCallback(async (currentPassword: string): Promise<User> => {
+    const auth = getFirebaseAuth();
+    const current = auth.currentUser;
+    if (!current?.email) {
+      throw new Error('Sign in again before changing your account details.');
+    }
+    await reauthenticateWithCredential(
+      current,
+      EmailAuthProvider.credential(current.email, currentPassword),
+    );
+    return current;
+  }, []);
+
+  /**
+   * Sends a confirmation link to the NEW address and changes nothing until it is clicked.
+   *
+   * verifyBeforeUpdateEmail rather than updateEmail: the old call switched the address immediately
+   * and would happily move an account onto a mailbox nobody could open — locking the person out of
+   * their own password resets. It is also the only one of the two that still works once Firebase's
+   * email-enumeration protection is on.
+   */
+  const changeEmail = useCallback(
+    async (newEmail: string, currentPassword: string) => {
+      const current = await reauthenticate(currentPassword);
+      await verifyBeforeUpdateEmail(current, newEmail.trim(), {
+        url: `${window.location.origin}/app`,
+      });
+    },
+    [reauthenticate],
+  );
+
+  const changePassword = useCallback(
+    async (currentPassword: string, newPassword: string) => {
+      const current = await reauthenticate(currentPassword);
+      await updatePassword(current, newPassword);
+    },
+    [reauthenticate],
+  );
+
+  /**
+   * Renames through the server, which owns the cooldown and never releases the old handle.
+   *
+   * The local cache is updated from the server's answer rather than from what was typed, so a name
+   * that was normalised on the way through shows the normalised form.
+   */
+  const renameUsername = useCallback(async (requested: string): Promise<string> => {
+    const result = await renameUsernameRemote(requested);
+    const uid = getFirebaseAuth().currentUser?.uid;
+    if (uid) cacheUsername(uid, result.username);
+    setUsername(result.username);
+    return result.username;
+  }, []);
+
   const logout = useCallback(async () => {
     const auth = getFirebaseAuth();
     const uid = auth.currentUser?.uid;
@@ -294,6 +385,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       claimUsername,
       resetPassword,
       logout,
+      signInWithIdentifier,
+      changeEmail,
+      changePassword,
+      renameUsername,
     }),
     [
       user,
@@ -308,6 +403,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       claimUsername,
       resetPassword,
       logout,
+      signInWithIdentifier,
+      changeEmail,
+      changePassword,
+      renameUsername,
     ],
   );
 

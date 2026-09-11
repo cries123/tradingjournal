@@ -22,6 +22,9 @@ import { AssistantContent } from '../components/analytics/AssistantContent';
 import { RuleStandingBanner } from '../components/RuleStandingBanner';
 import { CoachNotesPanel } from '../components/coach/CoachNotesPanel';
 import { CoachInboxContent } from '../components/coach/CoachInboxContent';
+import { AccountSettingsContent } from '../components/account/AccountSettingsContent';
+import { SubscriptionContent } from '../components/account/SubscriptionContent';
+import { OrderHistoryContent } from '../components/account/OrderHistoryContent';
 import { PerformanceContent } from '../components/PerformanceContent';
 import { RequestBrokerContent } from '../components/support/RequestBrokerContent';
 import { TradeModal } from '../components/TradeModal';
@@ -220,6 +223,18 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
       openView('coach');
       closeMobileMenu();
     },
+    onAccount: () => {
+      openView('account');
+      closeMobileMenu();
+    },
+    onSubscription: () => {
+      openView('subscription');
+      closeMobileMenu();
+    },
+    onOrderHistory: () => {
+      openView('order-history');
+      closeMobileMenu();
+    },
     onAdmin,
   };
 
@@ -309,6 +324,15 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                   onBack={goBackView}
                 />
               </LockedFeature>
+            ) : appView === 'account' ? (
+              <AccountSettingsContent onBack={goBackView} />
+            ) : appView === 'subscription' ? (
+              <SubscriptionContent
+                onBack={goBackView}
+                onOrderHistory={() => openView('order-history')}
+              />
+            ) : appView === 'order-history' ? (
+              <OrderHistoryContent onBack={goBackView} />
             ) : appView === 'coach' ? (
               <CoachInboxContent onBack={goBackView} />
             ) : appView === 'support' ? (
