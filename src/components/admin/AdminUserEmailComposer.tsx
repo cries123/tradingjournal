@@ -54,19 +54,36 @@ export function AdminUserEmailComposer({ uid, email, displayName, onDone, onErro
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
+  /*
+   * The result, reported HERE as well as to the parent.
+   *
+   * The parent's banner lives at the bottom of the Account section — past the password reset, the
+   * change-email box, the set-password box and the delete button. This composer is the first
+   * control in that section, so on a phone the answer to "did it send?" landed several screens
+   * below the button that asked, and pressing Send looked like it did nothing at all. Both a
+   * failure and a success were invisible.
+   */
+  const [failed, setFailed] = useState<string | null>(null);
+  const [sent, setSent] = useState<string | null>(null);
 
   const canSend = Boolean(email) && subject.trim().length > 0 && body.trim().length > 0 && !sending;
 
   const send = async () => {
     setSending(true);
+    setFailed(null);
+    setSent(null);
     try {
       const { message } = await adminEmailUser(uid, subject, body);
       onDone(message);
       onAudit('user.emailed', subject.trim());
       setSubject('');
       setBody('');
-      setOpen(false);
+      // The form stays open on success, showing what happened. Collapsing it the instant the send
+      // worked is the other half of why this felt like nothing: the composer vanished and the only
+      // confirmation was off-screen.
+      setSent(message);
     } catch (err) {
+      setFailed(err instanceof Error ? err.message : 'Could not send the email');
       onError(err instanceof Error ? err.message : 'Could not send the email');
     } finally {
       setSending(false);
@@ -150,6 +167,24 @@ export function AdminUserEmailComposer({ uid, email, displayName, onDone, onErro
           {sending ? 'Sending…' : 'Send'}
         </button>
       </div>
+
+      {/* Directly under the button that caused it. */}
+      {failed && <p className="text-[11px] text-red-400">{failed}</p>}
+      {sent && (
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[11px] text-emerald-300">{sent}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setSent(null);
+              setOpen(false);
+            }}
+            className="text-[11px] text-text-secondary hover:text-text-primary shrink-0 focus-ring rounded"
+          >
+            Close
+          </button>
+        </div>
+      )}
     </div>
   );
 }

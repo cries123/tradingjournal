@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import type { Trade } from '../types';
+import { toDateKey } from '../utils/format';
 
 /*
  * A first paint of every screen this release touched, with nothing mocked but the network and the
@@ -387,7 +388,16 @@ describe('DiamondSection', () => {
 });
 
 describe('RuleStandingBanner', () => {
-  const today = new Date().toISOString().slice(0, 10);
+  /*
+   * The LOCAL date, via the same function the component uses.
+   *
+   * This was `new Date().toISOString().slice(0, 10)`, which is the UTC date — and RuleStandingBanner
+   * asks toDateKey(new Date()), which is local. West of Greenwich those two disagree from early
+   * evening until midnight, so these tests tagged their trades with tomorrow, the banner correctly
+   * ignored them, and the suite failed for about six hours a day and passed the rest. The component
+   * was never wrong.
+   */
+  const today = toDateKey(new Date());
   const on = (pnl: number, n = 1) =>
     Array.from({ length: n }, () => trade({ date: today, pnl: pnl / n }));
 
