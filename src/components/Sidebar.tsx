@@ -8,9 +8,6 @@ import {
   LifeBuoy,
   ShieldCheck,
   Sparkles,
-  UserCog,
-  CreditCard,
-  Receipt,
 } from 'lucide-react';
 import { PlanBadge } from './plan/PlanBadge';
 import { BrandLogo } from './BrandLogo';
@@ -45,9 +42,6 @@ interface SidebarProps {
   onSettings: () => void;
   onSupport: () => void;
   onCoach: () => void;
-  onAccount: () => void;
-  onSubscription: () => void;
-  onOrderHistory: () => void;
   onAdmin?: () => void;
   onHome?: () => void;
   variant?: 'desktop' | 'drawer';
@@ -62,44 +56,6 @@ interface SidebarProps {
  * says "you are here" with one element instead of four borders, and it lines up down the column so
  * the eye finds the current view without reading any of the labels.
  */
-/**
- * A row in the account block under the profile.
- *
- * Quieter than NavItem on purpose — smaller text, no pill, no left bar. These sit directly beneath
- * the email address and must read as belonging to it; given the nav's own treatment they would
- * compete with Overview and Performance for the eye, and nobody opens a journal to look at their
- * billing.
- */
-function AccountLink({
-  active,
-  onClick,
-  icon,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-current={active ? 'page' : undefined}
-      className={`flex items-center gap-2 rounded-lg px-1.5 py-1.5 text-[11px] transition-colors focus-ring ${
-        active
-          ? 'text-accent font-medium bg-bg-tertiary/60'
-          : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/40'
-      }`}
-    >
-      <span className="shrink-0" aria-hidden>
-        {icon}
-      </span>
-      {label}
-    </button>
-  );
-}
-
 function NavItem({
   active,
   onClick,
@@ -171,9 +127,6 @@ export function Sidebar({
   onSettings,
   onSupport,
   onCoach,
-  onAccount,
-  onSubscription,
-  onOrderHistory,
   onAdmin,
   onHome,
   variant = 'desktop',
@@ -316,35 +269,29 @@ export function Sidebar({
           + Log Trade
         </button>
 
+        {/*
+          Identity only. Account settings, Subscription and Order history used to sit under this
+          row and have moved into the account dropdown in the top bar — the same control, in the
+          same corner, as the one in the marketing nav. Three more rows at the bottom of a panel
+          that already ends in a plan card, a Log Trade button and an email address was the
+          quietest possible place to put the billing screens.
+        */}
         {firebaseEnabled && !loading && user && (
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 px-1 min-w-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
-              <div className="min-w-0 flex-1">
-                {username ? (
-                  <p className="text-[11px] text-accent font-medium truncate">@{username}</p>
-                ) : null}
-                <p className="text-[11px] text-text-secondary truncate">{user.email}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => void logout()}
-                className="text-[11px] text-text-secondary hover:text-text-primary shrink-0 focus-ring rounded"
-              >
-                Sign out
-              </button>
+          <div className="flex items-center gap-2 px-1 min-w-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
+            <div className="min-w-0 flex-1">
+              {username ? (
+                <p className="text-[11px] text-accent font-medium truncate">@{username}</p>
+              ) : null}
+              <p className="text-[11px] text-text-secondary truncate">{user.email}</p>
             </div>
-
-            {/*
-              Under the identity row rather than up in the nav, because these three are about the
-              account named directly above them — not about the journal. The nav answers "where am
-              I looking", this answers "what am I signed in as and what am I paying".
-            */}
-            <div className="flex flex-col">
-              <AccountLink active={appView === 'account'} onClick={wrap(onAccount)} icon={<UserCog size={13} />} label="Account settings" />
-              <AccountLink active={appView === 'subscription'} onClick={wrap(onSubscription)} icon={<CreditCard size={13} />} label="Subscription" />
-              <AccountLink active={appView === 'order-history'} onClick={wrap(onOrderHistory)} icon={<Receipt size={13} />} label="Order history" />
-            </div>
+            <button
+              type="button"
+              onClick={() => void logout()}
+              className="text-[11px] text-text-secondary hover:text-text-primary shrink-0 focus-ring rounded"
+            >
+              Sign out
+            </button>
           </div>
         )}
 

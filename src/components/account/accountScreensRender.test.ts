@@ -152,6 +152,43 @@ describe('SubscriptionContent', () => {
   });
 });
 
+describe('AccountMenu', () => {
+  it('shows the signed-in trigger, closed', async () => {
+    const { AccountMenu } = await import('./AccountMenu');
+    const html = paint(
+      createElement(AccountMenu, {
+        onAccount: noop,
+        onSubscription: noop,
+        onOrderHistory: noop,
+      }),
+    );
+
+    expect(html).toContain('aria-expanded="false"');
+    // Closed means closed: rendering the panel and hiding it would put the email address of the
+    // signed-in user into the markup of every screen in the app.
+    expect(html).not.toContain('Signed in as');
+    expect(html).not.toContain('trader@example.com');
+  });
+
+  it('renders nothing at all with no account', async () => {
+    const restore = auth.user;
+    // @ts-expect-error -- deliberately the signed-out shape, which the component guards against.
+    auth.user = null;
+
+    const { AccountMenu } = await import('./AccountMenu');
+    const html = paint(
+      createElement(AccountMenu, {
+        onAccount: noop,
+        onSubscription: noop,
+        onOrderHistory: noop,
+      }),
+    );
+    expect(html).toBe('');
+
+    auth.user = restore;
+  });
+});
+
 describe('OrderHistoryContent', () => {
   it('paints before the fetch resolves rather than throwing on a null history', () => {
     // Effects do not run under renderToString, so this is the state the screen is in on first

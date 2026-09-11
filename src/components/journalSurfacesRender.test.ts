@@ -175,9 +175,6 @@ const sidebar = (appView: Parameters<typeof Sidebar>[0]['appView']) =>
     onSettings: noop,
     onSupport: noop,
     onCoach: noop,
-    onAccount: noop,
-    onSubscription: noop,
-    onOrderHistory: noop,
     onAdmin: noop,
     onHome: noop,
   });
@@ -200,31 +197,17 @@ describe('Sidebar', () => {
     }
   });
 
-  it('puts the three account rows under the signed-in identity', () => {
+  it('leaves the account screens to the top bar', () => {
+    // They lived under the identity row for one release and moved into the account dropdown. Two
+    // routes to the same three screens, one of them at the very bottom of the panel, is how a nav
+    // ends up with eleven destinations again.
     const html = renderToString(sidebar('dashboard'));
 
-    for (const label of ['Account settings', 'Subscription', 'Order history']) {
-      expect(html).toContain(label);
+    for (const moved of ['Account settings', 'Subscription', 'Order history']) {
+      expect(html, moved).not.toContain(moved);
     }
-    // After the email address, not before it: they are about the account named above them, and
-    // the footer is the only part of the panel that knows who is signed in.
-    expect(html.indexOf('trader@example.com')).toBeLessThan(html.indexOf('Account settings'));
-  });
-
-  it('hides the account rows from a signed-out panel', async () => {
-    // Nothing behind them would work, and "Subscription" on a panel with no account is an invitation
-    // to a screen that can only say no.
-    vi.resetModules();
-    vi.doMock('../context/useAuth', () => ({
-      useAuth: () => ({ user: null, username: null, loading: false, firebaseEnabled: true, logout: async () => undefined }),
-    }));
-    const { Sidebar: SignedOut } = await import('./Sidebar');
-    const html = renderToString(createElement(SignedOut, { ...sidebar('dashboard').props }));
-
-    expect(html).not.toContain('Account settings');
-    expect(html).not.toContain('Order history');
-    vi.doUnmock('../context/useAuth');
-    vi.resetModules();
+    // The identity row itself stays — it is what the dropdown is about.
+    expect(html).toContain('trader@example.com');
   });
 
   it('does not draw a scrollbar rail down the panel', () => {

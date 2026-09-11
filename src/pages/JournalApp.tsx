@@ -22,6 +22,7 @@ import { AssistantContent } from '../components/analytics/AssistantContent';
 import { RuleStandingBanner } from '../components/RuleStandingBanner';
 import { CoachNotesPanel } from '../components/coach/CoachNotesPanel';
 import { CoachInboxContent } from '../components/coach/CoachInboxContent';
+import { AccountMenu } from '../components/account/AccountMenu';
 import { AccountSettingsContent } from '../components/account/AccountSettingsContent';
 import { SubscriptionContent } from '../components/account/SubscriptionContent';
 import { OrderHistoryContent } from '../components/account/OrderHistoryContent';
@@ -245,6 +246,15 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
     onAdmin,
   };
 
+  /* Built once and handed to whichever header is on screen, so the two can never drift apart. */
+  const accountMenu = (
+    <AccountMenu
+      onAccount={sidebarActions.onAccount}
+      onSubscription={sidebarActions.onSubscription}
+      onOrderHistory={sidebarActions.onOrderHistory}
+    />
+  );
+
   return (
     <div
       className={`flex w-full bg-bg-primary dashboard-bg ${
@@ -256,7 +266,17 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
 
       {/* relative: keeps this content painting above the fixed Starfield canvas behind it */}
       <div className={`relative flex-1 flex flex-col min-w-0 w-full ${isDesktop ? '' : 'min-h-0'}`}>
-        {!isDesktop && <MobileHeader onHome={onHome} />}
+        {!isDesktop && <MobileHeader onHome={onHome} account={accountMenu} />}
+
+        {/*
+          The desktop top bar. Only the account control lives here: the sidebar is still the nav,
+          and a second row of destinations across the top would be two answers to "where do I go".
+          Sticky rather than scrolling away, because the thing it holds is the one control that is
+          not somewhere else on the screen.
+        */}
+        {isDesktop && (
+          <div className="sticky top-0 z-30 flex justify-end px-5 pt-3 pb-1">{accountMenu}</div>
+        )}
 
         <main
           className={`flex-1 p-2 md:p-5 ${

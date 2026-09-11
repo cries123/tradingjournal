@@ -23,9 +23,16 @@ interface MobileNavProps {
  * is the wrong one to keep. The logo shrank and the tagline dropped with it, because this bar was
  * spending 16% of an 844px viewport restating the name of an app the user deliberately opened.
  */
-export function MobileHeader({ onHome }: { onHome?: () => void }) {
+export function MobileHeader({
+  onHome,
+  account,
+}: {
+  onHome?: () => void;
+  /** The account dropdown. Optional so the header still renders where there is no journal to open. */
+  account?: ReactNode;
+}) {
   return (
-    <header className="md:hidden shrink-0 flex items-center px-3 py-1.5 pt-[max(0.375rem,env(safe-area-inset-top))] border-b border-border/60 bg-bg-secondary/90 backdrop-blur-md">
+    <header className="md:hidden shrink-0 flex items-center gap-2 px-3 py-1.5 pt-[max(0.375rem,env(safe-area-inset-top))] border-b border-border/60 bg-bg-secondary/90 backdrop-blur-md">
       {onHome ? (
         <button type="button" onClick={onHome} className="min-w-0 text-left focus-ring rounded">
           <BrandLogo size="sm" variant="compact" />
@@ -35,6 +42,10 @@ export function MobileHeader({ onHome }: { onHome?: () => void }) {
           <BrandLogo size="sm" variant="compact" />
         </div>
       )}
+
+      {/* Pushed to the trailing edge, opposite the logo — the same corner the marketing nav puts
+          it in, so the control does not move when somebody crosses between the two. */}
+      {account && <div className="ml-auto shrink-0">{account}</div>}
     </header>
   );
 }
