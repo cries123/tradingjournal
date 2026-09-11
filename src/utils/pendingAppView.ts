@@ -13,7 +13,21 @@
 
 const KEY = 'tc-pending-app-view';
 
-export type PendingAppView = 'connect-broker';
+export type PendingAppView = 'connect-broker' | 'account' | 'subscription' | 'order-history';
+
+/**
+ * The views a marketing page is allowed to ask for.
+ *
+ * A list rather than a cast, because this value comes back out of sessionStorage — which the user
+ * can edit — and is then pushed straight onto the view stack. Anything not named here opens the
+ * dashboard instead of a screen that does not exist.
+ */
+const ALLOWED: readonly PendingAppView[] = [
+  'connect-broker',
+  'account',
+  'subscription',
+  'order-history',
+];
 
 export function setPendingAppView(view: PendingAppView): void {
   try {
@@ -28,7 +42,7 @@ export function takePendingAppView(): PendingAppView | null {
   try {
     const value = sessionStorage.getItem(KEY);
     if (value) sessionStorage.removeItem(KEY);
-    return value === 'connect-broker' ? value : null;
+    return ALLOWED.includes(value as PendingAppView) ? (value as PendingAppView) : null;
   } catch {
     return null;
   }

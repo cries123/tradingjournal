@@ -113,6 +113,24 @@ import {
   type AdminBrokerUser,
   type AdminServerStats,
 } from '../services/adminStats';
+import {
+  effectiveTierOf,
+  fetchAllEntitlements,
+  type AdminEntitlementView,
+} from '../services/adminEntitlements';
+import { TIER_PLANS, type Tier } from '../config/tiers';
+
+/**
+ * One colour per paid plan, so the ladder is legible at a glance rather than read word by word.
+ *
+ * Deliberately the same family as the plan cards on the pricing page — somebody who has stared at
+ * those knows which is which without the label.
+ */
+const PLAN_BADGE: Record<Exclude<Tier, 'free'>, string> = {
+  silver: 'bg-slate-400/15 text-slate-300',
+  gold: 'bg-amber-400/15 text-amber-300',
+  diamond: 'bg-cyan-400/15 text-cyan-300',
+};
 
 interface AdminPageProps {
   onHome: () => void;
@@ -203,6 +221,8 @@ type AdminState =
       serverStats: AdminServerStats | null;
       serverStatsError: string | null;
       userNotes: Map<string, AdminUserNote>;
+      /** Plans by uid. Null until loaded — an empty map would render every row as Free. */
+      entitlements: Map<string, AdminEntitlementView> | null;
       auditLog: AdminAuditEntry[];
       healthHistory: AdminHealthSnapshot[];
     };
@@ -816,13 +836,14 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         serverStats: null,
         serverStatsError: null,
         userNotes: notesResult.status === 'fulfilled' ? notesResult.value : new Map(),
+        entitlements: null,
         auditLog: auditResult.status === 'fulfilled' ? auditResult.value : [],
         healthHistory: [],
       });
 
       // Second wave: the slow half. Timed out rather than awaited forever — a function that never
       // answers should leave one card saying so, not a panel that never finishes loading.
-      const [healthResult, healthHistoryResult, droppedResult, costsResult, visitorResult, serverResult] =
+      const [healthResult, healthHistoryResult, droppedResult, costsResult, visitorResult, serverResult, entitlementsResult] =
         await Promise.allSettled([
           withTimeout(fetchAdminHealth(), 'health check'),
           withTimeout(fetchAdminHealthHistory(), 'health history'),
@@ -830,6 +851,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
           withTimeout(fetchCostReport(), 'cost report'),
           withTimeout(fetchVisitorStats(signupStats.last7Days), 'visitor stats'),
           withTimeout(fetchAdminServerStats(), 'server stats'),
+          withTimeout(fetchAllEntitlements(), 'plans'),
         ]);
 
       if (!isCurrent()) return;
@@ -858,6 +880,8 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
             visitorResult.status === 'fulfilled'
               ? visitorResult.value.error
               : describeAdminActionError(visitorResult.reason),
+          entitlements:
+            entitlementsResult.status === 'fulfilled' ? entitlementsResult.value : new Map(),
           serverStats: serverResult.status === 'fulfilled' ? serverResult.value.stats : null,
           serverStatsError:
             serverResult.status === 'fulfilled'
@@ -886,6 +910,9 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         serverStats: null,
         serverStatsError: null,
         userNotes: new Map(),
+        // Loaded-and-empty rather than null: this is the failure path, and there are no users to
+        // badge anyway. Null would leave the list waiting for plans that are never coming.
+        entitlements: new Map(),
         auditLog: [],
         healthHistory: [],
       });
@@ -1917,6 +1944,29 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                             <div className="min-w-0">
                               <p className="font-semibold text-text-primary">
                                 {entry.username ? `@${entry.username}` : 'No username'}
+                                {/*
+                                  The plan, so the list answers "who is paying" without opening
+                                  forty-two rows. Effective rather than stored: a cancelled
+                                  subscriber still has their tier until the period they paid for
+                                  ends, and a comped account has one with no subscription at all.
+                                  Free is left unbadged — it is the majority and a badge on every
+                                  row would carry no information.
+                                */}
+                                {(() => {
+                                  if (!ready.entitlements) return null;
+                                  const plan = effectiveTierOf(
+                                    ready.entitlements.get(entry.uid) ?? null,
+                                    Date.now(),
+                                  );
+                                  if (plan === 'free') return null;
+                                  return (
+                                    <span
+                                      className={`ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium uppercase tracking-wide ${PLAN_BADGE[plan]}`}
+                                    >
+                                      {TIER_PLANS[plan].name}
+                                    </span>
+                                  );
+                                })()}
                                 {entry.suspended && (
                                   <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 text-[9px] font-medium uppercase tracking-wide">
                                     <Ban size={9} />

@@ -83,13 +83,20 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   // dashboard to go find it. Also covers SnapTrade's post-connect redirect (?brokerConnected=1).
   const [viewStack, setViewStack] = useState<AppView[]>(() => {
     if (typeof window === 'undefined') return ['dashboard'];
-    // Either the landing page asked for the broker screen, or SnapTrade just redirected the
-    // user back here after they approved a connection. Either way the dashboard stays underneath,
-    // so back from the broker screen has somewhere to go.
-    const wantsBroker =
-      takePendingAppView() === 'connect-broker'
-      || new URLSearchParams(window.location.search).has('brokerConnected');
-    return wantsBroker ? ['dashboard', 'connect-broker'] : ['dashboard'];
+    /*
+     * Either a marketing page asked for a specific screen — the broker flow, or one of the account
+     * screens from the nav dropdown — or SnapTrade just redirected the user back here after they
+     * approved a connection. The dashboard always stays underneath, so Back has somewhere to go.
+     *
+     * Taken once, before the brokerConnected check, because takePendingAppView CLEARS what it
+     * reads: calling it inside a short-circuit would leave a pending view sitting in sessionStorage
+     * to ambush the next mount.
+     */
+    const pending = takePendingAppView();
+    if (new URLSearchParams(window.location.search).has('brokerConnected')) {
+      return ['dashboard', 'connect-broker'];
+    }
+    return pending ? ['dashboard', pending] : ['dashboard'];
   });
 
   const appView = currentView(viewStack, 'dashboard');

@@ -1,12 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, LogOut, NotebookPen } from 'lucide-react';
+import { ChevronDown, CreditCard, LogOut, NotebookPen, Receipt, UserCog } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
 import { useEscapeToClose } from '../../hooks/useEscapeToClose';
 import { accountDisplayName, accountInitial } from '../../utils/accountName';
+import { setPendingAppView, type PendingAppView } from '../../utils/pendingAppView';
 
 interface NavAccountMenuProps {
   onLaunch: () => void;
 }
+
+const ACCOUNT_ITEMS: {
+  view: PendingAppView;
+  label: string;
+  Icon: typeof UserCog;
+}[] = [
+  { view: 'account', label: 'Account settings', Icon: UserCog },
+  { view: 'subscription', label: 'Subscription', Icon: CreditCard },
+  { view: 'order-history', label: 'Order history', Icon: Receipt },
+];
 
 /**
  * The signed-in half of the public nav: who you are, and a way back into the journal.
@@ -105,6 +116,31 @@ export function NavAccountMenu({ onLaunch }: NavAccountMenuProps) {
             <NotebookPen className="h-4 w-4 shrink-0 text-emerald-400" aria-hidden />
             <span className="text-sm font-medium text-text-primary">Open journal</span>
           </button>
+
+          {/*
+            The account screens, reached from the marketing pages without a detour through the
+            dashboard. Each opens the journal straight onto that screen: the destination is handed
+            over in sessionStorage rather than the URL, because navigating to /app wipes a query
+            string set beforehand — see utils/pendingAppView.
+          */}
+          {ACCOUNT_ITEMS.map(({ view, label, Icon }) => (
+            <button
+              key={view}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setPendingAppView(view);
+                onLaunch();
+                close();
+              }}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-bg-primary"
+            >
+              <Icon className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
+              <span className="text-sm font-medium text-text-primary">{label}</span>
+            </button>
+          ))}
+
+          <div className="my-1 border-t border-border/50" />
 
           <button
             type="button"
