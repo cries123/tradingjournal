@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, CheckCircle2, LifeBuoy, MessageSquare, Plus, Send } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
 import { useEntitlement } from '../../context/useEntitlement';
+import { reportErrorSilently } from '../../services/errorReporting';
 import {
   createSupportTicket,
   markTicketRead,
@@ -82,7 +83,14 @@ function TicketThread({
   // Opening the thread is what "read" means. Fired once per ticket, and only when there is
   // something to clear, so it isn't a write on every render.
   useEffect(() => {
-    if (ticket.unreadForUser) void markTicketRead(ticket.id, 'user');
+    // Caught for the same reason the profile write is: a bare `void` on a Firestore write turns
+    // any denial into an unhandled rejection with nothing but SDK frames in it. Clearing a read
+    // marker is not worth interrupting anybody over, but it is worth being able to see.
+    if (ticket.unreadForUser) {
+      void markTicketRead(ticket.id, 'user').catch((err: unknown) => {
+        reportErrorSilently(err, 'promise', 'ticket-read');
+      });
+    }
   }, [ticket.id, ticket.unreadForUser]);
 
   useEffect(() => {
@@ -391,7 +399,9 @@ export function SupportTicketsContent({
   );
 
   const closeTicket = useCallback((id: string) => {
-    void updateTicketStatus(id, 'closed');
+    void updateTicketStatus(id, 'closed').catch((err: unknown) => {
+      reportErrorSilently(err, 'promise', 'ticket-close');
+    });
   }, []);
 
   const unansweredCount = tickets.filter((t) => t.unreadForUser).length;

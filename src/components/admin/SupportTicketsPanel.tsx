@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Clock, Send, User } from 'lucide-react';
+import { reportErrorSilently } from '../../services/errorReporting';
 import {
   markTicketRead,
   MAX_MESSAGE_LENGTH,
@@ -60,7 +61,11 @@ function AdminTicketThread({
   }, [ticket.id]);
 
   useEffect(() => {
-    if (ticket.unreadForSupport) void markTicketRead(ticket.id, 'support');
+    if (ticket.unreadForSupport) {
+      void markTicketRead(ticket.id, 'support').catch((err: unknown) => {
+        reportErrorSilently(err, 'promise', 'ticket-read-support');
+      });
+    }
   }, [ticket.id, ticket.unreadForSupport]);
 
   useEffect(() => {

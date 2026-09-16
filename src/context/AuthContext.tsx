@@ -26,6 +26,7 @@ import {
 import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebase';
 import { isAccountDeleted } from '../services/deletedAccounts';
 import { ensureUserProfile } from '../services/userProfile';
+import { reportErrorSilently } from '../services/errorReporting';
 import { UsernameTakenError, claimUsername as claimUsernameDoc, cacheUsername, clearCachedUsername, fetchUsername, readCachedUsername } from '../services/username';
 import { renameUsername as renameUsernameRemote, usernameLoginToken } from '../services/account';
 import { validateUsername } from '../utils/usernameValidation';
@@ -97,7 +98,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user || !firebaseEnabled) return;
-    void ensureUserProfile(user, false);
+    /*
+     * Named, because this is the one that has been landing in the error feed as an anonymous
+     * "FirebaseError: Missing or insufficient permissions" with nothing but minified SDK frames.
+     *
+     * It fires on every auth state change and writes users/{uid}. The write loses its permission
+     * the instant the session behind it does — signing out with the write still in flight, a
+     * token revoked because the account was suspended, a tombstoned account — and a bare `void`
+     * turned all of that into an unhandled rejection nobody could trace. Reporting it under a
+     * scope means the next one names itself; swallowing it is right because the profile document
+     * is bookkeeping the trader never sees, and failing to refresh lastLoginAt must not break a
+     * session that is otherwise working.
+     */
+    void ensureUserProfile(user, false).catch((err: unknown) => {
+      reportErrorSilently(err, 'promise', 'profile-sync');
+    });
   }, [user, firebaseEnabled]);
 
   useEffect(() => {
