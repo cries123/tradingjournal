@@ -1676,13 +1676,16 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
               />
 
               <div className="grid xl:grid-cols-2 gap-4 mb-8">
+                {/* Both read serverStats, which arrives with the funnel's group. */}
                 <SignupTrendPanel
                   serverStats={ready.serverStats}
                   serverError={ready.serverStatsError}
+                  loading={ready.funnel === 'loading'}
                 />
                 <BrokerAdoptionPanel
                   serverStats={ready.serverStats}
                   serverError={ready.serverStatsError}
+                  loading={ready.funnel === 'loading'}
                 />
               </div>
 

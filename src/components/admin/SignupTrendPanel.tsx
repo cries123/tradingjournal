@@ -4,6 +4,16 @@ import type { AdminServerStats } from '../../services/adminStats';
 interface SignupTrendPanelProps {
   serverStats: AdminServerStats | null;
   serverError: string | null;
+  /**
+   * Still waiting on /api/admin-stats.
+   *
+   * Without this the empty state cannot tell "not loaded yet" from "not configured", and it chose
+   * the accusation: the panel told the site owner to go and set an environment variable every time
+   * the page opened, while the request that would have filled it was still in flight. It is a
+   * convincing thing to be told, and it sent somebody looking for a misconfiguration that was not
+   * there.
+   */
+  loading?: boolean;
 }
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: string }) {
@@ -24,7 +34,7 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: str
  * because the two can disagree: an account whose profile write failed still signed up, and
  * counting profiles would quietly under-report exactly the users worth investigating.
  */
-export function SignupTrendPanel({ serverStats, serverError }: SignupTrendPanelProps) {
+export function SignupTrendPanel({ serverStats, serverError, loading = false }: SignupTrendPanelProps) {
   if (!serverStats) {
     return (
       <div className="glass-card rounded-xl p-5 md:p-6">
@@ -33,7 +43,7 @@ export function SignupTrendPanel({ serverStats, serverError }: SignupTrendPanelP
           <h2 className="text-sm font-semibold">Signups</h2>
         </div>
         <p className="text-xs text-text-secondary">
-          {serverError ?? 'Set FIREBASE_SERVICE_ACCOUNT_JSON on Netlify to read signup stats.'}
+          {loading ? 'Loading…' : serverError ?? 'Set FIREBASE_SERVICE_ACCOUNT_JSON on Netlify to read signup stats.'}
         </p>
       </div>
     );

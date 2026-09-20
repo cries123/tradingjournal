@@ -4,6 +4,16 @@ import type { AdminServerStats } from '../../services/adminStats';
 interface BrokerAdoptionPanelProps {
   serverStats: AdminServerStats | null;
   serverError: string | null;
+  /**
+   * Still waiting on /api/admin-stats.
+   *
+   * Without this the empty state cannot tell "not loaded yet" from "not configured", and it chose
+   * the accusation: the panel told the site owner to go and set an environment variable every time
+   * the page opened, while the request that would have filled it was still in flight. It is a
+   * convincing thing to be told, and it sent somebody looking for a misconfiguration that was not
+   * there.
+   */
+  loading?: boolean;
 }
 
 /**
@@ -18,7 +28,7 @@ interface BrokerAdoptionPanelProps {
  * fills in as users happen to browse — that earlier design reported zero connections for users
  * who were plainly connected, because nothing had triggered a status check for them yet.
  */
-export function BrokerAdoptionPanel({ serverStats, serverError }: BrokerAdoptionPanelProps) {
+export function BrokerAdoptionPanel({ serverStats, serverError, loading = false }: BrokerAdoptionPanelProps) {
   if (!serverStats) {
     return (
       <div className="glass-card rounded-xl p-5 md:p-6">
@@ -27,7 +37,7 @@ export function BrokerAdoptionPanel({ serverStats, serverError }: BrokerAdoption
           <h2 className="text-sm font-semibold">Broker connections</h2>
         </div>
         <p className="text-xs text-text-secondary">
-          {serverError ??
+          {loading ? 'Loading…' : serverError ??
             'Set FIREBASE_SERVICE_ACCOUNT_JSON on Netlify to read broker connection stats.'}
         </p>
       </div>
