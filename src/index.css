@@ -540,6 +540,19 @@ details.glass-card > p {
 @layer components {
   .input-field {
     width: 100%;
+    /*
+     * Lets the field shrink inside a grid or flex column.
+     *
+     * width:100% is not enough on its own. A grid item's min-width defaults to `auto`, meaning "no
+     * narrower than my content" — and date and time inputs carry a large intrinsic width from the
+     * UA stylesheet, iOS Safari's especially, because they reserve room for the picker. So the
+     * column grew to fit the input rather than the input shrinking to fit the column, and the
+     * Entry/Exit time row pushed straight through the right edge of the trade modal.
+     *
+     * On the element as well as the wrapper below, because both are in that chain and either one
+     * refusing to shrink is enough to blow the row out.
+     */
+    min-width: 0;
     padding: 0.5rem 0.75rem;
     background-color: var(--color-bg-tertiary);
     border: 1px solid var(--color-border);

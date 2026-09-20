@@ -325,7 +325,9 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="block">
+    /* min-w-0: this label is the grid item, and a grid item will not shrink below its content
+       unless told to. See .input-field in index.css for what that cost. */
+    <label className="block min-w-0">
       <span className="text-xs text-text-secondary mb-1 block">{label}</span>
       {children}
       {/* The error replaces the hint rather than stacking under it — two lines of small grey and
