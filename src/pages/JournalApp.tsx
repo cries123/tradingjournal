@@ -354,7 +354,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 title="The rule simulator is a paid feature"
                 description="Replay your own journal against a daily stop or a trade cap and see what it would have cost you — or saved you. Your trades, your days, no market data required."
               >
-                <RuleSimulatorContent trades={allTrades} onBack={goBackView} />
+                <RuleSimulatorContent periods={assistantPeriods} onBack={goBackView} />
               </LockedFeature>
             ) : appView === 'assistant' ? (
               <LockedFeature

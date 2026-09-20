@@ -6,16 +6,44 @@ import { useSettings } from '../../context/useSettings';
 import { formatCurrency } from '../../utils/format';
 import { rulesAreTestable, simulateRules, type SimulatedDay } from '../../utils/ruleSimulator';
 
-interface RuleSimulatorContentProps {
+export interface SimulatorPeriod {
+  scope: 'month' | 'year' | 'all';
+  label: string;
   trades: Trade[];
+}
+
+interface RuleSimulatorContentProps {
+  periods: SimulatorPeriod[];
   onBack: () => void;
 }
+
+/**
+ * Below this, a rule's result is a coincidence.
+ *
+ * Four stopped days out of six is not evidence that a daily stop works, it is one bad Tuesday. The
+ * screen still shows the number — hiding it would be worse — but it says plainly that the sample
+ * is too thin to conclude from, the same way the Performance screen's MIN_SAMPLE gates do.
+ */
+const THIN_SAMPLE_DAYS = 20;
 
 const STOP_LABEL: Record<NonNullable<SimulatedDay['stoppedBy']>['rule'], string> = {
   max_trades: 'trade cap',
   max_loss: 'daily loss limit',
   max_gain: "day's target",
 };
+
+/**
+ * "Aug 27", from a YYYY-MM-DD key.
+ *
+ * Parsed by hand rather than through Date(key), which reads a bare date string as UTC midnight and
+ * then prints it in local time — one timezone west of Greenwich and every row shows the day before.
+ * That is the same trap the rule-standing tests fell into.
+ */
+function shortDate(key: string): string {
+  const [y, m, d] = key.split('-').map(Number);
+  if (!y || !m || !d) return key;
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 
 /** Blank clears the rule rather than meaning zero — "" and 0 are different answers here. */
 function numberOrNull(value: string): number | null {
@@ -38,8 +66,22 @@ function numberOrNull(value: string): number | null {
  * Every figure comes from simulateRules. Nothing is recomputed here, so the screen cannot round or
  * count anything differently from the function that is under test.
  */
-export function RuleSimulatorContent({ trades, onBack }: RuleSimulatorContentProps) {
+export function RuleSimulatorContent({ periods, onBack }: RuleSimulatorContentProps) {
   const { settings, updateSettings } = useSettings();
+
+  /*
+   * All time by default, NOT the month the dashboard happens to be showing.
+   *
+   * A rule is a claim about how you trade, and one month is six or eight stopped days — a sample
+   * that produces a confident number and a different one next month. The month is still offered,
+   * because "did my stop help in September" is a fair question, but it is not the answer somebody
+   * should land on without choosing it.
+   */
+  const [scope, setScope] = useState<SimulatorPeriod['scope']>('all');
+  const period = periods.find((p) => p.scope === scope) ?? periods[periods.length - 1];
+  /* Memoised because `?? []` is a fresh array every render, which would make the simulation below
+     re-run on every keystroke in a rule box rather than only when the rule or the period changes. */
+  const trades = useMemo(() => period?.trades ?? [], [period]);
 
   // Seeded from the rules they already set, so the screen opens on their own limits rather than on
   // an invented example — and so "save" is usually a small change rather than a new decision.
@@ -89,6 +131,26 @@ export function RuleSimulatorContent({ trades, onBack }: RuleSimulatorContentPro
         <p className="text-sm text-text-secondary mt-1">
           Your own trades, replayed against rules you set. Nothing here changes your journal.
         </p>
+      </div>
+
+      {/* Its own period, independent of what the dashboard is showing — asking "what would a stop
+          have done to my year" should not mean navigating the calendar first. */}
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Period">
+        {periods.map((p) => (
+          <button
+            key={p.scope}
+            type="button"
+            onClick={() => setScope(p.scope)}
+            aria-pressed={p.scope === scope}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus-ring ${
+              p.scope === scope
+                ? 'bg-accent/15 text-accent'
+                : 'border border-border text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
       </div>
 
       {trades.length === 0 ? (
@@ -151,6 +213,16 @@ export function RuleSimulatorContent({ trades, onBack }: RuleSimulatorContentPro
               {result.totalTrades} trades. Once a day is stopped, every trade after it that day is
               removed along with its result — win or lose.
             </p>
+
+            {testable && result.tradingDays > 0 && result.tradingDays < THIN_SAMPLE_DAYS && (
+              /* Shown rather than the number being hidden: the figure is real, it just is not yet
+                 evidence of anything. Saying so is the difference between a tool and a fortune
+                 teller. */
+              <p className="text-xs text-amber-300/90 mt-2 leading-relaxed">
+                Only {result.tradingDays} trading days here — enough to see what happened, not
+                enough to conclude a rule works. Try a longer period.
+              </p>
+            )}
           </section>
 
           <div className="grid lg:grid-cols-[300px_1fr] gap-6 items-start">
@@ -243,13 +315,23 @@ export function RuleSimulatorContent({ trades, onBack }: RuleSimulatorContentPro
                           <th className="pb-2 font-medium text-right">Trades</th>
                           <th className="pb-2 font-medium text-right">Actual</th>
                           <th className="pb-2 font-medium text-right">Simulated</th>
-                          <th className="pb-2 pl-4 font-medium">Stopped by</th>
+                          {/* Five columns in 366px gave every row three wrapped lines and a 61px
+                              height. On a phone this moves under the date instead, where it reads
+                              as a sentence rather than a squeezed column. */}
+                          <th className="hidden sm:table-cell pb-2 pl-4 font-medium">Stopped by</th>
                         </tr>
                       </thead>
                       <tbody>
                         {result.changedDays.slice(0, 25).map((day) => (
                           <tr key={day.date} className="border-t border-border/50">
-                            <td className="py-2.5 whitespace-nowrap">{day.date}</td>
+                            <td className="py-2.5 whitespace-nowrap">
+                              {shortDate(day.date)}
+                              {day.stoppedBy && (
+                                <span className="block sm:hidden text-[10px] text-text-secondary font-normal">
+                                  {STOP_LABEL[day.stoppedBy.rule]}, trade {day.stoppedBy.atTrade}
+                                </span>
+                              )}
+                            </td>
                             <td className="py-2.5 text-right tabular-nums text-text-secondary">
                               {day.actualTrades} → {day.keptTrades}
                             </td>
@@ -267,7 +349,7 @@ export function RuleSimulatorContent({ trades, onBack }: RuleSimulatorContentPro
                             >
                               {formatCurrency(day.simulatedPnl)}
                             </td>
-                            <td className="py-2.5 pl-4 text-[11px] text-text-secondary">
+                            <td className="hidden sm:table-cell py-2.5 pl-4 text-[11px] text-text-secondary">
                               {day.stoppedBy
                                 ? `${STOP_LABEL[day.stoppedBy.rule]}, trade ${day.stoppedBy.atTrade}`
                                 : '—'}
