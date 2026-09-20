@@ -53,6 +53,14 @@ export function fetchOrderHistory(): Promise<OrderHistory> {
 }
 
 /**
+ * Deletes the signed-in account and everything in it. Irreversible, and there is no export
+ * afterwards — the Settings CSV backup is the only copy anybody keeps.
+ */
+export function deleteOwnAccount(confirmation: string): Promise<{ message: string }> {
+  return accountPost<{ message: string }>({ action: 'deleteAccount', confirmation });
+}
+
+/**
  * Exchanges a username and password for a custom token.
  *
  * Separate from accountPost because this one is called by somebody who is not signed in — there is

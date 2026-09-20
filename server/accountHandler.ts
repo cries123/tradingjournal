@@ -1,4 +1,5 @@
 import { getAdminFirestore } from './firebaseAdmin';
+import { purgeAccount } from './accountTeardown';
 import { decideRename, renameAvailableAt } from './usernameRename';
 import { validateUsername } from '../src/utils/usernameValidation';
 import { isTier, TIER_PLANS, type Tier } from '../src/config/tiers';
@@ -91,6 +92,35 @@ export async function renameUsernameFor(uid: string, requested: string): Promise
   });
 
   return { username: normalized, nextChangeAt: renameAvailableAt(changedAt) };
+}
+
+/**
+ * Deleting your own account.
+ *
+ * The same teardown the admin panel runs, on the caller's own uid — which comes from the verified
+ * ID token and never from the body, so this cannot be pointed at anybody else.
+ *
+ * The confirmation is required here rather than trusted to the dialog. A client-side "are you
+ * sure" is a courtesy; this endpoint is reachable without one, and an irreversible action that
+ * deletes a person's entire trading history should not be one malformed request away.
+ *
+ * Deliberately NOT gated on having no subscription. Somebody who wants to leave should not be told
+ * to go and cancel first — that reads as an obstacle, and the Creem subscription stops billing when
+ * its customer is gone. The UI says so plainly before they confirm.
+ */
+export async function deleteOwnAccount(uid: string, confirmation: string): Promise<{ message: string }> {
+  if (confirmation.trim().toUpperCase() !== 'DELETE') {
+    throw new AccountRequestError('Type DELETE to confirm.', 400);
+  }
+
+  const adminSnap = await getAdminFirestore().doc('config/admin').get();
+  if ((adminSnap.data() as { uid?: string } | undefined)?.uid === uid) {
+    // Deleting the site admin locks everybody out of the admin panel with no way back in.
+    throw new AccountRequestError('The site admin account cannot be deleted here.', 400);
+  }
+
+  await purgeAccount(uid);
+  return { message: 'Your account and everything in it have been deleted.' };
 }
 
 export interface OrderHistoryEntry {

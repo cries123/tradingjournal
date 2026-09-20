@@ -205,6 +205,8 @@ type AdminState =
        * function start should not decide when an admin gets to see their bug reports.
        */
       extras: 'loading' | 'ready';
+      /** The acquisition funnel's own two calls, so it never waits on the health check's third parties. */
+      funnel: 'loading' | 'ready';
       isNewClaim: boolean;
       reports: BugReport[];
       brokerRequests: BrokerSupportRequest[];
@@ -820,6 +822,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
       setState({
         phase: 'ready',
         extras: 'loading',
+        funnel: 'loading',
         isNewClaim: access.isNewClaim,
         reports: reportsResult.status === 'fulfilled' ? reportsResult.value : [],
         brokerRequests: brokerResult.status === 'fulfilled' ? brokerResult.value : [],
@@ -841,59 +844,84 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         healthHistory: [],
       });
 
-      // Second wave: the slow half. Timed out rather than awaited forever — a function that never
-      // answers should leave one card saying so, not a panel that never finishes loading.
-      const [healthResult, healthHistoryResult, droppedResult, costsResult, visitorResult, serverResult, entitlementsResult] =
-        await Promise.allSettled([
-          withTimeout(fetchAdminHealth(), 'health check'),
-          withTimeout(fetchAdminHealthHistory(), 'health history'),
-          withTimeout(fetchErrorsDroppedToday(), 'dropped-error count'),
-          withTimeout(fetchCostReport(), 'cost report'),
-          withTimeout(fetchVisitorStats(signupStats.last7Days), 'visitor stats'),
-          withTimeout(fetchAdminServerStats(), 'server stats'),
-          withTimeout(fetchAllEntitlements(), 'plans'),
-        ]);
-
-      if (!isCurrent()) return;
-
-      const health = healthResult.status === 'fulfilled' ? healthResult.value : null;
-      if (health) void recordAdminHealthSnapshot(health);
-
-      setState((prev) => {
-        if (prev.phase !== 'ready') return prev;
-        return {
-          ...prev,
-          extras: 'ready',
-          health,
-          healthHistory: healthHistoryResult.status === 'fulfilled' ? healthHistoryResult.value : [],
-          errorsDropped: droppedResult.status === 'fulfilled' ? droppedResult.value : 0,
-          costs: costsResult.status === 'fulfilled' ? costsResult.value.report : null,
-          costsError:
-            costsResult.status === 'fulfilled'
-              ? costsResult.value.error
-              : describeAdminActionError(costsResult.reason),
-          visitorStats:
-            visitorResult.status === 'fulfilled'
-              ? visitorResult.value.stats
-              : emptyVisitorStats(signupStats.last7Days),
-          visitorStatsError:
-            visitorResult.status === 'fulfilled'
-              ? visitorResult.value.error
-              : describeAdminActionError(visitorResult.reason),
-          entitlements:
-            entitlementsResult.status === 'fulfilled' ? entitlementsResult.value : new Map(),
-          serverStats: serverResult.status === 'fulfilled' ? serverResult.value.stats : null,
-          serverStatsError:
-            serverResult.status === 'fulfilled'
-              ? serverResult.value.error
-              : describeAdminActionError(serverResult.reason),
-        };
+      /*
+       * Second wave: the slow half, in two groups that finish independently.
+       *
+       * This used to be one Promise.allSettled over all six with a single `extras` flag flipped at
+       * the end — so the acquisition funnel, which needs two of them, waited for the slowest of
+       * six. One of those six is the health check, and that is not one request either: it fans out
+       * to SnapTrade, a market-data endpoint and Creem. The funnel sat at "Counting visitors…"
+       * behind third parties it has nothing to do with, for up to the 15s withTimeout ceiling.
+       *
+       * Grouped by the card that consumes them instead. Each group paints when its own data lands,
+       * and a third party having a slow morning now delays only the card that asked about it.
+       */
+      const funnelDone = Promise.allSettled([
+        withTimeout(fetchVisitorStats(signupStats.last7Days), 'visitor stats'),
+        withTimeout(fetchAdminServerStats(), 'server stats'),
+        withTimeout(fetchAllEntitlements(), 'plans'),
+      ]).then(([visitorResult, serverResult, entitlementsResult]) => {
+        if (!isCurrent()) return;
+        setState((prev) => {
+          if (prev.phase !== 'ready') return prev;
+          return {
+            ...prev,
+            funnel: 'ready',
+            visitorStats:
+              visitorResult.status === 'fulfilled'
+                ? visitorResult.value.stats
+                : emptyVisitorStats(signupStats.last7Days),
+            visitorStatsError:
+              visitorResult.status === 'fulfilled'
+                ? visitorResult.value.error
+                : describeAdminActionError(visitorResult.reason),
+            entitlements:
+              entitlementsResult.status === 'fulfilled' ? entitlementsResult.value : new Map(),
+            serverStats: serverResult.status === 'fulfilled' ? serverResult.value.stats : null,
+            serverStatsError:
+              serverResult.status === 'fulfilled'
+                ? serverResult.value.error
+                : describeAdminActionError(serverResult.reason),
+          };
+        });
       });
+
+      const rest = Promise.allSettled([
+        withTimeout(fetchAdminHealth(), 'health check'),
+        withTimeout(fetchAdminHealthHistory(), 'health history'),
+        withTimeout(fetchErrorsDroppedToday(), 'dropped-error count'),
+        withTimeout(fetchCostReport(), 'cost report'),
+      ]).then(([healthResult, healthHistoryResult, droppedResult, costsResult]) => {
+        if (!isCurrent()) return;
+
+        const health = healthResult.status === 'fulfilled' ? healthResult.value : null;
+        if (health) void recordAdminHealthSnapshot(health);
+
+        setState((prev) => {
+          if (prev.phase !== 'ready') return prev;
+          return {
+            ...prev,
+            extras: 'ready',
+            health,
+            healthHistory: healthHistoryResult.status === 'fulfilled' ? healthHistoryResult.value : [],
+            errorsDropped: droppedResult.status === 'fulfilled' ? droppedResult.value : 0,
+            costs: costsResult.status === 'fulfilled' ? costsResult.value.report : null,
+            costsError:
+              costsResult.status === 'fulfilled'
+                ? costsResult.value.error
+                : describeAdminActionError(costsResult.reason),
+          };
+        });
+      });
+
+      // Awaited only so the catch below still covers both groups; neither card waits on the other.
+      await Promise.allSettled([funnelDone, rest]);
     } catch {
       if (!isCurrent()) return;
       setState({
         phase: 'ready',
         extras: 'ready',
+        funnel: 'ready',
         isNewClaim: access.isNewClaim,
         reports: [],
         brokerRequests: [],
@@ -1644,7 +1672,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                 annualSignups={annualSignups}
                 visitorError={ready.visitorStatsError}
                 serverError={ready.serverStatsError}
-                loading={ready.extras === 'loading'}
+                loading={ready.funnel === 'loading'}
               />
 
               <div className="grid xl:grid-cols-2 gap-4 mb-8">

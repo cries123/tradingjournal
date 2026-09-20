@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useAuth } from '../../context/useAuth';
 import { authErrorCode, authErrorMessage } from '../../utils/authErrors';
 import { RENAME_COOLDOWN_DAYS } from '../../config/accountRules';
+import { deleteOwnAccount } from '../../services/account';
+import { refreshEmailVerified, resendEmailVerification } from '../../services/entitlement';
 import { AccountPanel, AccountScreen, Field, FormNote } from './AccountScreen';
 
 interface AccountSettingsContentProps {
@@ -45,6 +47,8 @@ export function AccountSettingsContent({ onBack }: AccountSettingsContentProps) 
     >
       <UsernamePanel current={username} onRename={renameUsername} />
 
+      <VerifyEmailPanel />
+
       {hasPassword ? (
         <>
           <EmailPanel currentEmail={user?.email ?? null} onChange={changeEmail} />
@@ -65,7 +69,177 @@ export function AccountSettingsContent({ onBack }: AccountSettingsContentProps) 
           </a>
         </AccountPanel>
       )}
+
+      <DeleteAccountPanel />
     </AccountScreen>
+  );
+}
+
+/**
+ * Confirming the email address — the half of this that was already written and never wired up.
+ *
+ * resendEmailVerification and refreshEmailVerified have existed in services/entitlement since the
+ * trial shipped, with no caller anywhere in the app. Meanwhile the server refuses a free trial on
+ * an unconfirmed address and tells the person "Confirm your email address first — we have sent you
+ * a link". If that email bounced, went to spam, or was simply never sent, there was no button
+ * anywhere to send another one: a dead end at the exact moment somebody is trying to start paying.
+ *
+ * Hidden once the address is confirmed, because then it is a panel about nothing.
+ */
+function VerifyEmailPanel() {
+  const { user } = useAuth();
+  const [verified, setVerified] = useState(user?.emailVerified ?? false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  if (!user || verified) return null;
+
+  const resend = async () => {
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await resendEmailVerification();
+      setSuccess('Sent. Open the link in that email, then come back and press "I have confirmed it".');
+    } catch (err) {
+      setError(describe(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const recheck = async () => {
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      // The link is opened in another tab and nothing tells this one about it.
+      const now = await refreshEmailVerified();
+      setVerified(now);
+      if (!now) setError('Still not confirmed. Open the link in the email first.');
+    } catch (err) {
+      setError(describe(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <AccountPanel
+      title="Confirm your email"
+      description="Your address has not been confirmed yet. Trial offers, receipts and the weekly recap all go there, so an unconfirmed address means silence rather than a bounce anybody notices."
+    >
+      <FormNote error={error} success={success} />
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => void resend()}
+          disabled={busy}
+          className="btn-primary px-4 py-2 text-sm font-semibold disabled:opacity-60"
+        >
+          {busy ? 'Working…' : 'Send the link again'}
+        </button>
+        <button
+          type="button"
+          onClick={() => void recheck()}
+          disabled={busy}
+          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:text-text-primary focus-ring disabled:opacity-60"
+        >
+          I have confirmed it
+        </button>
+      </div>
+    </AccountPanel>
+  );
+}
+
+/**
+ * Leaving, properly.
+ *
+ * There was no way to do this at all — deletion was admin-only, so the only route out was emailing
+ * support and waiting. For a paid product that holds somebody's entire trading history, "you can
+ * take your data and go" is both the decent answer and the one a privacy request expects.
+ *
+ * Typing DELETE rather than clicking twice: this removes every trade, note and journal with no
+ * export afterwards and no way back. The word is checked again on the server, because a
+ * confirmation that only exists in the dialog is not a confirmation.
+ */
+function DeleteAccountPanel() {
+  const { logout } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const remove = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteOwnAccount(typed);
+      // The Auth user is already gone server-side; this clears the local session and cached name
+      // so the app does not sit on a signed-in shell pointing at nothing.
+      await logout().catch(() => undefined);
+      window.location.assign('/');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete your account.');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="panel-card border-red-500/25 p-5 space-y-4">
+      <div>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-red-400">Delete account</h2>
+        <p className="mt-1.5 text-sm leading-relaxed text-text-secondary">
+          Removes your account and everything in it — every trade, note, journal and broker
+          connection. This cannot be undone and there is no copy afterwards, so download a CSV
+          backup from Settings first if you want one. Any subscription stops billing.
+        </p>
+      </div>
+
+      {!open ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="rounded-lg border border-red-500/30 px-4 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/10 focus-ring"
+        >
+          Delete my account
+        </button>
+      ) : (
+        <div className="space-y-3">
+          <Field
+            label="Type DELETE to confirm"
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            disabled={busy}
+            autoComplete="off"
+          />
+          <FormNote error={error} />
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void remove()}
+              disabled={busy || typed.trim().toUpperCase() !== 'DELETE'}
+              className="rounded-lg bg-red-500/90 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-500 focus-ring disabled:opacity-50"
+            >
+              {busy ? 'Deleting…' : 'Delete everything'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                setTyped('');
+                setError(null);
+              }}
+              disabled={busy}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:text-text-primary focus-ring disabled:opacity-60"
+            >
+              Keep my account
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

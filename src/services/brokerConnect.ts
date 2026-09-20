@@ -25,15 +25,57 @@ export class BrokerApiError extends Error {
   syncCredits?: number;
   /** The underlying reason, sent only to the site admin. Undefined for everyone else. */
   detail?: string;
+  /**
+   * The HTTP status the server answered with.
+   *
+   * Carried so the caller can tell a refusal from a fault. Every status this endpoint returns is a
+   * failed sync to the trader, but only some of them are anything to investigate: 402 means their
+   * plan does not include it, 429 means they are out of syncs for today, 503 means SnapTrade is
+   * down. Without the status there is no way to report the faults without also reporting all of
+   * those, which would bury the real ones.
+   */
+  statusCode?: number;
 
-  constructor(message: string, syncsRemaining?: number, syncsPerDay?: number, detail?: string, syncCredits?: number) {
+  constructor(
+    message: string,
+    syncsRemaining?: number,
+    syncsPerDay?: number,
+    detail?: string,
+    syncCredits?: number,
+    statusCode?: number,
+  ) {
     super(message);
     this.name = 'BrokerApiError';
     this.syncsRemaining = syncsRemaining;
     this.syncsPerDay = syncsPerDay;
     this.syncCredits = syncCredits;
     this.detail = detail;
+    this.statusCode = statusCode;
   }
+}
+
+/**
+ * Whether a failed broker call is worth a row in the error feed.
+ *
+ * Failed syncs were invisible: the connect screen's own handler only set React state, so a trader
+ * whose sync failed saw a message and nobody else ever knew. The first one anybody noticed was
+ * found by chance, in an account with two spent syncs and no trades.
+ *
+ * Reporting all of them would be worse than reporting none. A broker being down is one row per
+ * user per attempt, and somebody out of syncs is not a bug at all — both would bury the failures
+ * that are actually ours. So: server faults, and anything that was not an answer from the server
+ * at all, which is the shape a bug in this client takes.
+ */
+export function isReportableBrokerFailure(err: unknown): boolean {
+  if (err instanceof BrokerApiError) {
+    const status = err.statusCode ?? 0;
+    // 503 is SnapTrade being unavailable or unconfigured — expected, loud, and not ours.
+    return status >= 500 && status !== 503;
+  }
+  // A dropped connection mid-sync is the train going into a tunnel, not a defect.
+  const message = err instanceof Error ? err.message : String(err);
+  if (/failed to fetch|networkerror|load failed|network request failed/i.test(message)) return false;
+  return true;
 }
 
 async function brokerApiPost<T>(payload: Record<string, unknown>): Promise<T> {
@@ -74,6 +116,7 @@ async function brokerApiPost<T>(payload: Record<string, unknown>): Promise<T> {
       data.syncsPerDay,
       data.detail,
       data.syncCredits,
+      res.status,
     );
   }
   return data;

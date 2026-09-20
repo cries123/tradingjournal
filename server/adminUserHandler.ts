@@ -1,6 +1,7 @@
 import type { IncomingHttpHeaders } from 'http';
 import { AdminRequestError, assertCallerIsAdmin, getBearerToken } from './adminAuth';
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin';
+import { purgeAccount } from './accountTeardown';
 import { readEntitlement, resolveAccess, writeEntitlement } from './entitlements';
 import {
   adjustCredits,
@@ -79,39 +80,6 @@ interface UsageCounts {
   lastDay: string | null;
 }
 
-async function deleteCollectionDocs(collectionPath: string): Promise<number> {
-  const db = getAdminFirestore();
-  let deleted = 0;
-
-  while (true) {
-    const snap = await db.collection(collectionPath).limit(400).get();
-    if (snap.empty) break;
-    const batch = db.batch();
-    snap.docs.forEach((doc) => batch.delete(doc.ref));
-    await batch.commit();
-    deleted += snap.size;
-  }
-
-  return deleted;
-}
-
-async function deleteUserFirestoreData(uid: string): Promise<void> {
-  const db = getAdminFirestore();
-
-  await deleteCollectionDocs(`users/${uid}/trades`);
-  await deleteCollectionDocs(`users/${uid}/settings`);
-  await deleteCollectionDocs(`users/${uid}/dayNotes`);
-
-  const usernames = await db.collection('usernames').where('uid', '==', uid).get();
-  if (!usernames.empty) {
-    const batch = db.batch();
-    usernames.docs.forEach((doc) => batch.delete(doc.ref));
-    await batch.commit();
-  }
-
-  await db.doc(`users/${uid}`).delete().catch(() => undefined);
-}
-
 async function handleUpdateEmail(targetUid: string, email: string): Promise<{ message: string }> {
   const trimmed = email.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
@@ -144,26 +112,8 @@ async function handleDeleteUser(callerUid: string, targetUid: string): Promise<{
     throw new AdminRequestError('The site admin account cannot be deleted', 400);
   }
 
-  await deleteUserFirestoreData(targetUid);
-
-  // SnapTrade keeps charging for a connection until the user under it is deleted, and nothing else
-  // would ever delete one for an account that no longer exists. Best effort: a refusal here must
-  // not leave the account half-deleted.
-  await resetBrokerLink(targetUid).catch((err) => {
-    console.warn(`[admin-user] could not clear the SnapTrade user for ${targetUid}:`, err);
-  });
-  const db = getAdminFirestore();
-  await db.doc(`brokerConnections/${targetUid}`).delete().catch(() => undefined);
-  await db.doc(`usageCredits/${targetUid}`).delete().catch(() => undefined);
-
-  try {
-    await getAdminAuth().deleteUser(targetUid);
-  } catch (err) {
-    const code = (err as { code?: string }).code;
-    if (code !== 'auth/user-not-found') {
-      throw err;
-    }
-  }
+  // Shared with self-serve deletion from Account settings — see server/accountTeardown.
+  await purgeAccount(targetUid);
 
   return { message: 'User deleted' };
 }

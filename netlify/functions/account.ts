@@ -2,6 +2,7 @@ import type { Handler, HandlerResponse } from '@netlify/functions';
 import { assertCallerUid, BrokerRequestError } from '../../server/snaptradeAuth';
 import {
   AccountRequestError,
+  deleteOwnAccount,
   readOrderHistory,
   renameUsernameFor,
 } from '../../server/accountHandler';
@@ -33,7 +34,7 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
     });
   }
 
-  let body: { action?: string; username?: string };
+  let body: { action?: string; username?: string; confirmation?: string };
   try {
     body = JSON.parse(event.body ?? '{}') as typeof body;
   } catch {
@@ -50,6 +51,10 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
         return json(400, { error: 'Pick a username.' });
       }
       return json(200, await renameUsernameFor(uid, body.username));
+    }
+
+    if (body.action === 'deleteAccount') {
+      return json(200, await deleteOwnAccount(uid, body.confirmation ?? ''));
     }
 
     return json(400, { error: 'Unknown action' });

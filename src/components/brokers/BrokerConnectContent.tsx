@@ -8,6 +8,7 @@ import { brokersLabel, syncsLabel, TIER_PLANS } from '../../config/tiers';
 import { useAuth } from '../../context/useAuth';
 import {
   BrokerApiError,
+  isReportableBrokerFailure,
   checkBrokerConnectAvailable,
   disconnectBroker,
   fetchBrokerStatus,
@@ -182,10 +183,22 @@ export function BrokerConnectContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** Records a failure along with the reason, when the server sent one. */
-  const reportError = (err: unknown, fallback: string) => {
+  /**
+   * Shows a failure to the trader, and — new — tells us about the ones worth knowing.
+   *
+   * This function used to be called `reportError` and reported nothing: it set two pieces of React
+   * state and that was all. The file imports the real reporter and used it in exactly one place,
+   * for a journal write that failed after a successful pull, so the rare case was visible and the
+   * common one was not. Every failed sync, every failed connect and every failed disconnect went
+   * only to the person it happened to.
+   *
+   * Renamed to what it does. The reporting is now explicit and filtered — see
+   * isReportableBrokerFailure for why a broker outage must not become a row per user per attempt.
+   */
+  const showError = (err: unknown, fallback: string, scope: string) => {
     setError(err instanceof Error ? err.message : fallback);
     setErrorDetail(err instanceof BrokerApiError && err.detail ? err.detail : null);
+    if (isReportableBrokerFailure(err)) reportErrorSilently(err, 'promise', scope);
   };
 
   const refreshStatus = async (): Promise<BrokerStatus | null> => {
@@ -197,7 +210,7 @@ export function BrokerConnectContent({
       setStatus(next);
       return next;
     } catch (err) {
-      reportError(err, 'Could not load broker connections');
+      showError(err, 'Could not load broker connections', 'broker-status');
       return null;
     } finally {
       setStatusLoading(false);
@@ -221,7 +234,7 @@ export function BrokerConnectContent({
       const { redirectURI } = await startBrokerConnect(broker);
       window.open(redirectURI, '_blank', 'noopener,noreferrer');
     } catch (err) {
-      reportError(err, 'Could not start connection');
+      showError(err, 'Could not start connection', 'broker-connect');
     } finally {
       setConnectingBroker(null);
     }
@@ -331,7 +344,7 @@ export function BrokerConnectContent({
           syncCredits: bonus,
         });
       }
-      reportError(err, 'Sync failed');
+      showError(err, 'Sync failed', 'broker-sync');
     } finally {
       setSyncingAccountId(null);
     }
@@ -355,7 +368,7 @@ export function BrokerConnectContent({
           : `Disconnected ${account.name ?? account.institutionName}.`,
       );
     } catch (err) {
-      reportError(err, 'Could not disconnect');
+      showError(err, 'Could not disconnect', 'broker-disconnect');
     }
   };
 
