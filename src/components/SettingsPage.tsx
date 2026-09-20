@@ -4,7 +4,7 @@ import { useSettings } from '../context/useSettings';
 import { DiamondSection } from './settings/DiamondSection';
 import { useAuth } from '../context/useAuth';
 import { useEntitlement } from '../context/useEntitlement';
-import { journalsUnlimited, TIER_PLANS } from '../config/tiers';
+import { journalsUnlimited, tierHas, TIER_PLANS } from '../config/tiers';
 import { goToPricing } from '../utils/navigateToPath';
 import type { CurrencyCode, ThemeAccent } from '../types/settings';
 import type { Trade } from '../types';
@@ -13,7 +13,7 @@ import { downloadBackup, parseBackup, type ParsedBackup } from '../utils/backup'
 import { exportMonthReport, exportTaxYearCsv, exportTradesCsv } from '../utils/exportTrades';
 import { availableTaxYears, buildTaxReport } from '../utils/taxReport';
 import { formatCurrency } from '../utils/format';
-import { fetchEmailPrefs, setRecapOptIn } from '../services/emailPrefs';
+import { fetchEmailPrefs, recapIsOn, setRecapOptIn } from '../services/emailPrefs';
 import { ConfirmDialog } from './ConfirmDialog';
 
 interface SettingsPageProps {
@@ -79,7 +79,8 @@ export function SettingsPage({
   /* The recap opt-in lives in its own collection rather than in settings — see
      services/emailPrefs.ts for why the scheduled job needs it there. Loaded once, and stored with
      the uid it belongs to so a signed-out render can never show somebody else's choice. */
-  const [recapPref, setRecapPref] = useState<{ uid: string; recap: boolean } | null>(null);
+  // recap is tri-state: true, false, or null for "never said" — see services/emailPrefs.
+  const [recapPref, setRecapPref] = useState<{ uid: string; recap: boolean | null } | null>(null);
   const [recapSaving, setRecapSaving] = useState(false);
 
   useEffect(() => {
@@ -94,7 +95,11 @@ export function SettingsPage({
     };
   }, [user?.uid]);
 
-  const recapOn = recapPref?.uid === user?.uid && recapPref?.recap === true;
+  /* Matches what the scheduled job will actually do — see recapIsOn. A plan that includes
+     the written review is opted in unless the person has said no. */
+  const recapIncludedByPlan = tierHas(tier, 'aiReview');
+  const recapOn =
+    recapPref?.uid === user?.uid && recapIsOn(recapPref, recapIncludedByPlan);
 
   const toggleRecap = async (next: boolean) => {
     const uid = user?.uid;

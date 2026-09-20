@@ -16,10 +16,31 @@ import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
  */
 
 export interface EmailPrefs {
-  recap: boolean;
+  /**
+   * Three states, not two: yes, no, and never said.
+   *
+   * It used to collapse to a boolean, and that stopped being adequate the day the recap started
+   * defaulting ON for the plans that are sold it. A tier with aiReview and no document gets the
+   * email; a tier with aiReview and an explicit `false` does not. Collapsing "never said" into
+   * "no" would have left the Settings checkbox unticked for exactly the people who are receiving
+   * one every Sunday — the UI quietly contradicting the product.
+   */
+  recap: boolean | null;
 }
 
-export const DEFAULT_EMAIL_PREFS: EmailPrefs = { recap: false };
+export const DEFAULT_EMAIL_PREFS: EmailPrefs = { recap: null };
+
+/**
+ * Whether the recap is on, given the stored preference and whether the plan includes it.
+ *
+ * The same rule the scheduled job applies, written once so the checkbox and the send cannot
+ * disagree. See recapRecipients in netlify/functions/weekly-recap.ts.
+ */
+export function recapIsOn(prefs: EmailPrefs | null, planIncludesIt: boolean): boolean {
+  if (prefs?.recap === true) return true;
+  if (prefs?.recap === false) return false;
+  return planIncludesIt;
+}
 
 export async function fetchEmailPrefs(uid: string): Promise<EmailPrefs> {
   if (!isFirebaseConfigured()) return DEFAULT_EMAIL_PREFS;
@@ -27,10 +48,13 @@ export async function fetchEmailPrefs(uid: string): Promise<EmailPrefs> {
   try {
     const snap = await getDoc(doc(getFirebaseDb(), 'emailPrefs', uid));
     const data = snap.data() as { recap?: unknown } | undefined;
-    return { recap: data?.recap === true };
+    if (data?.recap === true) return { recap: true };
+    if (data?.recap === false) return { recap: false };
+    return { recap: null };
   } catch {
-    // Offline, or rules denying a document that doesn't exist yet. Off is the safe answer for an
-    // opt-in: it never shows somebody a toggle claiming they subscribed to something.
+    // Offline, or rules denying a document that doesn't exist yet. "Never said" rather than "no",
+    // so a transient failure cannot make a Diamond account's toggle read as off while the job is
+    // still sending them one.
     return DEFAULT_EMAIL_PREFS;
   }
 }

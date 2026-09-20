@@ -6,7 +6,7 @@ import { logServerError } from '../../server/errorReports';
 import { aiRecapEmail, weeklyRecapEmail } from '../../server/emailTemplates';
 import { writeReview } from '../../server/aiAssistantHandler';
 import { effectiveTier, readEntitlement } from '../../server/entitlements';
-import { tierHas } from '../../src/config/tiers';
+import { tierHas, TIER_ORDER } from '../../src/config/tiers';
 import { buildJournalFacts } from '../../src/utils/journalFacts';
 import { recordAutomatic } from '../../server/usage';
 import { isMailConfigured, sendEmail, siteUrl } from '../../server/mailer';
@@ -97,6 +97,75 @@ async function diamondReview(uid: string, trades: Trade[]): Promise<string | nul
   }
 }
 
+interface RecapPrefs {
+  lastRecapSentAt?: string;
+}
+
+/**
+ * Who gets a recap this week: everyone who asked for one, plus the tier that is sold one.
+ *
+ * This used to be the opt-in collection alone — emailPrefs where recap == true — and the default
+ * for that flag is false. So a Diamond subscriber who never went into Settings and found the
+ * toggle was not in the recipient list at all, while the pricing page sold them "a weekly review
+ * written by the assistant, emailed to you". Most of them never received the thing they were
+ * paying for and had no way to know it existed.
+ *
+ * Two sources, unioned:
+ *
+ *   - An explicit opt-in, from any tier. Unchanged, and still the only way a Free or Silver
+ *     account gets one.
+ *   - Any account whose plan includes aiReview and has not explicitly opted OUT. Defaulting an
+ *     email on is only defensible when the email is the product they bought; it is not defensible
+ *     for the tiers that were never promised it, which is why this is keyed on the entitlement
+ *     rather than applied to everybody.
+ *
+ * The unsubscribe link in the footer has always worked, and an opt-out written from it is a
+ * recap:false document, which this respects.
+ *
+ * One known gap: an account comped Diamond sits at tier 'free' with the grant inside `comp`, so
+ * the query below does not see it. Those are hand-granted and rare, and the toggle in Settings
+ * still works for them.
+ */
+async function recapRecipients(
+  db: FirebaseFirestore.Firestore,
+): Promise<Map<string, RecapPrefs>> {
+  const chosen = new Map<string, RecapPrefs>();
+
+  const optedIn = await db
+    .collection('emailPrefs')
+    .where('recap', '==', true)
+    .limit(MAX_RECIPIENTS_PER_RUN)
+    .get();
+  for (const doc of optedIn.docs) chosen.set(doc.id, doc.data() as RecapPrefs);
+
+  // The tiers that include the written review. Derived rather than hardcoded so adding aiReview to
+  // another plan brings its subscribers with it.
+  const included = TIER_ORDER.filter((t) => tierHas(t, 'aiReview'));
+  if (included.length === 0) return chosen;
+
+  const entitled = await db
+    .collection('entitlements')
+    .where('tier', 'in', included)
+    .limit(MAX_RECIPIENTS_PER_RUN)
+    .get();
+
+  for (const doc of entitled.docs) {
+    const uid = doc.id;
+    if (chosen.has(uid)) continue;
+    // A lapsed or past_due subscription is not entitled to it, so ask the same function every
+    // other gate in the product asks rather than trusting the stored tier.
+    if (!tierHas(effectiveTier(doc.data() as never, Date.now()), 'aiReview')) continue;
+
+    const prefs = await db.doc(`emailPrefs/${uid}`).get();
+    const data = prefs.data() as ({ recap?: unknown } & RecapPrefs) | undefined;
+    if (data?.recap === false) continue; // said no, explicitly
+
+    chosen.set(uid, data ?? {});
+  }
+
+  return chosen;
+}
+
 async function runRecap(): Promise<{ considered: number; sent: number; skipped: number }> {
   const db = getAdminFirestore();
   const stats = { considered: 0, sent: 0, skipped: 0 };
@@ -106,21 +175,11 @@ async function runRecap(): Promise<{ considered: number; sent: number; skipped: 
     return stats;
   }
 
-  // A dedicated top-level collection rather than a collectionGroup query over every user's
-  // settings document. A collection-group query needs an index somebody has to create by hand in
-  // the console, which would have made this work everywhere except production.
-  const optedIn = await db
-    .collection('emailPrefs')
-    .where('recap', '==', true)
-    .limit(MAX_RECIPIENTS_PER_RUN)
-    .get();
-
+  const recipients = await recapRecipients(db);
   const guard = dayKey(RESEND_GUARD_DAYS);
 
-  for (const doc of optedIn.docs) {
+  for (const [uid, prefs] of recipients) {
     stats.considered += 1;
-    const uid = doc.id;
-    const prefs = doc.data() as { lastRecapSentAt?: string };
 
     try {
       if (prefs.lastRecapSentAt && prefs.lastRecapSentAt.slice(0, 10) >= guard) {
@@ -165,7 +224,15 @@ async function runRecap(): Promise<{ considered: number; sent: number; skipped: 
 
       if (outcome.sent) {
         stats.sent += 1;
-        await doc.ref.set({ lastRecapSentAt: new Date().toISOString() }, { merge: true });
+        /*
+         * Merged rather than set on a doc reference from the query, because a recipient chosen by
+         * entitlement may have no emailPrefs document at all — that is the whole point of the
+         * change. Writing the timestamp creates one, which also gives the resend guard above
+         * something to read next week.
+         */
+        await db
+          .doc(`emailPrefs/${uid}`)
+          .set({ uid, lastRecapSentAt: new Date().toISOString() }, { merge: true });
       } else {
         stats.skipped += 1;
       }
