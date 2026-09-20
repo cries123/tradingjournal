@@ -29,6 +29,7 @@ export function lowestPaidPrice(): number {
 const FEATURE_NAMES: Record<Feature, string> = {
   brokerSync: 'broker sync',
   performanceAnalytics: 'the performance screen',
+  ruleSimulator: 'the rule simulator',
   aiAssistant: 'the AI assistant',
   marketReplay: 'market replay',
   autoSync: 'automatic daily imports',

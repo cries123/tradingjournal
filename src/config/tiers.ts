@@ -100,6 +100,14 @@ export interface TierLimits {
    * analysis of the data, never the recording of it or getting it back out.
    */
   performanceAnalytics: boolean;
+  /**
+   * Replay your own journal against rules you did not follow, and see what it would have changed.
+   *
+   * Gold and above, and it is the first thing on Gold that is a capability rather than a bigger
+   * number — everything else Gold added was more brokers, more syncs, more messages. Costs nothing
+   * to run: it is arithmetic over trades already stored, with no market data behind it.
+   */
+  ruleSimulator: boolean;
 }
 
 export interface TierPlan {
@@ -186,7 +194,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     tagline: 'Log trades by hand and keep the full journal.',
     limits: {
       brokers: 0, syncsPerDay: 0, aiMessagesPerDay: 0, marketReplay: false, journals: 2,
-      performanceAnalytics: false, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
+      performanceAnalytics: false, ruleSimulator: false, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
     },
   },
   silver: {
@@ -196,7 +204,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     tagline: 'Connect a broker and stop typing trades in.',
     limits: {
       brokers: 5, syncsPerDay: 5, aiMessagesPerDay: 0, marketReplay: false, journals: 3,
-      performanceAnalytics: true, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
+      performanceAnalytics: true, ruleSimulator: false, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
     },
     productIdEnv: 'CREEM_PRODUCT_SILVER',
     annualProductIdEnv: 'CREEM_PRODUCT_SILVER_ANNUAL',
@@ -208,7 +216,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     tagline: 'Ten brokers, and an assistant that reads your stats.',
     limits: {
       brokers: 10, syncsPerDay: 10, aiMessagesPerDay: 15, marketReplay: false, journals: 5,
-      performanceAnalytics: true, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
+      performanceAnalytics: true, ruleSimulator: true, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
     },
     productIdEnv: 'CREEM_PRODUCT_GOLD',
     annualProductIdEnv: 'CREEM_PRODUCT_GOLD_ANNUAL',
@@ -221,7 +229,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     limits: {
       brokers: UNLIMITED_BROKERS, syncsPerDay: 24, aiMessagesPerDay: 40, marketReplay: true,
       journals: UNLIMITED_JOURNALS,
-      performanceAnalytics: true, autoSync: true, coachSeat: true, ruleAlerts: true, aiReview: true,
+      performanceAnalytics: true, ruleSimulator: true, autoSync: true, coachSeat: true, ruleAlerts: true, aiReview: true,
     },
     productIdEnv: 'CREEM_PRODUCT_DIAMOND',
     annualProductIdEnv: 'CREEM_PRODUCT_DIAMOND_ANNUAL',
@@ -289,6 +297,7 @@ export type Feature =
   | 'aiAssistant'
   | 'marketReplay'
   | 'performanceAnalytics'
+  | 'ruleSimulator'
   | 'autoSync'
   | 'coachSeat'
   | 'ruleAlerts'
@@ -297,6 +306,7 @@ export type Feature =
 /** The limits flag each boolean feature reads, so the three functions below can't disagree. */
 const BOOLEAN_FEATURES: Partial<Record<Feature, keyof TierLimits>> = {
   performanceAnalytics: 'performanceAnalytics',
+  ruleSimulator: 'ruleSimulator',
   autoSync: 'autoSync',
   coachSeat: 'coachSeat',
   ruleAlerts: 'ruleAlerts',
@@ -358,6 +368,9 @@ export function featureLines(tier: Tier): { text: string; soon?: boolean }[] {
   }
   if (l.aiMessagesPerDay > 0) {
     lines.push({ text: `AI trade analysis — ${l.aiMessagesPerDay} messages per day` });
+  }
+  if (l.ruleSimulator) {
+    lines.push({ text: 'Rule simulator — what a daily stop would have done to your own year' });
   }
 
   /* The four that make the top tier a different product rather than a bigger one. Listed after

@@ -172,6 +172,7 @@ const sidebar = (appView: Parameters<typeof Sidebar>[0]['appView']) =>
     onAddTrade: noop,
     onConnectBroker: noop,
     onPerformance: noop,
+    onSimulator: noop,
     onAssistant: noop,
     onSettings: noop,
     onSupport: noop,
@@ -184,7 +185,9 @@ describe('Sidebar', () => {
   it('paints the six destinations and nothing that used to scroll', () => {
     const html = renderToString(sidebar('dashboard'));
 
-    for (const label of ['Overview', 'Performance', 'Assistant', 'Connect broker', 'Settings', 'Support']) {
+    for (const label of [
+      'Overview', 'Performance', 'Rule simulator', 'Assistant', 'Connect broker', 'Settings', 'Support',
+    ]) {
       expect(html).toContain(label);
     }
     /* The three that moved into Support, the two that moved out of the nav, and the leaderboard,

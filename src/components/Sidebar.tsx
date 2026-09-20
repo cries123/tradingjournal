@@ -8,6 +8,7 @@ import {
   LifeBuoy,
   ShieldCheck,
   Sparkles,
+  FlaskConical,
 } from 'lucide-react';
 import { PlanBadge } from './plan/PlanBadge';
 import { BrandLogo } from './BrandLogo';
@@ -23,6 +24,7 @@ export type SidebarAppView =
   | 'brokers'
   | 'connect-broker'
   | 'performance'
+  | 'simulator'
   | 'assistant'
   | 'report-bug'
   | 'request-broker'
@@ -38,6 +40,7 @@ interface SidebarProps {
   onAddTrade: () => void;
   onConnectBroker: () => void;
   onPerformance: () => void;
+  onSimulator: () => void;
   onAssistant: () => void;
   onSettings: () => void;
   onSupport: () => void;
@@ -123,6 +126,7 @@ export function Sidebar({
   onAddTrade,
   onConnectBroker,
   onPerformance,
+  onSimulator,
   onAssistant,
   onSettings,
   onSupport,
@@ -200,6 +204,14 @@ export function Sidebar({
             onClick={wrap(onPerformance)}
             icon={<Gauge size={16} />}
             label="Performance"
+          />
+          {/* Next to Performance: both answer "what did my trading actually do", and this one is
+              the only place that answers it about a version of the year that did not happen. */}
+          <NavItem
+            active={appView === 'simulator'}
+            onClick={wrap(onSimulator)}
+            icon={<FlaskConical size={16} />}
+            label="Rule simulator"
           />
           <NavItem
             active={appView === 'assistant'}

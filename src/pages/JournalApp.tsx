@@ -23,6 +23,7 @@ import { RuleStandingBanner } from '../components/RuleStandingBanner';
 import { CoachNotesPanel } from '../components/coach/CoachNotesPanel';
 import { CoachInboxContent } from '../components/coach/CoachInboxContent';
 import { AccountMenu } from '../components/account/AccountMenu';
+import { RuleSimulatorContent } from '../components/simulator/RuleSimulatorContent';
 import { AccountSettingsContent } from '../components/account/AccountSettingsContent';
 import { SubscriptionContent } from '../components/account/SubscriptionContent';
 import { OrderHistoryContent } from '../components/account/OrderHistoryContent';
@@ -223,6 +224,10 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
       openView('performance');
       closeMobileMenu();
     },
+    onSimulator: () => {
+      openView('simulator');
+      closeMobileMenu();
+    },
     onAssistant: () => {
       openView('assistant');
       closeMobileMenu();
@@ -342,6 +347,14 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                   month={month}
                   onBack={goBackView}
                 />
+              </LockedFeature>
+            ) : appView === 'simulator' ? (
+              <LockedFeature
+                feature="ruleSimulator"
+                title="The rule simulator is a paid feature"
+                description="Replay your own journal against a daily stop or a trade cap and see what it would have cost you — or saved you. Your trades, your days, no market data required."
+              >
+                <RuleSimulatorContent trades={allTrades} onBack={goBackView} />
               </LockedFeature>
             ) : appView === 'assistant' ? (
               <LockedFeature
