@@ -3,6 +3,7 @@ import { useRoute } from './hooks/useRoute';
 import { usePageMeta } from './hooks/usePageMeta';
 import { useStructuredData } from './hooks/useStructuredData';
 import { useVisitorTracking } from './hooks/useVisitorTracking';
+import { useLiveChat } from './hooks/useLiveChat';
 import { getPageSeo } from './seo/pageMeta';
 import { PageTransition } from './components/motion/FadeIn';
 import { LandingPage } from './pages/LandingPage';
@@ -45,6 +46,7 @@ export default function App() {
   usePageMeta(getPageSeo(route, guideSlug, brokerSlug));
   useStructuredData(route, guideSlug, brokerSlug);
   useVisitorTracking(route, guideSlug, brokerSlug);
+  useLiveChat(route);
 
   const goHome = () => navigate('landing');
   const goApp = () => navigate('app');
