@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
 import type { AdminPriority } from './adminShared';
+import { safeUnsubscribe } from './safeUnsubscribe';
 
 /**
  * Support tickets: a conversation, not a form submission.
@@ -291,15 +292,18 @@ export function subscribeToMyTickets(
    */
   const q = query(collection(getFirebaseDb(), TICKET_COLLECTION), where('uid', '==', uid), limit(50));
 
-  return onSnapshot(
-    q,
-    (snap) =>
-      onChange(
-        snap.docs
-          .map(toTicket)
-          .sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt)),
-      ),
-    (err) => onError?.(err),
+  return safeUnsubscribe(
+    onSnapshot(
+      q,
+      (snap) =>
+        onChange(
+          snap.docs
+            .map(toTicket)
+            .sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt)),
+        ),
+      (err) => onError?.(err),
+    ),
+    'unsub-my-tickets',
   );
 }
 
@@ -320,23 +324,26 @@ export function subscribeToTicketMessages(
     limit(200),
   );
 
-  return onSnapshot(
-    q,
-    (snap) =>
-      onChange(
-        snap.docs.map((d) => {
-          const data = d.data() as Partial<TicketMessage>;
-          return {
-            id: d.id,
-            from: data.from ?? 'user',
-            authorUid: data.authorUid ?? '',
-            authorName: data.authorName ?? '',
-            body: data.body ?? '',
-            createdAt: data.createdAt ?? '',
-          };
-        }),
-      ),
-    (err) => onError?.(err),
+  return safeUnsubscribe(
+    onSnapshot(
+      q,
+      (snap) =>
+        onChange(
+          snap.docs.map((d) => {
+            const data = d.data() as Partial<TicketMessage>;
+            return {
+              id: d.id,
+              from: data.from ?? 'user',
+              authorUid: data.authorUid ?? '',
+              authorName: data.authorName ?? '',
+              body: data.body ?? '',
+              createdAt: data.createdAt ?? '',
+            };
+          }),
+        ),
+      (err) => onError?.(err),
+    ),
+    'unsub-ticket-messages',
   );
 }
 

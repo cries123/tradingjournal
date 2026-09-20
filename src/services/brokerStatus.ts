@@ -6,6 +6,7 @@ import {
   type BrokerStatusKind,
   type BrokerStatusOverrides,
 } from '../data/brokerStatusOverrides';
+import { safeUnsubscribe } from './safeUnsubscribe';
 
 const [COLLECTION, DOC_ID] = BROKER_STATUS_DOC.split('/');
 
@@ -18,11 +19,14 @@ export function subscribeToBrokerStatus(
     return () => {};
   }
 
-  return onSnapshot(
-    doc(getFirebaseDb(), COLLECTION, DOC_ID),
-    (snap) => onChange(parseBrokerStatusOverrides(snap.data()?.brokers)),
-    // A read failure must not blank the connect page — fall back to the registry defaults.
-    () => onChange({}),
+  return safeUnsubscribe(
+    onSnapshot(
+      doc(getFirebaseDb(), COLLECTION, DOC_ID),
+      (snap) => onChange(parseBrokerStatusOverrides(snap.data()?.brokers)),
+      // A read failure must not blank the connect page — fall back to the registry defaults.
+      () => onChange({}),
+    ),
+    'unsub-broker-status',
   );
 }
 

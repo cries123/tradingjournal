@@ -11,6 +11,7 @@ import {
 import type { Trade } from '../types';
 import { getFirebaseDb } from '../lib/firebase';
 import { touchUserTradeActivity } from './userTradeActivity';
+import { safeUnsubscribe } from './safeUnsubscribe';
 
 function tradesCollection(uid: string) {
   return collection(getFirebaseDb(), 'users', uid, 'trades');
@@ -42,14 +43,17 @@ export function subscribeTrades(
   onChange: (trades: Trade[]) => void,
   onError?: (error: unknown) => void,
 ): Unsubscribe {
-  return onSnapshot(
-    tradesCollection(uid),
-    (snap) => {
-      const trades = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Trade);
-      trades.sort((a, b) => a.date.localeCompare(b.date));
-      onChange(trades);
-    },
-    (error) => onError?.(error),
+  return safeUnsubscribe(
+    onSnapshot(
+      tradesCollection(uid),
+      (snap) => {
+        const trades = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Trade);
+        trades.sort((a, b) => a.date.localeCompare(b.date));
+        onChange(trades);
+      },
+      (error) => onError?.(error),
+    ),
+    'unsub-trades',
   );
 }
 
