@@ -196,8 +196,14 @@ export function AdminUserDetailModal({
         aria-labelledby="user-detail-title"
         onClick={onClose}
       >
+        {/*
+          max-w-md at every width meant a 448px column on a 1900px monitor, with every fact and
+          every control stacked into one long scroll — most of the screen empty either side of it.
+          Widened from md upwards only; the phone layout is what it was, which is the one place a
+          single narrow column is right.
+        */}
         <div
-          className="glass-card rounded-xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto"
+          className="glass-card rounded-xl p-6 max-w-md md:max-w-3xl w-full max-h-[85vh] md:max-h-[88vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-start justify-between gap-3 mb-4">
@@ -223,7 +229,12 @@ export function AdminUserDetailModal({
             </button>
           </div>
 
-          <dl className="space-y-3 text-sm mb-6">
+          {/*
+            The read-only facts go two-up on a wide modal — nine stacked rows was most of the
+            scroll, and none of them is long enough to need a full line. The controls below stay in
+            one column deliberately: a form stretched across 700px is harder to fill in, not easier.
+          */}
+          <dl className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-8 md:gap-y-3 text-sm mb-6">
             <div>
               <dt className="text-xs text-text-secondary uppercase tracking-wider">Email</dt>
               <dd className="mt-0.5">{user.email || 'Not stored'}</dd>

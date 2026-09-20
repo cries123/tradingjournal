@@ -24,27 +24,95 @@ interface LayoutOptions {
   ctaUrl: string;
   footerNote: string;
   unsubscribeUrl?: string | null;
+  /**
+   * The grey line the inbox shows next to the subject.
+   *
+   * Without one, every client scrapes the first readable text in the document and shows that —
+   * which for these was the word "Trend Chasers" repeated from the header, so the list view read
+   * "Your syncs are back · Trend Chasers Your syncs are back". It is the second thing a person
+   * reads about an email and it was being spent restating the first.
+   */
+  preheader?: string;
 }
 
-function layout({ title, body, ctaLabel, ctaUrl, footerNote, unsubscribeUrl }: LayoutOptions): string {
+const FONT = '-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif';
+const BRAND = '#0ea5e9';
+
+/** The site's own origin, taken from the CTA rather than threaded through every caller. */
+function originOf(url: string): string | null {
+  try {
+    return new URL(url).origin;
+  } catch {
+    // A relative or malformed CTA: skip the logo rather than emit a broken image.
+    return null;
+  }
+}
+
+function layout({
+  title,
+  body,
+  ctaLabel,
+  ctaUrl,
+  footerNote,
+  unsubscribeUrl,
+  preheader,
+}: LayoutOptions): string {
+  const origin = originOf(ctaUrl);
+
+  /*
+   * A PNG, never the SVG the site uses. Most mail clients — Outlook and Gmail among them — refuse
+   * to render SVG entirely, so the one asset that makes this look like a real product would have
+   * been the one thing that did not load. Sized at 160px from a 735px source, which keeps it sharp
+   * on a retina screen, with width and height set so the layout does not jump while images load
+   * or collapse when a client blocks them.
+   */
+  const logo = origin
+    ? `<img src="${origin}/nav-logo.png" width="160" height="54" alt="Trend Chasers"
+         style="display:block;border:0;outline:none;text-decoration:none;height:auto;max-width:160px;">`
+    : `<p style="margin:0;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:${BRAND};">Trend Chasers</p>`;
+
+  /* Outlook on Windows ignores padding and border-radius on a link, so the button there would be
+     bare blue text. VML draws a real one; every other client takes the anchor below it. */
+  const buttonWidth = Math.max(180, ctaLabel.length * 9 + 48);
+  const button = `<!--[if mso]>
+        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${ctaUrl}" style="height:44px;v-text-anchor:middle;width:${buttonWidth}px;" arcsize="18%" stroke="f" fillcolor="${BRAND}">
+          <w:anchorlock/>
+          <center style="color:#ffffff;font-family:${FONT};font-size:15px;font-weight:600;">${escapeHtml(ctaLabel)}</center>
+        </v:roundrect>
+        <![endif]-->
+        <!--[if !mso]><!-- -->
+        <a href="${ctaUrl}" style="display:inline-block;background:${BRAND};color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 24px;border-radius:8px;">${escapeHtml(ctaLabel)}</a>
+        <!--<![endif]-->`;
+
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- Pins the palette. Several clients "helpfully" invert a light email into a dark one and turn
+     mid-greys into unreadable mud; saying the design is light-only stops the ones that listen. -->
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
 <title>${escapeHtml(title)}</title></head>
 <body style="margin:0;padding:0;background:#f4f5f7;">
+${
+  preheader
+    ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f4f5f7;">${escapeHtml(preheader)}</div>`
+    : ''
+}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:24px 12px;">
   <tr><td align="center">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;border:1px solid #e3e5e9;">
-      <tr><td style="padding:24px 28px 8px 28px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-        <p style="margin:0;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#0ea5e9;">Trend Chasers</p>
-        <h1 style="margin:8px 0 0 0;font-size:20px;line-height:1.3;color:#111827;">${escapeHtml(title)}</h1>
+      <tr><td style="padding:28px 28px 0 28px;font-family:${FONT};">
+        ${logo}
       </td></tr>
-      <tr><td style="padding:12px 28px 4px 28px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#374151;">
+      <tr><td style="padding:20px 28px 0 28px;font-family:${FONT};">
+        <h1 style="margin:0;font-size:21px;line-height:1.3;font-weight:700;color:#111827;">${escapeHtml(title)}</h1>
+      </td></tr>
+      <tr><td style="padding:12px 28px 4px 28px;font-family:${FONT};font-size:15px;line-height:1.6;color:#374151;">
         ${body}
       </td></tr>
-      <tr><td style="padding:20px 28px 28px 28px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-        <a href="${ctaUrl}" style="display:inline-block;background:#0ea5e9;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:11px 22px;border-radius:8px;">${escapeHtml(ctaLabel)}</a>
+      <tr><td style="padding:22px 28px 28px 28px;font-family:${FONT};">
+        ${button}
       </td></tr>
-      <tr><td style="padding:0 28px 24px 28px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#6b7280;border-top:1px solid #eef0f3;padding-top:16px;">
+      <tr><td style="padding:16px 28px 24px 28px;font-family:${FONT};font-size:12px;line-height:1.6;color:#6b7280;border-top:1px solid #eef0f3;">
         ${escapeHtml(footerNote)}${
           unsubscribeUrl
             ? ` &middot; <a href="${unsubscribeUrl}" style="color:#6b7280;">Unsubscribe</a>`
@@ -227,6 +295,9 @@ export function adminMessageEmail(options: {
       ctaLabel: 'Open Trend Chasers',
       ctaUrl: `${options.siteUrl}/app`,
       footerNote: 'Sent by the Trend Chasers team. Reply to this email to reach support.',
+      /* The opening line of what was actually written, so the inbox shows the message rather than
+         repeating the subject back. Truncated because clients cut it off anyway. */
+      preheader: paragraphs[0]?.slice(0, 140),
     }),
     text: [
       options.subject,
