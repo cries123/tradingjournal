@@ -1,6 +1,7 @@
 import type { Trade } from '../types';
 import type { TradingRules } from '../types/strategy';
 import { effectivePnl } from './tradeHelpers';
+import { tradesByDay } from './tradingRules';
 
 /**
  * What the journal would have looked like under rules the trader did not actually follow.
@@ -13,10 +14,10 @@ import { effectivePnl } from './tradeHelpers';
  * clock, no storage and no ordering of its own. Every figure on the screen comes from here, so the
  * screen cannot round, re-count or re-explain anything differently.
  *
- * ONLY THE RULES THE PRODUCT CAN ALSO ENFORCE. maxTradesPerDay, maxDailyLoss and maxDailyGain are
- * the three TradingRules carries, and the live banner already warns on all three. Simulating a
- * fourth — consecutive losses, position size — would produce a number the journal has no way to
- * hold you to afterwards, and a simulator whose best finding cannot be saved is a demo.
+ * ONLY THE RULES THE PRODUCT CAN ALSO ENFORCE — all four that TradingRules carries, each of which
+ * the live banner already warns on. A rule simulated here but unenforceable afterwards would give
+ * somebody a finding the journal has no way to hold them to, and a simulator whose best answer
+ * cannot be saved is a demo. Position size is still absent for that reason: it is not in the rules.
  */
 
 /** One day, once the rules have been applied to it. */
@@ -29,7 +30,7 @@ export interface SimulatedDay {
   actualPnl: number;
   simulatedPnl: number;
   /** Which rule stopped the day, and on which trade. Null when the day ran untouched. */
-  stoppedBy: { rule: 'max_trades' | 'max_loss' | 'max_gain'; atTrade: number } | null;
+  stoppedBy: { rule: 'max_trades' | 'max_loss' | 'max_gain' | 'max_streak'; atTrade: number } | null;
 }
 
 export interface SimulationResult {
@@ -73,32 +74,9 @@ export function rulesAreTestable(rules: TradingRules): boolean {
   return (
     (rules.maxTradesPerDay != null && rules.maxTradesPerDay > 0) ||
     (rules.maxDailyLoss != null && Math.abs(rules.maxDailyLoss) > 0) ||
-    (rules.maxDailyGain != null && Math.abs(rules.maxDailyGain) > 0)
+    (rules.maxDailyGain != null && Math.abs(rules.maxDailyGain) > 0) ||
+    (rules.maxConsecutiveLosses != null && rules.maxConsecutiveLosses > 0)
   );
-}
-
-/**
- * Trades grouped by day, each day in the order the trades were recorded.
- *
- * Within-day order matters — the rules stop a day partway through — and there is frequently no
- * fill time to sort by: Schwab's feed sends a date-only trade_date, so `hasTimeOfDay` is false for
- * most journals here. Where entryTime exists it is used; otherwise the recorded order stands, which
- * for a broker import is the order the matcher produced and for hand entry is the order they were
- * written. That is the best available answer, and it is stated on the screen rather than implied.
- */
-function byDay(trades: Trade[]): Map<string, Trade[]> {
-  const days = new Map<string, Trade[]>();
-  for (const trade of trades) {
-    if (!trade.date) continue;
-    const list = days.get(trade.date);
-    if (list) list.push(trade);
-    else days.set(trade.date, [trade]);
-  }
-
-  for (const list of days.values()) {
-    list.sort((a, b) => (a.entryTime ?? '').localeCompare(b.entryTime ?? ''));
-  }
-  return days;
 }
 
 /**
@@ -116,16 +94,25 @@ function replayDay(dayTrades: Trade[], rules: TradingRules): SimulatedDay {
   const maxTrades = rules.maxTradesPerDay != null && rules.maxTradesPerDay > 0 ? rules.maxTradesPerDay : null;
   const lossLimit = rules.maxDailyLoss != null && Math.abs(rules.maxDailyLoss) > 0 ? Math.abs(rules.maxDailyLoss) : null;
   const gainLimit = rules.maxDailyGain != null && Math.abs(rules.maxDailyGain) > 0 ? Math.abs(rules.maxDailyGain) : null;
+  const streakLimit =
+    rules.maxConsecutiveLosses != null && rules.maxConsecutiveLosses > 0 ? rules.maxConsecutiveLosses : null;
 
   let running = 0;
   let kept = 0;
+  // Counted as the day is replayed rather than measured afterwards: the rule stops the day at the
+  // moment the run reaches its limit, so what matters is the streak SO FAR, not the day's longest.
+  let streak = 0;
   let stoppedBy: SimulatedDay['stoppedBy'] = null;
 
   for (const trade of dayTrades) {
     if (stoppedBy) break;
 
-    running += effectivePnl(trade);
+    const pnl = effectivePnl(trade);
+    running += pnl;
     kept += 1;
+    // A scratch neither extends the run nor breaks it — same rule as longestLosingStreak.
+    if (pnl < 0) streak += 1;
+    else if (pnl > 0) streak = 0;
 
     // Checked in the order a trader would hit them: the count is knowable before the money is.
     if (maxTrades != null && kept >= maxTrades) {
@@ -134,6 +121,8 @@ function replayDay(dayTrades: Trade[], rules: TradingRules): SimulatedDay {
       stoppedBy = { rule: 'max_loss', atTrade: kept + 1 };
     } else if (gainLimit != null && running >= gainLimit) {
       stoppedBy = { rule: 'max_gain', atTrade: kept + 1 };
+    } else if (streakLimit != null && streak >= streakLimit) {
+      stoppedBy = { rule: 'max_streak', atTrade: kept + 1 };
     }
   }
 
@@ -163,7 +152,7 @@ export function simulateRules(trades: Trade[], rules: TradingRules): SimulationR
     // Not an error state. No rules set is the starting point of the screen, and the answer to
     // "what would have changed" is honestly nothing.
     const actualPnl = trades.reduce((sum, t) => sum + effectivePnl(t), 0);
-    const days = byDay(trades);
+    const days = tradesByDay(trades);
     return {
       ...EMPTY,
       actualPnl,
@@ -173,7 +162,7 @@ export function simulateRules(trades: Trade[], rules: TradingRules): SimulationR
     };
   }
 
-  const days = byDay(trades);
+  const days = tradesByDay(trades);
   const result: SimulationResult = { ...EMPTY, tradingDays: days.size, totalTrades: trades.length };
   const changed: SimulatedDay[] = [];
 

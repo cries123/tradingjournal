@@ -383,7 +383,13 @@ export function SettingsPage({
 
         <section className="panel-card p-5 space-y-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Trading rules</h2>
-          <p className="text-xs text-text-secondary">Track daily limits — violations show on the dashboard analytics panel.</p>
+          {/* "violations show on the analytics panel" undersold it by a release — these also drive
+              the banner at the top of the dashboard, which warns BEFORE a limit goes rather than
+              listing it afterwards, and the rule simulator tests them against your own history. */}
+          <p className="text-xs text-text-secondary">
+            Your daily limits. The journal warns you as you approach one, and the rule simulator can
+            test them against your own history before you commit to them.
+          </p>
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -420,7 +426,42 @@ export function SettingsPage({
                 className="input-field"
               />
             </label>
+            {/* Daily target has been in TradingRules, checkRuleViolations and the dashboard banner
+                since rules shipped, with no field here to set it — enforced, and unreachable. */}
+            <label className="block">
+              <span className="text-xs text-text-secondary mb-1 block">Daily target ($)</span>
+              <input
+                type="number"
+                value={settings.tradingRules.maxDailyGain ?? ''}
+                onChange={(e) =>
+                  updateSettings({
+                    tradingRules: { ...settings.tradingRules, maxDailyGain: Number(e.target.value) || undefined },
+                  })
+                }
+                className="input-field"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs text-text-secondary mb-1 block">Losses in a row</span>
+              <input
+                type="number"
+                value={settings.tradingRules.maxConsecutiveLosses ?? ''}
+                onChange={(e) =>
+                  updateSettings({
+                    tradingRules: {
+                      ...settings.tradingRules,
+                      maxConsecutiveLosses: Number(e.target.value) || undefined,
+                    },
+                  })
+                }
+                className="input-field"
+              />
+            </label>
           </div>
+          <p className="text-[11px] text-text-secondary leading-relaxed">
+            Leave a box empty to turn that limit off. Daily target and losses in a row stop the day
+            the same way the loss limit does.
+          </p>
         </section>
 
         <section className="panel-card p-5 space-y-4">

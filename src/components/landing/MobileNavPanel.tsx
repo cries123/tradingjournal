@@ -145,7 +145,7 @@ export function MobileNavPanel({
           onClick={() => go('pricing')}
           className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
         >
-          <Tag className="h-4 w-4 text-text-secondary shrink-0" aria-hidden />
+          <Tag className="h-4 w-4 text-emerald-400 shrink-0" aria-hidden />
           <span className="text-sm font-medium text-text-primary">Pricing</span>
         </button>
         <button
@@ -153,7 +153,7 @@ export function MobileNavPanel({
           onClick={() => go('whats-new')}
           className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
         >
-          <Megaphone className="h-4 w-4 text-text-secondary shrink-0" aria-hidden />
+          <Megaphone className="h-4 w-4 text-emerald-400 shrink-0" aria-hidden />
           <span className="text-sm font-medium text-text-primary">What&apos;s New</span>
         </button>
         <button
@@ -161,7 +161,7 @@ export function MobileNavPanel({
           onClick={() => go('market-simulator')}
           className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
         >
-          <Gauge className="h-4 w-4 text-text-secondary shrink-0" aria-hidden />
+          <Gauge className="h-4 w-4 text-emerald-400 shrink-0" aria-hidden />
           <span className="text-sm font-medium text-text-primary">Market Simulator</span>
           <SoonBadge />
         </button>
@@ -173,7 +173,7 @@ export function MobileNavPanel({
           onClick={goGuides}
           className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
         >
-          <GraduationCap className="h-4 w-4 text-text-secondary shrink-0" aria-hidden />
+          <GraduationCap className="h-4 w-4 text-emerald-400 shrink-0" aria-hidden />
           <span className="text-sm font-medium text-text-primary">Tutorials</span>
         </button>
         {showBrokersLink && (
@@ -182,7 +182,7 @@ export function MobileNavPanel({
             onClick={goBrokers}
             className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
           >
-            <Building2 className="h-4 w-4 text-text-secondary shrink-0" aria-hidden />
+            <Building2 className="h-4 w-4 text-emerald-400 shrink-0" aria-hidden />
             <span className="text-sm font-medium text-text-primary">Brokers</span>
           </button>
         )}
@@ -191,7 +191,7 @@ export function MobileNavPanel({
           onClick={() => go('help-center')}
           className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
         >
-          <LifeBuoy className="h-4 w-4 text-text-secondary shrink-0" aria-hidden />
+          <LifeBuoy className="h-4 w-4 text-emerald-400 shrink-0" aria-hidden />
           <span className="text-sm font-medium text-text-primary">Help Center</span>
         </button>
 

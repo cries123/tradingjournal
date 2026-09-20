@@ -1,7 +1,7 @@
 import type { Trade } from '../types';
 import type { TradingRules } from '../types/strategy';
 import { effectivePnl } from './tradeHelpers';
-import { checkRuleViolations, type RuleViolation } from './tradingRules';
+import { checkRuleViolations, longestLosingStreak, tradesByDay, type RuleViolation } from './tradingRules';
 
 /**
  * Where today stands against the limits the trader set for themselves.
@@ -53,7 +53,9 @@ export function ruleStandingToday(
 ): RuleStanding | null {
   if (!rules.enabled) return null;
 
-  const dayTrades = trades.filter((t) => t.date === today);
+  // Ordered, not filtered: the streak rule is about the sequence, so it must see the same
+  // order the violations list and the simulator do.
+  const dayTrades = tradesByDay(trades).get(today) ?? [];
   if (dayTrades.length === 0) return null;
 
   const dayPnl = dayTrades.reduce((sum, t) => sum + effectivePnl(t), 0);
@@ -96,6 +98,28 @@ export function ruleStandingToday(
       warnings.push({
         type: 'max_gain',
         message: `You are ${Math.round((dayPnl / limit) * 100)}% of the way to the day's target — the point you said you would stop.`,
+      });
+    }
+  }
+
+  /*
+   * The streak warning has no "approaching" fraction — it counts.
+   *
+   * Four fifths of three losses is not a number, and the useful sentence here is the exact one:
+   * you are on your third of three. That is also the moment it can still change a decision, which
+   * is the whole reason warnings exist separately from breaches.
+   */
+  if (rules.maxConsecutiveLosses != null && rules.maxConsecutiveLosses > 0 && !breached.has('max_streak')) {
+    const streak = longestLosingStreak(dayTrades);
+    if (streak === rules.maxConsecutiveLosses) {
+      warnings.push({
+        type: 'max_streak',
+        message: `That is ${streak} ${streak === 1 ? 'loss' : 'losses'} in a row — the point you said you would stop.`,
+      });
+    } else if (streak === rules.maxConsecutiveLosses - 1) {
+      warnings.push({
+        type: 'max_streak',
+        message: `${streak} in a row. One more and you are past your own limit.`,
       });
     }
   }

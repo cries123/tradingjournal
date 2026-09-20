@@ -30,6 +30,7 @@ const STOP_LABEL: Record<NonNullable<SimulatedDay['stoppedBy']>['rule'], string>
   max_trades: 'trade cap',
   max_loss: 'daily loss limit',
   max_gain: "day's target",
+  max_streak: 'losing streak',
 };
 
 /**
@@ -94,6 +95,11 @@ export function RuleSimulatorContent({ periods, onBack }: RuleSimulatorContentPr
   const [maxGain, setMaxGain] = useState(
     settings.tradingRules.maxDailyGain != null ? String(settings.tradingRules.maxDailyGain) : '',
   );
+  const [maxStreak, setMaxStreak] = useState(
+    settings.tradingRules.maxConsecutiveLosses != null
+      ? String(settings.tradingRules.maxConsecutiveLosses)
+      : '',
+  );
   const [saved, setSaved] = useState(false);
 
   const rules: TradingRules = useMemo(
@@ -102,8 +108,9 @@ export function RuleSimulatorContent({ periods, onBack }: RuleSimulatorContentPr
       ...(numberOrNull(maxTrades) != null ? { maxTradesPerDay: numberOrNull(maxTrades)! } : {}),
       ...(numberOrNull(maxLoss) != null ? { maxDailyLoss: numberOrNull(maxLoss)! } : {}),
       ...(numberOrNull(maxGain) != null ? { maxDailyGain: numberOrNull(maxGain)! } : {}),
+      ...(numberOrNull(maxStreak) != null ? { maxConsecutiveLosses: numberOrNull(maxStreak)! } : {}),
     }),
-    [maxTrades, maxLoss, maxGain],
+    [maxTrades, maxLoss, maxGain, maxStreak],
   );
 
   const result = useMemo(() => simulateRules(trades, rules), [trades, rules]);
@@ -244,6 +251,13 @@ export function RuleSimulatorContent({ periods, onBack }: RuleSimulatorContentPr
                 unit="dollars"
                 value={maxLoss}
                 onChange={setMaxLoss}
+              />
+              <RuleInput
+                label="Stop after losses in a row"
+                blurb="Stop for the day after this many losers back to back."
+                unit="in a row"
+                value={maxStreak}
+                onChange={setMaxStreak}
               />
               <RuleInput
                 label="Daily target"
