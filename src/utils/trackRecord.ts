@@ -82,8 +82,15 @@ export const EMPTY_RECORD: TrackRecord = {
 export interface PublishedRecord {
   published: true;
   showAmounts: boolean;
-  /** Null when published anonymously. The slug still exists; the name on the page does not. */
-  username: string | null;
+  /*
+   * There is deliberately no name field.
+   *
+   * It is not omitted from the rendering, it is absent from the document: a public-read
+   * document is readable by anyone, so a name kept 'just in case' is a name published. Most
+   * people's username is their real first name, and this page would otherwise be a permanent,
+   * indexable link between a person and their trading losses. The slug in the URL is the
+   * address they chose to hand out; the record itself identifies nobody.
+   */
   verifiedTrades: number;
   excludedTrades: number;
   brokers: string[];

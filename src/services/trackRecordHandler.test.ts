@@ -91,7 +91,7 @@ beforeEach(() => {
 
 describe('publishTrackRecord', () => {
   it('refuses without a username, because the slug is the username', async () => {
-    await expect(publishTrackRecord('u1', null, { showAmounts: true, anonymous: false })).rejects.toThrow(
+    await expect(publishTrackRecord('u1', null, { showAmounts: true })).rejects.toThrow(
       TrackRecordError,
     );
     expect(writes).toEqual([]);
@@ -105,7 +105,7 @@ describe('publishTrackRecord', () => {
       ...Array.from({ length: 50 }, (_, i) => typed(100 + i, 10)),
     ];
     await expect(
-      publishTrackRecord('u1', 'jay', { showAmounts: true, anonymous: false }),
+      publishTrackRecord('u1', 'jay', { showAmounts: true }),
     ).rejects.toThrow(/at least 30/);
     expect(writes).toEqual([]);
   });
@@ -113,7 +113,7 @@ describe('publishTrackRecord', () => {
   it('publishes the record and its ownership row in one commit', async () => {
     trades = Array.from({ length: 30 }, (_, i) => imported(i, 10));
 
-    const result = await publishTrackRecord('u1', 'Jay', { showAmounts: true, anonymous: false });
+    const result = await publishTrackRecord('u1', 'Jay', { showAmounts: true });
 
     expect(result).toEqual({ slug: 'jay', verifiedTrades: 30 });
     expect(committed).toBe(1);
@@ -124,7 +124,7 @@ describe('publishTrackRecord', () => {
     // The page is world-readable. An account identifier on it is something the trader never chose
     // to publish, which is why ownership lives in its own collection.
     trades = Array.from({ length: 30 }, (_, i) => imported(i, 10));
-    await publishTrackRecord('u1', 'jay', { showAmounts: true, anonymous: false });
+    await publishTrackRecord('u1', 'jay', { showAmounts: true });
 
     const record = writes.find((w) => w.path === 'trackRecords/jay')!.data!;
     expect(record.uid).toBeUndefined();
@@ -136,7 +136,7 @@ describe('publishTrackRecord', () => {
       ...Array.from({ length: 30 }, (_, i) => imported(i, 10)),
       ...Array.from({ length: 7 }, (_, i) => typed(100 + i, 999)),
     ];
-    await publishTrackRecord('u1', 'jay', { showAmounts: true, anonymous: false });
+    await publishTrackRecord('u1', 'jay', { showAmounts: true });
 
     const record = writes.find((w) => w.path === 'trackRecords/jay')!.data!;
     expect(record.verifiedTrades).toBe(30);
@@ -147,7 +147,7 @@ describe('publishTrackRecord', () => {
 
   it('omits the amounts entirely when the trader asked for rates only', async () => {
     trades = Array.from({ length: 30 }, (_, i) => imported(i, 10));
-    await publishTrackRecord('u1', 'jay', { showAmounts: false, anonymous: false });
+    await publishTrackRecord('u1', 'jay', { showAmounts: false });
 
     const record = writes.find((w) => w.path === 'trackRecords/jay')!.data!;
     // Absent from the document, not merely flagged: anyone can read this document, so a flag the
@@ -159,17 +159,25 @@ describe('publishTrackRecord', () => {
     expect(record.winRate).toBeGreaterThan(0);
   });
 
-  it('drops the name but keeps the slug when published anonymously', async () => {
+  it('writes no name into the public document at all', async () => {
+    /*
+     * Absent, not null, and not merely unrendered.
+     *
+     * The document is world-readable, so a name kept in it "for later" is a name published —
+     * and most people's username is their real first name. The slug is the address they chose
+     * to hand out; the record itself identifies nobody.
+     */
     trades = Array.from({ length: 30 }, (_, i) => imported(i, 10));
-    await publishTrackRecord('u1', 'jay', { showAmounts: true, anonymous: true });
+    await publishTrackRecord('u1', 'jay', { showAmounts: true });
 
     const record = writes.find((w) => w.path === 'trackRecords/jay')!.data!;
-    expect(record.username).toBeNull();
+    expect('username' in record).toBe(false);
+    expect(JSON.stringify(record).toLowerCase()).not.toContain('jay');
   });
 
   it('replaces rather than merges, so turning amounts off removes them', async () => {
     trades = Array.from({ length: 30 }, (_, i) => imported(i, 10));
-    await publishTrackRecord('u1', 'jay', { showAmounts: false, anonymous: false });
+    await publishTrackRecord('u1', 'jay', { showAmounts: false });
     // A merge would leave a previous publish's netPnl readable in the document forever.
     expect(writes[0].kind).toBe('set');
   });

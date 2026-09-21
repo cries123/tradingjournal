@@ -21,7 +21,6 @@ import type { PublishedRecord } from '../utils/trackRecord';
 const record: PublishedRecord = {
   published: true,
   showAmounts: true,
-  username: 'jaryn',
   verifiedTrades: 412,
   excludedTrades: 38,
   brokers: [],
@@ -67,11 +66,13 @@ describe('describeRecord', () => {
     expect(description).toContain('cannot edit these figures');
   });
 
-  it('names the trader and the verified count', () => {
+  it('reports the counts without naming anybody', () => {
     const { title, description } = describeRecord(record);
-    expect(title).toContain('jaryn');
     expect(description).toContain('412');
     expect(description).toContain('171');
+    // The card is pasted into group chats and indexed by search engines. It carries figures,
+    // never a person.
+    expect(`${title} ${description}`).not.toContain('jaryn');
   });
 
   it('states the exclusions on the card, not only on the page', () => {
@@ -90,11 +91,10 @@ describe('describeRecord', () => {
     expect(describeRecord(one).description).toContain('1 hand-entered trade excluded');
   });
 
-  it('does not name an anonymous trader', () => {
-    const anon = { ...record, username: null };
-    const { title, description } = describeRecord(anon);
-    expect(title).not.toContain('jaryn');
-    expect(description).not.toContain('jaryn');
+  it('has no name to leak, whatever the slug is', () => {
+    // There is no name field on a published record any more, so there is nothing for the card
+    // to fall back to and nothing for a future edit to accidentally reintroduce.
+    expect('username' in record).toBe(false);
   });
 });
 
@@ -128,11 +128,14 @@ describe('injectMeta', () => {
     expect(out).toContain('<div id="root"></div>');
   });
 
-  it('escapes a username that would otherwise break out of the attribute', () => {
-    // Usernames are validated elsewhere, but this string goes into an HTML attribute on a public
-    // page — the escaping belongs where the attribute is written, not in a rule somewhere else.
-    const nasty = { ...record, username: 'a" onload="alert(1)' };
-    const out = injectMeta(SHELL, tagsForRecord(nasty), 'https://trendchasers.net/r/x');
+  it('escapes a url that would otherwise break out of the attribute', () => {
+    // Slugs are validated elsewhere, but this string is written into an HTML attribute on a
+    // public page — escaping belongs where the attribute is written, not in a rule elsewhere.
+    const out = injectMeta(
+      SHELL,
+      tagsForRecord(record),
+      'https://trendchasers.net/r/a" onload="alert(1)',
+    );
 
     expect(out).not.toContain('onload="alert(1)"');
     expect(out).toContain('&quot;');
@@ -186,7 +189,7 @@ describe('against the real index.html', () => {
 
     expect(head).not.toContain('property="og:title" content="Trend Chasers');
     expect(head).not.toContain('href="https://trendchasers.net/" />');
-    expect(head).toContain('jaryn');
+    expect(head).toContain('broker-verified');
   });
 
   it('keeps the module script, so the page still boots after injection', () => {

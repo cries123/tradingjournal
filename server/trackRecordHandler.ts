@@ -33,8 +33,6 @@ export class TrackRecordError extends Error {
 export interface PublishOptions {
   /** Off, the page shows rates and ratios only — win rate, profit factor, win:loss. */
   showAmounts: boolean;
-  /** On, the page verifies the trades without naming who they belong to. */
-  anonymous: boolean;
   /**
    * Account ids the record covers. Undefined means every journal holding broker-imported
    * trades, which is the default.
@@ -106,7 +104,6 @@ export async function publishTrackRecord(
   const published: PublishedRecord = {
     published: true,
     showAmounts: options.showAmounts,
-    username: options.anonymous ? null : username,
     verifiedTrades: record.verifiedTrades,
     excludedTrades: record.excludedTrades,
     brokers: record.brokers,

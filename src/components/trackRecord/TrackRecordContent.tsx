@@ -106,7 +106,6 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
     null,
   );
   const [showAmounts, setShowAmounts] = useState(true);
-  const [anonymous, setAnonymous] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -124,10 +123,9 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
         if (cancelled) return;
         setLoaded({ forUser: username, record: found });
         if (found) {
-          // Opens on the choices already in force, so republishing after adding trades does
-          // not silently flip a trader who chose privacy back to showing amounts.
+          // Opens on the choice already in force, so republishing after adding trades does not
+          // silently flip a trader who chose privacy back to showing amounts.
           setShowAmounts(found.showAmounts);
-          setAnonymous(found.username === null);
         }
       })
       .catch((err: unknown) => {
@@ -151,7 +149,7 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
     setBusy(true);
     setError(null);
     try {
-      if (action === 'publish') await publishRecord({ showAmounts, anonymous, journals: selected });
+      if (action === 'publish') await publishRecord({ showAmounts, journals: selected });
       else await unpublishRecord();
       // Cleared first so the screen says "checking" rather than showing the state it just
       // replaced — after a take-down that would be a "Published" badge over a deleted page.
@@ -317,12 +315,14 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
             label="Show dollar amounts"
             blurb="Off, the page shows win rate and profit factor only. The amounts are not hidden by the page — they are never written to it, so nobody can read them out of it."
           />
-          <Toggle
-            checked={anonymous}
-            onChange={setAnonymous}
-            label="Publish without my name"
-            blurb="The page still lives at your username's address, so anyone you send it to can reach it, but your name is not printed on it."
-          />
+          {/* Stated rather than left to be noticed: somebody about to publish wants to know
+              what of theirs lands on a public page, and the answer is nothing that names
+              them. There is no toggle because there is no longer a choice to make. */}
+          <p className="text-xs text-text-secondary leading-relaxed">
+            Your name is never printed on the page. It is headed &ldquo;a verified trading
+            record&rdquo;, not who it belongs to — the only place your username appears is the
+            address you send people.
+          </p>
         </div>
 
         {/*

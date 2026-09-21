@@ -38,7 +38,6 @@ export function escapeHtml(value: string): string {
  * card that gets pasted into group chats.
  */
 export function describeRecord(record: PublishedRecord): { title: string; description: string } {
-  const who = record.username ?? 'A trader';
   const excluded =
     record.excludedTrades > 0
       ? ` ${record.excludedTrades.toLocaleString()} hand-entered ${
@@ -47,9 +46,7 @@ export function describeRecord(record: PublishedRecord): { title: string; descri
       : '';
 
   return {
-    title: record.username
-      ? `${who}'s broker-verified trading record — Trend Chasers`
-      : 'A broker-verified trading record — Trend Chasers',
+    title: 'A broker-verified trading record — Trend Chasers',
     description:
       `${record.verifiedTrades.toLocaleString()} trades imported straight from a connected ` +
       `brokerage over ${record.tradingDays.toLocaleString()} trading days.${excluded} ` +

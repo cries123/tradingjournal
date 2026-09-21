@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { BadgeCheck, Lock, ShieldQuestion } from 'lucide-react';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import type { ExtraNavRoute } from '../hooks/useRoute';
@@ -48,12 +49,43 @@ function Figure({
   );
 }
 
+/** A labelled band within the one page. Not a card — a rule is what separates the sections. */
+function Band({
+  title,
+  children,
+  className = '',
+}: {
+  title: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={`border-t pt-6 mt-6 border-border/60 ${className}`}>
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
+        {title}
+      </h2>
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
 /**
  * The record itself, with no fetching in it.
  *
- * Separate from the page so the markup can be rendered from a record object alone — by a test,
- * or by the offline preview used to check layout. The page below owns loading, missing and
- * failed; this owns only what a record looks like.
+ * Separate from the page so the markup can be rendered from a record object alone — by a test, or
+ * by the offline preview used to check layout. The page below owns loading, missing and failed;
+ * this owns only what a record looks like.
+ *
+ * ONE PAGE, not a stack of cards. The figures, the exclusions, the limits and the stamp are one
+ * argument, and a reader who takes the numbers off the top and stops before the caveats has read
+ * something we did not write. Bands separated by rules keep it readable without letting any part
+ * of it look like a self-contained tile.
+ *
+ * NO NAME ANYWHERE — not the heading, not the prose, not the stamp. Most people's username is
+ * their actual first name, and a page carrying it is a permanent, indexable, public association
+ * between a real person and their trading losses. The username is still the address, because that
+ * is the link somebody chooses to send, but the page never prints it: it cannot be scraped from
+ * the body, read off a screenshot, or picked up as the subject of a search result.
  */
 export function PublishedRecordView({
   record,
@@ -62,59 +94,51 @@ export function PublishedRecordView({
   record: PublishedRecord;
   onLaunch: () => void;
 }) {
-  const name = record.username ?? 'This trader';
   const amounts = record.showAmounts === true;
 
   return (
-    <>
-      <section className="hero-card p-5 md:p-6">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
-          <BadgeCheck className="h-3.5 w-3.5" aria-hidden />
-          Broker verified
-        </span>
+    <article className="panel-card p-5 md:p-8">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
+        <BadgeCheck className="h-3.5 w-3.5" aria-hidden />
+        Broker verified
+      </span>
 
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight mt-4">
-          {record.username ? `${record.username}'s trading record` : 'A verified trading record'}
-        </h1>
+      <h1 className="text-2xl md:text-3xl font-bold tracking-tight mt-4">
+        A verified trading record
+      </h1>
 
-        {/*
-          The sentence the whole page rests on, and it is first. Every figure below comes
-          from trades a brokerage sent to us through a read-only connection; the ones this
-          trader typed in themselves are counted here and then left out of everything else.
-        */}
-        <p className="text-sm text-text-secondary mt-3 leading-relaxed">
-          Built from{' '}
-          <strong className="text-text-primary tabular-nums">
-            {record.verifiedTrades.toLocaleString()}
-          </strong>{' '}
-          trades imported directly from a connected brokerage
-          {record.brokers.length > 0 ? ` (${record.brokers.join(', ')})` : ''}.{' '}
-          {record.excludedTrades > 0 ? (
-            <>
-              <strong className="text-text-primary tabular-nums">
-                {record.excludedTrades.toLocaleString()}
-              </strong>{' '}
-              hand-entered {record.excludedTrades === 1 ? 'trade was' : 'trades were'}{' '}
-              excluded.
-            </>
-          ) : (
-            'No hand-entered trades were excluded, because there were none.'
-          )}
-        </p>
+      {/*
+        The sentence the whole page rests on, and it is first. Every figure below came from trades a
+        brokerage sent us over a read-only connection; the ones that were typed in are counted here
+        and then left out of everything else.
+      */}
+      <p className="text-sm text-text-secondary mt-3 leading-relaxed">
+        Built from{' '}
+        <strong className="text-text-primary tabular-nums">
+          {record.verifiedTrades.toLocaleString()}
+        </strong>{' '}
+        trades imported directly from a connected brokerage
+        {record.brokers.length > 0 ? ` (${record.brokers.join(', ')})` : ''}.{' '}
+        {record.excludedTrades > 0 ? (
+          <>
+            <strong className="text-text-primary tabular-nums">
+              {record.excludedTrades.toLocaleString()}
+            </strong>{' '}
+            hand-entered {record.excludedTrades === 1 ? 'trade was' : 'trades were'} excluded.
+          </>
+        ) : (
+          'No hand-entered trades were excluded, because there were none.'
+        )}
+      </p>
 
-        <p className="text-xs text-text-secondary mt-3">
-          {longDate(record.firstDate)} – {longDate(record.lastDate)} ·{' '}
-          {record.tradingDays.toLocaleString()} trading{' '}
-          {record.tradingDays === 1 ? 'day' : 'days'}
-        </p>
-      </section>
+      <p className="text-xs text-text-secondary mt-3">
+        {longDate(record.firstDate)} – {longDate(record.lastDate)} ·{' '}
+        {record.tradingDays.toLocaleString()} trading{' '}
+        {record.tradingDays === 1 ? 'day' : 'days'}
+      </p>
 
-      <section className="panel-card p-5 md:p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
-          The numbers
-        </h2>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-5 mt-4">
+      <Band title="The numbers">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-5">
           <Figure label="Win rate" value={`${record.winRate.toFixed(1)}%`} />
           <Figure
             label="Profit factor"
@@ -124,9 +148,9 @@ export function PublishedRecordView({
           <Figure label="Trades" value={record.verifiedTrades.toLocaleString()} />
 
           {/*
-            Rendered only when the document actually carries them. A trader who published
-            without amounts has no money fields in their document at all, so there is
-            nothing here to leak and nothing to accidentally print as $0.
+            Rendered only when the document actually carries them. A trader who published without
+            amounts has no money fields in their document at all, so there is nothing here to leak
+            and nothing to accidentally print as $0.
           */}
           {amounts && record.netPnl !== undefined && (
             <Figure
@@ -159,92 +183,79 @@ export function PublishedRecordView({
 
         {!amounts && (
           <p className="text-xs text-text-secondary mt-5 leading-relaxed">
-            This trader published rates only. The dollar amounts were never sent to this
-            page.
+            This record shows rates only. The dollar amounts were never written to this page.
           </p>
         )}
-      </section>
+      </Band>
 
       {/*
         The section that makes the rest of the page worth reading.
 
-        Every claim here is one we could quietly not make — and a reader who has been sold a
-        doctored screenshot before is looking for exactly this. Saying what the record does
-        not establish is what separates "verified" from "posted".
+        Every claim here is one we could quietly not make — and a reader who has been shown a
+        doctored screenshot before is looking for exactly this. Saying what the record does not
+        establish is what separates "verified" from "posted".
       */}
-      <section className="panel-card p-5 md:p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
-          What this does and does not show
-        </h2>
-
-        <dl className="mt-4 space-y-4 text-sm leading-relaxed">
+      <Band title="What this does and does not show">
+        <dl className="space-y-4 text-sm leading-relaxed">
           <div>
             <dt className="font-semibold text-emerald-400">What it shows</dt>
             <dd className="text-text-secondary mt-1">
-              These trades were sent to Trend Chasers by {name.toLowerCase() === 'this trader' ? 'the trader' : name}
-              {"'"}s brokerage over a read-only connection, not typed in. The prices,
-              quantities, dates and fees are the broker&apos;s.
+              These trades were sent to Trend Chasers by a brokerage over a read-only connection,
+              not typed in. The prices, quantities, dates and fees are the broker&apos;s.
             </dd>
           </div>
           <div>
             <dt className="font-semibold text-text-primary">What it does not show</dt>
             <dd className="text-text-secondary mt-1">
               There is no percentage return here, and that is deliberate: a read-only broker
-              connection never exposes an account balance, so any percentage would be
-              dividing a real profit by a number the trader typed. This is also not an
-              audit, and it says nothing about what happens next — a verified past is still
-              the past.
+              connection never exposes an account balance, so any percentage would be dividing a
+              real profit by a number the trader typed. This is also not an audit, and it says
+              nothing about what happens next — a verified past is still the past.
             </dd>
           </div>
           <div>
             <dt className="font-semibold text-text-primary">Who chose what to show</dt>
             <dd className="text-text-secondary mt-1">
-              The trader chose whether to include dollar amounts and whether to use their
-              name. They cannot change the figures themselves — those are computed by Trend
-              Chasers from the imported trades, and there is no way to submit them from a
-              browser.
+              The trader chose whether to include dollar amounts and which of their accounts this
+              covers. They cannot change the figures themselves — those are computed by Trend
+              Chasers from the imported trades, and there is no way to submit them from a browser.
             </dd>
           </div>
           {record.journalsIncluded < record.journalsEligible && (
             /*
              * Printed whenever a trader left one of their broker-connected accounts out.
              *
-             * They are allowed to — plenty of people have an account they do not consider part
-             * of their trading. But a page that let them do it silently would be a highlight
-             * reel wearing the word "verified", and the reader is the one person who cannot
-             * find this out for themselves.
+             * They are allowed to — plenty of people have an account they do not consider part of
+             * their trading. But a page that let them do it silently would be a highlight reel
+             * wearing the word "verified", and the reader is the one person who cannot find this
+             * out for themselves.
              */
             <div>
               <dt className="font-semibold text-amber-300/90">Not all of their accounts</dt>
               <dd className="text-text-secondary mt-1">
-                This record covers {record.journalsIncluded} of the{" "}
-                {record.journalsEligible} broker-connected accounts this trader has in Trend
-                Chasers. The others are not included in any figure above.
+                This record covers {record.journalsIncluded} of the {record.journalsEligible}{' '}
+                broker-connected accounts this trader has in Trend Chasers. The others are not
+                included in any figure above.
               </dd>
             </div>
           )}
         </dl>
-
-        <p className="text-[11px] text-text-secondary mt-5">
-          Snapshot taken {new Date(record.updatedAt).toLocaleString()}. Figures do not update
-          until the trader republishes.
-        </p>
-      </section>
+      </Band>
 
       {/*
-        The seal, and every line of it is a claim we can actually stand behind.
+        The seal, and every line of it is a claim we can stand behind.
 
         Not "audited": nobody audits these, and an audited track record is a specific regulated
-        thing in performance advertising — it is the first word a sceptic tests, and the page
-        collapses when it fails. Not "cannot be manipulated" either, because the trader chooses
-        which accounts to connect and which journals to include.
+        thing in performance advertising — the first word a sceptic tests, and the page collapses
+        when it fails. Not "cannot be manipulated" either, because the trader chooses which
+        accounts to connect and which journals to include.
 
         What IS true is narrower and harder to argue with: the figures are computed here from
-        broker-imported data, and there is no path by which a browser can write them. That is not
-        a promise, it is what firestore.rules enforces — every client write to this collection is
+        broker-imported data, and there is no path by which a browser can write them. That is not a
+        promise, it is what firestore.rules enforces — every client write to this collection is
         denied, and the only writer is a server function that recomputes from the trades.
       */}
-      <section className="panel-card border-emerald-500/40 bg-emerald-500/[0.04] p-5 md:p-6">
+      <Band title="Stamped and verified by Trend Chasers" className="border-emerald-500/30">
         <div className="flex flex-col sm:flex-row sm:items-start gap-4">
           <div className="shrink-0 flex sm:block justify-center">
             <span className="inline-flex h-16 w-16 items-center justify-center rounded-full border-2 border-emerald-500/40 bg-emerald-500/10 text-emerald-400">
@@ -252,74 +263,60 @@ export function PublishedRecordView({
             </span>
           </div>
 
-          <div className="min-w-0 text-center sm:text-left">
-            <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-400">
-              Stamped &amp; verified by Trend Chasers
-            </p>
-
-            <ul className="mt-3 space-y-2 text-sm text-text-secondary leading-relaxed">
-              <li className="flex gap-2 items-start justify-center sm:justify-start">
+          <div className="min-w-0">
+            <ul className="space-y-2 text-sm text-text-secondary leading-relaxed">
+              <li className="flex gap-2 items-start">
                 <Lock className="h-3.5 w-3.5 mt-1 shrink-0 text-emerald-400" aria-hidden />
                 <span>
-                  <strong className="text-text-primary">The trader cannot edit these figures.</strong>{" "}
+                  <strong className="text-text-primary">The trader cannot edit these figures.</strong>{' '}
                   They are computed by Trend Chasers from the imported trades. There is no way to
                   submit a number to this page from a browser, and every attempt to write one is
                   refused by the database itself.
                 </span>
               </li>
-              <li className="flex gap-2 items-start justify-center sm:justify-start">
+              <li className="flex gap-2 items-start">
                 <Lock className="h-3.5 w-3.5 mt-1 shrink-0 text-emerald-400" aria-hidden />
                 <span>
                   <strong className="text-text-primary">
                     Every trade came from a read-only brokerage connection.
-                  </strong>{" "}
+                  </strong>{' '}
                   Not typed in, not uploaded. Anything hand-entered is excluded from all of it and
                   counted on this page.
                 </span>
               </li>
             </ul>
 
+            {/* Dated, not named. The stamp attests the figures; it does not identify a person. */}
             <p className="text-[11px] uppercase tracking-[0.14em] text-text-secondary mt-4">
-              Stamped{" "}
+              Stamped{' '}
               {new Date(record.updatedAt).toLocaleDateString(undefined, {
                 day: 'numeric',
                 month: 'short',
                 year: 'numeric',
-              })}
-              {record.username ? ` · ${record.username}` : ""} · trendchasers.net
+              })}{' '}
+              · trendchasers.net
             </p>
           </div>
         </div>
-      </section>
+      </Band>
 
-      <section className="panel-card border-emerald-500/25 p-5 md:p-6 text-center">
+      <Band title="Trend Chasers">
         <p className="text-sm text-text-secondary leading-relaxed">
-          Trend Chasers is a trading journal that imports your fills from your broker. If you
-          want a page like this one, it starts with connecting an account.
+          Trend Chasers is a trading journal that imports your fills from your broker. If you want a
+          page like this one, it starts with connecting an account.
         </p>
-        <button
-          type="button"
-          onClick={onLaunch}
-          className="btn-primary text-sm px-6 py-2.5 mt-4"
-        >
+        <button type="button" onClick={onLaunch} className="btn-primary text-sm px-6 py-2.5 mt-4">
           Start your own journal
         </button>
-      </section>
-    </>
+      </Band>
+    </article>
   );
 }
+
 /**
  * Somebody else's verified record, at /r/<username>.
  *
- * Written for a reader who does not have an account and has no reason to trust the page yet. That
- * shapes two things:
- *
- * 1. The exclusion count is stated as prominently as the figures. "412 verified, 38 hand-entered
- *    trades excluded" is the sentence that makes the rest believable, and burying it would make
- *    this page the same as a screenshot.
- * 2. There is a section saying plainly what the page does NOT establish. A verified P&L is not a
- *    verified return, is not audited, and is not a prediction. Writing that ourselves is the
- *    difference between a proof and a brag — and it is the part a reader checks for.
+ * Written for a reader who does not have an account and has no reason to trust the page yet.
  */
 export function TrackRecordPage({
   slug,
@@ -335,9 +332,9 @@ export function TrackRecordPage({
    * Stamped with the slug it belongs to, so "loading" is DERIVED rather than set.
    *
    * Resetting to loading with a setState at the top of the effect is the pattern eslint rejects
-   * here (react-hooks/set-state-in-effect) and it is also the one that briefly shows the
-   * previous trader’s figures under a new name while the next fetch is in flight. Anything whose
-   * stamp is not the current slug is simply not this page.
+   * here (react-hooks/set-state-in-effect), and it is also the one that briefly shows the previous
+   * record's figures while the next fetch is in flight. Anything whose stamp is not the current
+   * slug is simply not this page.
    */
   const [loaded, setLoaded] = useState<{
     forSlug: string;
@@ -387,10 +384,8 @@ export function TrackRecordPage({
       />
 
       <main className="relative z-10 flex-1 px-4 md:px-6 py-12 md:py-16">
-        <div className="max-w-3xl mx-auto space-y-6">
-          {state === 'loading' && (
-            <p className="text-sm text-text-secondary">Loading record…</p>
-          )}
+        <div className="max-w-3xl mx-auto">
+          {state === 'loading' && <p className="text-sm text-text-secondary">Loading record…</p>}
 
           {state === 'error' && (
             <section className="panel-card p-6 text-center">
