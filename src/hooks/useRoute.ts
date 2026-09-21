@@ -20,6 +20,7 @@ export type AppRoute =
   | 'help-center'
   | 'support'
   | 'whats-new'
+  | 'verified-records'
   | 'track-record';
 
 /** Nav destinations reachable from the header dropdown and the footer — the "coming soon" and
@@ -35,6 +36,7 @@ export type ExtraNavRoute =
   | 'pricing'
   | 'help-center'
   | 'whats-new'
+  | 'verified-records'
   | 'report-bug'
   | 'support'
   | 'request-broker';
@@ -58,6 +60,7 @@ const ROUTE_PATHS: Record<NavRoute, string> = {
   support: '/support',
   refunds: '/refunds',
   'whats-new': '/whats-new',
+  'verified-records': '/verified-track-record',
 };
 
 export interface RouteState {
@@ -107,6 +110,7 @@ export function parseRoutePath(path: string): RouteState {
   if (path.startsWith('/help-center')) return { route: 'help-center' };
   if (path.startsWith('/support')) return { route: 'support' };
   if (path.startsWith('/whats-new')) return { route: 'whats-new' };
+  if (path.startsWith('/verified-track-record')) return { route: 'verified-records' };
   return { route: 'landing' };
 }
 

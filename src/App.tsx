@@ -26,6 +26,7 @@ const RequestBrokerPage = lazy(() => import('./pages/RequestBrokerPage').then((m
 const SupportPage = lazy(() => import('./pages/SupportPage').then((m) => ({ default: m.SupportPage })));
 const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage').then((m) => ({ default: m.TermsOfServicePage })));
 const TrackRecordPage = lazy(() => import('./pages/TrackRecordPage').then((m) => ({ default: m.TrackRecordPage })));
+const VerifiedRecordPage = lazy(() => import('./pages/VerifiedRecordPage').then((m) => ({ default: m.VerifiedRecordPage })));
 const WhatsNewPage = lazy(() => import('./pages/WhatsNewPage').then((m) => ({ default: m.WhatsNewPage })));
 
 function RouteLoading() {
@@ -123,6 +124,8 @@ export default function App() {
     content = <RefundPolicyPage {...publicPageProps} />;
   } else if (route === 'help-center') {
     content = <HelpCenterPage {...publicPageProps} />;
+  } else if (route === 'verified-records') {
+    content = <VerifiedRecordPage {...publicPageProps} />;
   } else if (route === 'pricing') {
     content = <PricingPage {...publicPageProps} />;
   } else if (route === 'ai-assistant') {

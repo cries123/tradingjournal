@@ -21,7 +21,12 @@ import { readFileSync } from 'node:fs';
  */
 
 /** The public page and the link-preview card. */
-const PUBLIC_SURFACES = ['src/pages/TrackRecordPage.tsx', 'server/recordPreviewMeta.ts'];
+const PUBLIC_SURFACES = [
+  'src/components/trackRecord/PublishedRecordView.tsx',
+  'src/pages/TrackRecordPage.tsx',
+  'src/pages/VerifiedRecordPage.tsx',
+  'server/recordPreviewMeta.ts',
+];
 
 /** Everything above, plus the in-app screen the trader publishes from. */
 const ALL_SURFACES = [...PUBLIC_SURFACES, 'src/components/trackRecord/TrackRecordContent.tsx'];
@@ -76,7 +81,10 @@ describe('claims on a published record', () => {
 
   it('still makes the claim that is true, so the ban cannot quietly empty the page', () => {
     // Every rule above only forbids. Without this, deleting the honest sentence would pass them all.
-    const page = readFileSync(new URL('../../src/pages/TrackRecordPage.tsx', import.meta.url), 'utf8');
-    expect(page).toContain('can never reach these figures');
+    const view = readFileSync(
+      new URL('../../src/components/trackRecord/PublishedRecordView.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(view).toContain('can never reach these figures');
   });
 });

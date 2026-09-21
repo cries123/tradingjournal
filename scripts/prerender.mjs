@@ -54,6 +54,7 @@ const ROUTES = [
   '/help-center',
   '/ai-assistant',
   '/whats-new',
+  '/verified-track-record',
 ];
 
 function findFreePort(start = 4173) {

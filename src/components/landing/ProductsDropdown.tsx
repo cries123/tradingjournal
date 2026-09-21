@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BookOpen, ChevronDown, Gauge, Megaphone, Sparkles, Tag } from 'lucide-react';
+import { BadgeCheck, BookOpen, ChevronDown, Gauge, Megaphone, Sparkles, Tag } from 'lucide-react';
 import { useEscapeToClose } from '../../hooks/useEscapeToClose';
 import type { ExtraNavRoute } from '../../hooks/useRoute';
 
@@ -84,6 +84,21 @@ export function ProductsDropdown({ onLaunch, onNavigate }: ProductsDropdownProps
               <span className="block text-sm font-medium text-text-primary">AI Assistant</span>
               <span className="block text-xs text-text-secondary">
                 Ask why a setup keeps losing
+              </span>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => go('verified-records')}
+            className="w-full flex items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-bg-primary transition-colors"
+          >
+            <BadgeCheck className="h-4 w-4 mt-0.5 text-emerald-400 shrink-0" aria-hidden />
+            <span className="flex-1 min-w-0">
+              <span className="block text-sm font-medium text-text-primary">Verified Track Record</span>
+              <span className="block text-xs text-text-secondary">
+                Prove your results with your broker&apos;s own data
               </span>
             </span>
           </button>

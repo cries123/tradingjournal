@@ -109,6 +109,12 @@ export const PAGE_SEO: Record<
       'Ask questions about your own trades. The AI assistant reads your journal and answers with your numbers — setups, timing, and where the losses actually come from.',
     path: '/ai-assistant',
   },
+  'verified-records': {
+    title: 'Verified Track Record — Prove Your Trading Results | Trend Chasers',
+    description:
+      'Publish a trading track record built only from trades your broker sent us. Hand-entered trades are excluded and counted, and you cannot edit the figures. One link you can take down anytime.',
+    path: '/verified-track-record',
+  },
   pricing: {
     title: 'Pricing — Trend Chasers Trading Journal',
     description:
@@ -180,13 +186,37 @@ export function getPageSeo(
   return PAGE_SEO[route as Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide' | 'track-record'>];
 }
 
-/** Public marketing routes prerendered at build time for crawlers. */
+/**
+ * Public marketing routes prerendered at build time for crawlers.
+ *
+ * Mirrors the ROUTES array in scripts/prerender.mjs, which is what the build actually walks —
+ * the script is .mjs and cannot import this file without a build step. The two had already
+ * drifted by eleven routes before a test was put on them; prerenderRoutes.test.ts now fails if
+ * they disagree in either direction.
+ */
 export const PRERENDER_ROUTES = [
   '/',
   '/brokers',
   '/brokers/thinkorswim',
   '/brokers/charles-schwab',
   '/brokers/robinhood',
+  '/brokers/webull',
+  '/brokers/fidelity',
+  '/brokers/etrade',
+  '/brokers/interactive-brokers',
+  '/brokers/vanguard',
+  '/brokers/tastytrade',
+  '/brokers/tradestation',
+  '/brokers/tradier',
+  '/brokers/public',
+  '/brokers/alpaca',
+  '/brokers/moomoo',
+  '/brokers/chase',
+  '/brokers/citi',
+  '/brokers/edward-jones',
+  '/brokers/coinbase',
+  '/brokers/tiaa',
+  '/brokers/pnc',
   '/guides',
   '/guides/broker-sync-now-live',
   '/guides/free-trading-journal',
@@ -197,5 +227,9 @@ export const PRERENDER_ROUTES = [
   '/refunds',
   '/request-broker',
   '/report-bug',
+  '/pricing',
+  '/help-center',
+  '/ai-assistant',
   '/whats-new',
+  '/verified-track-record',
 ] as const;

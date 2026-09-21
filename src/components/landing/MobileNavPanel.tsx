@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  BadgeCheck,
   BookOpen,
   Building2,
   Gauge,
@@ -139,6 +140,14 @@ export function MobileNavPanel({
         >
           <Sparkles className="h-4 w-4 text-emerald-400 shrink-0" aria-hidden />
           <span className="text-sm font-medium text-text-primary">AI Assistant</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => go('verified-records')}
+          className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
+        >
+          <BadgeCheck className="h-4 w-4 text-emerald-400 shrink-0" aria-hidden />
+          <span className="text-sm font-medium text-text-primary">Verified Track Record</span>
         </button>
         <button
           type="button"
