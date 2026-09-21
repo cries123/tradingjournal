@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, History, RefreshCw, Trash2 } from 'lucide-react';
 import { adminReadJournalEvents } from '../../services/adminUserManagement';
-import { describeEvent, wasWasted, type JournalEvent } from '../../../server/journalEvents';
+import { describeEvent, wasWasted, type JournalEvent } from '../../utils/journalEvents';
 
 /**
  * What this account's syncs actually did.

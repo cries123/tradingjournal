@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeEvent, wasWasted, type JournalEvent } from '../../server/journalEvents';
+import { describeEvent, wasWasted, type JournalEvent } from '../utils/journalEvents';
 
 /*
  * The sentence a support thread actually reads.

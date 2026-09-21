@@ -1,5 +1,5 @@
 import { sendPasswordResetEmail } from 'firebase/auth';
-import type { JournalEvent } from '../../server/journalEvents';
+import type { JournalEvent } from '../utils/journalEvents';
 import type { UserJournalSnapshot } from '../../server/adminUserJournal';
 import type { AdminUsageReport, AdminUserAction } from '../../server/adminUserHandler';
 import type { CreditKind } from '../../server/usage';
