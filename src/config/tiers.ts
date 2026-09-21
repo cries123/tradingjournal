@@ -348,8 +348,18 @@ export function tierHas(tier: Tier, feature: Feature): boolean {
   return Boolean(l[BOOLEAN_FEATURES[feature]!]);
 }
 
-/** What each plan lists on the pricing page. Kept beside the limits so they can't disagree. */
-export function featureLines(tier: Tier): { text: string; soon?: boolean }[] {
+export interface FeatureLine {
+  text: string;
+  soon?: boolean;
+}
+
+/**
+ * Everything a plan includes, before anything is credited to the plan below it.
+ *
+ * Not what the card shows — featureLines() is. This is the full truth about a tier, which is
+ * what the card needs in order to work out which parts of it are actually new.
+ */
+function allFeatureLines(tier: Tier): FeatureLine[] {
   const l = limitsFor(tier);
   const lines: { text: string; soon?: boolean }[] = [];
 
@@ -364,7 +374,6 @@ export function featureLines(tier: Tier): { text: string; soon?: boolean }[] {
     return lines;
   }
 
-  lines.push({ text: 'Everything in ' + TIER_PLANS[TIER_ORDER[TIER_ORDER.indexOf(tier) - 1]].name });
   lines.push({ text: brokersLabel(l) });
   lines.push({ text: journalsLabel(l) });
   lines.push({ text: syncsLabel(l) });
@@ -399,4 +408,28 @@ export function featureLines(tier: Tier): { text: string; soon?: boolean }[] {
 
   if (l.marketReplay) lines.push({ text: 'Market replay', soon: !MARKET_REPLAY_LIVE });
   return lines;
+}
+
+/**
+ * What each plan lists on the pricing page. Kept beside the limits so they can't disagree.
+ *
+ * A paid card opens with "Everything in <the plan below>" and then lists only what that plan
+ * does not already give you. Repeating the inherited lines underneath that sentence — which is
+ * what this used to do — made Diamond thirteen bullets deep, most of them things the reader had
+ * already agreed to two cards ago, and buried the four lines that actually justify the price.
+ *
+ * Matched on the rendered text, not on the limit behind it, because that is exactly the
+ * distinction a reader makes: "5 broker connections" and "10 broker connections" are different
+ * sentences and both belong, while "Round-trip trades matched for you" is the same sentence
+ * twice and the second one is noise.
+ */
+export function featureLines(tier: Tier): FeatureLine[] {
+  const below = TIER_ORDER[TIER_ORDER.indexOf(tier) - 1];
+  if (!below) return allFeatureLines(tier);
+
+  const inherited = new Set(allFeatureLines(below).map((line) => line.text));
+  return [
+    { text: `Everything in ${TIER_PLANS[below].name}` },
+    ...allFeatureLines(tier).filter((line) => !inherited.has(line.text)),
+  ];
 }
