@@ -39,6 +39,7 @@ async function post<T>(payload: Record<string, unknown>): Promise<T> {
 export function publishRecord(options: {
   showAmounts: boolean;
   anonymous: boolean;
+  journals: string[];
 }): Promise<PublishResult> {
   return post<PublishResult>({ action: 'publish', ...options });
 }

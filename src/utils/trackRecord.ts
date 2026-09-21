@@ -2,6 +2,7 @@ import type { Trade } from '../types';
 import { effectivePnl } from './tradeHelpers';
 import { computeStats } from './stats';
 import { tradesByDay } from './tradingRules';
+import { resolveTradeAccountId } from './accounts';
 
 /**
  * A record of results that somebody else has a reason to believe.
@@ -31,6 +32,14 @@ export interface TrackRecord {
   firstDate: string | null;
   lastDate: string | null;
   tradingDays: number;
+  /**
+   * Journals holding at least one broker-imported trade, and how many of them this record
+   * covers. A journal with none cannot contribute to a verified record either way, so it is
+   * counted in neither — otherwise leaving a paper-trading journal out would look like hiding
+   * something, and leaving it in would pad the excluded count with trades nobody claimed.
+   */
+  journalsEligible: number;
+  journalsIncluded: number;
 
   netPnl: number;
   winRate: number;
@@ -50,6 +59,8 @@ export const EMPTY_RECORD: TrackRecord = {
   firstDate: null,
   lastDate: null,
   tradingDays: 0,
+  journalsEligible: 0,
+  journalsIncluded: 0,
   netPnl: 0,
   winRate: 0,
   profitFactor: 0,
@@ -79,6 +90,15 @@ export interface PublishedRecord {
   firstDate: string | null;
   lastDate: string | null;
   tradingDays: number;
+  /**
+   * How many of the trader’s broker-connected journals this record covers.
+   *
+   * Published so that leaving one out is visible to a reader rather than only to the person who
+   * left it out. Without it, "choose which journals to include" is cherry-picking with a
+   * checkbox in front of it.
+   */
+  journalsEligible: number;
+  journalsIncluded: number;
   winRate: number;
   profitFactor: number;
   /** ISO. The page dates itself by this — these are a snapshot, not a live feed. */
@@ -95,6 +115,21 @@ export interface PublishedRecord {
 /** True when the broker, not the trader, is the source of this row. */
 export function isBrokerVerified(trade: Trade): boolean {
   return typeof trade.sourceId === 'string' && trade.sourceId.length > 0;
+}
+
+/**
+ * The journals that hold at least one broker-imported trade.
+ *
+ * The only journals this feature has anything to say about. A journal of hand-entered trades
+ * contributes nothing to a verified record whether it is included or not, so it is not offered,
+ * not counted, and cannot make a published page look narrower than it is.
+ */
+export function eligibleJournals(allTrades: Trade[]): string[] {
+  return [
+    ...new Set(
+      allTrades.filter(isBrokerVerified).map((t) => resolveTradeAccountId(t.accountId)),
+    ),
+  ].sort();
 }
 
 /**
@@ -134,11 +169,35 @@ export function maxDrawdownByDay(trades: Trade[]): number {
   return worst;
 }
 
-export function buildTrackRecord(allTrades: Trade[]): TrackRecord {
-  const verified = allTrades.filter(isBrokerVerified);
-  const excluded = allTrades.length - verified.length;
+/**
+ * @param includedJournals account ids the record covers. Undefined means every eligible
+ *   journal, which is the default a trader never has to think about.
+ */
+export function buildTrackRecord(
+  allTrades: Trade[],
+  includedJournals?: readonly string[] | null,
+): TrackRecord {
+  const eligible = eligibleJournals(allTrades);
+  const included = includedJournals ? eligible.filter((j) => includedJournals.includes(j)) : eligible;
 
-  if (verified.length === 0) return { ...EMPTY_RECORD, excludedTrades: excluded };
+  /*
+   * Scoped to the included journals BEFORE anything is counted, so that excludedTrades means
+   * "typed into an account this record covers" rather than "typed in anywhere". A trader with a
+   * separate paper journal was otherwise publishing a page that announced hundreds of
+   * hand-entered trades against an account that had none.
+   */
+  const inScope = allTrades.filter((t) => included.includes(resolveTradeAccountId(t.accountId)));
+  const verified = inScope.filter(isBrokerVerified);
+  const excluded = inScope.length - verified.length;
+
+  if (verified.length === 0) {
+    return {
+      ...EMPTY_RECORD,
+      excludedTrades: excluded,
+      journalsEligible: eligible.length,
+      journalsIncluded: included.length,
+    };
+  }
 
   const stats = computeStats(verified);
   const wins = verified.map(effectivePnl).filter((p) => p > 0);
@@ -157,6 +216,8 @@ export function buildTrackRecord(allTrades: Trade[]): TrackRecord {
     firstDate: dates[0] ?? null,
     lastDate: dates[dates.length - 1] ?? null,
     tradingDays: dayTotals.length,
+    journalsEligible: eligible.length,
+    journalsIncluded: included.length,
 
     netPnl: stats.netPnl,
     winRate: stats.winRate,

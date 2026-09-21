@@ -205,6 +205,24 @@ export function PublishedRecordView({
               browser.
             </dd>
           </div>
+          {record.journalsIncluded < record.journalsEligible && (
+            /*
+             * Printed whenever a trader left one of their broker-connected accounts out.
+             *
+             * They are allowed to — plenty of people have an account they do not consider part
+             * of their trading. But a page that let them do it silently would be a highlight
+             * reel wearing the word "verified", and the reader is the one person who cannot
+             * find this out for themselves.
+             */
+            <div>
+              <dt className="font-semibold text-amber-300/90">Not all of their accounts</dt>
+              <dd className="text-text-secondary mt-1">
+                This record covers {record.journalsIncluded} of the{" "}
+                {record.journalsEligible} broker-connected accounts this trader has in Trend
+                Chasers. The others are not included in any figure above.
+              </dd>
+            </div>
+          )}
         </dl>
 
         <p className="text-[11px] text-text-secondary mt-5">

@@ -35,7 +35,7 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
     });
   }
 
-  let body: { action?: string; showAmounts?: unknown; anonymous?: unknown };
+  let body: { action?: string; showAmounts?: unknown; anonymous?: unknown; journals?: unknown };
   try {
     body = JSON.parse(event.body ?? '{}') as typeof body;
   } catch {
@@ -70,6 +70,11 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
     const result = await publishTrackRecord(uid, username, {
       showAmounts: body.showAmounts !== false,
       anonymous: body.anonymous === true,
+      // Anything that is not an array of strings is treated as "no selection", i.e. every
+      // journal — the inclusive answer, so a malformed body cannot quietly narrow a record.
+      journals: Array.isArray(body.journals)
+        ? body.journals.filter((j): j is string => typeof j === 'string')
+        : null,
     });
     return json(200, { published: true, ...result });
   } catch (err) {

@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, BadgeCheck, Check, Copy, ExternalLink } from 'lucide-react';
 import type { Trade } from '../../types';
 import { useAuth } from '../../context/useAuth';
+import { useSettings } from '../../context/useSettings';
 import {
   buildTrackRecord,
   canPublish,
+  eligibleJournals,
   MIN_TRADES_TO_PUBLISH,
   type PublishedRecord,
 } from '../../utils/trackRecord';
@@ -55,9 +57,47 @@ function Toggle({
  */
 export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) {
   const { username } = useAuth();
+  const { settings, updateSettings } = useSettings();
 
-  const record = useMemo(() => buildTrackRecord(trades), [trades]);
-  const eligible = canPublish(record);
+  /*
+   * Only journals holding broker-imported trades are offered.
+   *
+   * A hand-entry or paper journal cannot put anything on a verified page, so listing it as a
+   * choice would suggest it could. They are named further down as unavailable instead, which is
+   * also the answer to "why does it say I have hand-entered trades" for somebody who keeps one.
+   */
+  const journals = useMemo(() => eligibleJournals(trades), [trades]);
+
+  const chosen = settings.trackRecordJournals;
+  // Null means every journal — including ones connected after the choice was made, which is the
+  // behaviour somebody who never opened this control would expect.
+  const selected = useMemo(
+    () => (chosen ? journals.filter((j) => chosen.includes(j)) : journals),
+    [chosen, journals],
+  );
+
+  const record = useMemo(() => buildTrackRecord(trades, selected), [trades, selected]);
+  const canPost = canPublish(record);
+
+  const journalName = (id: string) =>
+    settings.accounts.find((a) => a.id === id)?.name ?? 'Untitled journal';
+
+  const verifiedIn = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const j of journals) counts.set(j, buildTrackRecord(trades, [j]).verifiedTrades);
+    return counts;
+  }, [journals, trades]);
+
+  const unavailable = settings.accounts.filter((a) => !journals.includes(a.id));
+
+  const toggleJournal = (id: string, on: boolean) => {
+    const next = on ? [...selected, id] : selected.filter((j) => j !== id);
+    // Stored as null when everything is picked, so a journal connected later is included by
+    // default instead of being silently left out of a list written before it existed.
+    updateSettings({
+      trackRecordJournals: next.length === journals.length ? null : next,
+    });
+  };
 
   /* Stamped with the username it was read for, so "loading" is derived rather than set inside
      the effect — and a reply that arrives after a rename is ignored rather than rendered under
@@ -111,7 +151,7 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
     setBusy(true);
     setError(null);
     try {
-      if (action === 'publish') await publishRecord({ showAmounts, anonymous });
+      if (action === 'publish') await publishRecord({ showAmounts, anonymous, journals: selected });
       else await unpublishRecord();
       // Cleared first so the screen says "checking" rather than showing the state it just
       // replaced — after a take-down that would be a "Published" badge over a deleted page.
@@ -190,7 +230,7 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
           )}
         </div>
 
-        {!eligible && (
+        {!canPost && (
           /*
            * Stated with the number, not as a bare refusal. Thirty trades is a product judgement
            * about what deserves the word "verified" on a public page, and somebody who is told
@@ -205,6 +245,65 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
           </p>
         )}
       </section>
+
+      {journals.length > 0 && (
+        <section className="panel-card p-5">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+              Journals to include
+            </h2>
+            {journals.length > 1 && (
+              <button
+                type="button"
+                onClick={() => updateSettings({ trackRecordJournals: null })}
+                disabled={selected.length === journals.length}
+                className="text-xs text-text-secondary hover:text-accent transition-colors focus-ring rounded-lg px-2 py-1 disabled:opacity-40 disabled:hover:text-text-secondary"
+              >
+                Select all
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-3 mt-4">
+            {journals.map((id) => (
+              <Toggle
+                key={id}
+                checked={selected.includes(id)}
+                onChange={(on) => toggleJournal(id, on)}
+                label={journalName(id)}
+                blurb={`${(verifiedIn.get(id) ?? 0).toLocaleString()} broker-imported ${
+                  verifiedIn.get(id) === 1 ? 'trade' : 'trades'
+                }`}
+              />
+            ))}
+          </div>
+
+          {selected.length === 0 && (
+            <p className="text-xs text-amber-300/90 mt-4">
+              Pick at least one journal — a record of nothing is not a record.
+            </p>
+          )}
+
+          {selected.length > 0 && selected.length < journals.length && (
+            /* The honesty clause. Choosing which accounts to show is reasonable; doing it
+               invisibly is how a "verified" page becomes a highlight reel, so the page itself
+               reports the ratio and the trader is told that here, before they publish. */
+            <p className="text-xs text-amber-300/90 mt-4 leading-relaxed">
+              Your page will say it covers {selected.length} of your {journals.length}{' '}
+              broker-connected journals. Leaving one out is allowed; hiding that you did is not.
+            </p>
+          )}
+
+          {unavailable.length > 0 && (
+            <p className="text-[11px] text-text-secondary mt-4 leading-relaxed">
+              Not available: {unavailable.map((a) => a.name).join(', ')} — no broker-imported
+              trades, so nothing in there can be verified. Trades you typed into
+              {unavailable.length === 1 ? ' it ' : ' them '}
+              are not counted anywhere on this screen.
+            </p>
+          )}
+        </section>
+      )}
 
       <section className="panel-card p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
@@ -287,7 +386,7 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
               <button
                 type="button"
                 onClick={() => void run('publish')}
-                disabled={busy || !eligible}
+                disabled={busy || !canPost}
                 className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold disabled:opacity-50"
               >
                 {busy ? 'Working…' : 'Republish with these settings'}
@@ -322,7 +421,7 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
             <button
               type="button"
               onClick={() => void run('publish')}
-              disabled={busy || !eligible}
+              disabled={busy || !canPost}
               className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold mt-4 disabled:opacity-50"
             >
               <BadgeCheck size={15} />

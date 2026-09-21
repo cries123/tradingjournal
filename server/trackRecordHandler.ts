@@ -35,6 +35,15 @@ export interface PublishOptions {
   showAmounts: boolean;
   /** On, the page verifies the trades without naming who they belong to. */
   anonymous: boolean;
+  /**
+   * Account ids the record covers. Undefined means every journal holding broker-imported
+   * trades, which is the default.
+   *
+   * Narrowing is safe to take from the client: it can only ever restrict the caller to a subset
+   * of their own trades, never reach anybody else’s. What it cannot do is hide that it
+   * happened — the published document records how many journals were left out.
+   */
+  journals?: readonly string[] | null;
 }
 
 /**
@@ -63,7 +72,7 @@ export async function publishTrackRecord(
     throw new TrackRecordError('Pick a username before publishing a record.', 400);
   }
 
-  const record = buildTrackRecord(await readAllTrades(uid));
+  const record = buildTrackRecord(await readAllTrades(uid), options.journals);
 
   if (!canPublish(record)) {
     throw new TrackRecordError(
@@ -104,6 +113,8 @@ export async function publishTrackRecord(
     firstDate: record.firstDate,
     lastDate: record.lastDate,
     tradingDays: record.tradingDays,
+    journalsEligible: record.journalsEligible,
+    journalsIncluded: record.journalsIncluded,
     winRate: record.winRate,
     profitFactor: record.profitFactor,
     ...money,

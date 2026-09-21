@@ -3,6 +3,7 @@ import type { Trade } from '../types';
 import {
   buildTrackRecord,
   canPublish,
+  eligibleJournals,
   isBrokerVerified,
   maxDrawdownByDay,
   MIN_TRADES_TO_PUBLISH,
@@ -63,8 +64,18 @@ describe('buildTrackRecord', () => {
   it('is empty, not broken, when nothing was imported', () => {
     const record = buildTrackRecord([typed(), typed()]);
     expect(record.verifiedTrades).toBe(0);
-    expect(record.excludedTrades).toBe(2);
     expect(record.netPnl).toBe(0);
+
+    /*
+     * Zero excluded, not two.
+     *
+     * excludedTrades means "typed into an account this record covers". With nothing imported
+     * anywhere there is no eligible journal, so the record covers no account and there is
+     * nothing for a trade to be excluded FROM. The screen says what is actually wrong here —
+     * that you need broker-imported trades and have none — from verifiedTrades.
+     */
+    expect(record.excludedTrades).toBe(0);
+    expect(record.journalsEligible).toBe(0);
   });
 
   it('reports the span of the verified trades only', () => {
@@ -159,5 +170,99 @@ describe('canPublish', () => {
       ...Array.from({ length: 100 }, () => typed()),
     ];
     expect(canPublish(buildTrackRecord(padded))).toBe(false);
+  });
+});
+
+/*
+ * Journal scoping.
+ *
+ * Added after a real report: a trader cleared one journal, re-synced it, and the screen still said
+ * 86 hand-entered trades were excluded — trades that were sitting untouched in a different journal
+ * he had never intended to publish. The counting was right and the scope was wrong.
+ */
+describe('journal scoping', () => {
+  const brokerJournal = () => imported({ accountId: 'broker' });
+  const paperJournal = () => typed({ accountId: 'paper' });
+
+  it('offers only journals that hold broker-imported trades', () => {
+    const trades = [brokerJournal(), paperJournal(), paperJournal()];
+    expect(eligibleJournals(trades)).toEqual(['broker']);
+  });
+
+  it('treats a trade with no accountId as the legacy journal', () => {
+    // Trades predate journals; resolveTradeAccountId maps a missing id onto 'default'. Getting
+    // this wrong would drop every trade an early user logged before journals existed.
+    expect(eligibleJournals([imported()])).toEqual(['default']);
+  });
+
+  it('ignores hand-entered trades in journals the record does not cover', () => {
+    // The reported bug, as a test. 'paper' is not eligible and not selected, so its 86 typed
+    // trades are not in the record's excluded count.
+    const trades = [
+      ...Array.from({ length: 30 }, brokerJournal),
+      ...Array.from({ length: 86 }, paperJournal),
+    ];
+
+    const record = buildTrackRecord(trades, eligibleJournals(trades));
+
+    expect(record.verifiedTrades).toBe(30);
+    expect(record.excludedTrades).toBe(0);
+  });
+
+  it('still counts hand-entered trades inside a journal it does cover', () => {
+    // The other half. These were typed into the same account the record is about, so leaving them
+    // uncounted would be hiding them rather than scoping them.
+    const trades = [
+      ...Array.from({ length: 30 }, brokerJournal),
+      typed({ accountId: 'broker' }),
+      typed({ accountId: 'broker' }),
+    ];
+
+    expect(buildTrackRecord(trades, ['broker']).excludedTrades).toBe(2);
+  });
+
+  it('covers every eligible journal when no selection is given', () => {
+    const trades = [imported({ accountId: 'a' }), imported({ accountId: 'b' })];
+    const record = buildTrackRecord(trades);
+
+    expect(record.verifiedTrades).toBe(2);
+    expect(record.journalsIncluded).toBe(2);
+    expect(record.journalsEligible).toBe(2);
+  });
+
+  it('reports the ratio when a journal is left out, so the page can say so', () => {
+    const trades = [
+      ...Array.from({ length: 30 }, () => imported({ accountId: 'good', pnl: 500 })),
+      ...Array.from({ length: 30 }, () => imported({ accountId: 'bad', pnl: -500 })),
+    ];
+
+    const record = buildTrackRecord(trades, ['good']);
+
+    expect(record.journalsIncluded).toBe(1);
+    expect(record.journalsEligible).toBe(2);
+    // The cherry-picked figure is still computed — it is the disclosure that makes it honest,
+    // not a refusal to compute it.
+    expect(record.netPnl).toBe(15000);
+  });
+
+  it('does not count a paper journal towards the ratio', () => {
+    // Otherwise excluding a hand-entry journal would make the page announce partial coverage,
+    // punishing somebody who hid nothing.
+    const trades = [
+      ...Array.from({ length: 30 }, brokerJournal),
+      ...Array.from({ length: 5 }, paperJournal),
+    ];
+    const record = buildTrackRecord(trades, eligibleJournals(trades));
+
+    expect(record.journalsEligible).toBe(1);
+    expect(record.journalsIncluded).toBe(1);
+  });
+
+  it('yields an empty record when every journal is deselected', () => {
+    const trades = Array.from({ length: 30 }, brokerJournal);
+    const record = buildTrackRecord(trades, []);
+
+    expect(record.verifiedTrades).toBe(0);
+    expect(canPublish(record)).toBe(false);
   });
 });

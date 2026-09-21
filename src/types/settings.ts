@@ -16,6 +16,14 @@ export interface UserSettings {
   setupTags: string[];
   accounts: JournalAccount[];
   activeAccountId: string;
+  /**
+   * Journals the published track record covers. Null means every journal holding
+   * broker-imported trades.
+   *
+   * Remembered rather than re-chosen each time so that republishing after a sync cannot
+   * silently widen a record the trader had deliberately narrowed.
+   */
+  trackRecordJournals: string[] | null;
   strategies: Strategy[];
   tradingRules: TradingRules;
   /** Monthly net P&L target — 0 disables the goal tracker. */
@@ -70,4 +78,5 @@ export const DEFAULT_SETTINGS: UserSettings = {
   ruleAlertsEnabled: true,
   shareCardBackgrounds: [],
   shareCardBackgroundId: null,
+  trackRecordJournals: null,
 };
