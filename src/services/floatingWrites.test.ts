@@ -78,10 +78,18 @@ describe('floating Firestore writes', () => {
 
           const end = callEndsAt(source, at + needle.length - 1);
           if (end === -1) continue;
-          // What follows the call: `.catch(` has to be the very next thing, allowing for the
-          // whitespace and line break a formatter may have put there.
-          const after = source.slice(end + 1, end + 12);
-          if (!/^\s*\.catch\b/.test(after)) {
+
+          /*
+           * `.catch` anywhere in the chain, not immediately after the call.
+           *
+           * This used to require it as the very next thing, which was wrong and said so the first
+           * time a real chain appeared: the settings write grew a `.then` to report success and
+           * the scanner called a properly-caught promise a floating one. What matters is that the
+           * statement ends up handled, however many links it takes to get there.
+           */
+          const statementEnd = source.indexOf(';', end);
+          const chain = statementEnd === -1 ? source.slice(end) : source.slice(end, statementEnd);
+          if (!/\.catch\b/.test(chain)) {
             const line = source.slice(0, at).split('\n').length;
             offenders.push(`${file.replace(process.cwd(), '').replace(/\\/g, '/')}:${line} — void ${writer}()`);
           }

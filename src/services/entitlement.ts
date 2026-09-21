@@ -1,6 +1,7 @@
 import { sendEmailVerification } from 'firebase/auth';
 import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebase';
 import { getVisitorId } from './visitorAnalytics';
+import { reportErrorSilently } from './errorReporting';
 import { limitsFor, MARKET_REPLAY_LIVE, type Tier, type TierLimits } from '../config/tiers';
 
 export interface EntitlementUsage {
@@ -218,6 +219,29 @@ function verificationReturnUrl(): string {
   return `${window.location.origin}/pricing`;
 }
 
+/**
+ * The failure, with Firebase's own code still attached.
+ *
+ * It used to throw a bare "Could not send the confirmation email. Try again in a minute." and drop
+ * the cause on the floor, so the screen said try again and nobody — including us — could tell
+ * whether it was an unauthorised domain, an exhausted quota or a misconfigured template. Retrying
+ * in a minute does not fix any of those.
+ *
+ * The code is safe to show: it is an auth error identifier, not a secret, and it is the one string
+ * that makes this searchable. It also goes to the error feed under its own scope so the next one
+ * appears there instead of only on somebody's phone.
+ */
+function verificationFailure(err: unknown): Error {
+  const code = (err as { code?: string }).code ?? '';
+  reportErrorSilently(err, 'promise', 'email-verification-send');
+  return new Error(
+    code
+      ? `Could not send the confirmation email (${code}).`
+      : 'Could not send the confirmation email. Try again in a minute.',
+    { cause: err },
+  );
+}
+
 export async function resendEmailVerification(): Promise<void> {
   if (!isFirebaseConfigured()) throw new Error('Sign in first.');
   const user = getFirebaseAuth().currentUser;
@@ -242,13 +266,11 @@ export async function resendEmailVerification(): Promise<void> {
         await sendEmailVerification(user);
         return;
       } catch (retryErr) {
-        throw new Error('Could not send the confirmation email. Try again in a minute.', {
-          cause: retryErr,
-        });
+        throw verificationFailure(retryErr);
       }
     }
 
-    throw new Error('Could not send the confirmation email. Try again in a minute.', { cause: err });
+    throw verificationFailure(err);
   }
 }
 

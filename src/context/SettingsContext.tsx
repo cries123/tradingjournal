@@ -39,6 +39,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const { limits } = useEntitlement();
   const { user } = useAuth();
   const [settings, setSettings] = useState<UserSettings>(() => loadSettings(user?.uid));
+  const [saveState, setSaveState] = useState<{ status: 'idle' | 'saved' | 'failed'; at: number }>({
+    status: 'idle',
+    at: 0,
+  });
 
   useEffect(() => {
     // Clearing state before the fetch or subscription below. This is the external-system sync
@@ -110,10 +114,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             ...Object.fromEntries(clearedKeys.map((key) => [key, deleteField()])),
           },
           { merge: true },
-        ).catch((error: unknown) => {
-          console.warn('[settings] could not save to the cloud; kept locally.', error);
-          reportErrorSilently(error, 'promise', 'settings-save');
-        });
+        )
+          .then(() => setSaveState({ status: 'saved', at: Date.now() }))
+          .catch((error: unknown) => {
+            console.warn('[settings] could not save to the cloud; kept locally.', error);
+            reportErrorSilently(error, 'promise', 'settings-save');
+            setSaveState({ status: 'failed', at: Date.now() });
+          });
       }
     },
     [user],
@@ -136,6 +143,37 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       const normalized = tag.trim().toUpperCase();
       if (!normalized || settings.setupTags.includes(normalized)) return;
       persist({ ...settings, setupTags: [...settings.setupTags, normalized] });
+    },
+    [settings, persist],
+  );
+
+  /**
+   * Renames a tag everywhere it is used.
+   *
+   * The list alone is not the truth — every trade carries its setup as a string, so renaming only
+   * the list would orphan the trades under the old name and split one setup into two rows on the
+   * Performance breakdown. The trades have to be rewritten with it, which is why this needs a
+   * callback the journal supplies rather than living purely in settings.
+   */
+  const renameSetupTag = useCallback(
+    (from: string, to: string) => {
+      const next = to.trim().toUpperCase();
+      const previous = from.trim().toUpperCase();
+      if (!next || next === previous) return;
+      // Merging into an existing tag is allowed — it is how somebody fixes having created both
+      // BREAKOUT and BREAK OUT — so a collision de-duplicates rather than being refused.
+      const tags = settings.setupTags.map((t) => (t === previous ? next : t));
+      persist({ ...settings, setupTags: [...new Set(tags)] });
+    },
+    [settings, persist],
+  );
+
+  const removeSetupTag = useCallback(
+    (tag: string) => {
+      const normalized = tag.trim().toUpperCase();
+      // Trades keep the tag they were saved with. Removing it from the list stops it being offered
+      // on new trades; rewriting history to erase a label somebody actually used would be worse.
+      persist({ ...settings, setupTags: settings.setupTags.filter((t) => t !== normalized) });
     },
     [settings, persist],
   );
@@ -215,8 +253,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       settings,
+      saveState,
       updateSettings,
       addSetupTag,
+      renameSetupTag,
+      removeSetupTag,
       addStrategy,
       removeStrategy,
       addAccount,
@@ -227,8 +268,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }),
     [
       settings,
+      saveState,
       updateSettings,
       addSetupTag,
+      renameSetupTag,
+      removeSetupTag,
       addStrategy,
       removeStrategy,
       addAccount,

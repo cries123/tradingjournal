@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { ArrowLeft, Download, FileText, Plus, Trash2, Upload } from 'lucide-react';
+import { ArrowLeft, Check, CloudOff, Download, FileText, Plus, Trash2, Upload, X } from 'lucide-react';
 import { useSettings } from '../context/useSettings';
 import { DiamondSection } from './settings/DiamondSection';
 import { useAuth } from '../context/useAuth';
@@ -15,6 +15,27 @@ import { availableTaxYears, buildTaxReport } from '../utils/taxReport';
 import { formatCurrency } from '../utils/format';
 import { fetchEmailPrefs, recapIsOn, setRecapOptIn } from '../services/emailPrefs';
 import { ConfirmDialog } from './ConfirmDialog';
+
+type ExportRange = 'all' | 'month' | '90' | 'ytd';
+
+/**
+ * A rule limit, or undefined when the box means "off".
+ *
+ * These were `Number(e.target.value) || undefined`, which quietly folded three different inputs
+ * into "off": an empty box, a zero, and anything unparseable. Empty meaning off is right and is
+ * now said in the copy beneath the fields. Zero and junk are not the same thing — a trade cap of
+ * nought is not a rule anybody wants, and NaN reaching the settings document would come back out
+ * as a limit nothing can compare against.
+ *
+ * So: blank, zero and unparseable all turn the limit off, deliberately and for a stated reason,
+ * rather than by falling through a falsy check.
+ */
+function limitOrOff(raw: string): number | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  const value = Number(trimmed);
+  return Number.isFinite(value) && value > 0 ? value : undefined;
+}
 
 interface SettingsPageProps {
   trades: Trade[];
@@ -59,12 +80,15 @@ export function SettingsPage({
   onAccount,
 }: SettingsPageProps) {
   const {
-    settings, updateSettings, addSetupTag, addStrategy, removeStrategy,
+    settings, saveState, updateSettings, addSetupTag, renameSetupTag, removeSetupTag,
+    addStrategy, removeStrategy,
     addAccount, removeAccount, setActiveAccount, journalLimit, canAddJournal,
   } = useSettings();
   const { username, user, firebaseEnabled } = useAuth();
   const { tier, limits } = useEntitlement();
   const [newTag, setNewTag] = useState('');
+  const [editingTag, setEditingTag] = useState<string | null>(null);
+  const [tagDraft, setTagDraft] = useState('');
   const [newAccount, setNewAccount] = useState('');
   const [newStrategy, setNewStrategy] = useState('');
   const [pendingBackup, setPendingBackup] = useState<ParsedBackup | null>(null);
@@ -114,6 +138,48 @@ export function SettingsPage({
       setRecapSaving(false);
     }
   };
+
+  /*
+   * Export range.
+   *
+   * Filtered on the trade's own date key rather than through Date(), which reads a bare YYYY-MM-DD
+   * as UTC midnight and then compares it in local time — so a boundary trade lands in the wrong
+   * side of the range one timezone west of Greenwich.
+   */
+  const [exportRange, setExportRange] = useState<ExportRange>('all');
+  const exportTrades = useMemo(() => {
+    if (exportRange === 'all') return trades;
+
+    if (exportRange === 'month') {
+      const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+      return trades.filter((t) => t.date?.startsWith(prefix));
+    }
+
+    const now = new Date();
+    if (exportRange === 'ytd') {
+      return trades.filter((t) => t.date >= `${now.getFullYear()}-01-01`);
+    }
+
+    const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90);
+    const key = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`;
+    return trades.filter((t) => t.date >= key);
+  }, [trades, exportRange, year, month]);
+
+  const exportFilename = useMemo(() => {
+    if (exportRange === 'month') return `trades-${year}-${String(month + 1).padStart(2, '0')}.csv`;
+    if (exportRange === 'ytd') return `trades-${new Date().getFullYear()}.csv`;
+    if (exportRange === '90') return 'trades-last-90-days.csv';
+    return 'trades-all.csv';
+  }, [exportRange, year, month]);
+
+  /** "2026-06-03 → 2026-09-19", from the dates in the file — enough to recognise a backup by. */
+  const backupRange = useMemo(() => {
+    const dates = (pendingBackup?.trades ?? []).map((t) => t.date).filter(Boolean).sort();
+    if (dates.length === 0) return null;
+    const first = dates[0]!;
+    const last = dates[dates.length - 1]!;
+    return first === last ? first : `${first} → ${last}`;
+  }, [pendingBackup]);
 
   const taxYears = useMemo(() => availableTaxYears(trades), [trades]);
   const [taxYear, setTaxYear] = useState(() => availableTaxYears(trades)[0] ?? new Date().getFullYear());
@@ -171,10 +237,38 @@ export function SettingsPage({
         </button>
 
         <div>
-          <h1 className="text-2xl font-bold">Settings</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-bold">Settings</h1>
+            {/*
+              Every field here writes as you type and said nothing either way. Silence is fine
+              while it works and invisible when it does not — and settings-save is already a real
+              scope in the error feed, so failures were happening and only we could see them.
+            */}
+            {firebaseEnabled && user && saveState.status !== 'idle' && (
+              <span
+                key={saveState.at}
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                  saveState.status === 'saved'
+                    ? 'bg-emerald-500/10 text-emerald-400'
+                    : 'bg-red-500/10 text-red-400'
+                }`}
+              >
+                {saveState.status === 'saved' ? <Check size={12} /> : <CloudOff size={12} />}
+                {saveState.status === 'saved' ? 'Saved' : 'Saved on this device only'}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-text-secondary mt-1">Preferences, accounts, and data export</p>
           {firebaseEnabled && user && username && (
             <p className="text-sm text-accent mt-2 font-medium">@{username}</p>
+          )}
+          {saveState.status === 'failed' && (
+            /* Said once, plainly. The setting IS applied locally — losing it only happens when they
+               open the app somewhere else — so this is a warning, not an error to panic about. */
+            <p className="text-xs text-red-400 mt-2">
+              Your last change could not reach the cloud. It is applied on this device and will sync
+              when the connection recovers.
+            </p>
           )}
         </div>
 
@@ -267,13 +361,65 @@ export function SettingsPage({
 
         <section className="panel-card p-5 space-y-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Setup tags</h2>
+          {/*
+            Editable, finally. A tag could be added and never corrected, so a typo was permanent —
+            and it does not sit quietly in a list: every trade carries its setup as a string, so
+            BREAKOUT and BREKOUT become two separate rows on the Performance breakdown forever.
+          */}
           <div className="flex flex-wrap gap-2">
             {settings.setupTags.map((tag) => (
-              <span key={tag} className="px-2.5 py-1 rounded-full text-xs bg-bg-tertiary border border-border/60">
-                {tag}
+              <span
+                key={tag}
+                className="group inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-xs bg-bg-tertiary border border-border/60"
+              >
+                {editingTag === tag ? (
+                  <input
+                    autoFocus
+                    value={tagDraft}
+                    onChange={(e) => setTagDraft(e.target.value)}
+                    onBlur={() => {
+                      renameSetupTag(tag, tagDraft);
+                      setEditingTag(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') e.currentTarget.blur();
+                      if (e.key === 'Escape') setEditingTag(null);
+                    }}
+                    aria-label={`Rename ${tag}`}
+                    className="w-24 bg-transparent outline-none uppercase"
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingTag(tag);
+                      setTagDraft(tag);
+                    }}
+                    title="Rename"
+                    className="focus-ring rounded"
+                  >
+                    {tag}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => removeSetupTag(tag)}
+                  aria-label={`Remove ${tag}`}
+                  title="Remove from the list — trades keep the tag"
+                  className="p-0.5 rounded-full text-text-secondary hover:text-red-400 focus-ring"
+                >
+                  <X size={11} />
+                </button>
               </span>
             ))}
+            {settings.setupTags.length === 0 && (
+              <p className="text-xs text-text-secondary">No tags yet.</p>
+            )}
           </div>
+          <p className="text-[11px] text-text-secondary leading-relaxed">
+            Tap a tag to rename it — the change follows through to every trade using it. Removing
+            one takes it off this list; trades keep the tag they were saved with.
+          </p>
           <div className="flex gap-2">
             <input
               type="text"
@@ -407,7 +553,7 @@ export function SettingsPage({
                 value={settings.tradingRules.maxDailyLoss ?? ''}
                 onChange={(e) =>
                   updateSettings({
-                    tradingRules: { ...settings.tradingRules, maxDailyLoss: Number(e.target.value) || undefined },
+                    tradingRules: { ...settings.tradingRules, maxDailyLoss: limitOrOff(e.target.value) },
                   })
                 }
                 className="input-field"
@@ -420,7 +566,7 @@ export function SettingsPage({
                 value={settings.tradingRules.maxTradesPerDay ?? ''}
                 onChange={(e) =>
                   updateSettings({
-                    tradingRules: { ...settings.tradingRules, maxTradesPerDay: Number(e.target.value) || undefined },
+                    tradingRules: { ...settings.tradingRules, maxTradesPerDay: limitOrOff(e.target.value) },
                   })
                 }
                 className="input-field"
@@ -435,7 +581,7 @@ export function SettingsPage({
                 value={settings.tradingRules.maxDailyGain ?? ''}
                 onChange={(e) =>
                   updateSettings({
-                    tradingRules: { ...settings.tradingRules, maxDailyGain: Number(e.target.value) || undefined },
+                    tradingRules: { ...settings.tradingRules, maxDailyGain: limitOrOff(e.target.value) },
                   })
                 }
                 className="input-field"
@@ -450,7 +596,7 @@ export function SettingsPage({
                   updateSettings({
                     tradingRules: {
                       ...settings.tradingRules,
-                      maxConsecutiveLosses: Number(e.target.value) || undefined,
+                      maxConsecutiveLosses: limitOrOff(e.target.value),
                     },
                   })
                 }
@@ -584,13 +730,36 @@ export function SettingsPage({
 
         <section className="panel-card p-5 space-y-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Export data</h2>
+
+          {/*
+            The button said "all trades" and exported the whole journal, with the selected month
+            only ever reaching the filename — so a file called trades-2026-9.csv held every trade
+            since the account opened. Two ways that misleads: somebody looking for one month gets
+            everything, and somebody archiving a year gets a file named after a month.
+          */}
+          <label className="block">
+            <span className="text-xs text-text-secondary mb-1 block">Range</span>
+            <select
+              value={exportRange}
+              onChange={(e) => setExportRange(e.target.value as ExportRange)}
+              className="input-field"
+            >
+              <option value="all">Everything</option>
+              <option value="month">This month</option>
+              <option value="90">Last 90 days</option>
+              <option value="ytd">This year so far</option>
+            </select>
+          </label>
           <button
             type="button"
-            onClick={() => exportTradesCsv(trades, `trades-${year}-${month + 1}.csv`)}
-            className="w-full flex items-center justify-center gap-2 btn-secondary py-2.5 text-sm"
+            onClick={() => exportTradesCsv(exportTrades, exportFilename)}
+            disabled={exportTrades.length === 0}
+            className="w-full flex items-center justify-center gap-2 btn-secondary py-2.5 text-sm disabled:opacity-50"
           >
             <Download size={16} />
-            Export all trades (CSV)
+            {exportTrades.length === 0
+              ? 'No trades in that range'
+              : `Export ${exportTrades.length} trade${exportTrades.length === 1 ? '' : 's'} (CSV)`}
           </button>
           <button
             type="button"
@@ -706,6 +875,19 @@ export function SettingsPage({
             <Trash2 size={16} />
             Clear this journal
           </button>
+          {/* Clearing the journal and deleting the account are the two irreversible things this
+              product does, and they sat on different screens with nothing linking them — so
+              somebody who came here to leave found only the half that empties the journal and
+              keeps charging them. */}
+          {firebaseEnabled && user && (
+            <button
+              type="button"
+              onClick={onAccount}
+              className="w-full text-center text-xs text-text-secondary hover:text-red-400 transition-colors focus-ring rounded py-1"
+            >
+              Looking to delete your whole account? That is on Account settings &rarr;
+            </button>
+          )}
         </section>
         </div>
       </div>
@@ -713,11 +895,26 @@ export function SettingsPage({
       {pendingBackup && (
         <ConfirmDialog
           title="Restore this backup?"
+          /*
+           * Says which backup, not just how many trades.
+           *
+           * It named a count and the day the file was made, which does not distinguish last
+           * night's from one taken in June if both hold a few hundred trades — and the file picker
+           * before it shows only a filename. The span of dates inside is the thing somebody
+           * actually recognises a backup by, and whether it carries settings decides whether
+           * confirming also rewrites their tags and journals.
+           */
           message={`This will restore ${pendingBackup.trades.length} trade(s)${
+            backupRange ? ` covering ${backupRange}` : ''
+          }${
             pendingBackup.exportedAt
-              ? ` from a backup made ${new Date(pendingBackup.exportedAt).toLocaleDateString()}`
+              ? `, from a backup made ${new Date(pendingBackup.exportedAt).toLocaleDateString()}`
               : ''
-          } plus your tags, journals, and preferences. Existing trades with the same IDs are updated; nothing is deleted.`}
+          }. ${
+            Object.keys(pendingBackup.settings).length > 0
+              ? 'Your tags, journals and preferences come with it. '
+              : 'It carries no settings, so yours are left alone. '
+          }Existing trades with the same IDs are updated; nothing is deleted.`}
           confirmLabel="Restore backup"
           onCancel={() => setPendingBackup(null)}
           onConfirm={() => {
