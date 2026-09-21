@@ -82,15 +82,14 @@ export const EMPTY_RECORD: TrackRecord = {
 export interface PublishedRecord {
   published: true;
   showAmounts: boolean;
-  /*
-   * There is deliberately no name field.
+  /**
+   * The trader’s handle, as they typed it — the chosen name, never a real one.
    *
-   * It is not omitted from the rendering, it is absent from the document: a public-read
-   * document is readable by anyone, so a name kept 'just in case' is a name published. Most
-   * people's username is their real first name, and this page would otherwise be a permanent,
-   * indexable link between a person and their trading losses. The slug in the URL is the
-   * address they chose to hand out; the record itself identifies nobody.
+   * Firebase hands us a displayName from Google sign-in that is somebody’s legal name, and it
+   * must never reach this document. Only the username does: a handle they picked, which is
+   * already the address of the page, and which they can change.
    */
+  username: string;
   verifiedTrades: number;
   excludedTrades: number;
   brokers: string[];

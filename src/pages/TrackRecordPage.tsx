@@ -81,11 +81,11 @@ function Band({
  * something we did not write. Bands separated by rules keep it readable without letting any part
  * of it look like a self-contained tile.
  *
- * NO NAME ANYWHERE — not the heading, not the prose, not the stamp. Most people's username is
- * their actual first name, and a page carrying it is a permanent, indexable, public association
- * between a real person and their trading losses. The username is still the address, because that
- * is the link somebody chooses to send, but the page never prints it: it cannot be scraped from
- * the body, read off a screenshot, or picked up as the subject of a search result.
+ * THE HANDLE, NEVER A REAL NAME. The page is headed by the trader’s username — a name they
+ * chose, which is already the address of the page and which they can change. What must never
+ * appear is the displayName Firebase takes from a Google sign-in, which is somebody’s legal
+ * name: it is not written to the published document at all, so it cannot arrive here by
+ * accident or by a later edit.
  */
 export function PublishedRecordView({
   record,
@@ -104,7 +104,7 @@ export function PublishedRecordView({
       </span>
 
       <h1 className="text-2xl md:text-3xl font-bold tracking-tight mt-4">
-        A verified trading record
+        {record.username}&rsquo;s verified trading record
       </h1>
 
       {/*
@@ -286,7 +286,7 @@ export function PublishedRecordView({
               </li>
             </ul>
 
-            {/* Dated, not named. The stamp attests the figures; it does not identify a person. */}
+            {/* The handle, not a legal name — the same string that is already in the URL. */}
             <p className="text-[11px] uppercase tracking-[0.14em] text-text-secondary mt-4">
               Stamped{' '}
               {new Date(record.updatedAt).toLocaleDateString(undefined, {
@@ -294,7 +294,7 @@ export function PublishedRecordView({
                 month: 'short',
                 year: 'numeric',
               })}{' '}
-              · trendchasers.net
+              · {record.username} · trendchasers.net
             </p>
           </div>
         </div>

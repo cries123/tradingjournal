@@ -46,7 +46,7 @@ export function describeRecord(record: PublishedRecord): { title: string; descri
       : '';
 
   return {
-    title: 'A broker-verified trading record — Trend Chasers',
+    title: `${record.username}'s broker-verified trading record — Trend Chasers`,
     description:
       `${record.verifiedTrades.toLocaleString()} trades imported straight from a connected ` +
       `brokerage over ${record.tradingDays.toLocaleString()} trading days.${excluded} ` +

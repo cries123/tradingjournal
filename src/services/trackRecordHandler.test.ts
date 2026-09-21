@@ -159,20 +159,20 @@ describe('publishTrackRecord', () => {
     expect(record.winRate).toBeGreaterThan(0);
   });
 
-  it('writes no name into the public document at all', async () => {
+  it('publishes the handle as typed, while the slug is its lowercased form', async () => {
     /*
-     * Absent, not null, and not merely unrendered.
+     * The username and nothing else.
      *
-     * The document is world-readable, so a name kept in it "for later" is a name published —
-     * and most people's username is their real first name. The slug is the address they chose
-     * to hand out; the record itself identifies nobody.
+     * The handle is a name the trader chose and can change, and it is already the address of
+     * the page. What must never reach this document is Firebase's displayName, which for a
+     * Google sign-in is somebody's legal name — the handler is never given it, so there is
+     * nothing here that could start leaking it after a later edit.
      */
     trades = Array.from({ length: 30 }, (_, i) => imported(i, 10));
-    await publishTrackRecord('u1', 'jay', { showAmounts: true });
+    await publishTrackRecord('u1', 'JayTrades', { showAmounts: true });
 
-    const record = writes.find((w) => w.path === 'trackRecords/jay')!.data!;
-    expect('username' in record).toBe(false);
-    expect(JSON.stringify(record).toLowerCase()).not.toContain('jay');
+    const record = writes.find((w) => w.path === 'trackRecords/jaytrades')!.data!;
+    expect(record.username).toBe('JayTrades');
   });
 
   it('replaces rather than merges, so turning amounts off removes them', async () => {

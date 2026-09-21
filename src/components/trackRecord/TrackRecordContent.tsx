@@ -315,13 +315,13 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
             label="Show dollar amounts"
             blurb="Off, the page shows win rate and profit factor only. The amounts are not hidden by the page — they are never written to it, so nobody can read them out of it."
           />
-          {/* Stated rather than left to be noticed: somebody about to publish wants to know
-              what of theirs lands on a public page, and the answer is nothing that names
-              them. There is no toggle because there is no longer a choice to make. */}
+          {/* Says WHICH name, because the two are not the same thing and the difference is the
+              point: the handle they chose goes on the page, the name their bank knows does not,
+              and nothing in the product can put the latter there. */}
           <p className="text-xs text-text-secondary leading-relaxed">
-            Your name is never printed on the page. It is headed &ldquo;a verified trading
-            record&rdquo;, not who it belongs to — the only place your username appears is the
-            address you send people.
+            The page is headed with your username{username ? ` — @${username}` : ""}, the same
+            name already in the link. Your real name is never printed on it and is never sent
+            to it.
           </p>
         </div>
 

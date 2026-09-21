@@ -104,6 +104,8 @@ export async function publishTrackRecord(
   const published: PublishedRecord = {
     published: true,
     showAmounts: options.showAmounts,
+    // The username as they typed it. The slug below is its lowercased form, used only as an id.
+    username,
     verifiedTrades: record.verifiedTrades,
     excludedTrades: record.excludedTrades,
     brokers: record.brokers,
