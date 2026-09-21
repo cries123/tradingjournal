@@ -30,6 +30,7 @@ const FEATURE_NAMES: Record<Feature, string> = {
   brokerSync: 'broker sync',
   performanceAnalytics: 'the performance screen',
   ruleSimulator: 'the rule simulator',
+  trackRecord: 'a publishable verified track record',
   aiAssistant: 'the AI assistant',
   marketReplay: 'market replay',
   autoSync: 'automatic daily imports',

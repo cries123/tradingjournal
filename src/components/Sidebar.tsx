@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Sparkles,
   FlaskConical,
+  BadgeCheck,
 } from 'lucide-react';
 import { PlanBadge } from './plan/PlanBadge';
 import { BrandLogo } from './BrandLogo';
@@ -25,6 +26,7 @@ export type SidebarAppView =
   | 'connect-broker'
   | 'performance'
   | 'simulator'
+  | 'track-record'
   | 'assistant'
   | 'report-bug'
   | 'request-broker'
@@ -41,6 +43,7 @@ interface SidebarProps {
   onConnectBroker: () => void;
   onPerformance: () => void;
   onSimulator: () => void;
+  onTrackRecord: () => void;
   onAssistant: () => void;
   onSettings: () => void;
   onSupport: () => void;
@@ -127,6 +130,7 @@ export function Sidebar({
   onConnectBroker,
   onPerformance,
   onSimulator,
+  onTrackRecord,
   onAssistant,
   onSettings,
   onSupport,
@@ -218,6 +222,15 @@ export function Sidebar({
             onClick={wrap(onAssistant)}
             icon={<Sparkles size={16} />}
             label="Assistant"
+          />
+          {/* Last of the analysis rows because it is the only one that produces something
+              other people see — it belongs after the screens that decide whether there is
+              anything worth showing them. */}
+          <NavItem
+            active={appView === 'track-record'}
+            onClick={wrap(onTrackRecord)}
+            icon={<BadgeCheck size={16} />}
+            label="Track record"
           />
           {/* Only for the people who are actually somebody's coach — which is almost nobody, and a
               permanent row saying "nobody has invited you" is a nav item advertising a feature

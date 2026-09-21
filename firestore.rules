@@ -321,6 +321,43 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    /*
+     * Published track records — the one deliberately public collection in this database.
+     *
+     * Read by anybody, including signed out, because that is the entire point: a record only
+     * proves something if the person being shown it can fetch it themselves. A screenshot proves
+     * nothing, so verification requires this to be readable without an account.
+     *
+     * Written only by the Admin SDK, from netlify/functions/track-record.ts. That is not a
+     * convenience — it is what the word "verified" rests on. A client that could write here could
+     * publish any figures it liked under a page branded as verified, which is worse than having no
+     * page at all. The server reads the trader's own trades, applies the broker-only rule itself,
+     * and writes the result.
+     *
+     * The documents carry no trade rows, no symbols, no account identifiers, and no amounts at all
+     * unless the trader asked for them — see publishTrackRecord, which omits them from the
+     * document rather than asking the page not to render them.
+     *
+     * Delete is denied here too: unpublishing goes through the same function, which checks the
+     * record belongs to the caller before removing it.
+     */
+    match /trackRecords/{slug} {
+      allow read: if true;
+      allow write, delete: if false;
+    }
+
+    /*
+     * Which account owns each published slug, so unpublishing can check before deleting.
+     *
+     * Deliberately not a field on the record above: that document is world-readable, and a uid
+     * on it would publish an account identifier the trader never agreed to show. Denying it here
+     * changes nothing on its own — an unlisted collection is already denied — but a collection
+     * that exists and appears in no rule reads like an oversight, and this says it is not.
+     */
+    match /trackRecordOwners/{slug} {
+      allow read, write, delete: if false;
+    }
+
     match /usernames/{usernameId} {
       allow read, list: if request.auth != null;
       allow create: if request.auth != null

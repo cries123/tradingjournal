@@ -108,6 +108,17 @@ export interface TierLimits {
    * to run: it is arithmetic over trades already stored, with no market data behind it.
    */
   ruleSimulator: boolean;
+  /**
+   * Publishing a verified record at /r/<username>.
+   *
+   * Every paid plan, including the cheapest, because this one is marketing that the customer
+   * does for us: each published page is branded and links back. Gating it to Gold would be
+   * charging more to be advertised. Free is excluded for the opposite reason — the page says the
+   * product vouches for these figures, and we should only vouch for customers.
+   *
+   * Costs nothing per publish: one document write, and the page is a public Firestore read.
+   */
+  trackRecord: boolean;
 }
 
 export interface TierPlan {
@@ -194,7 +205,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     tagline: 'Log trades by hand and keep the full journal.',
     limits: {
       brokers: 0, syncsPerDay: 0, aiMessagesPerDay: 0, marketReplay: false, journals: 2,
-      performanceAnalytics: false, ruleSimulator: false, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
+      performanceAnalytics: false, ruleSimulator: false, trackRecord: false, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
     },
   },
   silver: {
@@ -204,7 +215,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     tagline: 'Connect a broker and stop typing trades in.',
     limits: {
       brokers: 5, syncsPerDay: 5, aiMessagesPerDay: 0, marketReplay: false, journals: 3,
-      performanceAnalytics: true, ruleSimulator: false, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
+      performanceAnalytics: true, ruleSimulator: false, trackRecord: true, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
     },
     productIdEnv: 'CREEM_PRODUCT_SILVER',
     annualProductIdEnv: 'CREEM_PRODUCT_SILVER_ANNUAL',
@@ -216,7 +227,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     tagline: 'Ten brokers, and an assistant that reads your stats.',
     limits: {
       brokers: 10, syncsPerDay: 10, aiMessagesPerDay: 15, marketReplay: false, journals: 5,
-      performanceAnalytics: true, ruleSimulator: true, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
+      performanceAnalytics: true, ruleSimulator: true, trackRecord: true, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
     },
     productIdEnv: 'CREEM_PRODUCT_GOLD',
     annualProductIdEnv: 'CREEM_PRODUCT_GOLD_ANNUAL',
@@ -229,7 +240,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     limits: {
       brokers: UNLIMITED_BROKERS, syncsPerDay: 24, aiMessagesPerDay: 40, marketReplay: true,
       journals: UNLIMITED_JOURNALS,
-      performanceAnalytics: true, ruleSimulator: true, autoSync: true, coachSeat: true, ruleAlerts: true, aiReview: true,
+      performanceAnalytics: true, ruleSimulator: true, trackRecord: true, autoSync: true, coachSeat: true, ruleAlerts: true, aiReview: true,
     },
     productIdEnv: 'CREEM_PRODUCT_DIAMOND',
     annualProductIdEnv: 'CREEM_PRODUCT_DIAMOND_ANNUAL',
@@ -298,6 +309,7 @@ export type Feature =
   | 'marketReplay'
   | 'performanceAnalytics'
   | 'ruleSimulator'
+  | 'trackRecord'
   | 'autoSync'
   | 'coachSeat'
   | 'ruleAlerts'
@@ -307,6 +319,7 @@ export type Feature =
 const BOOLEAN_FEATURES: Partial<Record<Feature, keyof TierLimits>> = {
   performanceAnalytics: 'performanceAnalytics',
   ruleSimulator: 'ruleSimulator',
+  trackRecord: 'trackRecord',
   autoSync: 'autoSync',
   coachSeat: 'coachSeat',
   ruleAlerts: 'ruleAlerts',
@@ -371,6 +384,9 @@ export function featureLines(tier: Tier): { text: string; soon?: boolean }[] {
   }
   if (l.ruleSimulator) {
     lines.push({ text: 'Rule simulator — what a daily stop would have done to your own year' });
+  }
+  if (l.trackRecord) {
+    lines.push({ text: 'Publish a verified track record — broker-imported trades only' });
   }
 
   /* The four that make the top tier a different product rather than a bigger one. Listed after

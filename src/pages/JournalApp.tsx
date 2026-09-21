@@ -24,6 +24,7 @@ import { CoachNotesPanel } from '../components/coach/CoachNotesPanel';
 import { CoachInboxContent } from '../components/coach/CoachInboxContent';
 import { AccountMenu } from '../components/account/AccountMenu';
 import { RuleSimulatorContent } from '../components/simulator/RuleSimulatorContent';
+import { TrackRecordContent } from '../components/trackRecord/TrackRecordContent';
 import { Search as SearchIcon } from 'lucide-react';
 import { JournalSearch } from '../components/search/JournalSearch';
 import { AccountSettingsContent } from '../components/account/AccountSettingsContent';
@@ -230,6 +231,10 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
       openView('simulator');
       closeMobileMenu();
     },
+    onTrackRecord: () => {
+      openView('track-record');
+      closeMobileMenu();
+    },
     onAssistant: () => {
       openView('assistant');
       closeMobileMenu();
@@ -376,6 +381,17 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 description="Replay your own journal against a daily stop or a trade cap and see what it would have cost you — or saved you. Your trades, your days, no market data required."
               >
                 <RuleSimulatorContent periods={assistantPeriods} onBack={goBackView} />
+              </LockedFeature>
+            ) : appView === 'track-record' ? (
+              <LockedFeature
+                feature="trackRecord"
+                title="A verified track record is part of a paid plan"
+                description="Publish a public page built only from the trades your broker sent us, with anything you typed in left out and counted. You choose whether it shows dollar amounts or your name."
+              >
+                {/* everyTrade, not `trades`: a record is a claim about the trader, so it spans
+                    every journal and ignores whatever filter the dashboard has on. This is also
+                    the set the server reads, so the preview matches what gets published. */}
+                <TrackRecordContent trades={everyTrade} onBack={goBackView} />
               </LockedFeature>
             ) : appView === 'assistant' ? (
               <LockedFeature

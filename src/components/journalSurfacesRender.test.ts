@@ -173,6 +173,7 @@ const sidebar = (appView: Parameters<typeof Sidebar>[0]['appView']) =>
     onConnectBroker: noop,
     onPerformance: noop,
     onSimulator: noop,
+    onTrackRecord: noop,
     onAssistant: noop,
     onSettings: noop,
     onSupport: noop,

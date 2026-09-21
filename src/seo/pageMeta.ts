@@ -14,7 +14,10 @@ export interface PageSeo {
 }
 
 /** Exported so the pricing-claim test can read every published title and description. */
-export const PAGE_SEO: Record<Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>, PageSeo> = {
+export const PAGE_SEO: Record<
+  Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide' | 'track-record'>,
+  PageSeo
+> = {
   landing: {
     title: 'Trend Chasers — Trading Journal & P&L Calendar',
     description:
@@ -123,6 +126,7 @@ export function getPageSeo(
   route: AppRoute,
   guideSlug?: string,
   brokerSlug?: string,
+  recordSlug?: string,
 ): PageSeo {
   if (route === 'guide' && guideSlug) {
     const guide = getGuideBySlug(guideSlug);
@@ -158,7 +162,22 @@ export function getPageSeo(
     };
   }
 
-  return PAGE_SEO[route as Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide'>];
+  /*
+   * A published record is indexable on purpose — the page exists to be found and believed, and a
+   * noindex tag on it would make it a link you can send but not a result anybody stumbles on.
+   * The description says what the page is rather than what it claims, because the figures are the
+   * trader's and this text is ours.
+   */
+  if (route === 'track-record' && recordSlug) {
+    return {
+      title: `${recordSlug}'s verified trading record — Trend Chasers`,
+      description:
+        'A trading record built only from trades imported from a connected brokerage, with hand-entered trades excluded and counted.',
+      path: `/r/${recordSlug}`,
+    };
+  }
+
+  return PAGE_SEO[route as Exclude<AppRoute, 'coach' | 'guide' | 'broker-guide' | 'track-record'>];
 }
 
 /** Public marketing routes prerendered at build time for crawlers. */

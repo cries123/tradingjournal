@@ -25,6 +25,7 @@ const ReportBugPage = lazy(() => import('./pages/ReportBugPage').then((m) => ({ 
 const RequestBrokerPage = lazy(() => import('./pages/RequestBrokerPage').then((m) => ({ default: m.RequestBrokerPage })));
 const SupportPage = lazy(() => import('./pages/SupportPage').then((m) => ({ default: m.SupportPage })));
 const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage').then((m) => ({ default: m.TermsOfServicePage })));
+const TrackRecordPage = lazy(() => import('./pages/TrackRecordPage').then((m) => ({ default: m.TrackRecordPage })));
 const WhatsNewPage = lazy(() => import('./pages/WhatsNewPage').then((m) => ({ default: m.WhatsNewPage })));
 
 function RouteLoading() {
@@ -41,9 +42,9 @@ function RouteLoading() {
 }
 
 export default function App() {
-  const { route, guideSlug, brokerSlug, navigate, navigateGuide, navigateBrokerGuide } =
+  const { route, guideSlug, brokerSlug, recordSlug, navigate, navigateGuide, navigateBrokerGuide } =
     useRoute();
-  usePageMeta(getPageSeo(route, guideSlug, brokerSlug));
+  usePageMeta(getPageSeo(route, guideSlug, brokerSlug, recordSlug));
   useStructuredData(route, guideSlug, brokerSlug);
   useVisitorTracking(route, guideSlug, brokerSlug);
   useLiveChat(route);
@@ -96,6 +97,9 @@ export default function App() {
   } else if (route === 'guide' && guideSlug) {
     routeKey = `guide-${guideSlug}`;
     content = <GuidePage slug={guideSlug} {...publicPageProps} />;
+  } else if (route === 'track-record' && recordSlug) {
+    routeKey = `track-record-${recordSlug}`;
+    content = <TrackRecordPage slug={recordSlug} {...publicPageProps} />;
   } else if (route === 'broker-guide' && brokerSlug) {
     routeKey = `broker-guide-${brokerSlug}`;
     content = <BrokerGuidePage slug={brokerSlug} {...publicPageProps} />;

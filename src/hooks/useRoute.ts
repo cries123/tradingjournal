@@ -19,11 +19,15 @@ export type AppRoute =
   | 'pricing'
   | 'help-center'
   | 'support'
-  | 'whats-new';
+  | 'whats-new'
+  | 'track-record';
 
 /** Nav destinations reachable from the header dropdown and the footer — the "coming soon" and
  *  changelog pages, plus the two support pages the footer links to. Kept as its own union so a
  *  nav handler can't be passed a route that needs a slug. */
+/** Every route reachable by name alone. */
+export type NavRoute = Exclude<AppRoute, 'guide' | 'broker-guide' | 'track-record'>;
+
 export type ExtraNavRoute =
   | 'refunds'
   | 'market-simulator'
@@ -35,7 +39,9 @@ export type ExtraNavRoute =
   | 'support'
   | 'request-broker';
 
-const ROUTE_PATHS: Record<Exclude<AppRoute, 'guide' | 'broker-guide'>, string> = {
+/** Slug-less routes only: 'guide', 'broker-guide' and 'track-record' each need one, so they
+ *  navigate through their own function rather than through this table. */
+const ROUTE_PATHS: Record<NavRoute, string> = {
   landing: '/',
   app: '/app',
   brokers: '/brokers',
@@ -54,15 +60,22 @@ const ROUTE_PATHS: Record<Exclude<AppRoute, 'guide' | 'broker-guide'>, string> =
   'whats-new': '/whats-new',
 };
 
-interface RouteState {
+export interface RouteState {
   route: AppRoute;
   guideSlug?: string;
   brokerSlug?: string;
+  /** The username whose published record is being viewed — /r/<name>. */
+  recordSlug?: string;
 }
 
-function readRoute(): RouteState {
-  const path = window.location.pathname;
-
+/**
+ * Path to route, with no window in it so it can be tested directly.
+ *
+ * Pulled out of readRoute because this is the part that breaks: the slug branches are three
+ * near-identical lines of regex, and one of them shipping wrong is a page that silently falls
+ * through to the landing page. The hook below is the only caller that knows about window.
+ */
+export function parseRoutePath(path: string): RouteState {
   if (path.startsWith('/guides/')) {
     const slug = path.slice('/guides/'.length).replace(/\/$/, '');
     if (slug) return { route: 'guide', guideSlug: slug };
@@ -72,6 +85,12 @@ function readRoute(): RouteState {
   if (path.startsWith('/brokers/')) {
     const slug = path.slice('/brokers/'.length).replace(/\/$/, '');
     if (slug) return { route: 'broker-guide', brokerSlug: slug };
+  }
+
+  /* /r/<username>: short on purpose, because this path gets pasted into messages and bios. */
+  if (path.startsWith('/r/')) {
+    const slug = path.slice('/r/'.length).replace(/\/$/, '');
+    if (slug) return { route: 'track-record', recordSlug: slug.toLowerCase() };
   }
 
   if (path.startsWith('/app')) return { route: 'app' };
@@ -91,9 +110,13 @@ function readRoute(): RouteState {
   return { route: 'landing' };
 }
 
+function readRoute(): RouteState {
+  return parseRoutePath(window.location.pathname);
+}
+
 export function useRoute() {
   const [state, setState] = useState<RouteState>(readRoute);
-  const { route, guideSlug, brokerSlug } = state;
+  const { route, guideSlug, brokerSlug, recordSlug } = state;
 
   useEffect(() => {
     const onPopState = () => setState(readRoute());
@@ -128,7 +151,7 @@ export function useRoute() {
     return () => mobileQuery.removeEventListener('change', applyRouteStyles);
   }, [route]);
 
-  const navigate = useCallback((next: Exclude<AppRoute, 'guide' | 'broker-guide'>) => {
+  const navigate = useCallback((next: NavRoute) => {
     pushAppHistory(ROUTE_PATHS[next]);
     setState({ route: next });
     if (next !== 'app') window.scrollTo(0, 0);
@@ -140,11 +163,26 @@ export function useRoute() {
     window.scrollTo(0, 0);
   }, []);
 
+  const navigateRecord = useCallback((slug: string) => {
+    pushAppHistory(`/r/${slug}`);
+    setState({ route: 'track-record', recordSlug: slug.toLowerCase() });
+    window.scrollTo(0, 0);
+  }, []);
+
   const navigateBrokerGuide = useCallback((slug: string) => {
     pushAppHistory(`/brokers/${slug}`);
     setState({ route: 'broker-guide', brokerSlug: slug });
     window.scrollTo(0, 0);
   }, []);
 
-  return { route, guideSlug, brokerSlug, navigate, navigateGuide, navigateBrokerGuide };
+  return {
+    route,
+    guideSlug,
+    brokerSlug,
+    recordSlug,
+    navigate,
+    navigateGuide,
+    navigateBrokerGuide,
+    navigateRecord,
+  };
 }
