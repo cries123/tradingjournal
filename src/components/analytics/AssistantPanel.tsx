@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUp, Check, Copy, GitCompare, Lock, RotateCcw, Sparkles, SquarePen } from 'lucide-react';
 import type { Trade } from '../../types';
+import type { TradingRules } from '../../types/strategy';
+import { openingFindings } from '../../utils/assistantOpening';
 import { buildJournalFacts, suggestedQuestions } from '../../utils/journalFacts';
 import { AssistantError, streamAssistant, type AssistantMessage } from '../../services/aiAssistant';
 import { useAssistantThreads } from '../../hooks/useAssistantThreads';
@@ -19,7 +21,9 @@ interface AssistantPanelProps {
   /** One entry per period the trader can ask about, in the order they should appear. */
   periods: AssistantPeriod[];
   /** The trader's own configured risk limits, so it can report breaches of their rules. */
-  rules?: { enabled: boolean; maxDailyLoss?: number; maxTradesPerDay?: number; maxDailyGain?: number };
+  /* The whole rules object. The subset declared here before had no maxConsecutiveLosses, so a
+     stop-after-N-losers rule never reached the model even when the trader had set one. */
+  rules?: TradingRules;
   /** Drops the card chrome when the dock already provides a frame and a title bar. */
   bare?: boolean;
   /**
@@ -79,9 +83,14 @@ export function AssistantPanel({ periods, rules, bare = false, layout = 'dock' }
   const facts = useMemo(
     () =>
       active
-        ? buildJournalFacts(active.trades, active.label, { includeNotes: shareNotes, rules })
+        ? buildJournalFacts(active.trades, active.label, {
+            includeNotes: shareNotes,
+            rules,
+            // The widest period the trader has, so the trend spans more than what they are viewing.
+            history: periods[periods.length - 1]?.trades,
+          })
         : null,
-    [active, shareNotes, rules],
+    [active, shareNotes, rules, periods],
   );
 
   const compareFacts = useMemo(
@@ -107,6 +116,22 @@ export function AssistantPanel({ periods, rules, bare = false, layout = 'dock' }
       scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }),
     );
   };
+
+  /*
+   * What the panel says before anybody types.
+   *
+   * Computed locally rather than asked of the model: opening a screen must not spend a message
+   * from the daily allowance, wait on a network call, or be able to invent a figure. Capped at
+   * three because a wall of findings is the same problem as a blank box — nothing to act on.
+   */
+  const findings = useMemo(() => (facts ? openingFindings(facts).slice(0, 3) : []), [facts]);
+
+  /* Only worth offering when there is actually something to read. Asking permission for notes
+     that do not exist is a privacy prompt with no upside. */
+  const unreadNotes = useMemo(
+    () => (shareNotes ? 0 : (active?.trades.filter((t) => t.notes?.trim()).length ?? 0)),
+    [shareNotes, active],
+  );
 
   useEffect(scrollToEnd, [messages.length, busy, streaming]);
 
@@ -297,8 +322,58 @@ export function AssistantPanel({ periods, rules, bare = false, layout = 'dock' }
                   {' '}vs <span className="text-text-primary font-medium">{compare.label}</span>
                 </>
               )}{' '}
-              — {facts.tradeCount} {facts.tradeCount === 1 ? 'trade' : 'trades'}. Start here:
+              — {facts.tradeCount} {facts.tradeCount === 1 ? 'trade' : 'trades'}.
             </p>
+
+            {findings.length > 0 && (
+              <div className="space-y-2 mb-3">
+                {findings.map((f) => (
+                  <button
+                    key={f.headline}
+                    type="button"
+                    onClick={() => void send(f.question)}
+                    disabled={busy}
+                    className={`w-full text-left rounded-xl border px-3 py-2.5 transition-colors focus-ring disabled:opacity-50 ${
+                      f.tone === 'bad'
+                        ? 'border-red-500/25 bg-red-500/[0.04] hover:border-red-500/40'
+                        : f.tone === 'good'
+                          ? 'border-emerald-500/25 bg-emerald-500/[0.04] hover:border-emerald-500/40'
+                          : 'border-border/50 bg-bg-tertiary/25 hover:border-accent/40'
+                    }`}
+                  >
+                    <span
+                      className={`block text-xs font-semibold ${
+                        f.tone === 'bad'
+                          ? 'text-red-300'
+                          : f.tone === 'good'
+                            ? 'text-emerald-300'
+                            : 'text-text-primary'
+                      }`}
+                    >
+                      {f.headline}
+                    </span>
+                    <span className="block text-[11px] text-text-secondary mt-1 leading-relaxed">
+                      {f.detail}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {unreadNotes > 0 && (
+              /* Surfaced where somebody is actually looking, and only when it would change the
+                 answer. The checkbox in the control row is ten-point text nobody finds. */
+              <button
+                type="button"
+                onClick={() => setShareNotes(true)}
+                className="w-full text-left text-[11px] text-text-secondary hover:text-accent transition-colors mb-3 px-1 focus-ring rounded"
+              >
+                You wrote notes on {unreadNotes} of these trades.{' '}
+                <span className="text-accent underline">Let it read them</span> for a better answer.
+              </button>
+            )}
+
+            <p className="text-[11px] text-text-secondary mb-2">Or ask:</p>
             <div className="flex flex-col gap-1.5">
               {suggestions.map((s) => (
                 <button

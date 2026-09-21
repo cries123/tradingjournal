@@ -21,6 +21,10 @@ import {
   type WeekdayFact,
 } from './behaviourFacts';
 import { checkRuleViolations } from './tradingRules';
+import type { TradingRules } from '../types/strategy';
+import { breakevenStats, costStats, sizingStats, tiltStats } from './brokerAnalytics';
+import { rulesAreTestable, simulateRules } from './ruleSimulator';
+import { monthlyTrend, type MonthSummary } from './assistantOpening';
 
 /**
  * Compiles a trader's journal into a compact set of already-computed facts for the assistant.
@@ -85,13 +89,89 @@ export interface JournalFacts {
    * makes rather than one the app makes for them.
    */
   notes: { date: string; symbol: string; pnl: number; note: string }[] | null;
+
+  /*
+   * Everything below computes from symbol, side, quantity, price, date and fees alone.
+   *
+   * The blocks above it mostly do not. R multiples, hold time, the A-F grades and the checklist
+   * all need either a hand-entered field or a fill time, and Schwab sends a date with no time —
+   * so for most of the people paying for this they are null, the model is told that a null means
+   * not recorded, and the assistant answers nearly everything with a shrug.
+   *
+   * The Performance screen was rebuilt around exactly that constraint, and these are its
+   * findings. They were computed, tested and drawn on screen for months while the assistant,
+   * one import away, could not see any of them.
+   */
+
+  /** The win rate this payoff ratio requires, against the one they have. */
+  breakeven: {
+    winRate: number;
+    requiredWinRate: number;
+    gap: number;
+    avgWin: number;
+    avgLoss: number;
+    payoff: number;
+    sample: number;
+  } | null;
+  /** Whether the money goes on the trades that work. A ratio above 1 means it does not. */
+  sizing: {
+    ratio: number;
+    avgWinnerSize: number;
+    avgLoserSize: number;
+    biggestQuarterPerTrade: number;
+    restPerTrade: number;
+    sample: number;
+  } | null;
+  /** What the trade after a loss is worth, against the trade after a win. Same day only. */
+  tilt: {
+    afterLossAvg: number;
+    afterWinAvg: number;
+    delta: number;
+    afterLossCount: number;
+    afterWinCount: number;
+  } | null;
+  /** Commissions against gross profit — often the whole difference on an active year. */
+  costs: { fees: number; perTrade: number; shareOfGross: number; sample: number } | null;
+  /**
+   * What their own limits would have done to this period, had they kept them.
+   *
+   * Null when they have set no testable limit. Included because it is the one figure in the
+   * product that answers what to change with a number rather than an observation, and the
+   * assistant could not reach it while the screen next door was drawing it.
+   */
+  /**
+   * The last few months, newest last, when the caller supplies the full history.
+   *
+   * Every other block here describes one period in isolation, which is why the assistant could
+   * never say "that is the third month running" — the observation a person reviewing their own
+   * trading most wants. Four numbers a month, not the trades.
+   */
+  recentMonths: MonthSummary[] | null;
+  ruleSimulation: {
+    actualPnl: number;
+    simulatedPnl: number;
+    difference: number;
+    daysChanged: number;
+    tradingDays: number;
+    tradesRemoved: number;
+    winnersGivenUp: number;
+    lossesAvoided: number;
+  } | null;
 }
 
 export interface JournalFactsOptions {
   /** Include the trader's written notes. Requires their explicit opt-in. */
   includeNotes?: boolean;
-  /** The trader's configured risk limits, so breaches can be reported against their own rules. */
-  rules?: { enabled: boolean; maxDailyLoss?: number; maxTradesPerDay?: number; maxDailyGain?: number };
+  /** Every trade on the account, so the assistant can see a trend rather than one period. */
+  history?: Trade[];
+  /**
+   * The trader's configured risk limits, so breaches are reported against their own rules.
+   *
+   * The whole TradingRules shape, not a hand-copied subset. The subset declared here before had
+   * no maxConsecutiveLosses, so a stop-after-N-losers rule was dropped on the way to the model
+   * even though the trader had set one.
+   */
+  rules?: TradingRules;
 }
 
 /** Notes are the only free-text in the payload, so they're the only part that needs bounding. */
@@ -143,6 +223,22 @@ export function buildJournalFacts(
   const selectedNotes = options.includeNotes ? selectNotes(trades) : [];
   const excursion = computeExcursionInsights(trades);
   const rMultiple = computeRMultipleInsights(trades);
+
+  // Broker-only findings: the ones that survive a feed carrying no fill times.
+  const breakeven = breakevenStats(trades);
+  const sizing = sizingStats(trades);
+  const tilt = tiltStats(trades);
+  const costs = costStats(trades);
+
+  /* Only when they have actually set a limit. Simulating rules nobody chose would put a
+     hypothetical in front of the model and invite it to recommend one. */
+  /* Needs more than one month to be a trend; a single bucket is just this period again. */
+  const trend = options.history ? monthlyTrend(options.history) : [];
+
+  const simulation =
+    options.rules && rulesAreTestable(options.rules)
+      ? simulateRules(trades, options.rules)
+      : null;
   const sessions = computeSessionPerformance(trades);
 
   return {
@@ -233,6 +329,58 @@ export function buildJournalFacts(
         })()
       : null,
     notes: selectedNotes.length > 0 ? selectedNotes : null,
+
+    breakeven: breakeven
+      ? {
+          winRate: pct(breakeven.winRate),
+          requiredWinRate: pct(breakeven.requiredWinRate),
+          gap: pct(breakeven.gap),
+          avgWin: money(breakeven.avgWin),
+          avgLoss: money(breakeven.avgLoss),
+          payoff: Math.round(breakeven.payoff * 100) / 100,
+          sample: breakeven.covered,
+        }
+      : null,
+    sizing: sizing
+      ? {
+          ratio: Math.round(sizing.ratio * 100) / 100,
+          avgWinnerSize: money(sizing.avgWinnerSize),
+          avgLoserSize: money(sizing.avgLoserSize),
+          biggestQuarterPerTrade: money(sizing.biggestQuarterPerTrade),
+          restPerTrade: money(sizing.restPerTrade),
+          sample: sizing.covered,
+        }
+      : null,
+    tilt: tilt
+      ? {
+          afterLossAvg: money(tilt.afterLossAvg),
+          afterWinAvg: money(tilt.afterWinAvg),
+          delta: money(tilt.delta),
+          afterLossCount: tilt.afterLossCount,
+          afterWinCount: tilt.afterWinCount,
+        }
+      : null,
+    costs: costs
+      ? {
+          fees: money(costs.fees),
+          perTrade: money(costs.perTrade),
+          shareOfGross: pct(costs.shareOfGross),
+          sample: costs.covered,
+        }
+      : null,
+    recentMonths: trend.length > 1 ? trend : null,
+    ruleSimulation: simulation
+      ? {
+          actualPnl: money(simulation.actualPnl),
+          simulatedPnl: money(simulation.simulatedPnl),
+          difference: money(simulation.difference),
+          daysChanged: simulation.daysChanged,
+          tradingDays: simulation.tradingDays,
+          tradesRemoved: simulation.tradesRemoved,
+          winnersGivenUp: money(simulation.winnersGivenUp),
+          lossesAvoided: money(simulation.lossesAvoided),
+        }
+      : null,
   };
 }
 
