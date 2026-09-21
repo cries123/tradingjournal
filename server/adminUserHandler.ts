@@ -4,6 +4,7 @@ import { getAdminAuth, getAdminFirestore } from './firebaseAdmin';
 import { purgeAccount } from './accountTeardown';
 import { readEntitlement, resolveAccess, writeEntitlement } from './entitlements';
 import { readJournalEvents } from './journalEvents';
+import { readUserJournal } from './adminUserJournal';
 import {
   adjustCredits,
   dailyUnitsSpent,
@@ -31,6 +32,7 @@ import {
 export type AdminUserAction =
   | 'readUsage'
   | 'readJournalEvents'
+  | 'readUserJournal'
   | 'updateEmail'
   | 'updatePassword'
   | 'deleteUser'
@@ -398,6 +400,17 @@ export async function handleAdminUserRequest(
     }
 
     switch (action) {
+      case 'readUserJournal': {
+        /*
+         * Their journal as they see it, read-only.
+         *
+         * Not an impersonation: no token is minted and nothing here can write. Signing in as a
+         * customer would attribute every write to them, so a cancelled plan or a cleared
+         * journal would show in their own history as something they did.
+         */
+        const snapshot = await readUserJournal(targetUid);
+        return { statusCode: 200, body: { ok: true, snapshot } };
+      }
       case 'readJournalEvents': {
         /*
          * What their syncs actually returned, and when they wiped a journal.

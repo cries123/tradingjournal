@@ -1,5 +1,6 @@
 import { sendPasswordResetEmail } from 'firebase/auth';
 import type { JournalEvent } from '../../server/journalEvents';
+import type { UserJournalSnapshot } from '../../server/adminUserJournal';
 import type { AdminUsageReport, AdminUserAction } from '../../server/adminUserHandler';
 import type { CreditKind } from '../../server/usage';
 import type { Tier } from '../config/tiers';
@@ -96,6 +97,36 @@ export async function adminReadUserUsage(targetUid: string): Promise<UserUsage |
  * Server-only by rule, like the usage counters — journalEvents appears in no security rule, so
  * Firestore denies every client read and the admin function is the only way to see it.
  */
+/**
+ * What a user would see in their own journal, read-only.
+ *
+ * Served from the admin function rather than read directly so the assembly — resolving
+ * journal names, splitting broker imports from hand-entered rows, ordering by when each trade
+ * was last written — happens once, server-side, instead of in the panel.
+ */
+export async function adminReadUserJournal(targetUid: string): Promise<UserJournalSnapshot> {
+  if (!isFirebaseConfigured()) throw new Error('Firebase is not configured.');
+
+  const user = getFirebaseAuth().currentUser;
+  if (!user) throw new Error('Sign in first.');
+
+  const res = await fetch('/api/admin-user', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${await user.getIdToken()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action: 'readUserJournal', targetUid }),
+  });
+
+  const data = (await res.json().catch(() => ({}))) as {
+    snapshot?: UserJournalSnapshot;
+    error?: string;
+  };
+  if (!res.ok || !data.snapshot) throw new Error(data.error ?? 'Could not load their journal.');
+  return data.snapshot;
+}
+
 export async function adminReadJournalEvents(targetUid: string): Promise<JournalEvent[]> {
   if (!isFirebaseConfigured()) return [];
 

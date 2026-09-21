@@ -6,6 +6,7 @@ import { AdminUserUsageSection } from './AdminUserUsageSection';
 import { AdminUserEmailComposer } from './AdminUserEmailComposer';
 import { AdminUserHistorySection } from './AdminUserHistorySection';
 import { AdminJournalEventsSection } from './AdminJournalEventsSection';
+import { AdminViewJournalSection } from './AdminViewJournalSection';
 import type { AdminUserSummary } from '../../services/admin';
 import { AUDIT_ACTION_LABELS, logAdminAction } from '../../services/adminAuditLog';
 import type { AdminUserNote } from '../../services/adminUserNotes';
@@ -593,6 +594,8 @@ export function AdminUserDetailModal({
 
           {/* Above the support history: when somebody is in here about a sync, this is the
               panel they came for. */}
+          <AdminViewJournalSection uid={user.uid} />
+
           <AdminJournalEventsSection uid={user.uid} />
 
           <AdminUserHistorySection
