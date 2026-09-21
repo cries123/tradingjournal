@@ -237,6 +237,17 @@ export function PublishedRecordView({
                   counted on this page.
                 </span>
               </li>
+              <li className="flex gap-2 items-start">
+                <Lock className="h-3.5 w-3.5 mt-1 shrink-0 text-emerald-400" aria-hidden />
+                <span>
+                  <strong className="text-text-primary">
+                    A trade typed in by hand can never reach these figures.
+                  </strong>{' '}
+                  The journal lets anyone log a trade manually — and every one of those is left
+                  out of this page and counted at the top as excluded. Only rows carrying the
+                  brokerage&rsquo;s own transaction ids are included.
+                </span>
+              </li>
             </ul>
 
             {/* The handle, not a legal name — the same string that is already in the URL. */}

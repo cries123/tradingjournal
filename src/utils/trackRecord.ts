@@ -118,7 +118,25 @@ export interface PublishedRecord {
   worstDay?: number;
 }
 
-/** True when the broker, not the trader, is the source of this row. */
+/**
+ * True when the broker, not the trader, is the source of this row.
+ *
+ * THE GUARANTEE THIS GIVES IS BOUNDED, and the published page is worded to match. `sourceId` is
+ * set only by the import path, and nothing in the product puts one on a hand-logged trade — so
+ * this is a real answer to "did you type these in", which is what almost everyone means when they
+ * ask whether a record is made up.
+ *
+ * What it is NOT is proof against a determined forgery. firestore.rules lets a signed-in user
+ * write any field to their own trades (they have to: broker sync writes them from the browser),
+ * so somebody working the Firebase SDK by hand could set a sourceId this function would accept.
+ * That is why nothing on the published page claims a record cannot be faked — only that nothing
+ * typed into the journal reaches it, which is true and enforced.
+ *
+ * Closing the gap properly means one of two things, neither of them a tweak here: re-checking
+ * each trade against the brokerage feed when a record is published, or moving the import write
+ * server-side so the rules can forbid a browser from ever setting sourceId. Weigh those before
+ * strengthening any wording on the page.
+ */
 export function isBrokerVerified(trade: Trade): boolean {
   return typeof trade.sourceId === 'string' && trade.sourceId.length > 0;
 }
