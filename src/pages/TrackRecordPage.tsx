@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BadgeCheck, ShieldQuestion } from 'lucide-react';
+import { BadgeCheck, Lock, ShieldQuestion } from 'lucide-react';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import type { ExtraNavRoute } from '../hooks/useRoute';
 import { fetchPublishedRecord } from '../services/trackRecord';
@@ -229,6 +229,67 @@ export function PublishedRecordView({
           Snapshot taken {new Date(record.updatedAt).toLocaleString()}. Figures do not update
           until the trader republishes.
         </p>
+      </section>
+
+      {/*
+        The seal, and every line of it is a claim we can actually stand behind.
+
+        Not "audited": nobody audits these, and an audited track record is a specific regulated
+        thing in performance advertising — it is the first word a sceptic tests, and the page
+        collapses when it fails. Not "cannot be manipulated" either, because the trader chooses
+        which accounts to connect and which journals to include.
+
+        What IS true is narrower and harder to argue with: the figures are computed here from
+        broker-imported data, and there is no path by which a browser can write them. That is not
+        a promise, it is what firestore.rules enforces — every client write to this collection is
+        denied, and the only writer is a server function that recomputes from the trades.
+      */}
+      <section className="panel-card border-emerald-500/40 bg-emerald-500/[0.04] p-5 md:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+          <div className="shrink-0 flex sm:block justify-center">
+            <span className="inline-flex h-16 w-16 items-center justify-center rounded-full border-2 border-emerald-500/40 bg-emerald-500/10 text-emerald-400">
+              <BadgeCheck className="h-8 w-8" aria-hidden />
+            </span>
+          </div>
+
+          <div className="min-w-0 text-center sm:text-left">
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-400">
+              Stamped &amp; verified by Trend Chasers
+            </p>
+
+            <ul className="mt-3 space-y-2 text-sm text-text-secondary leading-relaxed">
+              <li className="flex gap-2 items-start justify-center sm:justify-start">
+                <Lock className="h-3.5 w-3.5 mt-1 shrink-0 text-emerald-400" aria-hidden />
+                <span>
+                  <strong className="text-text-primary">The trader cannot edit these figures.</strong>{" "}
+                  They are computed by Trend Chasers from the imported trades. There is no way to
+                  submit a number to this page from a browser, and every attempt to write one is
+                  refused by the database itself.
+                </span>
+              </li>
+              <li className="flex gap-2 items-start justify-center sm:justify-start">
+                <Lock className="h-3.5 w-3.5 mt-1 shrink-0 text-emerald-400" aria-hidden />
+                <span>
+                  <strong className="text-text-primary">
+                    Every trade came from a read-only brokerage connection.
+                  </strong>{" "}
+                  Not typed in, not uploaded. Anything hand-entered is excluded from all of it and
+                  counted on this page.
+                </span>
+              </li>
+            </ul>
+
+            <p className="text-[11px] uppercase tracking-[0.14em] text-text-secondary mt-4">
+              Stamped{" "}
+              {new Date(record.updatedAt).toLocaleDateString(undefined, {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              })}
+              {record.username ? ` · ${record.username}` : ""} · trendchasers.net
+            </p>
+          </div>
+        </div>
       </section>
 
       <section className="panel-card border-emerald-500/25 p-5 md:p-6 text-center">

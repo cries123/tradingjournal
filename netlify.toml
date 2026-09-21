@@ -23,6 +23,14 @@
   to = "/.netlify/functions/:splat"
   status = 200
 
+# Published track records are served by a function so their Open Graph tags are in the HTML.
+# Link-preview crawlers do not run JavaScript, so without this every shared record previews as
+# the homepage card. Must stay ABOVE the SPA catch-all: Netlify takes the first match.
+[[redirects]]
+  from = "/r/*"
+  to = "/.netlify/functions/record-preview"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
