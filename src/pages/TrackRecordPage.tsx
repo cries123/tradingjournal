@@ -188,59 +188,12 @@ export function PublishedRecordView({
         )}
       </Band>
 
-      {/*
-        The section that makes the rest of the page worth reading.
-
-        Every claim here is one we could quietly not make — and a reader who has been shown a
-        doctored screenshot before is looking for exactly this. Saying what the record does not
-        establish is what separates "verified" from "posted".
-      */}
-      <Band title="What this does and does not show">
-        <dl className="space-y-4 text-sm leading-relaxed">
-          <div>
-            <dt className="font-semibold text-emerald-400">What it shows</dt>
-            <dd className="text-text-secondary mt-1">
-              These trades were sent to Trend Chasers by a brokerage over a read-only connection,
-              not typed in. The prices, quantities, dates and fees are the broker&apos;s.
-            </dd>
-          </div>
-          <div>
-            <dt className="font-semibold text-text-primary">What it does not show</dt>
-            <dd className="text-text-secondary mt-1">
-              There is no percentage return here, and that is deliberate: a read-only broker
-              connection never exposes an account balance, so any percentage would be dividing a
-              real profit by a number the trader typed. This is also not an audit, and it says
-              nothing about what happens next — a verified past is still the past.
-            </dd>
-          </div>
-          <div>
-            <dt className="font-semibold text-text-primary">Who chose what to show</dt>
-            <dd className="text-text-secondary mt-1">
-              The trader chose whether to include dollar amounts and which of their accounts this
-              covers. They cannot change the figures themselves — those are computed by Trend
-              Chasers from the imported trades, and there is no way to submit them from a browser.
-            </dd>
-          </div>
-          {record.journalsIncluded < record.journalsEligible && (
-            /*
-             * Printed whenever a trader left one of their broker-connected accounts out.
-             *
-             * They are allowed to — plenty of people have an account they do not consider part of
-             * their trading. But a page that let them do it silently would be a highlight reel
-             * wearing the word "verified", and the reader is the one person who cannot find this
-             * out for themselves.
-             */
-            <div>
-              <dt className="font-semibold text-amber-300/90">Not all of their accounts</dt>
-              <dd className="text-text-secondary mt-1">
-                This record covers {record.journalsIncluded} of the {record.journalsEligible}{' '}
-                broker-connected accounts this trader has in Trend Chasers. The others are not
-                included in any figure above.
-              </dd>
-            </div>
-          )}
-        </dl>
-      </Band>
+      {record.journalsIncluded < record.journalsEligible && (
+        <p className="text-xs text-amber-300/90 mt-4 leading-relaxed">
+          Covers {record.journalsIncluded} of this trader&rsquo;s {record.journalsEligible}{' '}
+          broker-connected accounts. The rest are not in any figure here.
+        </p>
+      )}
 
       {/*
         The seal, and every line of it is a claim we can stand behind.
