@@ -33,6 +33,7 @@ export type AdminUserAction =
   | 'readUsage'
   | 'readJournalEvents'
   | 'readUserJournal'
+  | 'impersonate'
   | 'updateEmail'
   | 'updatePassword'
   | 'deleteUser'
@@ -400,6 +401,25 @@ export async function handleAdminUserRequest(
     }
 
     switch (action) {
+      case 'impersonate': {
+        /*
+         * A token that signs the admin in as this user.
+         *
+         * Real impersonation: the session that comes out of this IS them, with their full
+         * read and write access. Firestore sees their uid, so every write lands in their
+         * account and their history — there is no way to make Firestore attribute it
+         * elsewhere without rewriting every rule in the database.
+         *
+         * What the claim below buys is the ability to tell afterwards. impersonatedBy rides
+         * in the token, so anything written during the session can record who was actually
+         * holding the keyboard, and the journal history says "cleared by support" rather
+         * than leaving the user looking like they wiped their own trades.
+         */
+        const token = await getAdminAuth().createCustomToken(targetUid, {
+          impersonatedBy: callerUid,
+        });
+        return { statusCode: 200, body: { ok: true, token } };
+      }
       case 'readUserJournal': {
         /*
          * Their journal as they see it, read-only.

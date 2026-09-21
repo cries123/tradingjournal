@@ -594,7 +594,7 @@ export function AdminUserDetailModal({
 
           {/* Above the support history: when somebody is in here about a sync, this is the
               panel they came for. */}
-          <AdminViewJournalSection uid={user.uid} />
+          <AdminViewJournalSection uid={user.uid} label={user.username ? `@${user.username}` : user.email ?? user.uid} />
 
           <AdminJournalEventsSection uid={user.uid} />
 

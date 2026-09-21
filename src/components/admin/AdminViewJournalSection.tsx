@@ -1,19 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Eye, Link2, PenLine } from 'lucide-react';
 import { adminReadUserJournal } from '../../services/adminUserManagement';
+import { AdminImpersonateButton } from './AdminImpersonateButton';
 import type { UserJournalSnapshot } from '../../../server/adminUserJournal';
 
 /**
- * Their journal, as they see it, without becoming them.
+ * Their journal, as they see it, without becoming them — and the button that does become them.
  *
- * Deliberately not a login-as. Minting a token and signing in as a customer means every write is
- * recorded as theirs, so a plan cancelled or a journal cleared by mistake would sit in their own
- * history as something they did, with no way afterwards to tell which. Everything here is a read,
- * and there is nothing on this panel that can change their account.
+ * The panel itself is every read and no write: nothing on it can change their account. It is the
+ * answer to the question that brings somebody here — "they say syncing is broken, what does their
+ * account actually look like" — so it leads with the split that settles it: how many trades came
+ * from a broker against how many were typed, per journal, and what was most recently written.
  *
- * Built for one question — "they say syncing is broken, what does their account actually look
- * like" — so it leads with the split that answers it: how many of their trades came from a broker
- * against how many were typed, per journal, and what the most recent writes were.
+ * Sign in as them sits beside it rather than replacing it, because the two are not the same tool.
+ * This one is free to use and cannot go wrong; that one replaces the session, writes into a
+ * customer’s account under their own name, and is worth reaching for only when looking is not
+ * enough. The ordering on screen says which to try first.
  */
 
 function formatWhen(iso: string | null): string {
@@ -24,7 +26,7 @@ function formatWhen(iso: string | null): string {
 
 const money = (n: number) => `${n < 0 ? '-' : ''}$${Math.abs(n).toLocaleString()}`;
 
-export function AdminViewJournalSection({ uid }: { uid: string }) {
+export function AdminViewJournalSection({ uid, label }: { uid: string; label: string }) {
   const [loaded, setLoaded] = useState<{
     uid: string;
     snapshot: UserJournalSnapshot | null;
@@ -65,6 +67,8 @@ export function AdminViewJournalSection({ uid }: { uid: string }) {
           <Eye size={13} />
           Their journal (read-only)
         </h3>
+        <div className="flex items-center gap-2">
+        <AdminImpersonateButton uid={uid} label={label} />
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
@@ -72,6 +76,7 @@ export function AdminViewJournalSection({ uid }: { uid: string }) {
         >
           {open ? 'Hide' : 'View what they see'}
         </button>
+        </div>
       </div>
 
       {open && (

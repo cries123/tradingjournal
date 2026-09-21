@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { useRoute } from './hooks/useRoute';
+import { ImpersonationBanner } from './components/admin/ImpersonationBanner';
 import { usePageMeta } from './hooks/usePageMeta';
 import { useStructuredData } from './hooks/useStructuredData';
 import { useVisitorTracking } from './hooks/useVisitorTracking';
@@ -157,8 +158,12 @@ export default function App() {
   }
 
   return (
-    <Suspense fallback={<RouteLoading />}>
+    <>
+      {/* Above every route: the risk of impersonation is forgetting you are doing it. */}
+      <ImpersonationBanner />
+      <Suspense fallback={<RouteLoading />}>
       <PageTransition routeKey={routeKey}>{content}</PageTransition>
-    </Suspense>
+      </Suspense>
+    </>
   );
 }

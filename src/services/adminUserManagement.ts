@@ -104,6 +104,33 @@ export async function adminReadUserUsage(targetUid: string): Promise<UserUsage |
  * journal names, splitting broker imports from hand-entered rows, ordering by when each trade
  * was last written — happens once, server-side, instead of in the panel.
  */
+/**
+ * A token that signs you in as this user.
+ *
+ * This REPLACES the current session — Firebase holds one signed-in user per app, so taking it
+ * signs the admin out of their own account and they sign back in afterwards. The caller is
+ * expected to say so before doing it.
+ */
+export async function adminImpersonate(targetUid: string): Promise<string> {
+  if (!isFirebaseConfigured()) throw new Error('Firebase is not configured.');
+
+  const user = getFirebaseAuth().currentUser;
+  if (!user) throw new Error('Sign in first.');
+
+  const res = await fetch('/api/admin-user', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${await user.getIdToken()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action: 'impersonate', targetUid }),
+  });
+
+  const data = (await res.json().catch(() => ({}))) as { token?: string; error?: string };
+  if (!res.ok || !data.token) throw new Error(data.error ?? 'Could not start the session.');
+  return data.token;
+}
+
 export async function adminReadUserJournal(targetUid: string): Promise<UserJournalSnapshot> {
   if (!isFirebaseConfigured()) throw new Error('Firebase is not configured.');
 
