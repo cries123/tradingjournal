@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { reportJournalCleared } from '../services/account';
 import { useAuth } from '../context/useAuth';
 import { useSettings } from '../context/useSettings';
 import type { Filters, Trade } from '../types';
@@ -336,6 +337,22 @@ export function useTrades() {
       // honest about the spinner, but it reported a journal that had just refused a delete as
       // healthy. runCloudWrite says what actually happened.
       await runCloudWrite(() => deleteTradesBatch(user.uid, toRemove));
+
+      /*
+       * A breadcrumb for support, written only once the delete actually succeeded.
+       *
+       * Above the await it would record wipes that never happened, which is worse than no
+       * history at all — an account that still has its trades showing a row saying they were
+       * deleted sends the next person looking for a bug that is not there.
+       *
+       * Deliberately not awaited and deliberately cannot reject: the trades are gone either way,
+       * and a failed log must not turn a successful clear into an error on screen.
+       */
+      void reportJournalCleared({
+        tradesRemoved: toRemove.length,
+        journalId: activeId,
+        journalName: settings.accounts.find((a) => a.id === activeId)?.name ?? null,
+      });
     } else {
       const removing = new Set(toRemove);
       setTrades((prev) => {
@@ -344,7 +361,7 @@ export function useTrades() {
         return next;
       });
     }
-  }, [user, firebaseEnabled, settings.activeAccountId, trades, runCloudWrite]);
+  }, [user, firebaseEnabled, settings.activeAccountId, settings.accounts, trades, runCloudWrite]);
 
   return {
     trades: filteredTrades,

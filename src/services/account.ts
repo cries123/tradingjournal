@@ -48,6 +48,21 @@ export function renameUsername(username: string): Promise<RenameResult> {
   return accountPost<RenameResult>({ action: 'renameUsername', username });
 }
 
+/**
+ * Leaves a note that a journal was wiped, for the support history.
+ *
+ * Never blocks or fails the clear itself — the trades are already gone by the time this runs,
+ * and refusing to acknowledge it because a log write failed would be the tail wagging the dog.
+ * The caller fires it and ignores the outcome; the server logs its own failures.
+ */
+export function reportJournalCleared(input: {
+  tradesRemoved: number;
+  journalId: string;
+  journalName: string | null;
+}): Promise<unknown> {
+  return accountPost({ action: 'journalCleared', ...input }).catch(() => null);
+}
+
 export function fetchOrderHistory(): Promise<OrderHistory> {
   return accountPost<OrderHistory>({ action: 'orderHistory' });
 }

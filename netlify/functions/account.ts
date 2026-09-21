@@ -1,4 +1,5 @@
 import type { Handler, HandlerResponse } from '@netlify/functions';
+import { recordJournalEvent } from '../../server/journalEvents';
 import { assertCallerUid, BrokerRequestError } from '../../server/snaptradeAuth';
 import {
   AccountRequestError,
@@ -34,7 +35,14 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
     });
   }
 
-  let body: { action?: string; username?: string; confirmation?: string };
+  let body: {
+    action?: string;
+    username?: string;
+    confirmation?: string;
+    tradesRemoved?: unknown;
+    journalId?: unknown;
+    journalName?: unknown;
+  };
   try {
     body = JSON.parse(event.body ?? '{}') as typeof body;
   } catch {
@@ -42,6 +50,28 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
   }
 
   try {
+    if (body.action === 'journalCleared') {
+      /*
+       * A note that somebody wiped a journal, for the support history.
+       *
+       * Reported by the client because the delete itself happens there, which means the count
+       * is the browser’s word rather than something observed. That is fine for what it is —
+       * a support breadcrumb explaining why an account went from 400 trades to none, not an
+       * audit record. It is written under the caller’s own uid from their verified token, so
+       * nobody can write history onto somebody else’s account.
+       */
+      await recordJournalEvent(uid, {
+        type: 'clear',
+        at: new Date().toISOString(),
+        clear: {
+          tradesRemoved: typeof body.tradesRemoved === 'number' ? body.tradesRemoved : 0,
+          journalId: typeof body.journalId === 'string' ? body.journalId : 'unknown',
+          journalName: typeof body.journalName === 'string' ? body.journalName : null,
+        },
+      });
+      return json(200, { ok: true });
+    }
+
     if (body.action === 'orderHistory') {
       return json(200, await readOrderHistory(uid));
     }
