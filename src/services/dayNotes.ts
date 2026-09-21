@@ -1,4 +1,4 @@
-import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
 import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
 
 export interface DayNote {
@@ -26,6 +26,22 @@ function saveLocalNotes(notes: Record<string, DayNote>): void {
   } catch {
     // quota / private mode — note stays in memory for the session
   }
+}
+
+/**
+ * Every day note at once, for searching.
+ *
+ * The rest of this file reads one note per day, which is right for a calendar — but search cannot
+ * ask "which day mentions ES" one document at a time. One subcollection read, on demand when the
+ * search panel first opens rather than on app start, so a trader who never searches never pays for
+ * it. Signed out, the local store already holds them all.
+ */
+export async function fetchAllDayNotes(uid: string | null): Promise<DayNote[]> {
+  if (uid && isFirebaseConfigured()) {
+    const snap = await getDocs(collection(getFirebaseDb(), 'users', uid, 'dayNotes'));
+    return snap.docs.map((d) => ({ ...(d.data() as DayNote), date: d.id }));
+  }
+  return Object.values(loadLocalNotes());
 }
 
 export async function fetchDayNote(uid: string | null, date: string): Promise<DayNote | null> {

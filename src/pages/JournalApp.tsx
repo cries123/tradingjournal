@@ -24,6 +24,8 @@ import { CoachNotesPanel } from '../components/coach/CoachNotesPanel';
 import { CoachInboxContent } from '../components/coach/CoachInboxContent';
 import { AccountMenu } from '../components/account/AccountMenu';
 import { RuleSimulatorContent } from '../components/simulator/RuleSimulatorContent';
+import { Search as SearchIcon } from 'lucide-react';
+import { JournalSearch } from '../components/search/JournalSearch';
 import { AccountSettingsContent } from '../components/account/AccountSettingsContent';
 import { SubscriptionContent } from '../components/account/SubscriptionContent';
 import { OrderHistoryContent } from '../components/account/OrderHistoryContent';
@@ -251,13 +253,32 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
     onAdmin,
   };
 
+  const [searchOpen, setSearchOpen] = useState(false);
+
   /* Built once and handed to whichever header is on screen, so the two can never drift apart. */
-  const accountMenu = (
-    <AccountMenu
-      onAccount={sidebarActions.onAccount}
-      onSubscription={sidebarActions.onSubscription}
-      onOrderHistory={sidebarActions.onOrderHistory}
-    />
+  /*
+   * Search sits beside the account menu rather than becoming an eighth nav row.
+   *
+   * It is something you do on the way to somewhere else, not a destination — and the nav was cut
+   * back to six items once already for exactly this reason.
+   */
+  const headerTools = (
+    <div className="flex items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => setSearchOpen(true)}
+        aria-label="Search your journal"
+        title="Search your journal"
+        className="p-1.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60 transition-colors focus-ring"
+      >
+        <SearchIcon size={17} />
+      </button>
+      <AccountMenu
+        onAccount={sidebarActions.onAccount}
+        onSubscription={sidebarActions.onSubscription}
+        onOrderHistory={sidebarActions.onOrderHistory}
+      />
+    </div>
   );
 
   return (
@@ -271,7 +292,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
 
       {/* relative: keeps this content painting above the fixed Starfield canvas behind it */}
       <div className={`relative flex-1 flex flex-col min-w-0 w-full ${isDesktop ? '' : 'min-h-0'}`}>
-        {!isDesktop && <MobileHeader onHome={onHome} account={accountMenu} />}
+        {!isDesktop && <MobileHeader onHome={onHome} account={headerTools} />}
 
         {/*
           The desktop top bar. Only the account control lives here: the sidebar is still the nav,
@@ -282,7 +303,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
         {isDesktop && (
           /* z-40 for the same reason the mobile header carries one — see MobileNav. The open
              dropdown overhangs <main>, and main is the later sibling. */
-          <div className="sticky top-0 z-40 flex justify-end px-5 pt-3 pb-1">{accountMenu}</div>
+          <div className="sticky top-0 z-40 flex justify-end px-5 pt-3 pb-1">{headerTools}</div>
         )}
 
         <main
@@ -484,6 +505,16 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
         <OnboardingOverlay onDone={() => setShowOnboarding(false)} />
       )}
 
+      {searchOpen && (
+        <JournalSearch
+          trades={everyTrade}
+          onClose={() => setSearchOpen(false)}
+          onOpenDay={(date) => {
+            setSelectedDay(date);
+            openView('dashboard');
+          }}
+        />
+      )}
       {showAuthModal && <AuthModal />}
 
       {showUsernameModal && <UsernameSetupModal />}

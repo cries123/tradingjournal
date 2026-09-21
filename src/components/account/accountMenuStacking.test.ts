@@ -32,7 +32,9 @@ describe('account dropdown stacking', () => {
 
   it('gives the desktop top bar one too', () => {
     const source = read('src/pages/JournalApp.tsx');
-    expect(source).toMatch(/sticky top-0 z-40[^"]*"[^>]*>\{accountMenu\}/);
+    // headerTools, not accountMenu: search joined the dropdown in that bar. What is being pinned
+    // is the bar's stacking context, not the name of whatever it holds.
+    expect(source).toMatch(/sticky top-0 z-40[^"]*"[^>]*>\{headerTools\}/);
   });
 
   it('still relies on the header, because the panel is inside a backdrop-filter', () => {
