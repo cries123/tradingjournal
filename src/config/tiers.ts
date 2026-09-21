@@ -351,6 +351,15 @@ export function tierHas(tier: Tier, feature: Feature): boolean {
 export interface FeatureLine {
   text: string;
   soon?: boolean;
+  /**
+   * Printed on every card that includes it, even though the card below already showed it.
+   *
+   * The deliberate exception to the inheritance rule below, and it should stay a very short
+   * list. A line earns it by being a reason somebody buys rather than a detail they read after
+   * deciding: "Everything in Silver" is true, but nobody scanning the Gold card reads it as
+   * "and I can publish a verified record", and that is a feature people choose a plan for.
+   */
+  repeat?: boolean;
 }
 
 /**
@@ -361,7 +370,7 @@ export interface FeatureLine {
  */
 function allFeatureLines(tier: Tier): FeatureLine[] {
   const l = limitsFor(tier);
-  const lines: { text: string; soon?: boolean }[] = [];
+  const lines: FeatureLine[] = [];
 
   if (tier === 'free') {
     lines.push(
@@ -395,7 +404,10 @@ function allFeatureLines(tier: Tier): FeatureLine[] {
     lines.push({ text: 'Rule simulator — what a daily stop would have done to your own year' });
   }
   if (l.trackRecord) {
-    lines.push({ text: 'Publish a verified track record — broker-imported trades only' });
+    lines.push({
+      text: 'Publish a verified track record — broker-imported trades only',
+      repeat: true,
+    });
   }
 
   /* The four that make the top tier a different product rather than a bigger one. Listed after
@@ -418,6 +430,8 @@ function allFeatureLines(tier: Tier): FeatureLine[] {
  * what this used to do — made Diamond thirteen bullets deep, most of them things the reader had
  * already agreed to two cards ago, and buried the four lines that actually justify the price.
  *
+ * A line marked repeat is the exception and is printed anyway — see FeatureLine.repeat.
+ *
  * Matched on the rendered text, not on the limit behind it, because that is exactly the
  * distinction a reader makes: "5 broker connections" and "10 broker connections" are different
  * sentences and both belong, while "Round-trip trades matched for you" is the same sentence
@@ -430,6 +444,6 @@ export function featureLines(tier: Tier): FeatureLine[] {
   const inherited = new Set(allFeatureLines(below).map((line) => line.text));
   return [
     { text: `Everything in ${TIER_PLANS[below].name}` },
-    ...allFeatureLines(tier).filter((line) => !inherited.has(line.text)),
+    ...allFeatureLines(tier).filter((line) => line.repeat || !inherited.has(line.text)),
   ];
 }

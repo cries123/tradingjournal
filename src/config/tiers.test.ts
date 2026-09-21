@@ -51,19 +51,44 @@ describe('performance analytics', () => {
     }
   });
 
-  it('never reprints a line the plan below already showed', () => {
-    // The dedup itself, over every tier rather than this one feature: a card that repeats what
-    // the card beside it already said is the thing that made Diamond thirteen bullets deep.
+  it('never reprints a line the plan below showed, unless it is marked repeat', () => {
+    /*
+     * The dedup itself, over every tier: a card that repeats what the card beside it already
+     * said is what made Diamond thirteen bullets deep.
+     *
+     * A line flagged repeat is allowed through, and the flag is checked rather than the text —
+     * so an accidental duplicate still fails here, and only a deliberate one passes.
+     */
     for (const tier of ['silver', 'gold', 'diamond'] as Tier[]) {
       const below = TIER_ORDER[TIER_ORDER.indexOf(tier) - 1];
       const shown = new Set(featureLines(below).map((l) => l.text));
-      const repeated = featureLines(tier)
+      const accidental = featureLines(tier)
         .slice(1)
-        .filter((l) => shown.has(l.text))
+        .filter((l) => shown.has(l.text) && !l.repeat)
         .map((l) => l.text);
 
-      expect(repeated, `${tier} repeats: ${repeated.join(" | ")}`).toEqual([]);
+      expect(accidental, `${tier} repeats: ${accidental.join(" | ")}`).toEqual([]);
     }
+  });
+
+  it('names the verified track record on every paid card that includes it', () => {
+    // Inherited is not the same as visible. "Everything in Silver" is true, but nobody scanning
+    // the Gold card reads it as "and I can publish a verified record" — and that is a feature
+    // people pick a plan for, so it is printed on all three rather than only the cheapest.
+    const names = (tier: Tier) =>
+      featureLines(tier).some((l) => /verified track record/i.test(l.text));
+
+    expect(names('free')).toBe(false);
+    for (const tier of ['silver', 'gold', 'diamond'] as Tier[]) {
+      expect(names(tier), `${tier} does not name the track record`).toBe(true);
+    }
+  });
+
+  it('keeps the repeat list short, because repeating everything is what was wrong', () => {
+    // A guard on the exception rather than on the rule. If this number climbs, the cards are on
+    // their way back to relisting the plan below them one flag at a time.
+    const repeated = featureLines('diamond').filter((l) => l.repeat);
+    expect(repeated.length).toBeLessThanOrEqual(2);
   });
 
   it('still shows a changed limit rather than swallowing it as a repeat', () => {
