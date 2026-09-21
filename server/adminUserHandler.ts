@@ -3,6 +3,7 @@ import { AdminRequestError, assertCallerIsAdmin, getBearerToken } from './adminA
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin';
 import { purgeAccount } from './accountTeardown';
 import { readEntitlement, resolveAccess, writeEntitlement } from './entitlements';
+import { readJournalEvents } from './journalEvents';
 import {
   adjustCredits,
   dailyUnitsSpent,
@@ -29,6 +30,7 @@ import {
 
 export type AdminUserAction =
   | 'readUsage'
+  | 'readJournalEvents'
   | 'updateEmail'
   | 'updatePassword'
   | 'deleteUser'
@@ -396,6 +398,17 @@ export async function handleAdminUserRequest(
     }
 
     switch (action) {
+      case 'readJournalEvents': {
+        /*
+         * What their syncs actually returned, and when they wiped a journal.
+         *
+         * Read-only, and the one action here that answers a support ticket rather than changing
+         * something — "I synced and nothing imported" was unanswerable before this existed,
+         * because syncUsage counts syncs and records nothing about their outcome.
+         */
+        const events = await readJournalEvents(targetUid);
+        return { statusCode: 200, body: { ok: true, events } };
+      }
       case 'updateEmail': {
         if (!email?.trim()) {
           return { statusCode: 400, body: { error: 'email is required' } };

@@ -15,6 +15,7 @@ import { readEntitlement, resolveAccess } from './entitlements';
 import { brokerageKey, brokerageOwner, claimBrokerage } from './trialGuards';
 import { compIsLive } from '../src/config/accessExtension';
 import { consumeDaily, refundDaily } from './usage';
+import { recordJournalEvent } from './journalEvents';
 import { describeHttpError, isRejectedCredential, isUpstreamOutage } from './upstreamErrors';
 import { brokersUnlimited, lowestTierWith, TIER_PLANS, type Tier } from '../src/config/tiers';
 
@@ -455,6 +456,11 @@ async function handleSync(uid: string, accountId?: string, startDate?: string, e
 
   // Counted before the pull, not after: a sync that fails halfway still cost the SnapTrade call
   // it was capped for, and counting afterwards would let a retry loop pull for free.
+  /* Named here while the account list is still in hand, so the history row can say which
+     connection a sync belonged to — a two-account trader cannot read a log that does not. */
+  const syncedInstitution =
+    listed.data.find((a) => a.id === accountId)?.institution_name ?? null;
+
   const spend = await consumeDaily('sync', uid, limits.syncsPerDay);
   if (!spend.ok) {
     if (spend.reason === 'unavailable') {
@@ -470,7 +476,7 @@ async function handleSync(uid: string, accountId?: string, startDate?: string, e
   }
 
   try {
-    return await pullActivities(uid, creds, accountId, startDate, endDate, spend.remaining, limits.syncsPerDay, tier, spend.credits);
+    return await pullActivities(uid, creds, accountId, startDate, endDate, spend.remaining, limits.syncsPerDay, tier, spend.credits, syncedInstitution);
   } catch (err) {
     if (isUpstreamOutage(err)) {
       // The user paid for a request nobody answered. Give it back before the error goes out, so
@@ -509,6 +515,7 @@ async function pullActivities(
   syncsPerDay: number,
   tier: Tier,
   syncCredits: number,
+  institution: string | null,
 ): Promise<BrokerConnectResult> {
   const snaptrade = getSnaptrade();
   const PAGE_SIZE = 1000;
@@ -556,6 +563,30 @@ async function pullActivities(
   }
 
   const { trades, diagnostics } = mapSnapTradeActivities(activities);
+
+  /*
+   * What this sync actually produced, recorded before the response goes out.
+   *
+   * syncUsage counts how many syncs were spent and nothing about what any of them returned, so
+   * "I synced and nothing imported" was unanswerable — the trade total cannot tell an empty
+   * sync from one that worked. Awaited rather than fired off: the write never throws, and a
+   * floating promise here would reject into the global handler as minified frames.
+   */
+  await recordJournalEvent(uid, {
+    type: 'sync',
+    at: new Date().toISOString(),
+    sync: {
+      accountId,
+      institution,
+      activityCount: activities.length,
+      tradesReturned: trades.length,
+      unmatchedCloses: diagnostics.unmatchedOptionCloses.length,
+      ignored: Object.values(diagnostics.ignored).reduce((a, b) => a + b, 0),
+      ignoredByType: diagnostics.ignored,
+      truncated,
+      syncsRemaining,
+    },
+  });
 
   return {
     statusCode: 200,

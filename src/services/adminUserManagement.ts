@@ -1,4 +1,5 @@
 import { sendPasswordResetEmail } from 'firebase/auth';
+import type { JournalEvent } from '../../server/journalEvents';
 import type { AdminUsageReport, AdminUserAction } from '../../server/adminUserHandler';
 import type { CreditKind } from '../../server/usage';
 import type { Tier } from '../config/tiers';
@@ -83,6 +84,36 @@ export async function adminReadUserUsage(targetUid: string): Promise<UserUsage |
   } catch {
     return null;
   }
+}
+
+/**
+ * Every sync and journal wipe on this account, newest first, with what each sync returned.
+ *
+ * The answer to "I synced and nothing imported", which was unanswerable before: syncUsage
+ * counts how many syncs were spent and records nothing about their outcome, so the trade total
+ * was the only evidence and it cannot tell an empty sync from one that worked.
+ *
+ * Server-only by rule, like the usage counters — journalEvents appears in no security rule, so
+ * Firestore denies every client read and the admin function is the only way to see it.
+ */
+export async function adminReadJournalEvents(targetUid: string): Promise<JournalEvent[]> {
+  if (!isFirebaseConfigured()) return [];
+
+  const user = getFirebaseAuth().currentUser;
+  if (!user) return [];
+
+  const res = await fetch('/api/admin-user', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${await user.getIdToken()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action: 'readJournalEvents', targetUid }),
+  });
+
+  const data = (await res.json().catch(() => ({}))) as { events?: JournalEvent[]; error?: string };
+  if (!res.ok) throw new Error(data.error ?? 'Could not load the journal history.');
+  return data.events ?? [];
 }
 
 /** Sends Firebase's standard password reset email to the user. */
