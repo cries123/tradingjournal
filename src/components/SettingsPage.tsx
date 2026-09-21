@@ -15,6 +15,12 @@ import { availableTaxYears, buildTaxReport } from '../utils/taxReport';
 import { formatCurrency } from '../utils/format';
 import { fetchEmailPrefs, recapIsOn, setRecapOptIn } from '../services/emailPrefs';
 import { ConfirmDialog } from './ConfirmDialog';
+import { resolveTradeAccountId } from '../utils/accounts';
+import {
+  countOrphans,
+  describeOrphanSource,
+  findOrphanTrades,
+} from '../utils/orphanTrades';
 
 type ExportRange = 'all' | 'month' | '90' | 'ytd';
 
@@ -89,6 +95,25 @@ export function SettingsPage({
   const [newTag, setNewTag] = useState('');
   const [editingTag, setEditingTag] = useState<string | null>(null);
   const [tagDraft, setTagDraft] = useState('');
+  /*
+   * Trades belonging to a journal that no longer exists.
+   *
+   * From a real report: an account showing one journal whose track record insisted 86
+   * hand-entered trades were being excluded. Removing a journal drops it from settings and
+   * leaves its trades behind, so they stop appearing anywhere while still being counted by
+   * everything that walks every trade. Surfaced here rather than swept up automatically,
+   * because moving somebody else’s trades between journals without asking is not a repair.
+   */
+  const orphans = useMemo(
+    () => findOrphanTrades(everyTrade, settings.accounts),
+    [everyTrade, settings.accounts],
+  );
+  const orphanCount = countOrphans(orphans);
+  const [orphanTarget, setOrphanTarget] = useState(settings.activeAccountId);
+  const [movingOrphans, setMovingOrphans] = useState(false);
+  const [removingJournal, setRemovingJournal] = useState<string | null>(null);
+  const [orphanMoved, setOrphanMoved] = useState(0);
+
   const [newAccount, setNewAccount] = useState('');
   const [newStrategy, setNewStrategy] = useState('');
   const [pendingBackup, setPendingBackup] = useState<ParsedBackup | null>(null);
@@ -473,7 +498,7 @@ export function SettingsPage({
                 {settings.accounts.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => removeAccount(account.id)}
+                    onClick={() => setRemovingJournal(account.id)}
                     className="text-text-secondary hover:text-loss-bright p-1 focus-ring rounded"
                     aria-label={`Remove ${account.name}`}
                   >
@@ -526,6 +551,121 @@ export function SettingsPage({
             )}
           </p>
         </section>
+
+        {removingJournal !== null &&
+          (() => {
+            const journal = settings.accounts.find((a) => a.id === removingJournal);
+            const held = everyTrade.filter(
+              (t) => resolveTradeAccountId(t.accountId) === removingJournal,
+            ).length;
+            return (
+              <ConfirmDialog
+                title={`Remove "${journal?.name ?? "this journal"}"?`}
+                /*
+                 * Says what happens to the trades, because what happens to them is nothing.
+                 *
+                 * Removing a journal leaves its trades in the account carrying an id nothing
+                 * points at any more: gone from the dashboard, out of reach of Clear all, and
+                 * still counted in backups and the track record. That was silent until somebody
+                 * asked why their record claimed 86 hand-entered trades.
+                 */
+                message={
+                  held === 0
+                    ? "This journal has no trades in it."
+                    : `This journal holds ${held.toLocaleString()} ${held === 1 ? "trade" : "trades"}. Removing it does NOT delete them — they stay in your account but stop showing anywhere, and you will have to move them back from "Trades with no journal" below. Move them into another journal first if you want to keep seeing them.`
+                }
+                confirmLabel="Remove journal"
+                danger
+                onConfirm={() => {
+                  removeAccount(removingJournal);
+                  setRemovingJournal(null);
+                }}
+                onCancel={() => setRemovingJournal(null)}
+              />
+            );
+          })()}
+
+        {orphanCount > 0 && (
+          <section className="panel-card border-amber-500/30 p-5 space-y-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+              Trades with no journal
+            </h2>
+            <p className="text-xs text-text-secondary leading-relaxed">
+              {orphanCount.toLocaleString()} {orphanCount === 1 ? "trade belongs" : "trades belong"}{" "}
+              to a journal that is no longer here. They do not show on your dashboard or calendar
+              and Clear all does not reach them, but they are still in your account — so they turn
+              up in backups and in your track record.
+            </p>
+
+            <div className="space-y-2">
+              {orphans.map((group) => (
+                <div
+                  key={group.accountId}
+                  className="flex items-center justify-between gap-3 p-3 rounded-lg border border-border/60 text-sm"
+                >
+                  <span className="text-text-secondary">
+                    {describeOrphanSource(group.accountId)}
+                  </span>
+                  <span className="tabular-nums font-medium shrink-0">
+                    {group.trades.length.toLocaleString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={orphanTarget}
+                onChange={(e) => setOrphanTarget(e.target.value)}
+                className="input-field text-sm"
+                aria-label="Journal to move them into"
+              >
+                {settings.accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={movingOrphans}
+                onClick={() => {
+                  setMovingOrphans(true);
+                  const moving = orphans.flatMap((g) => g.trades);
+                  void onRestoreTrades(
+                    moving.map((t) => ({ ...t, accountId: orphanTarget })),
+                  )
+                    .then(() => setOrphanMoved(moving.length))
+                    .catch(() => setOrphanMoved(-1))
+                    .finally(() => setMovingOrphans(false));
+                }}
+                className="btn-secondary px-4 py-2 text-sm disabled:opacity-50"
+              >
+                {movingOrphans ? "Moving…" : "Move them in"}
+              </button>
+            </div>
+
+            {/* Move, not delete. Once they are in a journal they are visible, and every existing
+                way of getting rid of trades works on them — which is a better answer than adding
+                a second bulk-delete button next to the one that already exists. */}
+            <p className="text-[11px] text-text-secondary leading-relaxed">
+              Moving them in makes them visible on your dashboard, where you can review and delete
+              them normally. Nothing is deleted here.
+            </p>
+
+            {orphanMoved > 0 && (
+              <p className="text-xs text-emerald-400">
+                Moved {orphanMoved.toLocaleString()}{" "}
+                {orphanMoved === 1 ? "trade" : "trades"}.
+              </p>
+            )}
+            {orphanMoved === -1 && (
+              <p className="text-xs text-red-400">
+                Could not move them. Check your connection and try again.
+              </p>
+            )}
+          </section>
+        )}
 
         <section className="panel-card p-5 space-y-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Trading rules</h2>
