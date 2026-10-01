@@ -14,7 +14,7 @@ interface TermsOfServicePageProps {
 
 export function TermsOfServicePage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onGuides, onNavigate }: TermsOfServicePageProps) {
   return (
-    <LegalPageLayout title="Terms of Service" lastUpdated="August 23, 2026" onHome={onHome} onLaunch={onLaunch} onPrivacy={onPrivacy} onTerms={onTerms} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate}>
+    <LegalPageLayout title="Terms of Service" lastUpdated="October 1, 2026" onHome={onHome} onLaunch={onLaunch} onPrivacy={onPrivacy} onTerms={onTerms} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate}>
       <section>
         <h2>Who you are agreeing with</h2>
         <p>
@@ -59,7 +59,7 @@ export function TermsOfServicePage({ onHome, onLaunch, onPrivacy, onTerms, onBro
       <section>
         <h2>Broker connections</h2>
         <p>
-          Connecting a brokerage account is optional. If you choose to connect Schwab or Robinhood, the
+          Connecting a brokerage account is optional. If you choose to connect a supported brokerage, the
           connection is brokered by SnapTrade, a third-party service, and is read-only: it can retrieve your
           trade activity but cannot place trades, withdraw funds, or otherwise act on your account. You are
           responsible for reviewing synced trade data for accuracy — we do not guarantee that synced data
@@ -104,10 +104,12 @@ export function TermsOfServicePage({ onHome, onLaunch, onPrivacy, onTerms, onBro
       <section>
         <h2>Broker support</h2>
         <p>
-          Broker import is supported today for Schwab (including thinkorswim accounts) and Robinhood, and runs
-          only when you request a sync;
-          additional brokers may be added over time. Manual entry works for any broker. Custom broker
-          support may be configured upon request at our discretion.
+          Broker import is brokered by SnapTrade, and the brokerages it currently covers — Schwab and
+          thinkorswim among them — are listed on the Brokers page, which is the list that is kept
+          current. Which brokerages are available can change as SnapTrade&apos;s own coverage changes,
+          and a connection that works today is not a commitment that it always will. Imports run only
+          when you request a sync, or on the automatic morning import if your plan includes it and you
+          leave it switched on. Manual entry and CSV import work for any broker.
         </p>
       </section>
 
