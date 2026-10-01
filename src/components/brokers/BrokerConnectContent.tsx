@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { syncStartDate } from '../../utils/syncWindow';
 import { ArrowLeft, CheckCircle2, ExternalLink, Link2, Loader2, RefreshCw, Unlink } from 'lucide-react';
 import { BrokerLogo } from './BrokerLogo';
 import { useEntitlement } from '../../context/useEntitlement';
@@ -255,7 +256,20 @@ export function BrokerConnectContent({
       const {
         trades, truncated, syncsRemaining, syncsPerDay, syncCredits,
         unmatchedCloses, assumedShorts, inferredOrderDays, ignored, negativeFees,
-      } = await syncBrokerAccount(account.id);
+        /*
+         * A window, not the whole account.
+         *
+         * This passed nothing, so every press re-pulled the entire history — up to 25 serial
+         * pages for somebody checking today’s fills. Length is what broke it: the longest
+         * request in the app is the one that loses its body when a phone locks mid-flight, and
+         * a lost reply still cost the trader a sync.
+         *
+         * Undefined on a first sync, so a new connection still pulls everything.
+         */
+      } = await syncBrokerAccount(
+        account.id,
+        syncStartDate(existingTrades, account.id, new Date()),
+      );
       // The server has already spent one of today's syncs by the time this returns, so the meter
       // is updated from its answer rather than guessed at. Bonus syncs ride inside the remaining
       // count, so they come out before the day's own allowance is worked back.

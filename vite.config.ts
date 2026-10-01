@@ -41,7 +41,20 @@ export default defineConfig({
          * chunk, so every future logo tweak would have invalidated 688 kB instead of 11.
          */
         manualChunks(id: string) {
-          if (id.includes('node_modules/firebase') || id.includes('node_modules/@firebase')) {
+          /*
+           * Matched on the exact package, not on a substring of its name.
+           *
+           * `includes('node_modules/firebase')` also matches node_modules/firebase-admin — the
+           * Node-only Admin SDK. When a component briefly imported a value from server/, the
+           * Admin SDK and its whole google-auth-library tree were pulled into the browser and
+           * filed into this chunk, taking it from 677 kB to 3,615 kB. The page then died on a
+           * `process is not defined` thrown inside google-logging-utils, and because it had been
+           * filed under "firebase" the stack read as a Firebase problem rather than as a Node
+           * package that had no business being there.
+           *
+           * The import was the bug and is fixed; this is so the next one cannot hide.
+           */
+          if (/node_modules\/(firebase|@firebase)\//.test(id)) {
             return 'firebase'
           }
           return undefined

@@ -38,8 +38,13 @@ export function UsernameField({ value, onChange, currentUid, disabled }: Usernam
 
     setChecking(true);
     const timer = window.setTimeout(() => {
+      /* .catch, not just .finally — .finally re-throws. Without this the denied read that
+         used to happen here became an unhandled rejection in the error feed, eight times over
+         a month, with no scope and no frame to trace it by. A hint that cannot be computed is
+         not an error worth reporting: the claim itself is transactional and decides this. */
       void isUsernameAvailable(result.normalized, currentUid)
         .then(setAvailable)
+        .catch(() => setAvailable(null))
         .finally(() => setChecking(false));
     }, 350);
 

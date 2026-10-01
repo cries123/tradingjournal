@@ -3,8 +3,19 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { globSync } from 'node:fs';
 
-const files = globSync('src/**/*.tsx', { cwd: process.cwd() })
-  .map((f) => ({ path: f, source: readFileSync(join(process.cwd(), f), 'utf-8') }));
+/*
+ * Paths normalised to forward slashes before anything compares them.
+ *
+ * globSync returns native separators, so on Windows every path came back as src\pages\LandingPage.tsx
+ * while the assertions below are written with forward slashes. Both tests in this file failed on
+ * every Windows checkout — and worse than failing, the second one failed open: its skip-the-landing-
+ * page guard never matched, so it asserted that LandingPage must not use drift, which is the exact
+ * opposite of the rule. Two permanently red tests nobody could act on.
+ */
+const files = globSync('src/**/*.tsx', { cwd: process.cwd() }).map((f) => ({
+  path: f.split(/[\\/]/).join('/'),
+  source: readFileSync(join(process.cwd(), f), 'utf-8'),
+}));
 
 describe('starfield drift stays on the landing page', () => {
   it('is switched on in exactly one place', () => {
