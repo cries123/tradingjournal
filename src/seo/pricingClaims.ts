@@ -60,9 +60,20 @@ function joinList(items: string[]): string {
  * derived — but a test asserts it names none of the paid features, which is the mistake that keeps
  * happening.
  */
+/*
+ * Two of these were features that no longer exist.
+ *
+ * "screenshots" and "coach share links" were both removed — the read-only coach link is gone (a
+ * shared one no longer opens) and the Trade type has no screenshot field at all. The only coaching
+ * left is the Diamond seat, which is a $39 feature being advertised in the answer to "is it free?".
+ *
+ * This string is emitted as FAQPage JSON-LD, so it is what a search engine caches and shows. The
+ * existing guard test only checks that no PAID feature is named here, which is blind to a free one
+ * that has been deleted — see the removed-phrases check beside it.
+ */
 export const FREE_INCLUSIONS =
-  'unlimited manual logging, the P&L calendar, dashboard stats, notes, tags, screenshots, coach '
-  + 'share links and the year-end export for your accountant';
+  'unlimited manual logging, the P&L calendar, dashboard stats, notes, tags, trade grading '
+  + 'and the year-end export for your accountant';
 
 /** The answer to "is it free?" — accurate in both directions. */
 export function freeAnswer(): string {

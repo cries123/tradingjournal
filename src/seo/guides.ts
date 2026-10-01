@@ -52,8 +52,8 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
       {
         heading: 'Syncing happens when you ask for it',
         paragraphs: [
-          'Trend Chasers never reaches out to your broker on its own. There is no background job and no schedule — your trades come in when you open Connect broker and press Sync, and at no other time.',
-          'That is a deliberate choice. A version that synced by itself on app open was briefly live in August 2026 and was withdrawn: it could run before your journal had finished loading, fail to recognise the trades you already had, and import your history a second time. Anything that touches your trading record unattended needs a stronger guarantee than that one had, so until it has one, you press the button.',
+          'On Free, Silver and Gold, Trend Chasers never reaches out to your broker on its own — your trades come in when you open Connect broker and press Sync, and at no other time. Diamond adds an automatic import that runs on weekday mornings, after the US close and before you open the app; it is on by default and there is a switch for it in Settings.',
+          'The manual button stayed the default for a reason. A version that synced by itself on app open was briefly live in August 2026 and was withdrawn: it could run before your journal had finished loading, fail to recognise the trades you already had, and import your history a second time. The morning import is the version with that guarantee — it reads a window rather than your whole history, and every trade it brings in is matched against what you already have before anything is written.',
           'Pressing Sync as often as you like is safe. Every synced trade carries an id from your broker, so a trade already in your journal is recognised and skipped rather than added again.',
         ],
       },

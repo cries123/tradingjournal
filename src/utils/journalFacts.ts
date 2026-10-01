@@ -62,8 +62,9 @@ export interface JournalFacts {
   worstSymbols: { symbol: string; pnl: number; trades: number; winRate: number }[];
   sessions: { session: string; pnl: number; trades: number; winRate: number }[] | null;
   execution: {
-    captureRate: number;
-    leftOnTable: number;
+    /** Null when no winners were measured — the assistant reads null as "not recorded". */
+    captureRate: number | null;
+    leftOnTable: number | null;
     avgHeatOnWinners: number;
     avgHeatOnLosers: number;
     roundTrips: number;
@@ -299,8 +300,21 @@ export function buildJournalFacts(
       : null,
     execution: excursion
       ? {
-          captureRate: pct(excursion.captureRate),
-          leftOnTable: money(excursion.leftOnTable),
+          /*
+           * Null when there were no winners to measure, never zero.
+           *
+           * tradeQuality's gate is an OR — it returns a result when EITHER the MFE sample or the heat
+           * sample is big enough — which is right, because it keeps the MAE-only heat figures
+           * available. But capture rate is computed from winners, and with none it fell out as 0.
+           *
+           * The assistant is told that a null field means "not recorded", so a zero reads as a
+           * measurement: five losing trades carrying MAE produced "you captured 0% of your winners'
+           * peak" and offered "am I exiting winners too early?", which fires on anything under 85.
+           * The dashboard stays quiet in that state because its own consumer checks the sample, so
+           * the model was being told something no screen would say.
+           */
+          captureRate: excursion.winnerSample >= 3 ? pct(excursion.captureRate) : null,
+          leftOnTable: excursion.winnerSample >= 3 ? money(excursion.leftOnTable) : null,
           avgHeatOnWinners: money(excursion.avgHeatOnWinners),
           avgHeatOnLosers: money(excursion.avgHeatOnLosers),
           roundTrips: excursion.roundTrips,
@@ -460,7 +474,9 @@ export function suggestedQuestions(facts: JournalFacts): SuggestedQuestion[] {
     });
   }
 
-  if (facts.execution && facts.execution.captureRate < 85) {
+  // Only when there is a capture rate at all: null means no winners were measured, and the old `< 85`
+  // was satisfied by the zero that produced.
+  if (facts.execution && facts.execution.captureRate !== null && facts.execution.captureRate < 85) {
     out.push({
       id: 'capture',
       label: 'Am I exiting winners too early?',
