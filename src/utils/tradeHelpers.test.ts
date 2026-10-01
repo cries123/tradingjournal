@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { Trade } from '../types';
-import { effectivePnl, holdTimeMinutes, marketSessionFromTime } from './tradeHelpers';
+import {
+  describeTradeForDeletion,
+  effectivePnl,
+  holdTimeMinutes,
+  marketSessionFromTime,
+} from './tradeHelpers';
 
 const trade = (over: Partial<Trade>): Trade =>
   ({ id: '1', date: '2026-08-03', symbol: 'SPY', pnl: 0, ...over }) as Trade;
@@ -43,6 +48,49 @@ describe('effectivePnl', () => {
     // The branch that was always correct: a synced trade has grossPnl, so the fees have something
     // to come off. This is the one the fix must not disturb.
     expect(effectivePnl(trade({ grossPnl: 100, fees: 7, pnl: 93 }))).toBe(93);
+  });
+});
+
+describe('describeTradeForDeletion', () => {
+  it('names the contract, the size and the money', () => {
+    // The whole point: the X sits beside the edit pencil on rows that look alike, so the dialog has
+    // to identify which row it is about.
+    const message = describeTradeForDeletion(
+      trade({ contract: 'SPY 29 SEP 26 660 C', quantity: 4, pnl: 287 }),
+    );
+
+    expect(message).toContain('SPY 29 SEP 26 660 C');
+    expect(message).toContain('4');
+    expect(message).toContain('287');
+    expect(message).toContain('cannot be undone');
+  });
+
+  it('falls back to the symbol when there is no contract string', () => {
+    expect(describeTradeForDeletion(trade({ symbol: 'AAPL', pnl: -40 }))).toContain('AAPL');
+  });
+
+  it('warns about the work that goes with it', () => {
+    const message = describeTradeForDeletion(
+      trade({ notes: 'faded the open', tags: ['reversal'], grade: 'B' }),
+    );
+
+    expect(message).toContain('notes, tags and grade');
+    expect(message).toContain('broker sync cannot bring those back');
+  });
+
+  it('says nothing about annotations on a bare synced row', () => {
+    // A re-sync genuinely does restore this one, so the warning would be false.
+    const message = describeTradeForDeletion(trade({ sourceId: 'snaptrade:o1:c1' }));
+
+    expect(message).not.toContain('go too');
+    expect(message).toContain('cannot be undone');
+  });
+
+  it('reads as a sentence with exactly one annotation', () => {
+    // The list joiner is the kind of thing that ships as "The notes and you saved on it".
+    expect(describeTradeForDeletion(trade({ notes: 'late entry' }))).toContain(
+      'The notes you saved on it go too',
+    );
   });
 });
 

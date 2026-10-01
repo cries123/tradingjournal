@@ -6,8 +6,10 @@ import { useAuth } from '../context/useAuth';
 import { useSettings } from '../context/useSettings';
 import { fetchDayNote, saveDayNote } from '../services/dayNotes';
 import { formatCurrency } from '../utils/format';
+import { describeTradeForDeletion } from '../utils/tradeHelpers';
 import { computeStats } from '../utils/stats';
 import { ShareCardModal } from './ShareCardModal';
+import { ConfirmDialog } from './ConfirmDialog';
 import { useEscapeToClose } from '../hooks/useEscapeToClose';
 
 interface DayDetailDrawerProps {
@@ -27,10 +29,18 @@ export function DayDetailDrawer({
   onEdit,
   onAddTrade,
 }: DayDetailDrawerProps) {
-  useEscapeToClose(onClose);
   const { settings } = useSettings();
   const { user, firebaseEnabled } = useAuth();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  /*
+   * Which trade the delete button is asking about.
+   *
+   * Deleting a trade used to happen on one tap of a 14px X sitting right beside the 14px edit
+   * pencil, with no confirmation and no undo — and a trade carries the notes, tags, grade and
+   * screenshot the trader wrote about it, none of which the broker can send again. Wiping a whole
+   * journal asks twice; a single trade asked nothing.
+   */
+  const [pendingDelete, setPendingDelete] = useState<Trade | null>(null);
   const [visible, setVisible] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
   const [discipline, setDiscipline] = useState<number | null>(null);
@@ -81,6 +91,9 @@ export function DayDetailDrawer({
   };
 
   const [showShare, setShowShare] = useState(false);
+
+  // Escape belongs to whatever is on top: the confirmation, the share card, then the drawer.
+  useEscapeToClose(onClose, !pendingDelete && !showShare);
   const dayTrades = trades.filter((t) => t.date === date);
   const dayStats = useMemo(() => computeStats(dayTrades), [dayTrades]);
   const totalPnl = dayStats.netPnl;
@@ -220,7 +233,7 @@ export function DayDetailDrawer({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onDelete(trade.id);
+                          setPendingDelete(trade);
                         }}
                         className="text-text-secondary hover:text-loss-bright p-1 focus-ring rounded"
                         aria-label="Delete trade"
@@ -246,6 +259,21 @@ export function DayDetailDrawer({
           </button>
         </div>
       </aside>
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Delete this trade?"
+          message={describeTradeForDeletion(pendingDelete)}
+          confirmLabel="Delete trade"
+          cancelLabel="Keep it"
+          danger
+          onConfirm={() => {
+            onDelete(pendingDelete.id);
+            setPendingDelete(null);
+          }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
 
       {showShare && dayTrades.length > 0 && (
         <ShareCardModal

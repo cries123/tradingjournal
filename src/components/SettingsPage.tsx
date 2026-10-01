@@ -10,6 +10,7 @@ import type { CurrencyCode, ThemeAccent } from '../types/settings';
 import type { Trade } from '../types';
 import type { TradingStats } from '../utils/stats';
 import { downloadBackup, parseBackup, type ParsedBackup } from '../utils/backup';
+import { fetchAllDayNotes, saveDayNotesBatch, type DayNote } from '../services/dayNotes';
 import { exportMonthReport, exportTaxYearCsv, exportTradesCsv } from '../utils/exportTrades';
 import { availableTaxYears, buildTaxReport } from '../utils/taxReport';
 import { formatCurrency } from '../utils/format';
@@ -118,8 +119,12 @@ export function SettingsPage({
   const [newStrategy, setNewStrategy] = useState('');
   const [pendingBackup, setPendingBackup] = useState<ParsedBackup | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
   const [backupMessage, setBackupMessage] = useState<string | null>(null);
   const [backupMessageIsError, setBackupMessageIsError] = useState(false);
+
+  /** Signed out, day notes live in localStorage, which the service handles for a null uid. */
+  const noteUid = firebaseEnabled && user ? user.uid : null;
   const backupInputRef = useRef<HTMLInputElement>(null);
 
   /* The tax export is per YEAR, so everything about it derives from the selected one — including
@@ -215,7 +220,11 @@ export function SettingsPage({
     setBackupMessage(null);
     try {
       const parsed = parseBackup(await file.text());
-      if (parsed.trades.length === 0 && Object.keys(parsed.settings).length === 0) {
+      if (
+        parsed.trades.length === 0
+        && parsed.dayNotes.length === 0
+        && Object.keys(parsed.settings).length === 0
+      ) {
         throw new Error('This backup is empty.');
       }
       setPendingBackup(parsed);
@@ -227,18 +236,62 @@ export function SettingsPage({
     }
   };
 
+  /*
+   * The written journal is fetched at download time, not held in state.
+   *
+   * Day notes live in their own subcollection and only the calendar drawer reads them, one day at a
+   * time. Nothing on this screen has them, so a backup taken from here had none — which is exactly
+   * how they came to be missing from a file that calls itself a full backup.
+   */
+  const handleDownloadBackup = async () => {
+    setBackingUp(true);
+    setBackupMessage(null);
+
+    let dayNotes: DayNote[] = [];
+    let notesFailed = false;
+    try {
+      dayNotes = await fetchAllDayNotes(noteUid);
+    } catch {
+      // A backup missing the notes beats no backup at all — but say so, rather than hand over a
+      // file that looks complete.
+      notesFailed = true;
+    }
+
+    try {
+      downloadBackup(everyTrade, settings, dayNotes);
+      setBackupMessageIsError(notesFailed);
+      setBackupMessage(
+        notesFailed
+          ? `Saved ${everyTrade.length} trade${everyTrade.length === 1 ? '' : 's'}, but your day notes could not be read — they are NOT in this file. Try again in a moment.`
+          : `Saved ${everyTrade.length} trade${everyTrade.length === 1 ? '' : 's'} and ${dayNotes.length} day note${dayNotes.length === 1 ? '' : 's'}.`,
+      );
+    } catch (err) {
+      setBackupMessageIsError(true);
+      setBackupMessage(err instanceof Error ? err.message : 'Could not save the backup file.');
+    } finally {
+      setBackingUp(false);
+    }
+  };
+
   const handleRestore = async () => {
     if (!pendingBackup) return;
     setRestoring(true);
     setBackupMessage(null);
     try {
       await onRestoreTrades(pendingBackup.trades);
+      // Notes after trades, and before settings: a half-finished restore should leave the journal
+      // more complete than it was, not rearranged around trades that failed to land.
+      await saveDayNotesBatch(noteUid, pendingBackup.dayNotes);
       if (Object.keys(pendingBackup.settings).length > 0) {
         updateSettings(pendingBackup.settings);
       }
       setBackupMessageIsError(false);
       setBackupMessage(
-        `Restored ${pendingBackup.trades.length} trade${pendingBackup.trades.length === 1 ? '' : 's'} and settings.`,
+        `Restored ${pendingBackup.trades.length} trade${pendingBackup.trades.length === 1 ? '' : 's'}${
+          pendingBackup.dayNotes.length
+            ? `, ${pendingBackup.dayNotes.length} day note${pendingBackup.dayNotes.length === 1 ? '' : 's'}`
+            : ''
+        } and settings.`,
       );
       setPendingBackup(null);
     } catch (err) {
@@ -963,16 +1016,19 @@ export function SettingsPage({
         <section className="panel-card p-5 space-y-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Backup & restore</h2>
           <p className="text-xs text-text-secondary">
-            Download a full backup of every journal — all trades, tags, accounts, and preferences —
-            as one file. Restore it here on any device.
+            Download a full backup of every journal — all trades, your day notes and discipline
+            ratings, tags, accounts and preferences — as one file. Restore it here on any device.
           </p>
           <button
             type="button"
-            onClick={() => downloadBackup(everyTrade, settings)}
-            className="w-full flex items-center justify-center gap-2 btn-secondary py-2.5 text-sm"
+            disabled={backingUp}
+            onClick={() => void handleDownloadBackup()}
+            className="w-full flex items-center justify-center gap-2 btn-secondary py-2.5 text-sm disabled:opacity-50"
           >
             <Download size={16} />
-            Download full backup ({everyTrade.length} trade{everyTrade.length === 1 ? '' : 's'})
+            {backingUp
+              ? 'Preparing backup…'
+              : `Download full backup (${everyTrade.length} trade${everyTrade.length === 1 ? '' : 's'})`}
           </button>
           <button
             type="button"
@@ -1050,7 +1106,11 @@ export function SettingsPage({
             pendingBackup.exportedAt
               ? `, from a backup made ${new Date(pendingBackup.exportedAt).toLocaleDateString()}`
               : ''
-          }. ${
+          }.${
+            pendingBackup.dayNotes.length
+              ? ` ${pendingBackup.dayNotes.length} day note(s) come with it, overwriting any note you have on those same days.`
+              : ''
+          } ${
             Object.keys(pendingBackup.settings).length > 0
               ? 'Your tags, journals and preferences come with it. '
               : 'It carries no settings, so yours are left alone. '

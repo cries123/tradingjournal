@@ -1,4 +1,5 @@
 import type { Trade } from '../types';
+import { formatCurrency } from './format';
 
 /**
  * Net P&L.
@@ -31,6 +32,38 @@ export function holdTimeMinutes(trade: Trade): number | null {
   const [xh, xm] = trade.exitTime.split(':').map(Number);
   if ([eh, em, xh, xm].some((n) => Number.isNaN(n))) return null;
   return xh * 60 + xm - (eh * 60 + em);
+}
+
+/**
+ * Names a trade in the delete confirmation, and says what else goes with it.
+ *
+ * There was no confirmation at all: a 14px X beside a 14px edit pencil deleted a trade on one tap,
+ * with no undo. A day of 0DTE is a list of rows that look alike, so "Delete this trade?" on its own
+ * would not tell anyone whether the right one is about to go — which is most of what a confirmation
+ * is for. The annotations get their own sentence because a re-sync restores the fill and never the
+ * thinking written on it.
+ */
+export function describeTradeForDeletion(trade: Trade): string {
+  const what = trade.contract?.trim() || trade.symbol;
+  const size = trade.quantity ? ` · ${trade.quantity}` : '';
+  const written = [
+    trade.notes?.trim() ? 'notes' : null,
+    trade.tags?.length ? 'tags' : null,
+    trade.setup?.trim() ? 'setup' : null,
+    trade.grade ? 'grade' : null,
+    typeof trade.rMultiple === 'number' ? 'R multiple' : null,
+  ].filter((part): part is string => part !== null);
+
+  const parts = [`${what}${size} · ${formatCurrency(trade.pnl)}.`];
+  if (written.length) {
+    const list =
+      written.length === 1
+        ? written[0]
+        : `${written.slice(0, -1).join(', ')} and ${written[written.length - 1]}`;
+    parts.push(`The ${list} you saved on it go too, and a broker sync cannot bring those back.`);
+  }
+  parts.push('This cannot be undone.');
+  return parts.join(' ');
 }
 
 export function marketSessionFromTime(time?: string): string | null {

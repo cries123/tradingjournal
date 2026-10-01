@@ -1,8 +1,23 @@
 import type { Trade } from '../types';
 import type { UserSettings } from '../types/settings';
+import type { DayNote } from '../services/dayNotes';
+import { downloadJson } from './downloadJson';
 
 const BACKUP_APP_ID = 'trend-chasers';
-const BACKUP_VERSION = 1;
+
+/*
+ * 2 adds dayNotes.
+ *
+ * The file called itself a full backup and left out the written journal. Day notes live in their
+ * own Firestore subcollection, so they were never in the trades array — and they are the one thing
+ * in this app a broker cannot send again. A trader who moved devices on the strength of this file
+ * lost every note and every discipline rating and had no way to know until they looked.
+ *
+ * A version 1 file still restores: dayNotes absent means an empty list, not a corrupt file. A
+ * version 2 file opened by an older deployed build is refused with "created by a newer version",
+ * which is the check immediately below and the reason this number exists.
+ */
+const BACKUP_VERSION = 2;
 
 export interface TrendChasersBackup {
   app: typeof BACKUP_APP_ID;
@@ -10,33 +25,38 @@ export interface TrendChasersBackup {
   exportedAt: string;
   settings: UserSettings;
   trades: Trade[];
+  dayNotes: DayNote[];
 }
 
 export interface ParsedBackup {
   trades: Trade[];
   settings: Partial<UserSettings>;
+  dayNotes: DayNote[];
   exportedAt: string | null;
 }
 
-export function buildBackup(trades: Trade[], settings: UserSettings): TrendChasersBackup {
+export function buildBackup(
+  trades: Trade[],
+  settings: UserSettings,
+  dayNotes: DayNote[],
+): TrendChasersBackup {
   return {
     app: BACKUP_APP_ID,
     version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
     settings,
     trades,
+    dayNotes,
   };
 }
 
-export function downloadBackup(trades: Trade[], settings: UserSettings): void {
-  const backup = buildBackup(trades, settings);
-  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `trend-chasers-backup-${backup.exportedAt.slice(0, 10)}.json`;
-  link.click();
-  URL.revokeObjectURL(url);
+export function downloadBackup(
+  trades: Trade[],
+  settings: UserSettings,
+  dayNotes: DayNote[],
+): void {
+  const backup = buildBackup(trades, settings, dayNotes);
+  downloadJson('trend-chasers-backup', backup.exportedAt, backup);
 }
 
 function isValidTrade(value: unknown): value is Trade {
@@ -51,6 +71,19 @@ function isValidTrade(value: unknown): value is Trade {
     && typeof t.pnl === 'number'
     && Number.isFinite(t.pnl)
   );
+}
+
+function isValidDayNote(value: unknown): value is DayNote {
+  if (typeof value !== 'object' || value === null) return false;
+  const n = value as Record<string, unknown>;
+  return (
+    typeof n.date === 'string'
+    && /^\d{4}-\d{2}-\d{2}$/.test(n.date)
+    && typeof n.note === 'string'
+    && (n.discipline === undefined || typeof n.discipline === 'number')
+  );
+  // updatedAt is not required: restoring stamps a fresh one, and a note worth keeping is worth
+  // keeping without it.
 }
 
 /** Settings keys restored from a backup. Coach-share fields are intentionally
@@ -107,9 +140,29 @@ export function parseBackup(text: string): ParsedBackup {
     }
   }
 
+  /*
+   * Absent is fine, present and wrong is not.
+   *
+   * Every version 1 backup in anybody's downloads folder has no dayNotes key at all, and those
+   * files must keep restoring. A key that is there but malformed is a different thing: it means the
+   * file has been edited or truncated, and the trades it carries should not be trusted either.
+   */
+  let dayNotes: DayNote[] = [];
+  if (backup.dayNotes !== undefined) {
+    if (!Array.isArray(backup.dayNotes)) {
+      throw new Error('Backup day notes are malformed. File may be corrupted.');
+    }
+    const badNotes = backup.dayNotes.filter((n) => !isValidDayNote(n)).length;
+    if (badNotes > 0) {
+      throw new Error(`Backup contains ${badNotes} malformed day note(s). File may be corrupted.`);
+    }
+    dayNotes = backup.dayNotes as DayNote[];
+  }
+
   return {
     trades,
     settings,
+    dayNotes,
     exportedAt: typeof backup.exportedAt === 'string' ? backup.exportedAt : null,
   };
 }

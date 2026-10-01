@@ -3,6 +3,7 @@ import { Check, ChevronDown, CopyX, Download, X } from 'lucide-react';
 import type { Trade } from '../types';
 import { findDuplicateTrades } from '../utils/duplicateTrades';
 import { formatCurrency } from '../utils/format';
+import { downloadJson } from '../utils/downloadJson';
 
 const DISMISS_KEY = 'trend-chasers-duplicate-cleanup-dismissed';
 const PREVIEW_LIMIT = 40;
@@ -17,17 +18,17 @@ function dismissedCount(): number {
   }
 }
 
-/** Writes the exact rows about to be deleted to a file first, so nothing here is one-way. */
+/**
+ * Writes the exact rows about to be deleted to a file first, so nothing here is one-way.
+ *
+ * Through the shared helper, which throws if it cannot save — this is the caller whose next line
+ * deletes trades, so "the download didn't happen" has to be able to stop it. Its own copy of the
+ * anchor dance revoked the blob URL on the same tick as the click, which WebKit treats as a
+ * cancelled download: on an iPhone the promise one paragraph down could silently have been false.
+ */
 function downloadRemovedTrades(trades: Trade[]): void {
-  const blob = new Blob([JSON.stringify({ removedAt: new Date().toISOString(), trades }, null, 2)], {
-    type: 'application/json',
-  });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `trend-chasers-removed-duplicates-${new Date().toISOString().slice(0, 10)}.json`;
-  link.click();
-  URL.revokeObjectURL(url);
+  const removedAt = new Date().toISOString();
+  downloadJson('trend-chasers-removed-duplicates', removedAt, { removedAt, trades });
 }
 
 interface DuplicateTradesBannerProps {

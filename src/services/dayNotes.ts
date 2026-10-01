@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, writeBatch } from 'firebase/firestore';
 import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
 
 export interface DayNote {
@@ -42,6 +42,50 @@ export async function fetchAllDayNotes(uid: string | null): Promise<DayNote[]> {
     return snap.docs.map((d) => ({ ...(d.data() as DayNote), date: d.id }));
   }
   return Object.values(loadLocalNotes());
+}
+
+// Firestore limits a WriteBatch to 500 operations; the same margin tradesFirestore uses.
+const BATCH_LIMIT = 400;
+
+/**
+ * Writes many day notes at once — used by a backup restore.
+ *
+ * Chunked batches rather than a write per note for the reason the trade writers are: a year of
+ * journalling is a few hundred documents, and a few hundred serial round trips is a restore that
+ * looks hung. Only the dates in the backup are touched, so a note written since is left alone
+ * unless the backup has one for that same day, which matches how trades merge by id.
+ */
+export async function saveDayNotesBatch(uid: string | null, notes: DayNote[]): Promise<void> {
+  if (notes.length === 0) return;
+  const updatedAt = new Date().toISOString();
+
+  if (uid && isFirebaseConfigured()) {
+    const db = getFirebaseDb();
+    for (let offset = 0; offset < notes.length; offset += BATCH_LIMIT) {
+      const batch = writeBatch(db);
+      for (const note of notes.slice(offset, offset + BATCH_LIMIT)) {
+        batch.set(doc(db, 'users', uid, 'dayNotes', note.date), {
+          date: note.date,
+          note: note.note,
+          ...(note.discipline != null ? { discipline: note.discipline } : {}),
+          updatedAt,
+        });
+      }
+      await batch.commit();
+    }
+    return;
+  }
+
+  const stored = loadLocalNotes();
+  for (const note of notes) {
+    stored[note.date] = {
+      date: note.date,
+      note: note.note,
+      ...(note.discipline != null ? { discipline: note.discipline } : {}),
+      updatedAt,
+    };
+  }
+  saveLocalNotes(stored);
 }
 
 export async function fetchDayNote(uid: string | null, date: string): Promise<DayNote | null> {
