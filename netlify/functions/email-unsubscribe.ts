@@ -79,7 +79,7 @@ export const handler: Handler = async (event) => {
     );
   } catch (err) {
     console.error('[email-unsubscribe] failed:', err);
-    logServerError('email-unsubscribe', err);
+    await logServerError('email-unsubscribe', err);
     return page(
       'We couldn’t save that',
       `Something went wrong on our end. Turn ${definition.stopped} off in Settings and it will stick.`,

@@ -205,7 +205,7 @@ const autoSyncHandler: Handler = async () => {
   } catch (err) {
     // One thrown error here is every Diamond user's morning import, silently, so it is reported
     // rather than left in a log nobody reads.
-    logServerError('auto-sync', err, {});
+    await logServerError('auto-sync', err, {});
     console.error('[auto-sync] run failed:', err);
     return { statusCode: 500, body: 'auto-sync failed' };
   }

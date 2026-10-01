@@ -342,7 +342,7 @@ export async function handleCostsRequest(
     return { statusCode: 200, body: await buildCostReport() };
   } catch (err) {
     console.error('[costs] report failed:', err);
-    logServerError('admin-costs', err);
+    await logServerError('admin-costs', err);
     return { statusCode: 500, body: { error: 'Could not build the cost report' } };
   }
 }

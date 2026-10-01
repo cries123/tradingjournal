@@ -137,7 +137,7 @@ const reapHandler: Handler = async () => {
     return { statusCode: 200, body: JSON.stringify(await reap()) };
   } catch (err) {
     console.error('[reap-broker-links] run failed:', err);
-    logServerError('reap-broker-links', err);
+    await logServerError('reap-broker-links', err);
     return { statusCode: 500, body: JSON.stringify({ error: 'Reap run failed' }) };
   }
 };

@@ -256,7 +256,7 @@ const recapHandler: Handler = async () => {
     return { statusCode: 200, body: JSON.stringify(stats) };
   } catch (err) {
     console.error('[weekly-recap] run failed:', err);
-    logServerError('weekly-recap', err);
+    await logServerError('weekly-recap', err);
     return { statusCode: 500, body: JSON.stringify({ error: 'Recap run failed' }) };
   }
 };

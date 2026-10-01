@@ -87,7 +87,7 @@ export async function sendEmail(message: OutboundEmail): Promise<SendOutcome> {
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       console.error(`[mailer] provider refused (${res.status}): ${body.slice(0, 300)}`);
-      logServerError('email-send', new Error(`Resend ${res.status}: ${body.slice(0, 300)}`));
+      await logServerError('email-send', new Error(`Resend ${res.status}: ${body.slice(0, 300)}`));
       return { sent: false, reason: 'provider-error' };
     }
 
@@ -95,7 +95,7 @@ export async function sendEmail(message: OutboundEmail): Promise<SendOutcome> {
     return { sent: true, id: data?.id ?? null };
   } catch (err) {
     console.error('[mailer] send failed:', err);
-    logServerError('email-send', err);
+    await logServerError('email-send', err);
     return { sent: false, reason: 'provider-error' };
   }
 }

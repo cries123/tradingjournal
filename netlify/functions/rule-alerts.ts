@@ -160,7 +160,7 @@ const alertHandler: Handler = async () => {
     return { statusCode: 200, body: JSON.stringify(await run()) };
   } catch (err) {
     console.error('[rule-alerts] run failed:', err);
-    logServerError('rule-alerts', err);
+    await logServerError('rule-alerts', err);
     return { statusCode: 500, body: JSON.stringify({ error: 'Rule alert run failed' }) };
   }
 };

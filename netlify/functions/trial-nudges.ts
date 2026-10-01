@@ -127,7 +127,7 @@ const nudgeHandler: Handler = async () => {
     return { statusCode: 200, body: JSON.stringify(await run()) };
   } catch (err) {
     console.error('[trial-nudges] run failed:', err);
-    logServerError('trial-nudges', err);
+    await logServerError('trial-nudges', err);
     return { statusCode: 500, body: JSON.stringify({ error: 'Nudge run failed' }) };
   }
 };

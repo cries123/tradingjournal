@@ -356,7 +356,20 @@ async function handleStatus(uid: string): Promise<BrokerConnectResult> {
   if (!creds) {
     return { statusCode: 200, body: { registered: false, accounts: [], plan } };
   }
-  await recordBrokerConnectionState(uid, [], 0).catch(() => {});
+  /*
+   * The mirror is written from the ANSWER, below, and never before it.
+   *
+   * There was a `recordBrokerConnectionState(uid, [], 0)` here, which writes connected:false. On the
+   * happy path it was redundant — the call below writes the truth for an empty account list too — and
+   * on an unhappy one it was destructive: withCredentialRecovery rethrows anything that is not a
+   * refused credential, so a SnapTrade 5xx, a timeout or a rate limit left the mirror asserting this
+   * account has no broker.
+   *
+   * Everything downstream keys on connected == true: the reaper, Diamond's morning auto-import, the
+   * rule alerts, the cost run-rate and the trial nudge's "you have not connected a brokerage yet". A
+   * paying subscriber silently lost all of it the next time SnapTrade had a bad minute while their
+   * status screen was open, and nothing in any log named the account.
+   */
 
   const snaptrade = getSnaptrade();
   const res = await withCredentialRecovery(uid, creds, (c) =>
@@ -892,7 +905,7 @@ export async function handleBrokerConnectRequest(
      * which is exactly the class that used to be discovered only when a user wrote in. Recorded,
      * not awaited: the user is owed a response, not a wait on a diagnostic.
      */
-    logServerError('broker-connect', err, { uid: callerUid });
+    await logServerError('broker-connect', err, { uid: callerUid });
 
     // Your broker credentials live in Firestore, so a Firestore outage or an exhausted quota
     // surfaces here as "broker connect failed" — which sends the owner hunting through SnapTrade

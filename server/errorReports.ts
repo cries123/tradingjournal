@@ -157,13 +157,27 @@ export async function recordServerError(
   }
 }
 
-/** Fire-and-forget form for handlers that must not wait on a diagnostic. */
+/**
+ * Records a server-side error. AWAIT IT.
+ *
+ * This was fire-and-forget, "for handlers that must not wait on a diagnostic" — and every one of its
+ * callers is the line immediately before `return { statusCode: 500 }`. A Netlify function is a Lambda:
+ * the execution environment freezes the moment the handler's promise resolves, so the Firestore
+ * transaction inside was abandoned mid-flight and the report never landed. Worst exactly where it is
+ * needed most: a hot function might get its write finished by a later invocation thawing the same
+ * container, but the daily and weekly scheduled jobs run in a container that is then reaped — and
+ * those are the handlers whose own comments assert the row exists.
+ *
+ * The premise was wrong anyway. recordServerError swallows every error it can throw, so there was
+ * never anything for the response to be protected from; awaiting costs one round trip on a path that
+ * is already returning 500 and cannot change the status code.
+ */
 export function logServerError(
   scope: string,
   thrown: unknown,
   context: { uid?: string | null; path?: string } = {},
-): void {
-  void recordServerError(scope, thrown, context);
+): Promise<void> {
+  return recordServerError(scope, thrown, context);
 }
 
 /**

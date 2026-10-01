@@ -1,6 +1,6 @@
 import type { Handler } from '@netlify/functions';
 import { assertCallerIsAdmin, AdminRequestError, getBearerToken } from '../../server/adminAuth';
-import { getAdminFirestore } from '../../server/firebaseAdmin';
+import { getAdminFirestore, getAdminAuth } from '../../server/firebaseAdmin';
 import { logServerError } from '../../server/errorReports';
 import { ticketReplyEmail } from '../../server/emailTemplates';
 import { isMailConfigured, sendEmail, siteUrl } from '../../server/mailer';
@@ -63,6 +63,7 @@ export const handler: Handler = async (event) => {
     }
 
     const ticket = snap.data() as {
+      uid?: string;
       email?: string;
       subject?: string;
       lastMessagePreview?: string;
@@ -79,7 +80,28 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    if (!ticket.email) {
+    /*
+     * The recipient comes from the ACCOUNT, never from the ticket document.
+     *
+     * `email` on a ticket is written by the client at create time and validTicketCreate in
+     * firestore.rules does not check it — it is not required to exist, let alone to match the person
+     * opening the ticket. This line passed it straight to sendEmail's `to`, so anybody could open a
+     * ticket naming somebody else's address and the next routine support reply would send mail from
+     * our verified domain to that address, with a subject and quoted body they also chose
+     * (`subject` on create, `lastMessagePreview` via the owner-writable update rule). It leaked the
+     * support reply to a third party and made the domain a sending service for a stranger.
+     *
+     * adminAccountActions.ts already resolves a recipient this way and says why. The uid is the one
+     * field on a ticket the rules do pin to the caller.
+     */
+    const to = ticket.uid
+      ? await getAdminAuth()
+          .getUser(ticket.uid)
+          .then((u) => u.email ?? null)
+          .catch(() => null)
+      : null;
+
+    if (!to) {
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -94,7 +116,7 @@ export const handler: Handler = async (event) => {
     });
 
     const outcome = await sendEmail({
-      to: ticket.email,
+      to,
       subject: mail.subject,
       html: mail.html,
       text: mail.text,
@@ -115,7 +137,7 @@ export const handler: Handler = async (event) => {
     };
   } catch (err) {
     console.error('[ticket-notify] failed:', err);
-    logServerError('ticket-notify', err);
+    await logServerError('ticket-notify', err);
     // 200, for the reason in the header comment: the reply itself succeeded.
     return {
       statusCode: 200,

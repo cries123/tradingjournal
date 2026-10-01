@@ -131,7 +131,7 @@ export const handler: Handler = async (event) => {
     }
   } catch (err) {
     console.error('[creem-webhook] could not record the event id:', err);
-    logServerError('creem-webhook-dedupe', err);
+    await logServerError('creem-webhook-dedupe', err);
     return { statusCode: 500, body: JSON.stringify({ error: 'Storage unavailable' }) };
   }
 
@@ -181,7 +181,7 @@ export const handler: Handler = async (event) => {
      * arrive. Creem will retry, and the retry usually wins — but if it doesn't, this is the row
      * that says so, with the uid attached, before the customer has to notice and write in.
      */
-    logServerError('creem-webhook-apply', err, { uid: parsed.uid });
+    await logServerError('creem-webhook-apply', err, { uid: parsed.uid });
     // A real failure — let Creem retry, and undo the seen-marker so the retry isn't swallowed as
     // a duplicate of an attempt that never took effect.
     if (eventId) {
