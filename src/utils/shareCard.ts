@@ -1,4 +1,5 @@
 import type { User } from 'firebase/auth';
+import { saveBlob } from './downloadJson';
 import type { TradingStats } from './stats';
 
 import { SITE_DOMAIN } from '../config/site';
@@ -601,7 +602,7 @@ function prefersGallerySave(): boolean {
 }
 
 /** On phone, opens the share sheet so users can tap Save Image → Photos. Desktop downloads a file. */
-export async function saveSharePngToGallery(blob: Blob, filename: string): Promise<'shared' | 'downloaded' | 'cancelled'> {
+export async function saveSharePngToGallery(blob: Blob, filename: string): Promise<'shared' | 'downloaded' | 'cancelled' | 'failed'> {
   const file = new File([blob], filename, { type: 'image/png' });
 
   if (prefersGallerySave() && typeof navigator.share === 'function') {
@@ -620,13 +621,20 @@ export async function saveSharePngToGallery(blob: Blob, filename: string): Promi
     }
   }
 
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-  return 'downloaded';
+  /*
+   * Through the shared sequence, and honest about failing.
+   *
+   * This was a third copy with the same two faults — detached anchor, URL revoked on the click's own
+   * tick — and it returned 'downloaded' unconditionally, so the modal reported a saved file whether
+   * or not one arrived. On a phone the share sheet usually takes over, so the path that was wrong was
+   * desktop Safari and anywhere sharing is unavailable.
+   */
+  try {
+    saveBlob(blob, filename);
+    return 'downloaded';
+  } catch {
+    return 'failed';
+  }
 }
 
 export async function downloadSharePng(

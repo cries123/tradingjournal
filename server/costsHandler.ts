@@ -264,7 +264,19 @@ export async function buildCostReport(): Promise<CostReport> {
       // Real money, from the ledger the webhook writes — not the run rate, and not today's figure
       // pretended backwards. Months before the ledger existed read zero, which is honest: nothing
       // recorded them.
-      const collected = await readMonthRevenue(month).catch(() => ({ revenue: 0, charges: 0 }));
+      /*
+       * NOT caught here. A failed ledger read must not become a cached zero.
+       *
+       * This swallowed the failure into { revenue: 0, charges: 0 }, which then flowed into the month
+       * row and — because a completed month is cached permanently, with no TTL and nothing that ever
+       * re-reads it — froze that month's revenue at $0 for good. One transient Firestore error or a
+       * missing index on a range query, and a month that earned money reads as a month that earned
+       * nothing, every time the panel is opened afterwards.
+       *
+       * Letting it throw hands the month to the catch below, which already logs, sets `warning`, and
+       * skips both the table row and the cache write — the behaviour this wanted all along.
+       */
+      const collected = await readMonthRevenue(month);
 
       const counts: UsageCounts = {
         ...raw.counts,

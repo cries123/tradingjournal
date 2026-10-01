@@ -45,15 +45,25 @@ export function buildJsonFile(prefix: string, isoTimestamp: string, data: unknow
  * It cannot confirm the download finished — no browser API reports that — but it can refuse to
  * pretend in an environment that has no way to save at all.
  */
-export function saveJsonFile(file: JsonFile): void {
+/**
+ * Hands any blob to the browser as a download. The one copy of the sequence.
+ *
+ * There were three, and the other two had both of the faults this exists to fix — the trade and tax
+ * CSV exports, and the share-card PNG. Every one of them is a button a customer presses expecting a
+ * file.
+ *
+ * Throws rather than failing quietly, so a caller that is about to delete something, or about to
+ * report "downloaded", can tell that nothing was saved.
+ */
+export function saveBlob(blob: Blob, filename: string): void {
   if (typeof document === 'undefined' || typeof URL?.createObjectURL !== 'function') {
     throw new Error('This browser cannot save a file from the page.');
   }
 
-  const url = URL.createObjectURL(new Blob([file.text], { type: 'application/json' }));
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = file.filename;
+  link.download = filename;
   link.rel = 'noopener';
 
   // In the document before the click, out of it after: the tidy-up a detached anchor skips.
@@ -69,6 +79,10 @@ export function saveJsonFile(file: JsonFile): void {
    * still releases the memory; leaving it un-revoked would hold the whole file for the session.
    */
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+export function saveJsonFile(file: JsonFile): void {
+  saveBlob(new Blob([file.text], { type: 'application/json' }), file.filename);
 }
 
 /** Build and save in one step, for the callers that have nothing else to do with the file. */

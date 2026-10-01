@@ -154,6 +154,15 @@ export function ShareCardModal({ period, stats, dateKey = '', year, month = 0, o
       } else if (result === 'downloaded') {
         setSaveHint('Image downloaded.');
         setTimeout(() => setSaveHint(null), 3000);
+      } else if (result === 'failed') {
+        /*
+         * Said out loud. The save path used to return 'downloaded' whether or not a file arrived, so
+         * a browser that refused the download was reported as a success and the trader went looking
+         * in a downloads folder with nothing in it. 'cancelled' stays silent, because that one was
+         * the trader's own decision.
+         */
+        setSaveHint('Could not save the image — your browser blocked the download.');
+        setTimeout(() => setSaveHint(null), 5000);
       }
     } finally {
       setExporting(false);

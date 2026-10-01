@@ -133,3 +133,72 @@ describe('the broker connection mirror', () => {
     expect(handleStatus).toContain('accounts.length');
   });
 });
+
+describe('the automatic pull covers its window', () => {
+  /*
+   * pullRecentActivityForUser asked SnapTrade for one page of 1,000 activities and used whatever came
+   * back: no offset, no read of the pagination metadata, no check for hitting the cap. An account past
+   * 1,000 activities in the ten-day window was silently truncated, and nothing told the trader or the
+   * log.
+   *
+   * The manual sync beside it in the same file has paged properly all along — offset, a break on a
+   * short page, a truncated flag, and a sentence on screen saying the oldest history was left out — so
+   * both the parameter and the metadata were available and simply unused.
+   *
+   * Reachable by the repo's own estimate, stated twice: "ten days of an active 0DTE account is
+   * comfortably more than 500 round trips", and a round trip is at least two activities.
+   */
+  const source = codeOnly(readFileSync('server/brokerConnectHandler.ts', 'utf8'));
+  const pull = source.slice(source.indexOf('export async function pullRecentActivityForUser'));
+
+  it('asks for more than the first page', () => {
+    expect(pull).toContain('offset: page * PAGE_SIZE');
+    expect(pull).toMatch(/for \(let page = 0; page < MAX_PAGES/);
+  });
+
+  it('stops as soon as a page comes back short', () => {
+    // Otherwise every pull costs the full page budget in round trips.
+    expect(pull).toContain('if (batch.length < PAGE_SIZE) break;');
+  });
+
+  it('says so when it hits the cap instead of returning a quiet subset', () => {
+    expect(pull).toContain('truncated = true');
+    expect(pull).toMatch(/truncated,/);
+  });
+
+  it('is surfaced by the job that calls it', () => {
+    /*
+     * The warning has to be GUARDED by the flag, not merely present in the file. A first version of
+     * this asserted that both strings appeared somewhere, and a mutation replacing `if (truncated)`
+     * with `if (false)` sailed through it — the words were still there, the report was not.
+     */
+    const job = codeOnly(readFileSync('netlify/functions/auto-sync.ts', 'utf8'));
+
+    expect(job).toMatch(/const \{[^}]*truncated[^}]*\} = await pullRecentActivityForUser/);
+    expect(job).toMatch(/if \(truncated\) \{\s*console\.warn\(/);
+  });
+});
+
+describe('a month of revenue that could not be read', () => {
+  /*
+   * readMonthRevenue was wrapped in `.catch(() => ({ revenue: 0, charges: 0 }))` inside the per-month
+   * try. A completed month is cached permanently — no TTL, and nothing ever re-reads it — so one
+   * transient Firestore error or a missing index froze that month's revenue at $0 for good, on every
+   * later load of the panel.
+   *
+   * Letting it throw hands the month to the catch below, which already logs, sets the warning banner,
+   * and skips both the table row and the cache write.
+   */
+  const source = codeOnly(readFileSync('server/costsHandler.ts', 'utf8'));
+
+  it('is not swallowed into a zero', () => {
+    expect(source).not.toMatch(/readMonthRevenue\(month\)\.catch/);
+    expect(source).toContain('await readMonthRevenue(month);');
+  });
+
+  it('still has the catch that warns and skips the cache', () => {
+    // The fix is a deletion, so this is the half that has to survive it.
+    expect(source).toMatch(/warning = `Some months could not be read/);
+    expect(source).toMatch(/if \(!partial\) \{\s*await cacheRef\.set/);
+  });
+});

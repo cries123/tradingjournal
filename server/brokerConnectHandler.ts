@@ -783,10 +783,12 @@ export async function pullRecentActivityForUser(
   /** Each trade tagged with the brokerage account it came from — see the push below. */
   trades: PulledTrade[];
   pulls: number;
+  /** An account hit the page cap, so the oldest of the window was left out. */
+  truncated: boolean;
   skippedAccounts: number;
 }> {
   const creds = await getCredsIfRegistered(uid);
-  if (!creds) return { accounts: 0, trades: [], pulls: 0, skippedAccounts: 0 };
+  if (!creds) return { accounts: 0, trades: [], pulls: 0, truncated: false, skippedAccounts: 0 };
 
   const snaptrade = getSnaptrade();
   let active = creds;
@@ -798,26 +800,59 @@ export async function pullRecentActivityForUser(
 
   const trades: PulledTrade[] = [];
   let pulls = 0;
+  /** True when an account hit the page cap, so the caller can say the window was not fully covered. */
+  let truncated = false;
 
   for (const account of listed.data) {
     if (!account.id) continue;
     if (pulls >= maxAccounts) break;
 
-    const res = await withCredentialRecovery(uid, active, (c) => {
-      active = c;
-      return snaptrade.accountInformation.getAccountActivities({
-        userId: c.userId,
-        userSecret: c.userSecret,
-        accountId: account.id,
-        // A window, not the whole history: this is topping up a journal that a manual sync already
-        // backfilled, and a full pull every morning would be slower and no more complete.
-        startDate,
-        limit: 1000,
+    /*
+     * Paged, like the manual sync beside it.
+     *
+     * This asked for one page of 1,000 and used whatever came back, with no offset, no read of the
+     * pagination metadata and no check for hitting the cap — so an account past 1,000 activities in
+     * the window was silently truncated, and nothing told the trader or the log. The manual path has
+     * done this properly all along, which is where the shape below comes from.
+     *
+     * The repo's own estimate is what makes it reachable: "ten days of an active 0DTE account is
+     * comfortably more than 500 round trips", and a round trip is at least two activities.
+     *
+     * Three pages is plenty for a ten-day window and keeps the wall-clock budget this job runs under;
+     * hitting it is recorded rather than ignored.
+     */
+    const PAGE_SIZE = 1000;
+    const MAX_PAGES = 3;
+    const activities: SnapTradeActivityLike[] = [];
+
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const res = await withCredentialRecovery(uid, active, (c) => {
+        active = c;
+        return snaptrade.accountInformation.getAccountActivities({
+          userId: c.userId,
+          userSecret: c.userSecret,
+          accountId: account.id,
+          // A window, not the whole history: this is topping up a journal that a manual sync already
+          // backfilled, and a full pull every morning would be slower and no more complete.
+          startDate,
+          offset: page * PAGE_SIZE,
+          limit: PAGE_SIZE,
+        });
       });
-    });
+
+      const batch = (res.data.data ?? []) as SnapTradeActivityLike[];
+      activities.push(...batch);
+
+      if (batch.length < PAGE_SIZE) break;
+      if (page === MAX_PAGES - 1) {
+        truncated = true;
+        console.warn(
+          `[broker-pull] ${uid}: account ${account.id} hit ${MAX_PAGES * PAGE_SIZE} activities; the oldest of the window was left for a manual sync.`,
+        );
+      }
+    }
     pulls += 1;
 
-    const activities = (res.data.data ?? []) as SnapTradeActivityLike[];
     /*
      * Matched per account, never across accounts.
      *
@@ -846,6 +881,7 @@ export async function pullRecentActivityForUser(
     accounts: listed.data.length,
     trades,
     pulls,
+    truncated,
     skippedAccounts: Math.max(0, listed.data.length - pulls),
   };
 }

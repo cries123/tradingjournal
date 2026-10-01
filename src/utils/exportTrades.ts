@@ -1,5 +1,6 @@
 import type { Trade } from '../types';
 import type { TradingStats } from './stats';
+import { saveBlob } from './downloadJson';
 import { csvCell } from './csvCell';
 import { formatCurrency, formatMonthYear } from './format';
 import type { CurrencyCode } from '../types/settings';
@@ -114,12 +115,14 @@ export function exportMonthReport(
   win.document.close();
 }
 
+/**
+ * Both CSV exports, through the one sequence that works.
+ *
+ * This had the two faults saveBlob exists to fix: the anchor was never put in the document, and the
+ * blob URL was revoked on the same tick as the click, which WebKit treats as a cancelled download.
+ * Both the trade export and the year-end tax CSV go through here, and both are buttons somebody
+ * presses expecting a file to arrive.
+ */
 function downloadBlob(content: string, filename: string, mime: string) {
-  const blob = new Blob([content], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  saveBlob(new Blob([content], { type: mime }), filename);
 }
