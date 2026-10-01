@@ -111,6 +111,10 @@ export function SettingsPage({
   );
   const orphanCount = countOrphans(orphans);
   const [orphanTarget, setOrphanTarget] = useState(settings.activeAccountId);
+
+  /** The journal these exports cover, named in the file so the scope travels with it. */
+  const activeJournalName =
+    settings.accounts.find((a) => a.id === settings.activeAccountId)?.name ?? null;
   const [movingOrphans, setMovingOrphans] = useState(false);
   const [removingJournal, setRemovingJournal] = useState<string | null>(null);
   const [orphanMoved, setOrphanMoved] = useState(0);
@@ -984,7 +988,7 @@ export function SettingsPage({
             <button
               type="button"
               disabled={taxReport.tradeCount === 0}
-              onClick={() => exportTaxYearCsv(trades, taxYear)}
+              onClick={() => exportTaxYearCsv(trades, taxYear, activeJournalName)}
               className="w-full flex items-center justify-center gap-2 btn-secondary py-2.5 text-sm disabled:opacity-50"
             >
               <Download size={16} />

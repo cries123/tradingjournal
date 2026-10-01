@@ -546,3 +546,45 @@ describe('what the commission percentage is a percentage of', () => {
     expect(stats!.covered).toBe(5);
   });
 });
+
+describe('days to expiry is measured from the open', () => {
+  /*
+   * It read `trade.date`, which is the CLOSING fill on every imported trade — all three importers set
+   * it from the close. So a Friday-expiry option bought on Monday and sold on Friday reported zero
+   * days to expiry and landed in the 0DTE row, under a panel headed "time left when you opened".
+   * Every multi-day hold was bucketed by its remaining life at exit.
+   */
+  it('uses the opening date when the importer recorded one', () => {
+    const heldAllWeek = trade({
+      openDate: '2026-03-02',
+      date: '2026-03-06',
+      expiration: '2026-03-06',
+      assetType: 'option',
+    });
+
+    expect(daysToExpiry(heldAllWeek)).toBe(4);
+  });
+
+  it('does not report a week-long hold as a 0DTE trade', () => {
+    const heldAllWeek = trade({
+      openDate: '2026-03-02',
+      date: '2026-03-06',
+      expiration: '2026-03-06',
+      assetType: 'option',
+    });
+
+    expect(daysToExpiry(heldAllWeek)).not.toBe(0);
+  });
+
+  it('falls back to the close for a trade imported before the field existed', () => {
+    // Exact for a day trade, which is the overwhelming majority here, and the old behaviour for
+    // anything held overnight — rather than refusing to say anything about an existing journal.
+    const sameDay = trade({ date: '2026-03-06', expiration: '2026-03-06', assetType: 'option' });
+    expect(daysToExpiry(sameDay)).toBe(0);
+  });
+
+  it('still refuses an expiry before the fill', () => {
+    const impossible = trade({ openDate: '2026-03-10', date: '2026-03-10', expiration: '2026-03-06' });
+    expect(daysToExpiry(impossible)).toBeNull();
+  });
+});

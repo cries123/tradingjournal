@@ -10,6 +10,7 @@ import { tierHas, TIER_ORDER } from '../../src/config/tiers';
 import { buildJournalFacts } from '../../src/utils/journalFacts';
 import { recordAutomatic } from '../../server/usage';
 import { isMailConfigured, sendEmail, siteUrl } from '../../server/mailer';
+import { resolveTradeAccountId } from '../../src/utils/accounts';
 import { unsubscribeUrl } from '../../server/unsubscribeToken';
 
 /**
@@ -47,7 +48,20 @@ function dayKey(offsetDays: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-async function recentTrades(uid: string): Promise<Trade[]> {
+/**
+ * The week's trades, from the journal the trader is actually looking at.
+ *
+ * Scoped like every figure in the app. This summed EVERY journal, and journals are a sold feature at
+ * every tier — two on Free, five on Gold, unlimited on Diamond, and the pricing page suggests them
+ * for exactly the split that breaks this: "a live account and a paper one, or one per strategy". So
+ * the emailed net, the best day, the worst day and the per-setup rollup matched no screen in the
+ * product for anybody who took that advice, with a paper account's results mailed to them as their
+ * week.
+ *
+ * Filtered in memory rather than in the query, so the single-field date index still covers it and
+ * nobody has to remember to create a composite one.
+ */
+async function recentTrades(uid: string, activeAccountId: string): Promise<Trade[]> {
   const snap = await getAdminFirestore()
     .collection(`users/${uid}/trades`)
     // A range on one field inside a subcollection rides Firestore's automatic single-field index,
@@ -56,7 +70,16 @@ async function recentTrades(uid: string): Promise<Trade[]> {
     .limit(1000)
     .get();
 
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Trade, 'id'>) }));
+  return snap.docs
+    .map((d) => ({ id: d.id, ...(d.data() as Omit<Trade, 'id'>) }))
+    .filter((trade) => resolveTradeAccountId(trade.accountId) === activeAccountId);
+}
+
+/** Which journal the trader has open, from the same document the rule alerts read. */
+async function activeJournalFor(uid: string): Promise<string> {
+  const snap = await getAdminFirestore().doc(`users/${uid}/settings/preferences`).get();
+  const value = (snap.data() as { activeAccountId?: unknown } | undefined)?.activeAccountId;
+  return typeof value === 'string' && value ? value : 'default';
 }
 
 /**
@@ -187,7 +210,7 @@ async function runRecap(): Promise<{ considered: number; sent: number; skipped: 
         continue;
       }
 
-      const trades = await recentTrades(uid);
+      const trades = await recentTrades(uid, await activeJournalFor(uid));
       const recap = computeWeeklyRecap(trades);
       if (!recap) {
         stats.skipped += 1;

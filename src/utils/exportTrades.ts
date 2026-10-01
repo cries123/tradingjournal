@@ -52,9 +52,21 @@ export function exportTradesCsv(trades: Trade[], filename = 'trades.csv'): void 
  * into it, whatever year they belonged to. See taxReport.ts for the totals, the per-symbol rollup
  * and why wash sales are only ever flagged for review here.
  */
-export function exportTaxYearCsv(trades: Trade[], year: number): void {
+/**
+ * The year's realized P&L, for the journal it was exported from.
+ *
+ * `journalName` is carried into both the file's header and its name, because the export covers the
+ * ACTIVE journal only and nothing in the artifact used to say so. An accountant receiving
+ * "realized-pnl-2026.csv" has no way to tell whether it is the year or one slice of it.
+ */
+export function exportTaxYearCsv(trades: Trade[], year: number, journalName?: string | null): void {
   const report = buildTaxReport(trades, year);
-  downloadBlob(taxReportCsv(report), `trend-chasers-realized-pnl-${year}.csv`, 'text/csv;charset=utf-8');
+  const suffix = journalName ? `-${journalName.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}` : '';
+  downloadBlob(
+    taxReportCsv(report, journalName),
+    `trend-chasers-realized-pnl-${year}${suffix}.csv`,
+    'text/csv;charset=utf-8',
+  );
 }
 
 export function exportMonthReport(

@@ -202,3 +202,52 @@ describe('a month of revenue that could not be read', () => {
     expect(source).toMatch(/if \(!partial\) \{\s*await cacheRef\.set/);
   });
 });
+
+describe('which journal a number covers', () => {
+  /*
+   * Every figure in the app is scoped to the active journal — useTrades filters combinedTrades by
+   * settings.activeAccountId. Two surfaces were not, and journals are a sold feature at every tier,
+   * suggested on the pricing page for exactly the split that breaks them: "a live account and a paper
+   * one, or one per strategy".
+   */
+  it('has the weekly recap reading the active journal', () => {
+    /*
+     * It summed EVERY journal into the net, the best day, the worst day and the per-setup rollup, so
+     * the emailed week matched no screen in the product and a paper account's results were mailed to
+     * the trader as their own.
+     */
+    const job = codeOnly(readFileSync('netlify/functions/weekly-recap.ts', 'utf8'));
+
+    expect(job).toMatch(/resolveTradeAccountId\(trade\.accountId\) === activeAccountId/);
+    expect(job).toMatch(/recentTrades\(uid, await activeJournalFor\(uid\)\)/);
+  });
+
+  it('filters in memory, so no composite index is needed', () => {
+    // The query still rides the automatic single-field index on date. Adding accountId to the where
+    // clause would need an index somebody has to remember to create in the console.
+    const job = codeOnly(readFileSync('netlify/functions/weekly-recap.ts', 'utf8'));
+    expect(job).not.toMatch(/where\('accountId'/);
+  });
+
+  it('has the rule banner reading the same journal as the breach list', () => {
+    /*
+     * The banner was given everyTrade — the union of every journal, documented as being for full
+     * backups — while the breach list beside it reads the filtered view. Two live trades and two
+     * paper ones under a cap of four produced "that is trade 4 of 4, the next one breaks your own
+     * limit" above a list reporting no breaches at all.
+     */
+    const page = codeOnly(readFileSync('src/pages/JournalApp.tsx', 'utf8'));
+    expect(page).toContain('<RuleStandingBanner trades={allTrades} />');
+    expect(page).not.toContain('<RuleStandingBanner trades={everyTrade} />');
+  });
+
+  it('names the journal in the year-end tax file', () => {
+    // The export covers one journal and the artifact said so nowhere — not the header, not the
+    // filename — so neither the trader nor their accountant could tell it was a slice.
+    const report = codeOnly(readFileSync('src/utils/taxReport.ts', 'utf8'));
+    const exporter = codeOnly(readFileSync('src/utils/exportTrades.ts', 'utf8'));
+
+    expect(report).toMatch(/if \(journalName\) lines\.push\(`Journal,/);
+    expect(exporter).toMatch(/exportTaxYearCsv\([^)]*journalName/);
+  });
+});

@@ -456,7 +456,16 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
             ) : (
               <>
                 {/* Above everything: a limit you are about to break outranks a checklist. */}
-                <RuleStandingBanner trades={everyTrade} />
+                {/*
+                  The ACTIVE journal, like every other surface that reads these rules.
+
+                  This was handed everyTrade — the union of every journal, which useTrades documents
+                  as being for full backups. So a paper journal counted against a limit set for the
+                  live one: two live trades and two paper ones under a cap of four produced "that is
+                  trade 4 of 4, the next one breaks your own limit" directly above a breach list,
+                  computed from the filtered journal, that reported nothing at all.
+                */}
+                <RuleStandingBanner trades={allTrades} />
                 <CoachNotesPanel />
 
                 {/* Above the dashboard, and only while there is something on it left to do. */}

@@ -389,6 +389,9 @@ function buildTrade(
     symbol: open.underlyingSymbol,
     pnl: Math.round(pnl * 100) / 100,
     date: journalDate(close.tradeDate),
+    // The open, kept alongside. `date` is the close on every imported trade, so the days-to-expiry
+    // panel was measuring a multi-day hold's remaining life at EXIT and calling it the open.
+    openDate: journalDate(open.tradeDate),
     side,
     contract,
     assetType: open.isOption ? 'option' : 'stock',

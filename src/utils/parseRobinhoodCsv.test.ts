@@ -257,3 +257,18 @@ describe('parseRobinhoodCsv parsing', () => {
     expect(() => parseRobinhoodCsv('')).toThrow(/empty/);
   });
 });
+
+describe('the opening date is kept', () => {
+  it('records the open as well as the close', () => {
+    const trades = parseRobinhoodCsv(
+      csv([
+        row('SPY', CALL, 'BTO', '1', '($100.00)', '9/28/2026'),
+        row('SPY', CALL, 'STC', '1', '$150.00', '9/29/2026'),
+      ]),
+    );
+
+    // The close is the journal date; the open is what a days-to-expiry panel needs.
+    expect(trades[0].date).toBe('2026-09-29');
+    expect(trades[0].openDate).toBe('2026-09-28');
+  });
+});

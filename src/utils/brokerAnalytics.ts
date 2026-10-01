@@ -382,10 +382,21 @@ export function dailyLoadRows(trades: Trade[], minDaysPerBucket = 3): LoadRow[] 
 
 const DAY_MS = 86_400_000;
 
-/** Whole days from the trade date to the expiry, or null when either is missing. */
+/**
+ * Whole days from the OPENING fill to the expiry, or null when either is missing.
+ *
+ * It read `trade.date`, which is the closing fill on every imported trade — all three importers set
+ * it from the close. So a Friday-expiry option bought on Monday and sold on Friday reported zero days
+ * to expiry and landed in the 0DTE row, under a panel headed "time left when you opened". Every
+ * multi-day hold was bucketed by its remaining life at exit, which is the opposite end of the trade.
+ *
+ * openDate is written by all three importers now. Trades imported before it existed fall back to the
+ * close, which is exact for a day trade — the overwhelming majority here — and the old behaviour for
+ * anything held overnight.
+ */
 export function daysToExpiry(trade: Trade): number | null {
   if (!trade.expiration || !trade.date) return null;
-  const open = Date.parse(`${trade.date.slice(0, 10)}T00:00:00Z`);
+  const open = Date.parse(`${(trade.openDate ?? trade.date).slice(0, 10)}T00:00:00Z`);
   const expiry = Date.parse(`${trade.expiration.slice(0, 10)}T00:00:00Z`);
   if (!Number.isFinite(open) || !Number.isFinite(expiry)) return null;
   const days = Math.round((expiry - open) / DAY_MS);

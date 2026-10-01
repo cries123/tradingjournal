@@ -192,6 +192,8 @@ function buildTrade(
   const option = open.contract !== null;
   return {
     date: close.date,
+    // See the Trade type: `date` is the close everywhere, so the open is carried separately.
+    openDate: open.date,
     symbol: open.symbol,
     pnl: Math.round(pnl * 100) / 100,
     /*

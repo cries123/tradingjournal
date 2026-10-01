@@ -173,11 +173,21 @@ function money(value: number): string {
  * with blank lines and header rows rather than split across three downloads, because the person
  * receiving this is going to email it to one accountant once a year.
  */
-export function taxReportCsv(report: TaxYearReport): string {
+export function taxReportCsv(report: TaxYearReport, journalName?: string | null): string {
   const lines: string[] = [];
 
   lines.push(`Trend Chasers realized P&L summary,${report.year}`);
   lines.push(`Generated,${new Date().toISOString().slice(0, 10)}`);
+  /*
+   * Which journal this covers, named in the file.
+   *
+   * The export is scoped to the ACTIVE journal, and nothing in the artifact said so — not the header,
+   * not the filename. Journals are sold for exactly the split that makes this matter: the pricing page
+   * suggests "a live account and a paper one, or one per strategy". Somebody forwarding this to an
+   * accountant had no way to know whether it was all of their year or one slice of it, and neither did
+   * the accountant.
+   */
+  if (journalName) lines.push(`Journal,${cell(journalName)}`);
   lines.push('');
   lines.push('Summary,Amount');
   lines.push(`Trades closed,${report.tradeCount}`);

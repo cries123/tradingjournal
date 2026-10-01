@@ -46,6 +46,19 @@ export interface Trade {
   grossPnl?: number;
   entryTime?: string;
   exitTime?: string;
+  /**
+   * The date the position was OPENED, when the importer knew it.
+   *
+   * `date` is the closing fill on every imported trade — all three importers set it from the close —
+   * so anything measuring from the open had nothing to read and silently used the exit instead. The
+   * days-to-expiry panel did exactly that: a Friday-expiry option bought on Monday and closed on
+   * Friday reported zero days to expiry and landed in the 0DTE row, under a heading that says "time
+   * left when you opened".
+   *
+   * Optional because trades imported before this existed do not have it, and hand entry has only one
+   * date. Readers fall back to `date` and are explicit about what that means.
+   */
+  openDate?: string;
   /** Max adverse / favorable excursion in $ */
   mae?: number;
   mfe?: number;

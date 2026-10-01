@@ -294,6 +294,9 @@ function buildTrade(
     grossPnl: cents(grossPnl),
     fees: cents(fees),
     date: close.date,
+    // The opening fill's date, which only this loop knows. Anything measuring from the open — days
+    // to expiry, holding period — had nothing to read and silently used the close instead.
+    openDate: open.date,
     side: open.side === 'BUY' ? 'long' : 'short',
     contract,
     assetType: isOption(open.type) ? 'option' : 'stock',

@@ -236,3 +236,19 @@ describe('the commission is recorded, not just subtracted', () => {
     }
   });
 });
+
+describe('the opening date is kept', () => {
+  it('records the open as well as the close', () => {
+    // `date` is the close on every imported trade, so anything measuring from the open — days to
+    // expiry, holding period — had nothing to read and silently used the exit.
+    const trades = parseSchwabCsv(
+      csv([
+        call('09:31:05', 'BUY', '+1', 'TO OPEN', '2.00'),
+        call('13:05:00', 'SELL', '-1', 'TO CLOSE', '2.50'),
+      ]),
+    );
+
+    expect(trades[0].openDate).toBe('2026-09-29');
+    expect(trades[0].date).toBe('2026-09-29');
+  });
+});
