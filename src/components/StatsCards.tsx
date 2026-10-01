@@ -110,7 +110,16 @@ export function StatsCards({
               </span>
             </span>
             <span className="stat-chip">
-              Avg win/loss <span className="chip-value">{stats.avgRR.toFixed(2)}</span>
+              {/*
+                An em dash rather than a number when there is no loss to divide by.
+
+                avgRR falls back to avgWin when losingTrades is 0, which is a DOLLAR amount — so a
+                trader five winners into a new journal read "Avg win/loss 287.00" and saw a 287:1
+                ratio. The reasoning was already written against the breakeven hint above; the chip
+                it comes from was still printing the number.
+              */}
+              Avg win/loss{' '}
+              <span className="chip-value">{hasBothSides ? stats.avgRR.toFixed(2) : '—'}</span>
             </span>
             <span className="stat-chip">
               Avg/trade{' '}

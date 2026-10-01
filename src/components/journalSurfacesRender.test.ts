@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import type { Trade } from '../types';
 import { toDateKey } from '../utils/format';
+import { computeStats } from '../utils/stats';
 
 /*
  * A first paint of every screen this release touched, with nothing mocked but the network and the
@@ -112,6 +113,7 @@ import { RuleStandingBanner } from './RuleStandingBanner';
 import { CoachNotesPanel } from './coach/CoachNotesPanel';
 import { CoachInboxContent } from './coach/CoachInboxContent';
 import { MobileBottomNav } from './MobileNav';
+import { StatsCards } from './StatsCards';
 
 const noop = () => undefined;
 
@@ -476,5 +478,59 @@ describe('MobileBottomNav', () => {
 
   it('lights the row for the view you are on', () => {
     expect(paint(bar('performance'))).toContain('aria-current="page"');
+  });
+});
+
+describe('StatsCards', () => {
+  /*
+   * The degenerate case this panel gets wrong: a journal with no losing trade.
+   *
+   * avgRR is avgWin/avgLoss, and with no losers it falls back to avgWin — a DOLLAR figure. The chip
+   * printed it anyway, so a trader five winners into a new journal read "Avg win/loss 287.00" and
+   * saw a 287-to-1 ratio. The reasoning was already written one screen up, where it correctly
+   * suppresses the breakeven hint for exactly this reason; the chip beside it had not been told.
+   */
+  const stats = (trades: Trade[]) => computeStats(trades);
+
+  it('shows no win/loss ratio when there is nothing to divide by', () => {
+    /*
+     * The breakeven trade is here to separate two numbers that would otherwise be equal: with every
+     * trade a winner, avgWin and avg/trade are the same figure, so "the ratio chip is not printing
+     * dollars" could not be asserted without it. Winners average 293.50 and all three average
+     * 195.67, so 293.50 appearing anywhere means the ratio chip printed a dollar amount.
+     */
+    const allWinners = stats([trade({ pnl: 287 }), trade({ pnl: 300 }), trade({ pnl: 0 })]);
+
+    // The fallback itself, so the reason for the guard is visible here too.
+    expect(allWinners.losingTrades).toBe(0);
+    expect(allWinners.avgRR).toBe(293.5);
+
+    const html = paint(createElement(StatsCards, { stats: allWinners }));
+    expect(html).toContain('Avg win/loss');
+    expect(html).not.toContain('293.50');
+    expect(html).toContain('—');
+  });
+
+  it('shows the ratio once both sides exist', () => {
+    /*
+     * Two winners against one loser on purpose. With one of each, the win/loss ratio and the profit
+     * factor are the same number, and the chip could be blank while the assertion still passed on
+     * the other chip's text — which is exactly what a mutation run caught. Here the ratio is 2.00
+     * and the profit factor is 4.00.
+     */
+    const mixed = stats([trade({ pnl: 200 }), trade({ pnl: 200 }), trade({ pnl: -100 })]);
+    expect(mixed.avgRR).toBe(2);
+    expect(mixed.profitFactor).toBe(4);
+
+    const html = paint(createElement(StatsCards, { stats: mixed }));
+    expect(html).toContain('Avg win/loss');
+    expect(html).toContain('2.00');
+    expect(html).not.toContain('—');
+  });
+
+  it('paints an empty journal without dividing by zero', () => {
+    const html = paint(createElement(StatsCards, { stats: stats([]) }));
+    expect(html).not.toContain('NaN');
+    expect(html).not.toContain('Infinity');
   });
 });

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import type { Trade } from '../types';
 import {
@@ -330,5 +331,38 @@ describe('autoSyncTradeId', () => {
   it('gives every trade in a run its own id', () => {
     const ids = new Set(Array.from({ length: 50 }, (_, i) => autoSyncTradeId('acct', 1234, i)));
     expect(ids.size).toBe(50);
+  });
+});
+
+describe('which trades the journal choice is made from', () => {
+  it('asks the newest trades, not the ten-day dedupe window', () => {
+    /*
+     * journalForImports picks the journal the trader last imported broker trades into, and the
+     * handler was handing it the dedupe window — ten days. Anyone who had not traded for a fortnight
+     * therefore had no broker trade in that list, so it fell through to the ACTIVE journal, and the
+     * comment on that fallback names the harm exactly: "someone who left a paper-trading journal
+     * selected would find real fills in it". A holiday was enough.
+     *
+     * Asserted against the source because importFor lives in the Netlify handler, which vitest does
+     * not collect — the same idiom as the streaming refund's coupling test. The behaviour below is
+     * what the function does with each list; this is what it gets handed.
+     */
+    const handler = readFileSync('netlify/functions/auto-sync.ts', 'utf8');
+
+    expect(handler).toContain('journalForImports(await journalCandidates(uid), activeAccountId)');
+    expect(handler).not.toMatch(/journalForImports\(existing/);
+  });
+
+  it('files into the journal of the most recent broker import, not the active one', () => {
+    // The behaviour that makes the list above worth widening: given a broker trade from any date, it
+    // wins over whatever journal happens to be selected.
+    const old = [
+      trade({ date: '2026-07-01', accountId: 'real-money', sourceId: 'snaptrade:o1:c1' }),
+      trade({ date: '2026-06-01', accountId: 'paper', sourceId: 'snaptrade:o2:c2' }),
+    ];
+
+    expect(journalForImports(old, 'paper')).toBe('real-money');
+    // And with nothing imported ever, the active journal is still the only signal there is.
+    expect(journalForImports([], 'paper')).toBe('paper');
   });
 });

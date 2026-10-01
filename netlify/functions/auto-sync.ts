@@ -48,6 +48,31 @@ async function recentTrades(uid: string, since: string): Promise<Trade[]> {
   return snap.docs.map((doc) => ({ ...(doc.data() as Trade), id: doc.id }));
 }
 
+/**
+ * The newest trades in the journal, whatever their date — only to decide which journal to file into.
+ *
+ * journalForImports picks the journal the trader last imported broker trades into, and it was being
+ * handed the ten-day dedupe window. Anyone who had not traded for a fortnight therefore had no broker
+ * trade in that list at all, so it fell through to the ACTIVE journal — and the comment on that
+ * fallback names the exact harm: "someone who left a paper-trading journal selected would find real
+ * fills in it". A holiday was enough to trigger it.
+ *
+ * Fifty is plenty: the question is only which journal the most recent broker import went to, and the
+ * answer is in the first row that has a sourceId. Sorting by date descending means a reader of the
+ * whole journal is never needed.
+ */
+const JOURNAL_LOOKUP_LIMIT = 50;
+
+async function journalCandidates(uid: string): Promise<Trade[]> {
+  const snap = await getAdminFirestore()
+    .collection(`users/${uid}/trades`)
+    .orderBy('date', 'desc')
+    .limit(JOURNAL_LOOKUP_LIMIT)
+    .get();
+
+  return snap.docs.map((doc) => ({ ...(doc.data() as Trade), id: doc.id }));
+}
+
 async function importFor(uid: string, activeAccountId: string, today: string) {
   const since = lookbackStart(today);
   const { accounts, trades, pulls, skippedAccounts } = await pullRecentActivityForUser(
@@ -72,7 +97,8 @@ async function importFor(uid: string, activeAccountId: string, today: string) {
   const { fresh } = dedupeIncomingTrades(trades, existing);
   if (fresh.length === 0) return { imported: 0, accounts };
 
-  const journal = journalForImports(existing, activeAccountId);
+  // Asked of the newest trades rather than of the dedupe window, which only reaches back ten days.
+  const journal = journalForImports(await journalCandidates(uid), activeAccountId);
   const db = getAdminFirestore();
   const stamp = Date.now();
   const savedAt = new Date().toISOString();
