@@ -14,7 +14,13 @@ import {
 import { readEntitlement, resolveAccess } from './entitlements';
 import { brokerageKey, brokerageOwner, claimBrokerage } from './trialGuards';
 import { compIsLive } from '../src/config/accessExtension';
-import { consumeDaily, refundDaily } from './usage';
+import { consumeDaily, refundDaily, type SpendSource } from './usage';
+import {
+  refundNotice,
+  remainingAfterSync,
+  shouldRefundSync,
+  type SyncOutcome,
+} from '../src/utils/syncRefund';
 import { recordJournalEvent } from './journalEvents';
 import { describeHttpError, isRejectedCredential, isUpstreamOutage } from './upstreamErrors';
 import { brokersUnlimited, lowestTierWith, TIER_PLANS, type Tier } from '../src/config/tiers';
@@ -476,7 +482,7 @@ async function handleSync(uid: string, accountId?: string, startDate?: string, e
   }
 
   try {
-    return await pullActivities(uid, creds, accountId, startDate, endDate, spend.remaining, limits.syncsPerDay, tier, spend.credits, syncedInstitution);
+    return await pullActivities(uid, creds, accountId, startDate, endDate, spend.remaining, limits.syncsPerDay, tier, spend.credits, syncedInstitution, spend.source);
   } catch (err) {
     if (isUpstreamOutage(err)) {
       // The user paid for a request nobody answered. Give it back before the error goes out, so
@@ -516,6 +522,7 @@ async function pullActivities(
   tier: Tier,
   syncCredits: number,
   institution: string | null,
+  spendSource: SpendSource,
 ): Promise<BrokerConnectResult> {
   const snaptrade = getSnaptrade();
   const PAGE_SIZE = 1000;
@@ -565,6 +572,31 @@ async function pullActivities(
   const { trades, diagnostics } = mapSnapTradeActivities(activities);
 
   /*
+   * A sync that brought back nothing does not cost a sync.
+   *
+   * The allowance is spent before the pull and used to be handed back only for an upstream
+   * outage, so every other fruitless outcome was charged — including the common one, which is
+   * not an exception at all: a 200 carrying zero trades. This handler already wrote "A sync was
+   * spent for nothing" into the trader’s own history on each occurrence, and then billed for
+   * it. Somebody cancelled over exactly that, having told us plainly it was happening.
+   *
+   * Still charged first and handed back after. Counting at the end instead would let a retry
+   * loop pull for free, which is what the ordering above the pull is defending.
+   *
+   * Only the zero case is server-decidable. Trades that came back and turned out to be already
+   * imported are still charged, because that is decided in the browser by dedupeIncomingTrades
+   * and the server never learns it; refunding those needs the client to report what it kept.
+   *
+   * The rule itself lives in src/utils/syncRefund.ts so it can be read and tested on its own.
+   * This end only names what happened — and it is decided here, above the journal row, because
+   * that row reports the allowance the trader was actually left with.
+   */
+  const outcome: SyncOutcome =
+    trades.length > 0 ? 'trades' : activities.length === 0 ? 'empty-feed' : 'nothing-matched';
+  const refunded = shouldRefundSync(outcome);
+  if (refunded) await refundDaily('sync', uid, spendSource);
+
+  /*
    * What this sync actually produced, recorded before the response goes out.
    *
    * syncUsage counts how many syncs were spent and nothing about what any of them returned, so
@@ -584,9 +616,10 @@ async function pullActivities(
       ignored: Object.values(diagnostics.ignored).reduce((a, b) => a + b, 0),
       ignoredByType: diagnostics.ignored,
       truncated,
-      syncsRemaining,
+      syncsRemaining: remainingAfterSync(syncsRemaining, refunded),
     },
   });
+
 
   return {
     statusCode: 200,
@@ -602,7 +635,13 @@ async function pullActivities(
       activityCount: activities.length,
       totalActivityCount: total ?? activities.length,
       truncated,
-      syncsRemaining,
+      // Corrected for the refund above, so the badge does not count down a sync the user got
+      // back. The client trusts this number over its own arithmetic.
+      syncsRemaining: remainingAfterSync(syncsRemaining, refunded),
+      /** True when this sync cost nothing, so the screen can say so rather than stay quiet. */
+      syncRefunded: refunded,
+      /** The sentence to show for it, or null when the sync was earned. */
+      syncRefundNotice: refundNotice(outcome),
       syncsPerDay,
       syncCredits,
       tier,

@@ -19,7 +19,12 @@ interface ErrorEventsPanelProps {
 const KIND_LABELS: Record<string, string> = {
   render: 'Render crash',
   window: 'Uncaught',
-  promise: 'Unhandled promise',
+  // Not 'Unhandled promise'. Kind 'promise' covers two different things: the global
+  // unhandledrejection listener, which passes no scope, and reportErrorSilently(err, 'promise',
+  // scope) called from a catch we wrote. Labelling both as unhandled cost real debugging time —
+  // a caught, deliberately-reported sync failure read as a missing .catch. The scope column is
+  // what tells them apart, so the label no longer claims to.
+  promise: 'Async',
   server: 'Server',
 };
 

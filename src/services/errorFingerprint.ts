@@ -162,7 +162,22 @@ export function normalizeMessage(message: string): string {
 export function topAppFrame(stack: string | null | undefined): string {
   if (!stack) return '';
 
-  const lines = stack.split('\n').slice(1); // line 0 repeats the message
+  /*
+   * Only drop the first line when it really is the message.
+   *
+   * V8 starts a stack with "TypeError: ..." and the frames follow. WebKit does not — line 0 is
+   * already a frame. Dropping it unconditionally threw away the top frame of every iOS report,
+   * so one bug grouped as several: a broker-sync failure on an iPhone produced one row for
+   * `json@[native code]`, another when Safari inserted `asyncFunctionResume`, and a third when
+   * the stack was one line long and nothing survived at all. Three rows, one defect, and the
+   * count on each too low to look urgent.
+   */
+  const rawLines = stack.split('\n');
+  const looksLikeFrame = (l: string) => {
+    const t = l.trim();
+    return t.startsWith('at ') || t.includes('@');
+  };
+  const lines = looksLikeFrame(rawLines[0] ?? '') ? rawLines : rawLines.slice(1);
   const vendor = /node_modules|\/vendor-|\/firebase-|react-dom|scheduler\.production/i;
 
   const frames = lines.map((l) => l.trim()).filter((l) => l.startsWith('at ') || l.includes('@'));
