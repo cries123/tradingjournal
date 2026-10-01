@@ -132,11 +132,36 @@ async function handleDeleteUser(callerUid: string, targetUid: string): Promise<{
  * webhook about a lapsed or absent one must never take it back off them.
  */
 async function handleSetTier(callerUid: string, targetUid: string, tier: Tier) {
+  const existing = await readEntitlement(targetUid);
+
+  /*
+   * What billing said before the grant covered it over, so removing the grant can put it back.
+   *
+   * A grant overwrites tier and forces status 'active', and nothing recorded what was there. Removing
+   * it then restored only `source`, so a customer paying for Silver who was granted Diamond and later
+   * had the grant removed was left reading as an ACTIVE DIAMOND PURCHASE: resolveAccess served them
+   * Diamond, the run-rate counted $39 of revenue that does not exist, and a genuine attempt to buy
+   * was answered "you're already on Diamond". It self-corrected at the next renewal webhook, and not
+   * at all if the subscription had already lapsed.
+   *
+   * Only captured over a real billing record, and never over another grant — overwriting one grant
+   * with another must not bury the billing state the first one saved.
+   */
+  const preGrant =
+    existing && existing.source === 'purchase'
+      ? {
+          tier: existing.tier,
+          status: existing.status,
+          ...(existing.currentPeriodEnd ? { currentPeriodEnd: existing.currentPeriodEnd } : {}),
+        }
+      : undefined;
+
   await writeEntitlement(targetUid, {
     tier,
     source: 'admin',
     status: 'active',
     grantedBy: callerUid,
+    ...(preGrant ? { preGrant } : {}),
   });
   return { message: `${TIER_PLANS[tier].name} granted` };
 }
@@ -155,7 +180,21 @@ async function handleClearTierGrant(targetUid: string) {
   }
 
   if (existing.creemSubscriptionId) {
-    await writeEntitlement(targetUid, { source: 'purchase', grantedBy: '' });
+    /*
+     * Back to what billing actually said, not just back to billing's custody.
+     *
+     * This wrote only source and grantedBy, so the granted tier and the forced status 'active' stayed
+     * — handing the account to billing while still claiming a plan nobody is paying for. preGrant is
+     * what handleSetTier saved for exactly this moment; without it (a grant made before this existed)
+     * the status is at least cleared so the next webhook decides rather than an invented 'active'
+     * standing in for one.
+     */
+    await writeEntitlement(targetUid, {
+      source: 'purchase',
+      grantedBy: '',
+      ...(existing.preGrant ?? {}),
+      preGrant: null,
+    });
     return { message: 'Grant removed — their own subscription applies again' };
   }
 

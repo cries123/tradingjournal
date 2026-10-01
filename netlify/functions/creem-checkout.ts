@@ -123,11 +123,37 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
    */
   const route = planChangeRoute(existing, tier);
 
+  /*
+   * Every route the router can return is answered here.
+   *
+   * 'admin-granted' was not, and fell through to createCheckout at the bottom of this function. The
+   * paid case never got that far — isProtectedGrant answers it above — but a grant of FREE is
+   * deliberately not protected, and it leaves any creemSubscriptionId on the record untouched. So
+   * granting Free to a paying customer, which the admin plan grid offers as an enabled button, left
+   * them one click from buying a SECOND live subscription on top of the one they already had.
+   */
+  if (route.action === 'admin-granted') {
+    return {
+      statusCode: 409,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        error:
+          'Your plan is set by hand on this account, so it cannot be changed from here. Contact support and we will sort it out.',
+      }),
+    };
+  }
+
   if (route.action === 'already-on-it') {
     return {
       statusCode: 409,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: `You're already on ${TIER_PLANS[tier].name}.` }),
+      body: JSON.stringify({
+        // A past_due customer asking for the plan they already have does not need a sale, they need
+        // their card updated — and before this they were sold a second subscription for asking.
+        error: route.needsPayment
+          ? `You already have ${TIER_PLANS[tier].name} — the last payment just didn't go through. Open Manage billing to update your card; buying again would start a second subscription.`
+          : `You're already on ${TIER_PLANS[tier].name}.`,
+      }),
     };
   }
 

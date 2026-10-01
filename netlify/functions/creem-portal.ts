@@ -40,7 +40,17 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
 
   const entitlement = await readEntitlement(uid).catch(() => null);
 
-  if (entitlement?.source === 'admin') {
+  /*
+   * A hand-granted plan with NO Creem customer behind it has nothing to manage. One that does — a
+   * customer who bought a plan and was later given a grant — very much does, and refusing it here was
+   * trapping them: the grant rewrites source to 'admin' and leaves the subscription running, so this
+   * 409 was the end of the only route they had to cancelling a charge that kept arriving.
+   *
+   * Order matters: the customer-id test below now answers the case this one used to swallow, and
+   * canManageBilling in server/entitlements.ts decides the same way so the button and this endpoint
+   * cannot disagree.
+   */
+  if (entitlement?.source === 'admin' && !entitlement.creemCustomerId) {
     return {
       statusCode: 409,
       headers: { 'Content-Type': 'application/json' },

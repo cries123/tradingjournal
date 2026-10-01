@@ -42,6 +42,20 @@ export interface Entitlement {
    * an unlimited supply of them.
    */
   trialStartedAt?: string | null;
+  /**
+   * What billing said before a hand-grant covered it over, so removing the grant can put it back.
+   *
+   * Written by handleSetTier only when it is overwriting a real purchase, and cleared the moment the
+   * grant is removed. Without it, removing a grant left the granted tier recorded as an active
+   * purchase: paid access nobody was paying for, phantom revenue in the run rate, and a refused
+   * checkout for a customer trying to buy the plan they were already being told they had.
+   */
+  preGrant?: {
+    tier: Tier;
+    status: Entitlement['status'];
+    /** Omitted rather than nulled, so restoring it matches the shape writeEntitlement merges. */
+    currentPeriodEnd?: string;
+  } | null;
   updatedAt: string;
 }
 
@@ -133,13 +147,19 @@ export function subscribedTier(e: Entitlement | null): Tier {
  * is free for a past_due customer — so the one person who urgently needs the portal was shown no
  * way to reach it, on the same panel that told them to update their card.
  *
- * The two false cases are deliberately the two that creem-portal itself refuses, so the button and
- * the endpoint behind it cannot disagree: an admin grant has no subscription, and no Creem customer
- * id means Creem has never heard of this account. Status is NOT consulted — past_due and expired
- * both still have a portal, which is the whole point, and a cancelled customer may want an invoice.
+ * The test is ONLY whether Creem has heard of this account. It also required source 'purchase', which
+ * trapped anybody who had bought a plan and was later given a grant by hand: the grant rewrites source
+ * to 'admin' and leaves the subscription untouched, so the billing carried on while the portal link —
+ * the one route to cancelling it — vanished from their account screen. An account with a Creem
+ * customer id has something to manage whatever this app has since written over the top of it.
+ *
+ * Status is not consulted either. past_due and expired both still have a portal, which is the whole
+ * point, and a cancelled customer may still want an invoice.
+ *
+ * creem-portal.ts has to agree with this, or the button reports an error for a living.
  */
 export function canManageBilling(e: Entitlement | null): boolean {
-  return e?.source === 'purchase' && Boolean(e.creemCustomerId);
+  return Boolean(e?.creemCustomerId);
 }
 
 /** When the complimentary access runs out, if it is live. */
@@ -161,6 +181,27 @@ export function readComp(value: unknown): ComplimentaryAccess | null {
   };
 }
 
+const STATUSES = ['active', 'canceled', 'past_due', 'expired'] as const;
+
+/**
+ * A stored pre-grant snapshot, or null for anything that is not one.
+ *
+ * Validated for the same reason readComp is, and with more at stake: clearing a grant writes this
+ * straight back into the live entitlement, so a half-written or hand-edited value would become the
+ * tier and status the account is served from. Anything unrecognised reads as "nothing was saved",
+ * which falls back to clearing the status and letting the next webhook decide.
+ */
+export function readPreGrant(value: unknown): Entitlement['preGrant'] {
+  const p = value as Partial<NonNullable<Entitlement['preGrant']>> | null | undefined;
+  if (!p || !isTier(p.tier)) return null;
+  if (!STATUSES.includes(p.status as (typeof STATUSES)[number])) return null;
+  return {
+    tier: p.tier,
+    status: p.status as Entitlement['status'],
+    ...(typeof p.currentPeriodEnd === 'string' ? { currentPeriodEnd: p.currentPeriodEnd } : {}),
+  };
+}
+
 export async function readEntitlement(uid: string): Promise<Entitlement | null> {
   const snap = await entitlementDoc(uid).get();
   if (!snap.exists) return null;
@@ -171,6 +212,7 @@ export async function readEntitlement(uid: string): Promise<Entitlement | null> 
     ...data,
     tier: data.tier,
     comp: readComp(data.comp),
+    preGrant: readPreGrant(data.preGrant),
     trialStartedAt: typeof data.trialStartedAt === 'string' ? data.trialStartedAt : null,
   } as Entitlement;
 }

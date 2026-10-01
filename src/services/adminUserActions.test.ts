@@ -220,6 +220,79 @@ describe('removing a manual grant', () => {
     await call({ action: 'clearTierGrant' });
     expect(store.has(`entitlements/${TARGET}`)).toBe(false);
   });
+
+  it('hands a real subscription back at the tier they actually pay for', async () => {
+    /*
+     * The case this block never covered, and the bug it hid. Removing a grant wrote only source and
+     * grantedBy, so the GRANTED tier and the forced status 'active' stayed behind — a Silver customer
+     * granted Diamond and then un-granted read as an active Diamond purchase. resolveAccess served
+     * Diamond, the admin run-rate counted $39 of revenue nobody pays, and a genuine attempt to buy
+     * Silver was answered "you're already on Diamond".
+     *
+     * handleSetTier now snapshots what billing said; this is the round trip.
+     */
+    store.set(`entitlements/${TARGET}`, {
+      tier: 'silver',
+      source: 'purchase',
+      status: 'active',
+      creemSubscriptionId: 'sub_123',
+      currentPeriodEnd: '2026-11-01T00:00:00.000Z',
+    });
+
+    await call({ action: 'setTier', tier: 'diamond' });
+    const granted = store.get(`entitlements/${TARGET}`) as Record<string, unknown>;
+    expect(granted.tier).toBe('diamond');
+    expect(granted.source).toBe('admin');
+    expect(granted.preGrant).toMatchObject({ tier: 'silver', status: 'active' });
+
+    const res = await call({ action: 'clearTierGrant' });
+    expect(res.statusCode).toBe(200);
+
+    const restored = store.get(`entitlements/${TARGET}`) as Record<string, unknown>;
+    expect(restored.tier).toBe('silver');
+    expect(restored.status).toBe('active');
+    expect(restored.source).toBe('purchase');
+    expect(restored.currentPeriodEnd).toBe('2026-11-01T00:00:00.000Z');
+    // Cleared, so a second grant-and-clear cannot restore a snapshot from the first one.
+    expect(restored.preGrant).toBeNull();
+  });
+
+  it('does not bury the billing snapshot when one grant replaces another', async () => {
+    // Granting twice must keep the ORIGINAL billing state, not overwrite it with the first grant.
+    store.set(`entitlements/${TARGET}`, {
+      tier: 'silver',
+      source: 'purchase',
+      status: 'past_due',
+      creemSubscriptionId: 'sub_123',
+    });
+
+    await call({ action: 'setTier', tier: 'gold' });
+    await call({ action: 'setTier', tier: 'diamond' });
+    await call({ action: 'clearTierGrant' });
+
+    const restored = store.get(`entitlements/${TARGET}`) as Record<string, unknown>;
+    expect(restored.tier).toBe('silver');
+    expect(restored.status).toBe('past_due');
+  });
+
+  it('clears an invented status when there is no snapshot to restore', async () => {
+    /*
+     * A grant made before the snapshot existed. The granted tier cannot be undone, but the forced
+     * 'active' can be, so the next webhook decides the status instead of a value this app made up.
+     */
+    store.set(`entitlements/${TARGET}`, {
+      tier: 'diamond',
+      source: 'admin',
+      status: 'active',
+      creemSubscriptionId: 'sub_123',
+    });
+
+    await call({ action: 'clearTierGrant' });
+
+    const restored = store.get(`entitlements/${TARGET}`) as Record<string, unknown>;
+    expect(restored.source).toBe('purchase');
+    expect(restored.preGrant).toBeNull();
+  });
 });
 
 describe("today's allowance and the bank", () => {
