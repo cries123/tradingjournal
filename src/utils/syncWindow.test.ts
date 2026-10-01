@@ -23,7 +23,7 @@ const trade = (over: Partial<Trade> = {}): Trade =>
     date: '2026-09-20',
     symbol: 'SPY',
     pnl: 10,
-    accountId: 'schwab',
+    id: `snaptrade_schwab_${seq++}_0`,
     sourceId: `snaptrade:o${seq}:c${seq}`,
     ...over,
   }) as Trade;
@@ -39,7 +39,7 @@ describe('syncStartDate', () => {
 
   it('asks for everything when this account has nothing imported yet', () => {
     // Another account's trades say nothing about this one.
-    const other = [trade({ accountId: 'robinhood' })];
+    const other = [trade({ id: `snaptrade_robinhood_${seq++}_0` })];
     expect(syncStartDate(other, 'schwab', TODAY)).toBeUndefined();
   });
 
@@ -82,17 +82,37 @@ describe('syncStartDate', () => {
 
   it('counts only this account, so a busy second broker cannot narrow a quiet one', () => {
     const held = [
-      trade({ accountId: 'robinhood', date: '2026-09-29' }),
-      trade({ accountId: 'schwab', date: '2026-07-01' }),
+      trade({ id: `snaptrade_robinhood_${seq++}_0`, date: '2026-09-29' }),
+      trade({ id: `snaptrade_schwab_${seq++}_0`, date: '2026-07-01' }),
     ];
 
     expect(syncStartDate(held, 'schwab', TODAY)).toBe('2026-06-17');
   });
 
-  it('treats a missing accountId as the legacy journal', () => {
-    // Trades predate journals; resolveTradeAccountId maps a missing id onto 'default'.
-    const held = [trade({ accountId: undefined, date: '2026-09-20' })];
-    expect(syncStartDate(held, 'default', TODAY)).toBe('2026-09-06');
+  it('does not match a journal id against a brokerage account id', () => {
+    /*
+     * The regression test for how this shipped broken.
+     *
+     * The first version compared trade.accountId to the id handed to a sync. But accountId is the
+     * JOURNAL a trade was filed into — addTrades defaults it to settings.activeAccountId — while
+     * the sync is given SnapTrade's account id. The two never matched, so this returned undefined
+     * every time and every sync went on pulling the entire history. Ten tests passed, because they
+     * used the same string on both sides of a comparison that is never the same string in life.
+     *
+     * The brokerage account survives onto the trade only in its document id.
+     */
+    const filedInAJournal = [
+      { id: 'abc', accountId: 'schwab-journal', date: '2026-09-20', symbol: 'SPY', pnl: 1, sourceId: 'snaptrade:a:b' },
+    ] as unknown as Trade[];
+
+    expect(syncStartDate(filedInAJournal, 'schwab-journal', TODAY)).toBeUndefined();
+  });
+
+  it('ignores a trade imported before the id scheme rather than guessing', () => {
+    // Falls back to a full pull, which is the safe direction: a window built on a trade we cannot
+    // attribute to this connection could skip real fills.
+    const held = [trade({ id: 'legacy-1', date: '2026-09-20' })];
+    expect(syncStartDate(held, 'schwab', TODAY)).toBeUndefined();
   });
 
   it('never asks for a start date in the future', () => {

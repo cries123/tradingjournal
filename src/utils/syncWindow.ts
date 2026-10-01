@@ -1,6 +1,5 @@
 import type { Trade } from '../types';
 import { isBrokerVerified } from './trackRecord';
-import { resolveTradeAccountId } from './accounts';
 
 /**
  * How far back a sync needs to ask the broker to look.
@@ -38,6 +37,23 @@ function toKey(date: Date): string {
 }
 
 /**
+ * Trades this brokerage account imported, identified by the id the importer stamps on them.
+ *
+ * The obvious field is the wrong one, and using it shipped a fix that did nothing. A trade’s
+ * `accountId` is the JOURNAL it was filed into — addTrades defaults it to settings.activeAccountId
+ * — while the id handed to a sync is SnapTrade’s account id. Comparing the two never matched, so
+ * this returned undefined every time and every sync went on pulling the whole history.
+ *
+ * The importer writes `snaptrade_<accountId>_<stamp>_<i>` as the document id, which is the only
+ * place the brokerage account survives onto the trade. Matching on it keeps the window per
+ * connection: two brokers importing into one journal must not narrow each other, or a quiet
+ * account inherits a busy one’s window and silently stops fetching its own history.
+ */
+function belongsToAccount(trade: Trade, snaptradeAccountId: string): boolean {
+  return typeof trade.id === 'string' && trade.id.startsWith(`snaptrade_${snaptradeAccountId}_`);
+}
+
+/**
  * The start date for a sync of one account, or undefined to pull everything.
  *
  * Undefined is the right answer more often than it looks: a first sync, a newly connected account,
@@ -50,6 +66,7 @@ function toKey(date: Date): string {
  */
 export function syncStartDate(
   existingTrades: Trade[],
+  /** SnapTrade’s account id — the one passed to the sync, not the journal id. */
   accountId: string,
   today: Date,
   overlapDays = OVERLAP_DAYS,
@@ -58,7 +75,7 @@ export function syncStartDate(
 
   for (const trade of existingTrades) {
     if (!isBrokerVerified(trade)) continue;
-    if (resolveTradeAccountId(trade.accountId) !== accountId) continue;
+    if (!belongsToAccount(trade, accountId)) continue;
 
     const date = trade.date;
     if (typeof date !== 'string' || date.length < 10) continue;
