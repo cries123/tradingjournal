@@ -2,12 +2,15 @@ import { AlertTriangle, Receipt, TrendingDown } from 'lucide-react';
 import { TIER_PLANS, PAID_TIERS } from '../../config/tiers';
 import { worstCaseMonthlyCost } from '../../config/costs';
 import type { CostReport } from '../../services/adminCosts';
+import { AdminUserRef } from './AdminUserRef';
 
 interface CostsPanelProps {
   report: CostReport | null;
   error: string | null;
   /** The report comes from a Netlify function, so it lands after the panel does. */
   loading: boolean;
+  onOpenUser?: (uid: string) => void;
+  canOpenUser?: (uid: string) => boolean;
 }
 
 function money(value: number): string {
@@ -33,10 +36,10 @@ function monthLabel(month: string): string {
  * to real counts, not a reconciliation of invoices, and the moment somebody forgets that they will
  * make a pricing decision against a number that was never a bill.
  */
-export function CostsPanel({ report, error, loading }: CostsPanelProps) {
+export function CostsPanel({ report, error, loading, onOpenUser, canOpenUser }: CostsPanelProps) {
   if (loading && !report && !error) {
     return (
-      <div className="glass-card rounded-xl p-8 text-center text-sm text-text-secondary">
+      <div className="panel-card rounded-xl p-8 text-center text-sm text-text-secondary">
         Working out the running costs…
       </div>
     );
@@ -44,7 +47,7 @@ export function CostsPanel({ report, error, loading }: CostsPanelProps) {
 
   if (error || !report) {
     return (
-      <div className="glass-card rounded-xl p-8 text-center text-sm text-text-secondary">
+      <div className="panel-card rounded-xl p-8 text-center text-sm text-text-secondary">
         {error ?? 'No cost data yet.'}
       </div>
     );
@@ -95,7 +98,7 @@ export function CostsPanel({ report, error, loading }: CostsPanelProps) {
             note: `${report.subscribers} paid subscriber${report.subscribers === 1 ? '' : 's'}`,
           },
         ].map((tile) => (
-          <div key={tile.label} className="glass-card rounded-xl p-4">
+          <div key={tile.label} className="panel-card rounded-xl p-4">
             <p className="text-[10px] uppercase tracking-wider text-text-secondary">{tile.label}</p>
             <p className={`text-xl font-bold tabular-nums mt-1 ${tile.tone}`}>{tile.value}</p>
             <p className="text-[10px] text-text-secondary mt-0.5">{tile.note}</p>
@@ -112,16 +115,36 @@ export function CostsPanel({ report, error, loading }: CostsPanelProps) {
       </p>
 
       {/* Month by month */}
-      <div className="glass-card rounded-xl overflow-hidden">
+      <div className="panel-card rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
+            {/*
+              Two header rows, because the columns are two different things.
+
+              There were ten columns in one row, and two of them were both called "Syncs" — one a
+              count of syncs, one the dollars those syncs cost. "AI msgs" and "AI" were the same
+              split. Nothing said where the counts stopped and the money began, so reading a row
+              meant counting columns across to work out which "Syncs" you were looking at.
+
+              A grouping row is the smallest fix that says it: it labels the two halves once, and
+              the per-column headers underneath stop having to carry the distinction alone.
+            */}
             <thead>
+              <tr className="text-[10px] uppercase tracking-widest text-text-secondary/70 border-b border-border/40">
+                <th className="px-4 py-1.5" />
+                <th className="text-right font-semibold px-3 py-1.5" colSpan={3}>
+                  How much was used
+                </th>
+                <th className="text-right font-semibold px-3 py-1.5 border-l border-border/40" colSpan={6}>
+                  What it cost, and what came in
+                </th>
+              </tr>
               <tr className="text-[10px] uppercase tracking-wider text-text-secondary border-b border-border/60">
                 <th className="text-left font-medium px-4 py-2.5">Month</th>
                 <th className="text-right font-medium px-3 py-2.5">AI msgs</th>
                 <th className="text-right font-medium px-3 py-2.5">Syncs</th>
                 <th className="text-right font-medium px-3 py-2.5">Users</th>
-                <th className="text-right font-medium px-3 py-2.5">AI</th>
+                <th className="text-right font-medium px-3 py-2.5 border-l border-border/40">AI</th>
                 <th className="text-right font-medium px-3 py-2.5">Syncs</th>
                 <th className="text-right font-medium px-3 py-2.5">SnapTrade</th>
                 <th className="text-right font-medium px-3 py-2.5">Fees</th>
@@ -179,16 +202,18 @@ export function CostsPanel({ report, error, loading }: CostsPanelProps) {
           tiers never appear here — nobody paid for one.
         </p>
         {report.purchases.length === 0 ? (
-          <div className="glass-card rounded-xl p-6 text-center text-xs text-text-secondary">
+          <div className="panel-card rounded-xl p-6 text-center text-xs text-text-secondary">
             No payments recorded yet. Sales made before the ledger existed are not in here.
           </div>
         ) : (
-          <div className="glass-card rounded-xl divide-y divide-border/30">
+          <div className="panel-card rounded-xl divide-y divide-border/30">
             {report.purchases.map((p) => (
               <div key={`${p.uid}-${p.at}`} className="flex items-center gap-3 px-4 py-2.5 text-xs">
                 <Receipt size={13} className="text-emerald-400 shrink-0" />
                 <span className="truncate flex-1 min-w-0">
-                  {p.email || <span className="font-mono text-text-secondary">{p.uid}</span>}
+                  <AdminUserRef uid={p.uid} onOpen={onOpenUser} canOpen={canOpenUser}>
+                    {p.email || <span className="font-mono text-text-secondary">{p.uid}</span>}
+                  </AdminUserRef>
                 </span>
                 <span className="uppercase tracking-wide text-text-secondary shrink-0">
                   {p.tier}
@@ -218,7 +243,7 @@ export function CostsPanel({ report, error, loading }: CostsPanelProps) {
             const worst = worstCaseMonthlyCost(plan, report.rates);
             const margin = plan.price - worst.total;
             return (
-              <div key={tier} className="glass-card rounded-xl p-4">
+              <div key={tier} className="panel-card rounded-xl p-4">
                 <div className="flex items-baseline justify-between mb-2">
                   <p className="text-sm font-semibold">{plan.name}</p>
                   <p className="text-xs text-text-secondary tabular-nums">${plan.price}/mo</p>
@@ -268,11 +293,15 @@ export function CostsPanel({ report, error, loading }: CostsPanelProps) {
             Across every month read live this visit. Cached months are not included, so this is
             recent activity rather than all time.
           </p>
-          <div className="glass-card rounded-xl divide-y divide-border/30">
+          <div className="panel-card rounded-xl divide-y divide-border/30">
             {report.topUsers.map((u) => (
               <div key={u.uid} className="flex items-center gap-3 px-4 py-2.5 text-xs">
                 <TrendingDown size={13} className="text-text-secondary shrink-0" />
-                <span className="font-mono text-text-secondary truncate flex-1">{u.uid}</span>
+                <span className="font-mono text-text-secondary truncate flex-1">
+                  <AdminUserRef uid={u.uid} onOpen={onOpenUser} canOpen={canOpenUser}>
+                    {u.uid}
+                  </AdminUserRef>
+                </span>
                 <span className="text-text-secondary tabular-nums shrink-0">
                   {u.aiMessages} msgs · {u.syncs} syncs
                 </span>

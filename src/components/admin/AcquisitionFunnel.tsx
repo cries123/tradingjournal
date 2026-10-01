@@ -48,7 +48,7 @@ export function AcquisitionFunnel({
 }: AcquisitionFunnelProps) {
   if (loading) {
     return (
-      <div className="glass-card rounded-xl p-8 text-center text-sm text-text-secondary">
+      <div className="panel-card rounded-xl p-8 text-center text-sm text-text-secondary">
         Counting visitors…
       </div>
     );
@@ -97,7 +97,7 @@ export function AcquisitionFunnel({
   const widthBase = Math.max(1, visitors.uniqueVisitors, annualSignups);
 
   return (
-    <div className="glass-card rounded-xl p-5 md:p-6 mb-8">
+    <div className="panel-card rounded-xl p-5 md:p-6 mb-8">
       <div className="flex flex-wrap items-start justify-between gap-2 mb-1">
         <div>
           <h2 className="text-sm font-semibold">Acquisition funnel</h2>

@@ -97,7 +97,7 @@ export function BrokerStatusPanel({ adminUid }: BrokerStatusPanelProps) {
           const overridden = Boolean(overrides[entry.key]);
 
           return (
-            <article key={entry.key} className="glass-card rounded-xl p-4">
+            <article key={entry.key} className="panel-card rounded-xl p-4">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <div className="flex items-center gap-2">
                   {live?.kind === 'down' ? (

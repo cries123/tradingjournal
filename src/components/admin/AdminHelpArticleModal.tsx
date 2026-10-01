@@ -113,7 +113,7 @@ export function AdminHelpArticleModal({
         onClick={onClose}
       >
         <div
-          className="glass-card rounded-xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto"
+          className="panel-card rounded-xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-start justify-between gap-3 mb-5">

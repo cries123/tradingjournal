@@ -31,7 +31,7 @@ interface BrokerAdoptionPanelProps {
 export function BrokerAdoptionPanel({ serverStats, serverError, loading = false }: BrokerAdoptionPanelProps) {
   if (!serverStats) {
     return (
-      <div className="glass-card rounded-xl p-5 md:p-6">
+      <div className="panel-card rounded-xl p-5 md:p-6">
         <div className="flex items-center gap-2 mb-3">
           <Link2 size={16} className="text-amber-400" />
           <h2 className="text-sm font-semibold">Broker connections</h2>
@@ -57,7 +57,7 @@ export function BrokerAdoptionPanel({ serverStats, serverError, loading = false 
   const maxInstitution = Math.max(1, ...brokerInstitutions.map((b) => b.users));
 
   return (
-    <div className="glass-card rounded-xl p-5 md:p-6">
+    <div className="panel-card rounded-xl p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
         <div className="flex items-center gap-2">
           <Link2 size={16} className="text-amber-400" />

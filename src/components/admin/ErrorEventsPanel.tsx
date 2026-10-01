@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { AlertTriangle, Check, ChevronDown, ChevronRight, EyeOff, RotateCcw } from 'lucide-react';
 import type { ErrorEvent, ErrorStatus } from '../../services/errorEvents';
+import { AdminUserRef } from './AdminUserRef';
 
 interface ErrorEventsPanelProps {
   events: ErrorEvent[];
   droppedToday: number;
   busyId: string | null;
   onStatusChange: (id: string, status: ErrorStatus) => void;
+  onOpenUser?: (uid: string) => void;
+  canOpenUser?: (uid: string) => boolean;
 }
 
 /**
@@ -66,17 +69,21 @@ function ErrorRow({
   event,
   busy,
   onStatusChange,
+  onOpenUser,
+  canOpenUser,
 }: {
   event: ErrorEvent;
   busy: boolean;
   onStatusChange: (id: string, status: ErrorStatus) => void;
+  onOpenUser?: (uid: string) => void;
+  canOpenUser?: (uid: string) => boolean;
 }) {
   const [open, setOpen] = useState(false);
   const dimmed = event.status !== 'open';
 
   return (
     <article
-      className={`glass-card rounded-xl overflow-hidden transition-opacity ${dimmed ? 'opacity-55' : ''}`}
+      className={`panel-card rounded-xl overflow-hidden transition-opacity ${dimmed ? 'opacity-55' : ''}`}
     >
       <button
         type="button"
@@ -155,9 +162,16 @@ function ErrorRow({
             )}
 
             {event.affectedUids.length > 0 && (
-              <p className="text-xs text-text-secondary break-all">
+              <p className="text-xs text-text-secondary break-all flex flex-wrap items-baseline gap-x-1.5 gap-y-1">
                 <span className="font-medium text-text-primary">Affected uids: </span>
-                {event.affectedUids.join(', ')}
+                {event.affectedUids.map((uid, i) => (
+                  <span key={uid} className="font-mono">
+                    <AdminUserRef uid={uid} onOpen={onOpenUser} canOpen={canOpenUser}>
+                      {uid}
+                    </AdminUserRef>
+                    {i < event.affectedUids.length - 1 ? ',' : ''}
+                  </span>
+                ))}
               </p>
             )}
 
@@ -209,6 +223,8 @@ export function ErrorEventsPanel({
   droppedToday,
   busyId,
   onStatusChange,
+  onOpenUser,
+  canOpenUser,
 }: ErrorEventsPanelProps) {
   const [showHandled, setShowHandled] = useState(false);
 
@@ -246,7 +262,7 @@ export function ErrorEventsPanel({
       )}
 
       {visible.length === 0 ? (
-        <div className="glass-card rounded-xl p-8 text-center text-text-secondary text-sm">
+        <div className="panel-card rounded-xl p-8 text-center text-text-secondary text-sm">
           {events.length === 0
             ? 'No errors reported. This is what it should say.'
             : 'Nothing open — everything reported has been fixed or ignored.'}
@@ -259,6 +275,8 @@ export function ErrorEventsPanel({
               event={event}
               busy={busyId === event.id}
               onStatusChange={onStatusChange}
+              onOpenUser={onOpenUser}
+              canOpenUser={canOpenUser}
             />
           ))}
         </div>

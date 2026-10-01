@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Clock, Send, User } from 'lucide-react';
 import { reportErrorSilently } from '../../services/errorReporting';
+import { AdminUserRef } from './AdminUserRef';
 import {
   markTicketRead,
   MAX_MESSAGE_LENGTH,
@@ -19,6 +20,8 @@ interface SupportTicketsPanelProps {
   busyId: string | null;
   onStatusChange: (ticketId: string, status: TicketStatus, subject: string) => void;
   onReplied: (ticketId: string) => void;
+  onOpenUser?: (uid: string) => void;
+  canOpenUser?: (uid: string) => boolean;
 }
 
 /**
@@ -156,6 +159,8 @@ export function SupportTicketsPanel({
   busyId,
   onStatusChange,
   onReplied,
+  onOpenUser,
+  canOpenUser,
 }: SupportTicketsPanelProps) {
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -169,7 +174,7 @@ export function SupportTicketsPanel({
 
   if (ordered.length === 0) {
     return (
-      <div className="glass-card rounded-xl p-8 text-center text-text-secondary text-sm">
+      <div className="panel-card rounded-xl p-8 text-center text-text-secondary text-sm">
         No support tickets yet.
       </div>
     );
@@ -185,14 +190,21 @@ export function SupportTicketsPanel({
         return (
           <article
             key={ticket.id}
-            className={`glass-card rounded-xl p-5 ${stale ? 'ring-1 ring-amber-500/40' : ''}`}
+            className={`panel-card rounded-xl p-5 ${stale ? 'ring-1 ring-amber-500/40' : ''}`}
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
+              {/*
+                * The identity line is a sibling of the expand button rather than inside it: the
+                * name is its own control now, and a button inside a button is invalid markup the
+                * browser silently un-nests. Subject and preview stayed in the expand target, so the
+                * metadata line moved below them.
+                */}
+              <div className="min-w-0 flex-1">
               <button
                 type="button"
                 onClick={() => setOpenId(open ? null : ticket.id)}
                 aria-expanded={open}
-                className="text-left min-w-0 flex-1 focus-ring rounded"
+                className="text-left w-full focus-ring rounded"
               >
                 <div className="flex flex-wrap items-center gap-2 mb-1">
                   {ticket.unreadForSupport && (
@@ -220,16 +232,6 @@ export function SupportTicketsPanel({
 
                 <p className="text-sm font-semibold truncate">{ticket.subject}</p>
 
-                <p className="text-xs text-text-secondary mt-1 flex items-center gap-1.5 flex-wrap">
-                  <User size={11} />
-                  {ticket.email}
-                  {ticket.username ? ` (@${ticket.username})` : ''}
-                  {' · '}
-                  {ticket.messageCount} message{ticket.messageCount === 1 ? '' : 's'}
-                  {' · last '}
-                  {formatWhen(ticket.lastMessageAt)}
-                </p>
-
                 {!open && (
                   <p className="text-xs text-text-secondary mt-1.5 line-clamp-1">
                     {ticket.lastMessageFrom === 'support' ? 'You: ' : 'Them: '}
@@ -237,6 +239,19 @@ export function SupportTicketsPanel({
                   </p>
                 )}
               </button>
+
+              <p className="text-xs text-text-secondary mt-1.5 flex items-center gap-1.5 flex-wrap">
+                <User size={11} />
+                <AdminUserRef uid={ticket.uid} onOpen={onOpenUser} canOpen={canOpenUser}>
+                  {ticket.email}
+                  {ticket.username ? ` (@${ticket.username})` : ''}
+                </AdminUserRef>
+                {' · '}
+                {ticket.messageCount} message{ticket.messageCount === 1 ? '' : 's'}
+                {' · last '}
+                {formatWhen(ticket.lastMessageAt)}
+              </p>
+              </div>
 
               <select
                 value={ticket.status}

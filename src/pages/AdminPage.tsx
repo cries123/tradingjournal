@@ -279,7 +279,16 @@ function PrioritySelect({
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value as AdminPriority)}
-      className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 border-0 cursor-pointer ${priorityBadgeClass(value)}`}
+      /*
+       * 16px on a phone, 10px from md up.
+       *
+       * index.css forces 16px on select.input-field below 768px because iOS Safari zooms the page in
+       * on any control under 16px and never zooms back out. This is a raw select, so that rule never
+       * reached it — and it is the priority control, which is routine triage. The `input-field` class
+       * itself is not an option here: it would flatten the pill, and the pill's colour is the thing
+       * being read. py-1.5 takes the target from roughly 18px to something a thumb can hit.
+       */
+      className={`text-[16px] md:text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-1.5 md:py-0.5 border-0 cursor-pointer ${priorityBadgeClass(value)}`}
       aria-label="Set priority"
     >
       <option value="low">Low priority</option>
@@ -540,14 +549,35 @@ function AdminTabBar({
     return null;
   };
 
+  /*
+   * Sticky, and it scrolls the active tab into view.
+   *
+   * Seven tabs do not fit a 375px phone — Costs and Content sit off the right edge, so two of the
+   * seven were only reachable by a horizontal swipe nobody signals. Worse, "Review →" in the
+   * attention banner switches tab without moving the strip, so the tab you just landed on could be
+   * off-screen while its panel was on it.
+   *
+   * scrollIntoView on the active button fixes the second; sticky keeps the nav reachable once a long
+   * queue has been scrolled, which is the state it is most wanted in.
+   *
+   * Near-opaque rather than blurred: a backdrop-filter here would make this the containing block for
+   * any fixed-position descendant, which is the bug that has already bitten this panel twice.
+   */
+  const activeRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [tab]);
+
   return (
-    <div className="flex items-center gap-1 border-b border-border/60 mb-6 overflow-x-auto">
+    <div className="sticky top-0 z-20 flex items-center gap-1 border-b border-border/60 mb-6 overflow-x-auto bg-bg-primary/95">
       {ADMIN_TABS.map((t) => {
         const active = t.id === tab;
         const badge = badgeFor(t.id);
         return (
           <button
             key={t.id}
+            ref={active ? activeRef : undefined}
             type="button"
             onClick={() => onChange(t.id)}
             aria-current={active ? 'page' : undefined}
@@ -733,6 +763,8 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
   const { user, username, loading, firebaseEnabled, logout } = useAuth();
   const [state, setState] = useState<AdminState>({ phase: 'loading', step: 'access' });
   const [tab, setTab] = useState<AdminTab>('overview');
+  /** Busy state for a silent refresh, which leaves the panel on screen rather than replacing it. */
+  const [refreshing, setRefreshing] = useState(false);
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   /** The last admin mutation that failed, named. Cleared when the next one starts. */
   const [actionError, setActionError] = useState<string | null>(null);
@@ -755,7 +787,16 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
 
   const loadToken = useRef(0);
 
-  const loadAdmin = useCallback(async () => {
+  /*
+   * A silent load keeps what is already on screen while the data is refetched.
+   *
+   * Refresh used to drop the whole panel to a single line of text — every tab, count and banner
+   * gone — and the first copy it showed was "Checking access…", which reads as being locked out
+   * rather than as waiting. The AdminState comment above already says that about this exact string.
+   * Keeping the stale data visible costs nothing: the first wave replaces the whole state object
+   * when it lands anyway, and a denial still takes over the screen from inside a silent run.
+   */
+  const loadAdmin = useCallback(async (silent = false) => {
     const token = ++loadToken.current;
     const isCurrent = () => loadToken.current === token;
 
@@ -774,7 +815,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
       return;
     }
 
-    setState({ phase: 'loading', step: 'access' });
+    if (!silent) setState({ phase: 'loading', step: 'access' });
 
     let access: AdminAccessResult;
     try {
@@ -791,7 +832,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
       return;
     }
 
-    setState({ phase: 'loading', step: 'data' });
+    if (!silent) setState({ phase: 'loading', step: 'data' });
 
     try {
       // First wave: the reads the panel is made of. All of these are Firestore, and none of them
@@ -1274,6 +1315,30 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
   );
 
   /*
+   * Support tickets, error events and the costs breakdown all name a person. Each one used to leave
+   * the reader to copy the uid, switch to Users, paste it into the search box and click the row —
+   * for the single most common next question in all three panels. The detail modal renders at page
+   * level, so opening it from another tab needs nothing but the summary.
+   *
+   * canOpenUser is the other half: tickets and errors outlive the account that filed them, and a
+   * name that cannot be opened stays plain text instead of becoming a button that does nothing.
+   */
+  const userByUid = useMemo(
+    () => new Map((ready?.users ?? []).map((u) => [u.uid, u])),
+    [ready?.users],
+  );
+
+  const openUserByUid = useCallback(
+    (uid: string) => {
+      const found = userByUid.get(uid);
+      if (found) setSelectedUser(found);
+    },
+    [userByUid],
+  );
+
+  const canOpenUserByUid = useCallback((uid: string) => userByUid.has(uid), [userByUid]);
+
+  /*
    * Who actually has a brokerage linked, keyed by uid.
    *
    * The stats endpoint already asks SnapTrade this to produce the "Connected a broker" total, and
@@ -1428,20 +1493,20 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         )}
 
         {state.phase === 'unavailable' && (
-          <div className="glass-card rounded-xl p-6 text-sm text-text-secondary">
+          <div className="panel-card rounded-xl p-6 text-sm text-text-secondary">
             Admin panel is unavailable — Firebase is not configured for this environment.
           </div>
         )}
 
         {state.phase === 'auth-required' && (
-          <div className="glass-card rounded-xl p-6 text-sm text-text-secondary">
+          <div className="panel-card rounded-xl p-6 text-sm text-text-secondary">
             Sign in to access the admin panel. The first account to sign in here becomes the site
             administrator.
           </div>
         )}
 
         {state.phase === 'denied' && (
-          <div className="glass-card rounded-xl p-8 text-center max-w-lg">
+          <div className="panel-card rounded-xl p-8 text-center max-w-lg">
             <Lock size={36} className="mx-auto text-red-400 mb-4" />
             <h2 className="text-xl font-semibold mb-2">Access denied</h2>
             <p className="text-text-secondary text-sm mb-6">
@@ -1468,9 +1533,15 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
             {/* One header bar: who you are, what build is live, and the utilities. Export used to
                 be a panel of its own, competing for attention with the data it exports. */}
             <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+              {/*
+                Who is signed in, not a second title.
+
+                This said "Admin" again, in a second <h1>, fifty pixels under the one at the top of
+                the page — so the word appeared twice at two sizes, and on a phone the first screen
+                was mostly chrome before any content. The identity line was always the useful part.
+              */}
               <div className="min-w-0">
-                <h1 className="text-lg font-semibold tracking-tight">Admin</h1>
-                <p className="text-text-secondary text-xs mt-0.5 truncate">
+                <p className="text-sm font-medium text-text-primary truncate">
                   {user?.email}
                   {username ? ` (@${username})` : ''}
                 </p>
@@ -1491,11 +1562,17 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                 />
                 <button
                   type="button"
-                  onClick={() => void loadAdmin()}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary hover:border-emerald-400/40 transition-colors focus-ring"
+                  disabled={refreshing}
+                  onClick={() => {
+                    // Silent: the panel stays on screen and the icon carries the busy state, rather
+                    // than the whole thing being replaced by "Checking access…" for a second.
+                    setRefreshing(true);
+                    void loadAdmin(true).finally(() => setRefreshing(false));
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary hover:border-emerald-400/40 transition-colors focus-ring disabled:opacity-60"
                 >
-                  <RefreshCw size={13} />
-                  Refresh
+                  <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
+                  {refreshing ? 'Refreshing…' : 'Refresh'}
                 </button>
               </div>
             </div>
@@ -1541,8 +1618,44 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
             {tab === 'overview' && (
               <>
 
+              {/*
+                The card when the check has not answered — not nothing.
+
+                `ready.health` is null both while the request is in flight and when it failed or timed
+                out, and this block was its only renderer. So the first seconds of every visit, and
+                every failure, looked exactly like a healthy system: Overview jumped from the header
+                to the growth charts. NeedsAttention is computed from the same null, so it could not
+                raise an outage either — the one screen whose job is "is anything on fire" answered
+                "no" by staying silent.
+              */}
+              {!ready.health && (
+                <div className="panel-card rounded-xl p-4 md:p-5 mb-6">
+                  <div className="flex items-center gap-1.5 mb-3">
+                    <History size={13} className="text-text-secondary" />
+                    <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                      System health
+                    </p>
+                  </div>
+                  {ready.extras === 'loading' ? (
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                      {['api', 'broker', 'payments', 'mail'].map((key) => (
+                        <div
+                          key={key}
+                          className="h-[42px] rounded-lg bg-bg-tertiary/30 border border-border/40 skeleton-shimmer"
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-amber-300 rounded-lg border border-amber-400/30 bg-amber-400/5 px-3 py-2">
+                      The health check did not answer. This says nothing about whether the services
+                      are up — it means we could not ask.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {ready.health && (
-                <div className="glass-card rounded-xl p-4 md:p-5 mb-6">
+                <div className="panel-card rounded-xl p-4 md:p-5 mb-6">
                   <div className="flex items-center gap-1.5 mb-3">
                     <History size={13} className="text-text-secondary" />
                     <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
@@ -1690,7 +1803,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
               </div>
 
               <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <div className="glass-card rounded-xl p-5 md:p-6">
+                <div className="panel-card rounded-xl p-5 md:p-6">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
                       <Eye size={18} />
@@ -1725,7 +1838,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                   )}
                 </div>
 
-                <div className="glass-card rounded-xl p-5 md:p-6">
+                <div className="panel-card rounded-xl p-5 md:p-6">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
                       <Users size={18} />
@@ -1754,7 +1867,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                   )}
                 </div>
 
-                <div className="glass-card rounded-xl p-5 md:p-6">
+                <div className="panel-card rounded-xl p-5 md:p-6">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
                       <ShieldCheck size={18} />
@@ -1770,7 +1883,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                   </p>
                 </div>
 
-                <div className="glass-card rounded-xl p-5 md:p-6 sm:col-span-2 lg:col-span-1">
+                <div className="panel-card rounded-xl p-5 md:p-6 sm:col-span-2 lg:col-span-1">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
                       <Building2 size={18} />
@@ -1800,7 +1913,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
               </div>
 
               {platformStats && (
-                <div className="glass-card rounded-xl p-5 md:p-6 mb-8">
+                <div className="panel-card rounded-xl p-5 md:p-6 mb-8">
                   <div className="flex items-center gap-2 mb-4">
                     <BarChart3 size={16} className="text-emerald-400" />
                     <div>
@@ -1859,7 +1972,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                     two stacked panels called "Recent activity" and "Recent admin activity" —
                     adjacent, near-identical names, entirely different data. */}
                 <div className="grid md:grid-cols-2 gap-4 mb-8">
-                <div className="glass-card rounded-xl p-5 md:p-6">
+                <div className="panel-card rounded-xl p-5 md:p-6">
                   <div className="flex items-center gap-2 mb-4">
                     <Activity size={16} className="text-emerald-400" />
                     <h2 className="text-sm font-semibold text-text-primary">Site activity</h2>
@@ -1872,7 +1985,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                     ))}</ul>
                   )}
                 </div>
-              <div className="glass-card rounded-xl p-5 md:p-6">
+              <div className="panel-card rounded-xl p-5 md:p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <ScrollText size={16} className="text-emerald-400" />
                   <h2 className="text-sm font-semibold text-text-primary">Your recent actions</h2>
@@ -1895,7 +2008,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
             )}
 
             {tab === 'users' && (
-              <div className="glass-card rounded-xl p-5 md:p-6 mb-8">
+              <div className="panel-card rounded-xl p-5 md:p-6 mb-8">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                   <div className="flex items-center gap-2">
                     <Users size={16} className="text-emerald-400" />
@@ -2087,12 +2200,20 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                   busyId={updatingKey?.startsWith('ticket:') ? updatingKey.slice('ticket:'.length) : null}
                   onStatusChange={(id, status, subject) => void handleTicketStatusChange(id, status, subject)}
                   onReplied={handleTicketReplied}
+                  onOpenUser={openUserByUid}
+                  canOpenUser={canOpenUserByUid}
                 />
               </>
             )}
 
             {tab === 'costs' && (
-              <CostsPanel report={ready.costs} error={ready.costsError} loading={ready.extras === 'loading'} />
+              <CostsPanel
+                report={ready.costs}
+                error={ready.costsError}
+                loading={ready.extras === 'loading'}
+                onOpenUser={openUserByUid}
+                canOpenUser={canOpenUserByUid}
+              />
             )}
 
             {tab === 'errors' && (
@@ -2101,6 +2222,8 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                 droppedToday={ready.errorsDropped}
                 busyId={updatingKey?.startsWith('error:') ? updatingKey.slice('error:'.length) : null}
                 onStatusChange={(id, status) => void handleErrorStatusChange(id, status)}
+                onOpenUser={openUserByUid}
+                canOpenUser={canOpenUserByUid}
               />
             )}
 
@@ -2110,7 +2233,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
               <StatusFilterBar value={brokerFilter} onChange={setBrokerFilter} counts={brokerFilterCounts} />
 
               {filteredBrokers.length === 0 ? (
-                <div className="glass-card rounded-xl p-8 text-center text-text-secondary text-sm mb-10">
+                <div className="panel-card rounded-xl p-8 text-center text-text-secondary text-sm mb-10">
                   {ready.brokerRequests.length === 0
                     ? 'No broker support requests yet.'
                     : 'No requests match this filter.'}
@@ -2118,7 +2241,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
               ) : (
                 <div className="space-y-4 mb-10">
                   {filteredBrokers.map((request) => (
-                    <article key={request.id} className="glass-card rounded-xl p-5 md:p-6">
+                    <article key={request.id} className="panel-card rounded-xl p-5 md:p-6">
                       <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
                         <div>
                           <div className="flex items-center gap-2">
@@ -2189,13 +2312,13 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
               <StatusFilterBar value={bugFilter} onChange={setBugFilter} counts={bugFilterCounts} />
 
               {filteredBugs.length === 0 ? (
-                <div className="glass-card rounded-xl p-8 text-center text-text-secondary text-sm">
+                <div className="panel-card rounded-xl p-8 text-center text-text-secondary text-sm">
                   {ready.reports.length === 0 ? 'No bug reports yet.' : 'No reports match this filter.'}
                 </div>
               ) : (
                 <div className="space-y-4">
                   {filteredBugs.map((report) => (
-                    <article key={report.id} className="glass-card rounded-xl p-5 md:p-6">
+                    <article key={report.id} className="panel-card rounded-xl p-5 md:p-6">
                       <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
                         <div>
                           <div className="flex items-center gap-2">
@@ -2303,7 +2426,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                   })
                 }
               />
-              <div className="glass-card rounded-xl p-5 md:p-6 mb-8">
+              <div className="panel-card rounded-xl p-5 md:p-6 mb-8">
                 <div className="flex items-center justify-between gap-3 mb-4">
                   <div className="flex items-center gap-2">
                     <LifeBuoy size={16} className="text-emerald-400" />
@@ -2377,7 +2500,9 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                                 )
                               }
                               aria-label={`Category for ${article.title}`}
-                              className="rounded border border-border/60 bg-bg-tertiary/50 px-1.5 py-0.5 text-[11px] text-text-primary focus-ring disabled:opacity-50"
+                              // 16px on a phone for the same reason as PrioritySelect: a raw select
+                              // under 16px leaves iOS Safari zoomed in with no way back.
+                              className="rounded border border-border/60 bg-bg-tertiary/50 px-1.5 py-1.5 md:py-0.5 text-[16px] md:text-[11px] text-text-primary focus-ring disabled:opacity-50"
                             >
                               {HELP_CATEGORIES.map((c) => (
                                 <option key={c.key} value={c.key}>

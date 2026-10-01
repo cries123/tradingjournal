@@ -86,7 +86,7 @@ export function AdminCheckoutCard({ onAudit }: AdminCheckoutCardProps) {
   };
 
   return (
-    <div className="glass-card rounded-xl p-5 md:p-6 mb-8">
+    <div className="panel-card rounded-xl p-5 md:p-6 mb-8">
       <div className="flex items-start justify-between gap-3 mb-1">
         <div className="flex items-center gap-2 min-w-0">
           <CreditCard size={16} className="text-emerald-400 shrink-0" aria-hidden />

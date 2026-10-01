@@ -37,7 +37,7 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: str
 export function SignupTrendPanel({ serverStats, serverError, loading = false }: SignupTrendPanelProps) {
   if (!serverStats) {
     return (
-      <div className="glass-card rounded-xl p-5 md:p-6">
+      <div className="panel-card rounded-xl p-5 md:p-6">
         <div className="flex items-center gap-2 mb-3">
           <TrendingUp size={16} className="text-emerald-400" />
           <h2 className="text-sm font-semibold">Signups</h2>
@@ -57,7 +57,7 @@ export function SignupTrendPanel({ serverStats, serverError, loading = false }: 
       : 0;
 
   return (
-    <div className="glass-card rounded-xl p-5 md:p-6">
+    <div className="panel-card rounded-xl p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
         <div className="flex items-center gap-2">
           <TrendingUp size={16} className="text-emerald-400" />

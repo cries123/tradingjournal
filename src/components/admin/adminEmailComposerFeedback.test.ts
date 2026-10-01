@@ -44,12 +44,43 @@ describe('admin email composer feedback', () => {
     expect(sendFn).not.toContain('setOpen(false)');
   });
 
-  it('is still far above the modal banner it used to depend on', () => {
-    // Not a rule, a reason: if these ever end up near each other the inline copy above could be
-    // dropped. While this gap exists, it cannot be.
-    const composerAt = MODAL.indexOf('<AdminUserEmailComposer');
-    const bannerAt = MODAL.indexOf('{message && <p');
-    expect(composerAt).toBeGreaterThan(-1);
-    expect(bannerAt).toBeGreaterThan(composerAt);
+  it('keeps its own copy even though the modal banner now follows the reader', () => {
+    /*
+     * This used to assert the opposite — that the banner was far BELOW the composer, with a note
+     * saying that if the two ever ended up near each other the inline copy could be dropped.
+     *
+     * They have: the banner moved into a sticky header, so every section's result is visible from
+     * wherever the reader is, which is what Plan and Usage needed. The composer's own copy stays
+     * anyway. It sits next to the button that was pressed, which is still the better place to answer
+     * "did that send?", and the two do not conflict — one is a receipt, the other a status line.
+     */
+    expect(MODAL).toContain('<AdminUserEmailComposer');
+    expect(MODAL).not.toMatch(/\{message && <p/);
+    expect(COMPOSER).toMatch(/\{sent && /);
+  });
+
+  it('has the modal reporting results where they can be seen from any section', () => {
+    // The fix that made the note above obsolete: sticky, opaque, and carrying both states.
+    // To the first section heading after it, so the window is the header block rather than a
+    // character count that drifts the moment a class name changes.
+    const from = MODAL.indexOf('className="sticky ');
+    const header = MODAL.slice(from, MODAL.indexOf('<dl', from));
+
+    expect(header).toContain('bg-bg-card');
+    expect(header).toMatch(/\{error \?\? message\}/);
+  });
+
+  it('offsets that header by exactly the padding of the box it scrolls inside', () => {
+    /*
+     * These two numbers have to stay equal. Chromium pins a sticky child at top:0 to the scroll
+     * container's CONTENT box — 24px below where the header's own -mt-6 places it — while the
+     * elements after it are laid out from the static position. At top-0 the header therefore sat
+     * 24px lower than the layout thought and covered the first row of the identity grid.
+     */
+    const scroller = MODAL.match(/className="panel-card [^"]*"/)?.[0] ?? '';
+
+    expect(scroller).toContain('p-6');
+    expect(MODAL).toContain('sticky -top-6');
+    expect(MODAL).toContain('-mt-6');
   });
 });

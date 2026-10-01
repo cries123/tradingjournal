@@ -205,30 +205,66 @@ export function AdminUserDetailModal({
           single narrow column is right.
         */}
         <div
-          className="glass-card rounded-xl p-6 max-w-md md:max-w-3xl w-full max-h-[85vh] md:max-h-[88vh] overflow-y-auto"
+          className="panel-card rounded-xl p-6 max-w-md md:max-w-3xl w-full max-h-[85vh] md:max-h-[88vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-start justify-between gap-3 mb-4">
-            <div className="flex items-center gap-2">
-              <User size={18} className="text-emerald-400" />
-              <h3 id="user-detail-title" className="text-lg font-semibold">
-                {user.username ? `@${user.username}` : 'User details'}
-              </h3>
-              {user.suspended && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 text-[10px] font-medium uppercase tracking-wide">
-                  <Ban size={10} aria-hidden />
-                  Suspended
-                </span>
-              )}
+          {/*
+            Sticky, and it carries every section's result.
+
+            Two problems, one fix. The close button sat at the top of a modal nine sections long, so
+            on a phone closing it meant scrolling all the way back up. And the message/error pair was
+            rendered once, at the end of the Account block — so granting a plan or adjusting credits
+            confirmed several hundred pixels below the button that did it, and on a phone off-screen
+            entirely. AdminUserEmailComposer already worked this out for itself and kept local state,
+            with a comment saying "pressing Send looked like it did nothing at all"; Plan and Usage
+            were left reporting into the void.
+
+            Opaque bg-bg-card rather than a translucent treatment: this sits over its own scrolling
+            content, and anything semi-transparent smears the rows passing under it.
+
+            -top-6 cancels the scroller's p-6, and has to stay equal to it. Chromium pins a sticky
+            child at top:0 to the scroll container's CONTENT box — 24px below where -mt-6 places it —
+            while the elements after it are laid out from the static position. top:0 therefore left
+            the header sitting 24px lower than the layout thought, covering the first row of the
+            identity grid. At -top-6 it rests exactly where it is laid out and pins flush with the
+            padding box, so nothing shows above it while the body scrolls either.
+          */}
+          <div className="sticky -top-6 z-10 -mx-6 -mt-6 px-6 pt-6 pb-3 bg-bg-card border-b border-border/40 mb-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <User size={18} className="text-emerald-400 shrink-0" />
+                <h3 id="user-detail-title" className="text-lg font-semibold truncate">
+                  {user.username ? `@${user.username}` : 'User details'}
+                </h3>
+                {user.suspended && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 text-[10px] font-medium uppercase tracking-wide shrink-0">
+                    <Ban size={10} aria-hidden />
+                    Suspended
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-2 -m-1 rounded-lg text-text-secondary hover:text-text-primary focus-ring shrink-0"
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1 rounded-lg text-text-secondary hover:text-text-primary"
-              aria-label="Close"
-            >
-              <X size={18} />
-            </button>
+
+            {(message || error) && (
+              <p
+                role="status"
+                className={`mt-2.5 text-xs rounded-lg px-3 py-2 ${
+                  error
+                    ? 'text-red-300 border border-red-500/30 bg-red-500/10'
+                    : 'text-profit-bright border border-profit-bright/30 bg-profit-bright/10'
+                }`}
+              >
+                {error ?? message}
+              </p>
+            )}
           </div>
 
           {/*
@@ -345,6 +381,22 @@ export function AdminUserDetailModal({
               </div>
             )}
           </dl>
+
+          {/*
+            Straight after the identity, because this is what the modal is usually opened for.
+
+            These two answer "why didn't their sync work" — the read-only journal and the clear/sync
+            event history — and they were sixth and seventh of eight, under roughly two hundred lines
+            of account controls. The comment that used to sit on them said it outright: "when somebody
+            is in here about a sync, this is the panel they came for." It was then placed where you
+            had to scroll past Delete user to reach it.
+          */}
+          <AdminViewJournalSection
+            uid={user.uid}
+            label={user.username ? `@${user.username}` : user.email ?? user.uid}
+          />
+
+          <AdminJournalEventsSection uid={user.uid} />
 
           <AdminUserPlanSection
             uid={user.uid}
@@ -552,8 +604,8 @@ export function AdminUserDetailModal({
               </button>
             )}
 
-            {message && <p className="text-xs text-emerald-300">{message}</p>}
-            {error && <p className="text-xs text-red-400">{error}</p>}
+            {/* Both now report in the sticky header, where the result is visible from whichever
+                section caused it. See the header block at the top of this component. */}
           </div>
 
           <div className="border-t border-border/50 pt-5 mt-5 space-y-3">
@@ -591,12 +643,6 @@ export function AdminUserDetailModal({
                   : 'Never noted'}
             </p>
           </div>
-
-          {/* Above the support history: when somebody is in here about a sync, this is the
-              panel they came for. */}
-          <AdminViewJournalSection uid={user.uid} label={user.username ? `@${user.username}` : user.email ?? user.uid} />
-
-          <AdminJournalEventsSection uid={user.uid} />
 
           <AdminUserHistorySection
             uid={user.uid}

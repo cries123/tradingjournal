@@ -109,7 +109,7 @@ export function AdminAnnouncementCard({ onAudit }: AdminAnnouncementCardProps) {
   const label = 'text-xs text-text-secondary mb-1.5 block';
 
   return (
-    <div className="glass-card rounded-xl p-5 md:p-6 mb-8">
+    <div className="panel-card rounded-xl p-5 md:p-6 mb-8">
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
           <Megaphone size={16} className="text-emerald-400" />

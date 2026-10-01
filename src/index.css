@@ -135,6 +135,18 @@ body {
   color: transparent;
 }
 
+/*
+ * MARKETING PAGES ONLY. In-app screens use .panel-card below.
+ *
+ * The difference is not decorative. This one blurs what is behind it and lifts 2px on hover — right
+ * for a landing page, wrong for a panel full of data that is not clickable, and actively dangerous
+ * in the app: backdrop-filter makes an element the containing block for any `position: fixed`
+ * descendant, which is what put a confirmation dialog off the top of the screen on a phone and made
+ * the impersonation banner fill it. Both of those were in the admin panel, which was built entirely
+ * on this card — forty uses of it and none of panel-card — and is now on the app treatment.
+ *
+ * If you are reaching for a card inside the signed-in app, you want .panel-card.
+ */
 .glass-card {
   background: linear-gradient(145deg, rgba(15, 20, 31, 0.95), rgba(13, 17, 26, 0.85));
   border: 1px solid rgba(148, 163, 184, 0.16);
@@ -266,16 +278,30 @@ body {
   animation: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.panel-card {
-  background: linear-gradient(160deg, rgba(15, 20, 31, 0.98), rgba(13, 17, 26, 0.92));
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
-  transition: border-color 0.25s ease;
-}
+/* Layered, for the reason spelled out above @layer components at the bottom of this file.
+ *
+ * Unlayered, this `border` shorthand and this `box-shadow` beat every utility on the element. Six
+ * cards outside the admin panel already carried an accent border that was doing nothing —
+ * border-red-500/25 on both danger zones, border-amber-500/30 on the broker warning,
+ * border-emerald-500/25 on the simulator and track-record cards — plus two hover:border-accent/40
+ * that lost to .panel-card:hover. The stale support ticket's ring-1 ring-amber-500/40 was the one
+ * that made it visible: the ticket that has been waiting longest is the only card in the queue
+ * meant to look different, and after the admin panel moved onto this treatment it stopped doing so.
+ *
+ * Inside the layer the utility wins, which is what every one of those call sites already assumed.
+ */
+@layer components {
+  .panel-card {
+    background: linear-gradient(160deg, rgba(15, 20, 31, 0.98), rgba(13, 17, 26, 0.92));
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+    transition: border-color 0.25s ease;
+  }
 
-.panel-card:hover {
-  border-color: rgba(148, 163, 184, 0.24);
+  .panel-card:hover {
+    border-color: rgba(148, 163, 184, 0.24);
+  }
 }
 
 .stat-card {
