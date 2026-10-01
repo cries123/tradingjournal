@@ -2,12 +2,16 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Trade } from '../types';
 import {
   accountsPerRun,
+  autoSyncTradeId,
+  chunkForWrite,
   decideAutoSync,
   journalForImports,
   lookbackStart,
   runAutoSync,
+  TRADE_WRITE_CHUNK,
   type AutoSyncDeps,
 } from '../../server/autoSync';
+import { syncStartDate } from '../utils/syncWindow';
 
 const trade = (over: Partial<Trade>): Trade =>
   ({ id: 't', date: '2026-08-03', symbol: 'SPY', pnl: 0, ...over }) as Trade;
@@ -249,5 +253,82 @@ describe('accountsPerRun', () => {
     for (const bad of ['0', '-1', 'lots', '', '2.5', '400']) {
       withEnv(bad, () => expect(accountsPerRun()).toBe(3));
     }
+  });
+});
+
+describe('chunkForWrite', () => {
+  /*
+   * The automatic importer wrote every fresh trade in ONE Firestore batch, which takes 500
+   * operations. Ten days of an active 0DTE account is more than that, and the first automatic run
+   * after connecting or after a journal clear has the whole window to write.
+   *
+   * What made it permanent rather than occasional: markRun only happens after a successful import,
+   * so the failed morning left the window to widen and the next one failed harder. Diamond's
+   * headline feature doing nothing, silently, for good.
+   */
+  it('stays under the Firestore batch limit', () => {
+    expect(TRADE_WRITE_CHUNK).toBeLessThanOrEqual(500);
+
+    const groups = chunkForWrite(Array.from({ length: 1000 }, (_, i) => i));
+    for (const group of groups) {
+      expect(group.length).toBeLessThanOrEqual(TRADE_WRITE_CHUNK);
+    }
+  });
+
+  it('writes every item exactly once, in order', () => {
+    // A chunker that drops or repeats one is worse than the bug it replaces: a dropped trade is a
+    // missing fill and a repeated one is a duplicate, and both are invisible until somebody checks
+    // their own numbers.
+    const items = Array.from({ length: 905 }, (_, i) => i);
+    expect(chunkForWrite(items).flat()).toEqual(items);
+  });
+
+  it('handles the ordinary case in one batch and nothing in none', () => {
+    expect(chunkForWrite([1, 2, 3])).toEqual([[1, 2, 3]]);
+    expect(chunkForWrite([])).toEqual([]);
+  });
+
+  it('refuses a chunk size that would never terminate', () => {
+    expect(() => chunkForWrite([1, 2], 0)).toThrow();
+  });
+});
+
+describe('autoSyncTradeId', () => {
+  it('is readable by the sync window, which is the whole point', () => {
+    /*
+     * The bug this fixes. The brokerage account survives onto a trade only in the document id —
+     * accountId is the JOURNAL it was filed into — and syncStartDate reads that prefix to decide how
+     * far back a manual sync has to ask for.
+     *
+     * The old ids were `autosync_<stamp>_<i>`, invisible to that check. So a Diamond trader whose
+     * trades arrived automatically looked like someone who had never imported anything, and every
+     * manual sync pulled their entire history again — the exact bug b2198f6 fixed for the manual
+     * path, re-introduced through the other write path.
+     */
+    const id = autoSyncTradeId('schwab-acct-1', 1_700_000_000_000, 7);
+    const imported = [trade({ id, date: '2026-09-20', sourceId: 'snaptrade:o1:c1' })];
+
+    expect(syncStartDate(imported, 'schwab-acct-1', new Date(2026, 8, 30))).toBe('2026-09-06');
+  });
+
+  it('matches the manual importer letter for letter up to the account', () => {
+    // Both paths write into one journal, so an id scheme that differs between them is a difference
+    // nothing downstream can account for.
+    expect(autoSyncTradeId('acct', 1234, 0).startsWith('snaptrade_acct_')).toBe(true);
+  });
+
+  it('keeps the trades of one account out of another account’s window', () => {
+    const otherAccount = [trade({ id: autoSyncTradeId('robinhood-1', 1234, 0), date: '2026-09-29' })];
+    expect(syncStartDate(otherAccount, 'schwab-acct-1', new Date(2026, 8, 30))).toBeUndefined();
+  });
+
+  it('still says it was automatic', () => {
+    // Provenance after the prefix the check needs, so both facts fit in one id.
+    expect(autoSyncTradeId('acct', 1234, 9)).toBe('snaptrade_acct_auto1234_9');
+  });
+
+  it('gives every trade in a run its own id', () => {
+    const ids = new Set(Array.from({ length: 50 }, (_, i) => autoSyncTradeId('acct', 1234, i)));
+    expect(ids.size).toBe(50);
   });
 });

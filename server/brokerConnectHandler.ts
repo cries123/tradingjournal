@@ -751,6 +751,9 @@ async function isSiteAdmin(uid: string): Promise<boolean> {
  * Returns the mapped trades unwritten. Dedupe and the journal write belong to the caller, which is
  * the only part of this that differs from a manual sync.
  */
+/** A pulled trade, carrying the brokerage account id that only the pull loop knows. */
+export type PulledTrade = ParsedTradeInput & { snaptradeAccountId: string };
+
 export async function pullRecentActivityForUser(
   uid: string,
   startDate: string,
@@ -762,7 +765,13 @@ export async function pullRecentActivityForUser(
    * The caller sets it — see accountsPerRun in autoSync.ts.
    */
   maxAccounts = Infinity,
-): Promise<{ accounts: number; trades: ParsedTradeInput[]; pulls: number; skippedAccounts: number }> {
+): Promise<{
+  accounts: number;
+  /** Each trade tagged with the brokerage account it came from — see the push below. */
+  trades: PulledTrade[];
+  pulls: number;
+  skippedAccounts: number;
+}> {
   const creds = await getCredsIfRegistered(uid);
   if (!creds) return { accounts: 0, trades: [], pulls: 0, skippedAccounts: 0 };
 
@@ -774,7 +783,7 @@ export async function pullRecentActivityForUser(
     return snaptrade.accountInformation.listUserAccounts({ userId: c.userId, userSecret: c.userSecret });
   });
 
-  const trades: ParsedTradeInput[] = [];
+  const trades: PulledTrade[] = [];
   let pulls = 0;
 
   for (const account of listed.data) {
@@ -803,7 +812,21 @@ export async function pullRecentActivityForUser(
      * would otherwise have a buy in one closed by a sell in the other — a fabricated round trip
      * with a P&L that never happened to anybody.
      */
-    trades.push(...mapSnapTradeActivities(activities).trades);
+    const accountId = account.id;
+    /*
+     * Tagged with the account it came from, because the caller needs it and this loop is the last
+     * place that knows.
+     *
+     * The flattened list used to drop it, so the automatic importer had nothing to build a document
+     * id from and invented its own scheme — one that syncWindow cannot read, which left every
+     * manual sync for an auto-syncing trader pulling the whole history again.
+     */
+    trades.push(
+      ...mapSnapTradeActivities(activities).trades.map((trade) => ({
+        ...trade,
+        snaptradeAccountId: accountId,
+      })),
+    );
   }
 
   return {

@@ -8,6 +8,8 @@ import { recordAutomatic, usageDay } from '../../server/usage';
 import { dedupeIncomingTrades } from '../../src/utils/duplicateTrades';
 import {
   accountsPerRun,
+  autoSyncTradeId,
+  chunkForWrite,
   journalForImports,
   lookbackStart,
   runAutoSync,
@@ -72,19 +74,44 @@ async function importFor(uid: string, activeAccountId: string, today: string) {
 
   const journal = journalForImports(existing, activeAccountId);
   const db = getAdminFirestore();
-  const batch = db.batch();
   const stamp = Date.now();
+  const savedAt = new Date().toISOString();
 
-  fresh.forEach((trade, i) => {
-    const id = `autosync_${stamp}_${i}`;
-    batch.set(db.doc(`users/${uid}/trades/${id}`), {
-      ...trade,
-      id,
-      accountId: trade.accountId ?? journal,
-      savedAt: new Date().toISOString(),
+  /*
+   * Chunked, because one batch takes 500 writes and this used to use exactly one.
+   *
+   * Ten days of an active 0DTE account is more than 500 round trips, and the first automatic run
+   * after connecting or after a journal clear has the whole window to write. The commit threw, the
+   * import failed, and since markRun only runs on success the window widened and the next morning
+   * failed harder — Diamond's headline feature doing nothing, silently, for good.
+   */
+  let written = 0;
+  for (const group of chunkForWrite(fresh)) {
+    const batch = db.batch();
+    group.forEach((trade, i) => {
+      /*
+       * The same id scheme the manual importer writes.
+       *
+       * The brokerage account survives onto a trade only in this prefix — accountId is the journal —
+       * and syncWindow reads it to decide how far back the manual Sync button has to ask for. The old
+       * `autosync_` ids were unreadable to that check, so an auto-syncing trader's manual sync pulled
+       * their entire history every time.
+       *
+       * The tag itself is destructured off rather than stored: the id now carries it, and a field
+       * that is not in the Trade type is a field nothing will ever read.
+       */
+      const { snaptradeAccountId, ...fields } = trade;
+      const id = autoSyncTradeId(snaptradeAccountId, stamp, written + i);
+      batch.set(db.doc(`users/${uid}/trades/${id}`), {
+        ...fields,
+        id,
+        accountId: fields.accountId ?? journal,
+        savedAt,
+      });
     });
-  });
-  await batch.commit();
+    await batch.commit();
+    written += group.length;
+  }
 
   return { imported: fresh.length, accounts };
 }

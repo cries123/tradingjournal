@@ -119,6 +119,46 @@ export function journalForImports(existing: Trade[], activeAccountId: string): s
   return best?.accountId ?? activeAccountId;
 }
 
+/**
+ * Firestore's WriteBatch limit is 500 operations; the same 400 the trade writers use.
+ *
+ * The automatic import wrote every fresh trade in ONE batch. Ten days of an active 0DTE account is
+ * comfortably more than 500 round trips, and the first automatic run after connecting or after a
+ * journal clear has the whole window to write — so the commit threw, the import failed, and because
+ * markRun only happens on success the window kept widening and the next morning failed harder. The
+ * trader would see Diamond's headline feature quietly doing nothing, every day, forever.
+ */
+export const TRADE_WRITE_CHUNK = 400;
+
+/** Splits writes into batch-sized groups. Exported to be tested, since the handler cannot be. */
+export function chunkForWrite<T>(items: readonly T[], size = TRADE_WRITE_CHUNK): T[][] {
+  if (size < 1) throw new Error('chunk size must be at least 1');
+  const chunks: T[][] = [];
+  for (let offset = 0; offset < items.length; offset += size) {
+    chunks.push(items.slice(offset, offset + size));
+  }
+  return chunks;
+}
+
+/**
+ * The document id for an automatically imported trade.
+ *
+ * It has to start `snaptrade_<brokerage account id>_`, because that prefix is the ONLY place the
+ * brokerage account survives onto a trade — `accountId` is the journal it was filed into. syncWindow
+ * reads it to decide how far back a manual sync has to ask for.
+ *
+ * The old ids were `autosync_<stamp>_<i>`, which that check cannot read. So a Diamond trader whose
+ * trades arrived automatically looked, to the manual Sync button, like someone who had never
+ * imported anything: every manual sync pulled their entire history again, which is the exact bug
+ * b2198f6 fixed for the manual path and this write path quietly re-introduced.
+ *
+ * `auto` is kept in the middle so the provenance is still legible in the id. It sits after the
+ * prefix the check needs, so both facts fit.
+ */
+export function autoSyncTradeId(snaptradeAccountId: string, stamp: number, index: number): string {
+  return `snaptrade_${snaptradeAccountId}_auto${stamp}_${index}`;
+}
+
 export interface AutoSyncOutcome {
   uid: string;
   imported: number;

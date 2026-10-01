@@ -162,9 +162,15 @@ export function findDuplicateTrades(trades: Trade[]): DuplicateReport {
   return { duplicates, affectedTrades, duplicatedPnl };
 }
 
-export interface DedupeResult {
-  /** Trades not already present in the journal, safe to import. */
-  fresh: Partial<Trade>[];
+export interface DedupeResult<T extends Partial<Trade> = Partial<Trade>> {
+  /**
+   * Trades not already present in the journal, safe to import.
+   *
+   * Generic over the incoming type so that a caller carrying extra fields — the automatic importer
+   * tags each pull with the brokerage account it came from — still has them on the way out. Erasing
+   * them to Partial<Trade> is what forced that caller into a cast on the field it needed most.
+   */
+  fresh: T[];
   /** Already known — counted so the UI can say "you're up to date" rather than "found nothing". */
   alreadyKnown: number;
   /** Dropped because nothing about them could ever be recognised again. */
@@ -190,12 +196,12 @@ export interface DedupeResult {
  * on the next sync, so importing it guarantees a fresh copy of that fill every time anyone presses
  * Sync — a duplicate for each attempt, indefinitely.
  */
-export function dedupeIncomingTrades(
-  incoming: Partial<Trade>[],
+export function dedupeIncomingTrades<T extends Partial<Trade>>(
+  incoming: T[],
   existingTrades: Trade[],
   /** Carried across accounts in one run, so two accounts reporting the same round trip add it once. */
   seen: Set<string> = new Set(),
-): DedupeResult {
+): DedupeResult<T> {
   for (const t of existingTrades) {
     if (t.sourceId) {
       seen.add(`id:${t.sourceId}`);
@@ -203,7 +209,7 @@ export function dedupeIncomingTrades(
     }
   }
 
-  const fresh: Partial<Trade>[] = [];
+  const fresh: T[] = [];
   let alreadyKnown = 0;
   let unidentified = 0;
 
