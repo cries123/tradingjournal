@@ -1,11 +1,20 @@
 import type { Trade } from '../types';
 
-/** Net P&L after fees (pnl field is net when fees are set). */
+/**
+ * Net P&L.
+ *
+ * Fees are subtracted ONLY when there is a gross to net them against. The trade form labels its
+ * field "Net P/L ($)" and types.ts says the same, so a hand-entered pnl is already net — the old
+ * middle branch took the fees off a second time, and every screen that reads this disagreed with
+ * the one that read trade.pnl directly. Somebody who recorded $100 net with $2 of fees saw $98
+ * on one screen and $100 on another, with no way to tell which was lying.
+ *
+ * Imported trades are unaffected: they carry grossPnl, so they take the first branch.
+ */
 export function effectivePnl(trade: Trade): number {
   if (trade.grossPnl != null && trade.fees != null) {
     return trade.grossPnl - trade.fees;
   }
-  if (trade.fees != null) return trade.pnl - trade.fees;
   return trade.pnl;
 }
 

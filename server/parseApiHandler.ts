@@ -135,6 +135,17 @@ export async function handleParseScreenshotRequest(
   }
 
   const ip = getClientIp(headers);
+  /*
+   * Keyed on the uid the FUNCTION verified, never on a field from the body.
+   *
+   * The caller used to choose this key, so sending a fresh random userId each time put every
+   * request in its own empty bucket and the ceiling never bound anything. The IP fallback
+   * remains only for a caller the function could not identify, which should no longer happen.
+   *
+   * Still in memory, so it resets on a cold start and is not shared between concurrent Lambda
+   * instances — a real ceiling belongs in Firestore via consumeDaily, the way ai and takeaway
+   * already do it. Auth is what stops this being free to the internet; this only paces it.
+   */
   const rateKey = body.userId ? `user:${body.userId}` : `ip:${ip}`;
   const rateCheck = checkRateLimit(rateKey);
   if (!rateCheck.ok) {

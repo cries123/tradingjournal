@@ -10,19 +10,22 @@ import { resolveTradeAccountId } from './accounts';
  * but that only stops it happening again — the rows it already wrote are still sitting in people's
  * journals, and only a cleanup gets them out.
  *
- * WHAT COUNTS AS A DUPLICATE — two ways, both restricted to broker-imported rows.
+ * WHAT COUNTS AS A DUPLICATE: the same sourceId in the same journal, and nothing else. sourceId is
+ * the broker's own id for a round trip ("snaptrade:<open>:<close>"), so two rows carrying it are
+ * provably one fill written twice.
  *
- * 1. Same sourceId, same journal. sourceId is the broker's own id for a round trip
- *    ("snaptrade:<open>:<close>"), so two rows carrying it are provably the same fill twice.
+ * The cleanup used to ALSO group by execution fingerprint, to catch the duplicates left behind by
+ * a bug that put Math.random() in synthesised sourceIds. That was dropped, because the fingerprint
+ * is only as discriminating as the data the broker sent and Schwab sends no fill times: without
+ * them it reduces to date + contract + side + size + prices + P&L, which two genuine round trips
+ * on the same 0DTE contract share exactly. This screen was therefore pointing at real trades and
+ * offering a bulk delete. The random-id duplicates are indistinguishable from real trades by any
+ * means available here, so proposing their deletion was always a guess — a duplicate left on
+ * screen is visible and annoying, a deleted trade is gone.
  *
- * 2. Same execution fingerprint, same journal. This exists because sourceId turned out NOT to be
- *    stable: when SnapTrade's activity payload had no id of its own, the importer synthesised one
- *    ending in Math.random(), so the same fill got a different sourceId on every sync. Those
- *    duplicates are real but invisible to rule 1, and there are potentially thousands of them.
- *    The fingerprint is date + symbol + side + quantity + entry price + exit price + entry time +
- *    exit time + P&L — every execution detail the broker reported. Two round trips agreeing on all
- *    of that, down to the minute of entry and exit, are the same trade; a trader cannot open and
- *    close two separate positions at identical times for identical prices.
+ * The fingerprint still exists, and dedupeIncomingTrades still uses it, because recognising a row
+ * ALREADY in the journal is a different and safer question than proposing to delete one: guessing
+ * wrong there means one trade fails to import, not one destroyed.
  *
  * Deliberately NOT matched: trades with no sourceId at all. A manually-logged trade has no broker
  * record behind it, and two trades on the same symbol, same day, for the same amount are something
@@ -65,6 +68,12 @@ function annotationWeight(trade: Trade): number {
   return score;
 }
 
+/**
+ * The cleanup's grouping key: the broker's own id for the fill, scoped to one journal.
+ *
+ * Only rows carrying a sourceId qualify — a manually-logged trade has no broker record behind it,
+ * and two identical manual entries are something traders genuinely do.
+ */
 function duplicateKey(trade: Trade): string | null {
   if (!trade.sourceId) return null;
   return `${resolveTradeAccountId(trade.accountId)}|${trade.sourceId}`;
@@ -103,17 +112,6 @@ export function executionFingerprint(
 }
 
 /**
- * The cleanup's grouping key: the fingerprint, scoped to one journal.
- *
- * Only rows carrying a sourceId qualify — a manually-logged trade has no broker record behind it,
- * and two identical manual entries are something traders genuinely do.
- */
-function executionKey(trade: Trade): string | null {
-  if (!trade.sourceId) return null;
-  return `${resolveTradeAccountId(trade.accountId)}|${executionFingerprint(trade)}`;
-}
-
-/**
  * Returns the copies that should go, keeping exactly one of each real trade.
  *
  * The keeper is the most annotated copy; ties go to whichever was saved first, and then to
@@ -123,12 +121,10 @@ function executionKey(trade: Trade): string | null {
 export function findDuplicateTrades(trades: Trade[]): DuplicateReport {
   const groups = new Map<string, { trade: Trade; index: number }[]>();
 
-  // Fingerprint first: it catches everything the sourceId rule catches (two rows with one sourceId
-  // necessarily describe the same execution) plus the random-sourceId duplicates it cannot see.
-  // Falling back to the sourceId key keeps rows that lack execution detail — an older import, or a
-  // broker that reported no times — grouped the way they always were.
+  // One rule, the provable one. See the fingerprint note at the top of this file for why the
+  // broader grouping was taken out rather than kept as a fallback.
   trades.forEach((trade, index) => {
-    const key = executionKey(trade) ?? duplicateKey(trade);
+    const key = duplicateKey(trade);
     if (!key) return;
     const group = groups.get(key);
     if (group) group.push({ trade, index });
@@ -224,8 +220,22 @@ export function dedupeIncomingTrades(
       continue;
     }
 
+    /*
+     * The id is remembered; the fingerprint is NOT.
+     *
+     * sourceId is unique per fill by construction — fallbackActivityId counts occurrences so
+     * that two 100-share buys at the same price and time get different ids. The fingerprint is
+     * not unique, and on a Schwab feed it is barely unique at all: with no fill times it reduces
+     * to date + contract + size + prices + P&L, which two genuine round trips on the same 0DTE
+     * contract share exactly.
+     *
+     * Adding it here let one incoming row suppress another, so the second real trade of an
+     * identical pair was counted "already imported" and silently never arrived. The fingerprint
+     * exists for one job only — recognising rows ALREADY in the journal whose sourceIds carry the
+     * old Math.random() component and will never match again — and that job is done by the seed
+     * above, from existingTrades.
+     */
     seen.add(idKey);
-    seen.add(fpKey);
     fresh.push(trade);
   }
 

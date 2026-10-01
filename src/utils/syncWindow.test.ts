@@ -19,10 +19,10 @@ import { OVERLAP_DAYS, syncStartDate } from './syncWindow';
 let seq = 0;
 const trade = (over: Partial<Trade> = {}): Trade =>
   ({
-    id: `t${seq++}`,
     date: '2026-09-20',
     symbol: 'SPY',
     pnl: 10,
+    // The id carries the brokerage account, which is the only place it survives onto a trade.
     id: `snaptrade_schwab_${seq++}_0`,
     sourceId: `snaptrade:o${seq}:c${seq}`,
     ...over,

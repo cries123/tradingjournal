@@ -117,8 +117,48 @@ function parseSchwabDate(value: string): string {
   return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
 }
 
-function contractKey(e: RawExecution): string {
-  return `${e.symbol}|${e.exp}|${e.strike}|${e.type}`;
+/**
+ * Which queue a fill belongs to — including which way round it is.
+ *
+ * The side used to be left out, so long and short lots of the same contract shared one FIFO
+ * queue and a close took whatever was at the front regardless of direction. Selling a call
+ * against one you already held produced two trades with both signs inverted and a day total
+ * hundreds of dollars from the statement.
+ *
+ * server/mapSnapTradeActivities.ts hit exactly this and fixed it — "the day was $328 off a
+ * statement that every other day agreed with to the dollar" — and the CSV importer was left
+ * behind. See lotSideFor there for the full reasoning; this is the same rule.
+ */
+function contractKey(e: RawExecution, long: boolean): string {
+  return `${e.symbol}|${e.exp}|${e.strike}|${e.type}|${long ? 'long' : 'short'}`;
+}
+
+/** A BUY TO OPEN opens a long; a SELL TO OPEN opens a short. */
+function opensLong(e: RawExecution): boolean {
+  return e.side === 'BUY';
+}
+
+/**
+ * Which direction a close is unwinding.
+ *
+ * A SELL TO CLOSE closes a long, a BUY TO CLOSE closes a short — the opposite of what the same
+ * side means on an open. Reading it off the close is what lets a close find its own lot instead
+ * of the first one in the queue.
+ */
+function closesLong(e: RawExecution): boolean {
+  return e.side === 'SELL';
+}
+
+/**
+ * Schwab's per-CONTRACT options commission.
+ *
+ * Per contract, never per share: Schwab charges nothing to trade equities. Applied to a share
+ * count it invented $650 of commission on a 500-share round trip and turned a $500 winner into a
+ * $150 loser — which then lands in the loser bucket of every win rate, profit factor, tax export
+ * and published record downstream.
+ */
+function feesFor(e: RawExecution): number {
+  return isOption(e.type) ? e.qty * FEE_PER_CONTRACT : 0;
 }
 
 function isOption(type: string): boolean {
@@ -169,14 +209,16 @@ function matchRoundTrips(executions: RawExecution[]): ParsedTradeInput[] {
   const trades: ParsedTradeInput[] = [];
 
   for (const exec of executions) {
-    const key = contractKey(exec);
+    const opening = exec.posEffect === 'TO OPEN';
+    // An open files by the direction it opens; a close looks in the queue it unwinds.
+    const key = contractKey(exec, opening ? opensLong(exec) : closesLong(exec));
     if (!openLots.has(key)) openLots.set(key, []);
 
-    if (exec.posEffect === 'TO OPEN') {
+    if (opening) {
       openLots.get(key)!.push({
         qty: exec.qty,
         price: exec.price,
-        fees: exec.qty * FEE_PER_CONTRACT,
+        fees: feesFor(exec),
         exec,
       });
       continue;
@@ -184,7 +226,7 @@ function matchRoundTrips(executions: RawExecution[]): ParsedTradeInput[] {
 
     // TO CLOSE
     let remaining = exec.qty;
-    const closeFees = exec.qty * FEE_PER_CONTRACT;
+    const closeFees = feesFor(exec);
     const queue = openLots.get(key)!;
 
     while (remaining > 0 && queue.length > 0) {
@@ -192,10 +234,16 @@ function matchRoundTrips(executions: RawExecution[]): ParsedTradeInput[] {
       const matched = Math.min(remaining, lot.qty);
       const mult = multiplier(exec.type);
 
-      const grossPnl =
-        exec.side === 'SELL'
-          ? (exec.price - lot.price) * matched * mult
-          : (lot.price - exec.price) * matched * mult;
+      /*
+       * Direction taken from the LOT, not from the closing fill.
+       *
+       * They agree whenever the queue is pure, which it now is — but reading it off the close
+       * was half of the inversion bug, and reading it off the lot is what actually describes the
+       * position being unwound.
+       */
+      const grossPnl = opensLong(lot.exec)
+        ? (exec.price - lot.price) * matched * mult
+        : (lot.price - exec.price) * matched * mult;
 
       const feeShare =
         (lot.fees * (matched / lot.qty)) + (closeFees * (matched / exec.qty));

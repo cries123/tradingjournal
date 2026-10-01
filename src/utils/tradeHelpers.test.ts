@@ -24,11 +24,25 @@ describe('effectivePnl', () => {
     expect(effectivePnl(trade({ pnl: -42 }))).toBe(-42);
   });
 
-  it('treats pnl as gross when fees are set without a grossPnl', () => {
-    // Documents a real ambiguity rather than endorsing it: this branch only runs for hand-entered
-    // trades, where nothing says whether the typed pnl was before or after costs. The code assumes
-    // before. A user who types the figure their broker already netted is charged the fees twice.
-    expect(effectivePnl(trade({ pnl: 100, fees: 7 }))).toBe(93);
+  it('leaves a hand-entered pnl alone when there is no gross to net against', () => {
+    /*
+     * The ambiguity this used to document is now resolved, in the direction the product already
+     * promised twice: TradeModal labels the field "Net P/L ($)" and types.ts says fees are
+     * subtracted "when grossPnl set". So a typed pnl is already net, and taking the fees off again
+     * charged them twice — which this test's old comment predicted word for word.
+     *
+     * It was not a harmless rounding difference. computeStats, the calendar and the insights panel
+     * read trade.pnl directly while the Performance screen, the rule banner, the simulator, the tax
+     * report and the AI facts read effectivePnl, so the same month showed two different totals and
+     * nothing on screen said which was right.
+     */
+    expect(effectivePnl(trade({ pnl: 100, fees: 7 }))).toBe(100);
+  });
+
+  it('still nets an imported trade, which carries a real gross', () => {
+    // The branch that was always correct: a synced trade has grossPnl, so the fees have something
+    // to come off. This is the one the fix must not disturb.
+    expect(effectivePnl(trade({ grossPnl: 100, fees: 7, pnl: 93 }))).toBe(93);
   });
 });
 
