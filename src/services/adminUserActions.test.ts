@@ -30,11 +30,23 @@ function docRef(path: string) {
   };
 }
 
+/** Everything written to adminAuditLog, which is the only place some actions leave a trace. */
+const audit: Doc[] = [];
+/** Set to make the audit write fail, which must never block the action it describes. */
+let auditWritesFail = false;
+
 const fakeDb = {
   doc: docRef,
   collection: (path: string) => ({
     where: () => ({ get: async () => ({ empty: true, docs: [], size: 0 }) }),
     limit: () => ({ get: async () => ({ empty: true, docs: [], size: 0 }) }),
+    add: async (data: Doc) => {
+      if (path === 'adminAuditLog') {
+        if (auditWritesFail) throw new Error('audit collection refused the write');
+        audit.push(data);
+      }
+      return { id: `entry-${audit.length}` };
+    },
     path,
   }),
   batch: () => ({ delete: () => undefined, commit: async () => undefined }),
@@ -61,6 +73,8 @@ vi.mock('../../server/firebaseAdmin', () => ({
     updateUser,
     revokeRefreshTokens,
     deleteUser: async () => undefined,
+    createCustomToken: async (uid: string, claims: Record<string, unknown>) =>
+      `token-for-${uid}-by-${String(claims.impersonatedBy)}`,
   }),
 }));
 
@@ -92,6 +106,8 @@ async function call(body: Omit<AdminUserRequestBody, 'targetUid'> & { targetUid?
 beforeEach(() => {
   store.clear();
   authUsers.clear();
+  audit.length = 0;
+  auditWritesFail = false;
   updateUser.mockClear();
   revokeRefreshTokens.mockClear();
   store.set('config/admin', { uid: 'admin-1' });
@@ -330,5 +346,80 @@ describe('the door', () => {
     expect((await call({ action: 'launchRockets' as never })).statusCode).toBe(400);
     expect((await handleAdminUserRequest(HEADERS, { action: 'readUsage', targetUid: ' ' })).statusCode).toBe(400);
     expect((await handleAdminUserRequest({}, { action: 'readUsage', targetUid: TARGET })).statusCode).toBe(401);
+  });
+});
+
+describe('signing in as a customer', () => {
+  /*
+   * The most sensitive action in the panel, and the only one that used to leave no trace.
+   *
+   * Every other admin action logs itself from the browser, which works because the admin is still
+   * themselves afterwards. This one is not: the instant the custom token lands, the tab IS the
+   * customer and the admin session is gone, so there is no session left that could write an entry.
+   * Firestore then sees the customer's uid for everything that follows, so afterwards nothing
+   * distinguished a support session from the customer doing it themselves.
+   */
+  it('records who signed in as whom, before minting the token', async () => {
+    const result = await call({ action: 'impersonate', email: 'trader@example.com' });
+
+    expect(result.statusCode).toBe(200);
+    expect(audit).toHaveLength(1);
+    expect(audit[0]).toMatchObject({
+      adminUid: 'admin-1',
+      action: 'user.impersonated',
+      targetType: 'user',
+      targetId: TARGET,
+      targetLabel: 'trader@example.com',
+    });
+    // Dated, or a log is a pile of events in no order.
+    expect(typeof audit[0]!.at).toBe('string');
+  });
+
+  it('says in the entry what the session could do', async () => {
+    // "Signed in as" alone understates it. The entry has to say that writes land in their history,
+    // because that is what somebody reading the log later needs to know.
+    await call({ action: 'impersonate' });
+
+    expect(String(audit[0]!.detail)).toMatch(/full read and write/i);
+    expect(String(audit[0]!.detail)).toMatch(/attributed to them/i);
+  });
+
+  it('falls back to the uid when no address was passed', async () => {
+    await call({ action: 'impersonate' });
+    expect(audit[0]!.targetLabel).toBe(TARGET);
+  });
+
+  it('mints a token carrying who was holding the keyboard', async () => {
+    const result = await call({ action: 'impersonate' });
+    // The claim is the only thing that can attribute a write during the session, so it is not
+    // optional decoration.
+    expect((result.body as { token: string }).token).toBe(`token-for-${TARGET}-by-admin-1`);
+  });
+
+  it('is refused to somebody who is not the admin', async () => {
+    // The entry must never be written for a call that was going to be refused anyway.
+    store.set('config/admin', { uid: 'somebody-else' });
+
+    const result = await call({ action: 'impersonate' });
+
+    expect(result.statusCode).toBe(403);
+    expect(audit).toEqual([]);
+  });
+});
+
+describe('when the audit log itself refuses', () => {
+  it('still lets support into the account', async () => {
+    /*
+     * A refused audit write must not stop somebody getting in to fix a customer's problem, and the
+     * client-side writer makes the same choice. The failure is logged loudly instead — an audit trail
+     * with silent gaps is worse than one known to be patchy.
+     */
+    auditWritesFail = true;
+
+    const result = await call({ action: 'impersonate' });
+
+    expect(result.statusCode).toBe(200);
+    expect((result.body as { token?: string }).token).toBeTruthy();
+    expect(audit).toEqual([]);
   });
 });

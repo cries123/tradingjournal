@@ -1,6 +1,7 @@
 import type { IncomingHttpHeaders } from 'http';
 import { AdminRequestError, assertCallerIsAdmin, getBearerToken } from './adminAuth';
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin';
+import { adminEmailFor, logAdminActionServer } from './adminAudit';
 import { purgeAccount } from './accountTeardown';
 import { readEntitlement, resolveAccess, writeEntitlement } from './entitlements';
 import { readJournalEvents } from './journalEvents';
@@ -415,6 +416,30 @@ export async function handleAdminUserRequest(
          * holding the keyboard, and the journal history says "cleared by support" rather
          * than leaving the user looking like they wiped their own trades.
          */
+        /*
+         * Recorded BEFORE the token is minted, and from here rather than from the browser.
+         *
+         * Every other action in this panel logs itself client-side, which works because the admin is
+         * still themselves afterwards. This one is not: the instant that token lands the tab is the
+         * customer and the admin session is gone, so no browser session exists that could write the
+         * entry. The result was that the most sensitive action available — full read and write access
+         * to somebody's account, indistinguishable afterwards from the customer's own activity — was
+         * the only one leaving no trace.
+         *
+         * Before, not after, so a failure between the two leaves a recorded intent rather than an
+         * unrecorded session. logAdminActionServer never throws.
+         */
+        await logAdminActionServer({
+          adminUid: callerUid,
+          adminEmail: await adminEmailFor(callerUid),
+          action: 'user.impersonated',
+          targetType: 'user',
+          targetId: targetUid,
+          targetLabel: email?.trim() || targetUid,
+          detail:
+            'Signed in as this user. The session has their full read and write access, and anything written during it is attributed to them.',
+        });
+
         const token = await getAdminAuth().createCustomToken(targetUid, {
           impersonatedBy: callerUid,
         });

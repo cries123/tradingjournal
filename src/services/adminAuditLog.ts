@@ -6,6 +6,15 @@ export type AdminAuditAction =
   | 'user.password-changed'
   | 'user.password-reset-sent'
   | 'user.deleted'
+  /**
+   * Signed in as a customer.
+   *
+   * Written by the SERVER (see server/adminAudit.ts), unlike every other action here. The browser
+   * cannot record it: the moment the custom token lands the tab is the customer and the admin's own
+   * session is gone, so there is no session left to write with. That is also why it was the one
+   * action in the panel leaving no trace at all, while handing over full write access to an account.
+   */
+  | 'user.impersonated'
   | 'user.tier-granted'
   | 'user.tier-grant-cleared'
   | 'user.access-extended'
@@ -65,6 +74,7 @@ export const AUDIT_ACTION_LABELS: Record<AdminAuditAction, string> = {
   'user.password-changed': 'Set a new password for',
   'user.password-reset-sent': 'Sent password reset to',
   'user.deleted': 'Deleted user',
+  'user.impersonated': 'Signed in as',
   'announcement.published': 'Updated the site announcement',
   'checkout.toggled': 'Changed plan checkout availability',
   'user.tier-granted': 'Granted a plan to',
