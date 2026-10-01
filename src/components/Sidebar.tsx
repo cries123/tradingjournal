@@ -16,6 +16,7 @@ import { BrandLogo } from './BrandLogo';
 import { SidebarJournalPicker } from './SidebarJournalPicker';
 import { useAuth } from '../context/useAuth';
 import { isCurrentUserAdmin } from '../services/admin';
+import { reportErrorSilently } from '../services/errorReporting';
 import { useSupportUnread } from '../hooks/useSupportUnread';
 import { useCoachingCount } from '../hooks/useCoachingCount';
 
@@ -156,9 +157,16 @@ export function Sidebar({
       return;
     }
     let cancelled = false;
-    void isCurrentUserAdmin(user.uid).then((ok) => {
-      if (!cancelled) setIsAdmin(ok);
-    });
+    void isCurrentUserAdmin(user.uid)
+      .then((ok) => {
+        if (!cancelled) setIsAdmin(ok);
+      })
+      // Offline or on a refused read this rejected into the global handler with no scope, which is
+      // the same anonymous unhandled rejection this repo keeps finding. Not being shown the admin
+      // link is the correct outcome of not knowing, so there is nothing to tell the user.
+      .catch((error: unknown) => {
+        reportErrorSilently(error, 'promise', 'sidebar-admin-check');
+      });
     return () => {
       cancelled = true;
     };

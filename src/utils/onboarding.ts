@@ -7,11 +7,29 @@ const STORAGE_KEY = 'trend-chasers-onboarding-done';
  * cannot live in the component it gates.
  */
 export function hasCompletedOnboarding(): boolean {
-  return localStorage.getItem(STORAGE_KEY) === '1';
+  try {
+    return localStorage.getItem(STORAGE_KEY) === '1';
+  } catch {
+    /*
+     * This read happens while App decides what to mount, so it is on the render path for the very
+     * first paint — and in Safari with site data blocked, or a private window, getItem throws.
+     * Unguarded it did not degrade the tour, it took the whole app to the crash screen before
+     * anything had rendered. The two functions below this one have had a try/catch all along.
+     *
+     * false means "show the tour": a returning trader seeing it again is a small annoyance, and a
+     * new one never seeing it is the version that loses somebody.
+     */
+    return false;
+  }
 }
 
 export function markOnboardingDone(): void {
-  localStorage.setItem(STORAGE_KEY, '1');
+  try {
+    localStorage.setItem(STORAGE_KEY, '1');
+  } catch {
+    // Nothing to do about it. The tour reappears next visit, which beats throwing out of the
+    // handler that dismissed it.
+  }
 }
 
 const CHECKLIST_KEY = 'trend-chasers-getting-started-hidden';

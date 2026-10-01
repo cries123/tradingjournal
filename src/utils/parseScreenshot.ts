@@ -4,14 +4,25 @@ import { compressImage } from './compressImage';
 const API_KEY_STORAGE = 'trading-journal-openai-key';
 
 export function loadApiKey(): string {
-  return localStorage.getItem(API_KEY_STORAGE) ?? '';
+  try {
+    return localStorage.getItem(API_KEY_STORAGE) ?? '';
+  } catch {
+    // Blocked storage, same as everywhere else in this app. No key means the server-side parser is
+    // used, which is the normal path anyway.
+    return '';
+  }
 }
 
 export function saveApiKey(key: string): void {
-  if (key) {
-    localStorage.setItem(API_KEY_STORAGE, key);
-  } else {
-    localStorage.removeItem(API_KEY_STORAGE);
+  try {
+    if (key) {
+      localStorage.setItem(API_KEY_STORAGE, key);
+    } else {
+      localStorage.removeItem(API_KEY_STORAGE);
+    }
+  } catch {
+    // The key simply does not persist past this session, which is better than throwing out of the
+    // settings field that typed it.
   }
 }
 

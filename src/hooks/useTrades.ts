@@ -17,6 +17,7 @@ import { resolveTradeAccountId } from '../utils/accounts';
 import { buildSampleTrades, isSampleTrade } from '../utils/sampleData';
 import { tradeTags } from '../utils/tradeHelpers';
 import { describeJournalWriteError } from '../utils/journalWriteError';
+import { reportErrorSilently } from '../services/errorReporting';
 
 /** 'error' means the cloud journal is not working — shown, never guessed at silently. */
 export type SyncStatus = 'loading' | 'local' | 'cloud' | 'syncing' | 'error';
@@ -121,7 +122,25 @@ export function useTrades() {
       );
     };
 
-    void setup();
+    /*
+     * Caught, because the two things this awaits can both fail and the failure was invisible.
+     *
+     * migrateLocalTrades writes to Firestore and subscribeTrades opens a listener; offline, on a
+     * denied write, or on a quota error either rejects. Unguarded, that rejection went to the global
+     * handler as minified SDK frames with no scope — the exact shape this repo has fixed three times
+     * — and, worse, the status stayed on 'loading' for the rest of the session. The trader sat in
+     * front of a skeleton that never resolved and no message at all, which is indistinguishable
+     * from the app being broken and is very close to what people have been reporting.
+     *
+     * Now it says so, and says it in the same words a failed write does.
+     */
+    void setup().catch((error: unknown) => {
+      if (cancelled || activeUidRef.current !== uid) return;
+      setSyncStatus('error');
+      setSyncError(describeJournalWriteError(error));
+      reportErrorSilently(error, 'promise', 'trades-subscribe-setup');
+    });
+
     return () => {
       cancelled = true;
       unsubscribe?.();

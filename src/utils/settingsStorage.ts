@@ -22,7 +22,19 @@ export function loadSettings(userId?: string | null): UserSettings {
   }
 }
 
+/**
+ * Caches settings locally. Never throws.
+ *
+ * loadSettings above has always been guarded and this was not, which is the more dangerous half:
+ * settings are written on nearly every interaction — changing journal, adding a tag, editing a rule
+ * — so in a browser that refuses storage this threw out of whatever handler the trader had just
+ * used. Signed in, Firestore holds the real copy and this is only a cache.
+ */
 export function saveSettings(settings: UserSettings, userId?: string | null): void {
   const key = userId ? `${STORAGE_KEY}:${userId}` : STORAGE_KEY;
-  localStorage.setItem(key, JSON.stringify(settings));
+  try {
+    localStorage.setItem(key, JSON.stringify(settings));
+  } catch {
+    // Quota, or a browser with site data blocked.
+  }
 }
