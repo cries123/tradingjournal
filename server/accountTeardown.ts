@@ -29,6 +29,10 @@ export async function purgeAccount(uid: string): Promise<void> {
   await deleteCollectionDocs(`users/${uid}/takeaways`);
   await deleteCollectionDocs(`users/${uid}/private`);
 
+  // The clear/sync history shown in the admin panel. Written by the Admin SDK only, which is why it
+  // appears in no rule — and why nothing else would ever have removed it.
+  await deleteCollectionDocs(`journalEvents/${uid}/events`);
+
   /*
    * Every username they have ever held, including the ones retired by a rename. Those docs exist
    * to stop somebody else inheriting a handle the account traded under — a reason that ends when
@@ -38,6 +42,32 @@ export async function purgeAccount(uid: string): Promise<void> {
   if (!usernames.empty) {
     const batch = db.batch();
     usernames.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+  }
+
+  /*
+   * Any published track record, which is the only thing this account leaves on the public internet.
+   *
+   * It was not torn down at all. Deleting your account removed the journal and left a public page
+   * carrying your handle, your win rate, your P&L and a "verified by Trend Chasers" badge — online
+   * for good, with the button that would have taken it down behind an account that no longer
+   * exists. "Delete my account" is a promise about data, and this was the most visible data there
+   * was.
+   *
+   * It also blocked the next person. The username is released just above, so somebody else can
+   * claim the handle — and publishing would then be refused, because the ownership row at that slug
+   * still named a uid that is gone.
+   *
+   * Found by ownership rather than by username, so a record published under a handle retired by an
+   * earlier rename goes too.
+   */
+  const records = await db.collection('trackRecordOwners').where('uid', '==', uid).get();
+  if (!records.empty) {
+    const batch = db.batch();
+    records.docs.forEach((doc) => {
+      batch.delete(db.doc(`trackRecords/${doc.id}`));
+      batch.delete(doc.ref);
+    });
     await batch.commit();
   }
 

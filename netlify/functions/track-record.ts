@@ -47,7 +47,9 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
     const username = (profile.data() as { username?: string } | undefined)?.username ?? null;
 
     if (body.action === 'unpublish') {
-      await unpublishTrackRecord(uid, username);
+      // Deliberately not given the username: a record is found by who owns it, so taking it down
+      // still works for somebody who has renamed since publishing.
+      await unpublishTrackRecord(uid);
       return json(200, { published: false });
     }
 

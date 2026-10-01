@@ -61,6 +61,21 @@ async function readAllTrades(uid: string): Promise<Trade[]> {
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Trade, 'id'>) }));
 }
 
+/**
+ * Which slugs this account has a record published at — asked of the ownership rows, not of the
+ * current username.
+ *
+ * The username was the only thing either half of this used to find a record, and a username can be
+ * changed. Renaming therefore stranded the published page: it stayed online under the old handle,
+ * showing figures the trader could no longer take down, because unpublish went looking at the slug
+ * for the NEW name and found nothing there. Asking who owns what finds it whatever they are called
+ * now, and finds more than one if a rename ever left two behind.
+ */
+async function slugsOwnedBy(uid: string): Promise<string[]> {
+  const snap = await getAdminFirestore().collection(OWNERS).where('uid', '==', uid).get();
+  return snap.docs.map((d) => d.id);
+}
+
 export async function publishTrackRecord(
   uid: string,
   username: string | null,
@@ -80,6 +95,21 @@ export async function publishTrackRecord(
   }
 
   const slug = username.toLowerCase();
+
+  /*
+   * Never over the top of another account's record.
+   *
+   * Unpublishing has always checked ownership and publishing never did, which is the wrong way
+   * round: this one overwrites. The registry hands out a handle to one account at a time, so the
+   * ordinary path cannot collide — but it is one transaction away from being able to (a released
+   * handle, a repaired registry, an admin rename), and the failure mode is one trader's figures
+   * appearing under another trader's name on a page branded verified. 409 rather than a silent
+   * overwrite, because there is nothing sensible to do automatically.
+   */
+  const occupant = await getAdminFirestore().doc(`${OWNERS}/${slug}`).get();
+  if (occupant.exists && (occupant.data() as { uid?: string } | undefined)?.uid !== uid) {
+    throw new TrackRecordError('A record is already published at that username.', 409);
+  }
 
   /*
    * Amounts are dropped from the DOCUMENT, not hidden by the page.
@@ -128,6 +158,19 @@ export async function publishTrackRecord(
   // in the document, and a merge would leave them there to be read.
   batch.set(db.doc(`trackRecords/${slug}`), published, { merge: false });
   batch.set(db.doc(`${OWNERS}/${slug}`), { uid, updatedAt: published.updatedAt });
+
+  /*
+   * A trader has one record, so republishing after a rename moves it rather than leaving two.
+   *
+   * Without this, renaming and republishing left the old page online forever: a public record under
+   * a handle they no longer use, with no button anywhere that takes it down.
+   */
+  for (const stale of await slugsOwnedBy(uid)) {
+    if (stale === slug) continue;
+    batch.delete(db.doc(`trackRecords/${stale}`));
+    batch.delete(db.doc(`${OWNERS}/${stale}`));
+  }
+
   // One commit, so a published page can never exist without the ownership row that lets its owner
   // take it down again.
   await batch.commit();
@@ -141,21 +184,21 @@ export async function publishTrackRecord(
  * The document is deleted rather than flagged unpublished. A flag leaves every figure sitting in a
  * public-read collection for anyone who kept the URL, which is not what "unpublish" means to the
  * person pressing it.
+ *
+ * Found by ownership and not by the current username, which is what makes this work after a rename.
+ * It used to derive the slug from whatever the trader is called today, so renaming left the page
+ * published and unreachable: the button reported success and deleted nothing. Only ever their own
+ * rows, because the query is on their uid.
  */
-export async function unpublishTrackRecord(uid: string, username: string | null): Promise<void> {
-  if (!username) return;
+export async function unpublishTrackRecord(uid: string): Promise<void> {
+  const slugs = await slugsOwnedBy(uid);
+  if (slugs.length === 0) return;
 
-  const slug = username.toLowerCase();
   const db = getAdminFirestore();
-
-  // Only ever their own. A username can be renamed and re-registered, so the slug alone does not
-  // establish who a record belongs to — the ownership row does, and it is checked rather than
-  // assumed.
-  const owner = await db.doc(`${OWNERS}/${slug}`).get();
-  if (!owner.exists || (owner.data() as { uid?: string } | undefined)?.uid !== uid) return;
-
   const batch = db.batch();
-  batch.delete(db.doc(`trackRecords/${slug}`));
-  batch.delete(db.doc(`${OWNERS}/${slug}`));
+  for (const slug of slugs) {
+    batch.delete(db.doc(`trackRecords/${slug}`));
+    batch.delete(db.doc(`${OWNERS}/${slug}`));
+  }
   await batch.commit();
 }
