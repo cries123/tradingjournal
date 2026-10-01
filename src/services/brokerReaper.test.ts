@@ -351,3 +351,90 @@ describe('what the two emails actually say', () => {
     expect(friendlyDate('not a date')).toBe('shortly');
   });
 });
+
+describe('the notice period is real', () => {
+  const deps = (rows: { uid: string; unentitledSince?: string | null; warnedAt?: string | null }[], plans: Record<string, Entitlement | null>) => {
+    const removeLink = vi.fn(async () => undefined);
+    const markUnentitledSince = vi.fn(async () => undefined);
+    const markWarned = vi.fn(async () => undefined);
+    // Typed through the generic rather than with named parameters, so the recorded call can be read
+    // back — the date it was given is the whole point of this block — without declaring arguments the
+    // implementation does not use.
+    const warn = vi.fn<(uid: string, removesOn: string) => Promise<boolean>>(async () => true);
+    const notifyRemoved = vi.fn(async () => undefined);
+    return {
+      removeLink,
+      warn,
+      notifyRemoved,
+      base: {
+        listConnected: async () => rows,
+        readEntitlement: async (uid: string) => plans[uid] ?? null,
+        removeLink,
+        markUnentitledSince,
+        markWarned,
+        warn,
+        notifyRemoved,
+        now: NOW,
+      },
+    };
+  };
+
+  const lapsedLongAgo = () => entitlement({ tier: 'free', comp: comp('silver', -30) });
+
+  it('warns with a date in the future, not one that has already passed', () => {
+    /*
+     * The warning date was computed from the LAPSE, and on this branch the grace period is already
+     * spent by construction — decideReap only reaches it once lapsedAt + grace is behind us. So the
+     * email said "scheduled to be removed on <a day last week>" and "start a plan again before <that
+     * same past day> and nothing happens at all".
+     *
+     * The backlog is exactly the population that gets the worst dates: everything that lapsed before
+     * any of this shipped is thirty days past its grace on the first run.
+     */
+    const { base, warn } = deps([{ uid: 'u1', unentitledSince: at(-30) }], { u1: lapsedLongAgo() });
+
+    return runReap(base).then(() => {
+      const removesOn = warn.mock.calls[0]![1];
+      expect(Date.parse(removesOn)).toBeGreaterThan(NOW);
+      expect(removesOn).toBe(at(DEFAULT_GRACE_DAYS));
+    });
+  });
+
+  it('does not remove a link the morning after it warned', async () => {
+    /*
+     * The other half, and the one that makes the date true. The warning only had to EXIST, not to
+     * have aged — so a backlog account warned yesterday lost its connection today: about 24 hours of
+     * notice against the five days the email promises.
+     */
+    const { base, removeLink } = deps([{ uid: 'u1', unentitledSince: at(-30), warnedAt: at(-1) }], {
+      u1: lapsedLongAgo(),
+    });
+
+    const summary = await runReap(base);
+
+    expect(removeLink).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ reaped: 0, waiting: 1 });
+  });
+
+  it('removes it once the notice itself has run its course', async () => {
+    // Warned six days ago against five days of grace: the trader got what they were promised.
+    const { base, removeLink } = deps([{ uid: 'u1', unentitledSince: at(-30), warnedAt: at(-6) }], {
+      u1: lapsedLongAgo(),
+    });
+
+    await runReap(base);
+
+    expect(removeLink).toHaveBeenCalledWith('u1');
+  });
+
+  it('removes it on the day the notice runs out, not a day later', async () => {
+    const { base, removeLink } = deps(
+      [{ uid: 'u1', unentitledSince: at(-30), warnedAt: at(-DEFAULT_GRACE_DAYS) }],
+      { u1: lapsedLongAgo() },
+    );
+
+    await runReap(base);
+
+    expect(removeLink).toHaveBeenCalledWith('u1');
+  });
+});

@@ -49,8 +49,26 @@ export async function fetchBenchmarkQuote(symbol = 'SPY'): Promise<BenchmarkQuot
   if (valid.length < 2) return null;
 
   const monthStart = monthStartTimestamp();
-  const monthBars = valid.filter((b) => b.t >= monthStart);
-  const startPrice = monthBars.length > 0 ? monthBars[0].c : valid[valid.length - 2].c;
+
+  /*
+   * Month to date starts at the LAST CLOSE BEFORE the month, not at the first close inside it.
+   *
+   * This took monthBars[0].c — the close of the month's first session — so that session's own move
+   * was excluded from the figure entirely. On the first trading day it was worse: Yahoo publishes an
+   * in-progress bar whose close is the live price, so start and end were the same number and the chip
+   * read +0.0% all day. Before that bar exists at all — a weekend or holiday 1st — the fallback took
+   * valid[length - 2], which labels the PREVIOUS month's last single-day move as this month's return.
+   *
+   * The right baseline is already in hand: the request asks for three months of bars.
+   */
+  const firstOfMonth = valid.findIndex((b) => b.t >= monthStart);
+  const startPrice =
+    firstOfMonth > 0
+      ? valid[firstOfMonth - 1].c
+      : firstOfMonth === 0
+        ? valid[0].c
+        : // No bar in this month yet. An honest 0% beats relabelling a day from last month.
+          valid[valid.length - 1].c;
   const endPrice = valid[valid.length - 1].c;
   const periodStart = valid[0].c;
 

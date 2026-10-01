@@ -251,3 +251,50 @@ describe('which journal a number covers', () => {
     expect(exporter).toMatch(/exportTaxYearCsv\([^)]*journalName/);
   });
 });
+
+describe('a paused subscription', () => {
+  /*
+   * A pause maps to 'canceled' so that access eventually stops, which is right — but it then reached
+   * the billing email, whose subject and body both say "you will not be billed again". Creem lifts a
+   * pause automatically, so that is a written promise the product breaks by design.
+   */
+  it('is not told it will never be billed again', () => {
+    const webhook = codeOnly(readFileSync('netlify/functions/creem-webhook.ts', 'utf8'));
+    expect(webhook).toMatch(/includes\('paused'\)\) return;/);
+    expect(webhook).toContain('tellThem(parsed, payload.eventType)');
+  });
+
+  it('is not cancelled by being resumed', () => {
+    /*
+     * "unpaused" contains "paused" — the same trap the unpaid/paid guard in the ledger exists for.
+     * Checked first, so lifting a pause restores the plan instead of taking it away from somebody who
+     * had just restarted it.
+     */
+    const client = codeOnly(readFileSync('server/creemClient.ts', 'utf8'));
+    const statusBlock = client.slice(client.indexOf("const status: ParsedBillingEvent['status']"));
+
+    const unpausedAt = statusBlock.indexOf("includes('unpaused')");
+    const pausedAt = statusBlock.indexOf("includes('paused')");
+    expect(unpausedAt).toBeGreaterThan(-1);
+    expect(unpausedAt).toBeLessThan(pausedAt);
+  });
+});
+
+describe('the SPY comparison', () => {
+  /*
+   * Month to date was baselined on the first close INSIDE the month, so that session's own move was
+   * excluded. On the first trading day it was worse: Yahoo's in-progress bar closes at the live
+   * price, so start and end were the same number and the chip read +0.0% all day. With no bar yet at
+   * all, the fallback took the second-to-last close, labelling the previous month's last single-day
+   * move as this month's return.
+   */
+  const source = codeOnly(readFileSync('server/benchmarkHandler.ts', 'utf8'));
+
+  it('baselines on the last close before the month', () => {
+    expect(source).toContain('valid[firstOfMonth - 1].c');
+  });
+
+  it('no longer reaches back into the previous month for a fallback', () => {
+    expect(source).not.toContain('valid[valid.length - 2].c');
+  });
+});

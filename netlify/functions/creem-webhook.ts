@@ -67,14 +67,27 @@ async function alreadyHandled(eventId: string): Promise<boolean> {
  * gets a note too, and deliberately not a discount: what it says is that the journal keeps
  * working for free, which is true, and is the reason people come back.
  */
-async function tellThem(parsed: {
-  uid: string;
-  tier: Tier;
-  status: string;
-  currentPeriodEnd?: string;
-}): Promise<void> {
+async function tellThem(
+  parsed: {
+    uid: string;
+    tier: Tier;
+    status: string;
+    currentPeriodEnd?: string;
+  },
+  eventType: string | undefined,
+): Promise<void> {
   if (!isMailConfigured()) return;
   if (parsed.status !== 'past_due' && parsed.status !== 'canceled') return;
+
+  /*
+   * A pause is not a cancellation, whatever the entitlement records it as.
+   *
+   * A paused subscription maps to 'canceled' so that access eventually stops — which is right — but
+   * it arrived here and sent an email whose subject and body both say "you will not be billed
+   * again". That is a written promise the pause breaks the moment it lifts, and Creem lifts it
+   * automatically. The entitlement side stays as it is; the claim does not get made.
+   */
+  if ((eventType ?? '').toLowerCase().includes('paused')) return;
 
   const account = await getAdminAuth().getUser(parsed.uid);
   if (!account.email) return;
@@ -168,7 +181,7 @@ export const handler: Handler = async (event) => {
 
     // Best effort, and after the entitlement is written: an email that fails must never make a
     // webhook retry, because the retry would re-apply a billing change that already landed.
-    if (result.applied) await tellThem(parsed).catch(() => undefined);
+    if (result.applied) await tellThem(parsed, payload.eventType).catch(() => undefined);
 
     console.info(
       `[creem-webhook] ${payload.eventType} uid=${parsed.uid} tier=${parsed.tier} status=${parsed.status} applied=${result.applied}${result.reason ? ` (${result.reason})` : ''}`,

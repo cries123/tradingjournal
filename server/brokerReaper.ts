@@ -215,10 +215,22 @@ export async function runReap(deps: ReapDeps): Promise<ReapSummary> {
         continue;
       }
 
+      /*
+       * The notice runs from the NOTICE, not from the lapse.
+       *
+       * On the 'reap' branch the grace period is already spent by construction — decideReap only
+       * returns 'reap' once `now >= lapsedAt + graceDays`. So dating the warning from the lapse put a
+       * date in the PAST into the email: "scheduled to be removed on <a day last week>" and "start a
+       * plan again before <that same past day> and nothing happens at all". The backlog path the
+       * comment below is written about is exactly the path that produces the worst of them.
+       *
+       * Counting from today is what makes the sentence true. The removal is gated on the same clock
+       * below, so the five days the email promises are five days the trader actually gets.
+       */
       const reapAfter =
         decision.action === 'wait'
           ? decision.reapAfter
-          : new Date(Date.parse(decision.lapsedAt) + graceDays * DAY_MS).toISOString();
+          : new Date(now + graceDays * DAY_MS).toISOString();
 
       /*
        * Nothing is ever removed from an account that has not been told.
@@ -244,6 +256,20 @@ export async function runReap(deps: ReapDeps): Promise<ReapSummary> {
       }
 
       if (decision.action === 'wait') {
+        summary.waiting += 1;
+        continue;
+      }
+
+      /*
+       * The notice period is honoured from the day the notice went out.
+       *
+       * Without this, a connection warned yesterday was removed this morning: the warning only has to
+       * exist, not to have aged. For the backlog — every connection that lapsed before any of this
+       * shipped — that meant about 24 hours of notice against the five days the email promises, which
+       * is the opposite of what the paragraph above says this design is for.
+       */
+      const noticeGivenAt = Date.parse(row.warnedAt);
+      if (Number.isFinite(noticeGivenAt) && noticeGivenAt + graceDays * DAY_MS > now) {
         summary.waiting += 1;
         continue;
       }

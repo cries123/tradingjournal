@@ -375,11 +375,19 @@ export function parseBillingEvent(event: CreemWebhookEvent): ParsedBillingEvent 
    * used to fall through to null — so a triallist would have been left on Free, having handed
    * over a card, looking at the paywall they just paid to get past.
    */
-  const status: ParsedBillingEvent['status'] | null = type.includes('canceled')
-    ? 'canceled'
-    : type.includes('paused')
+  const status: ParsedBillingEvent['status'] | null = type.includes('unpaused')
+    || type.includes('resumed')
+    ? /*
+       * A resume is checked BEFORE the pause, because "unpaused" contains "paused" — the same trap
+       * the unpaid/paid guard in billingLedger exists for. Without this, lifting a pause read as
+       * cancelling the subscription and took the plan away from somebody who had just restarted it.
+       */
+      'active'
+    : type.includes('canceled')
       ? 'canceled'
-      : type.includes('expired')
+      : type.includes('paused')
+        ? 'canceled'
+        : type.includes('expired')
         ? 'expired'
         : type.includes('past_due') || type.includes('unpaid')
           ? 'past_due'
