@@ -118,7 +118,9 @@ export const PAGE_SEO: Record<
   pricing: {
     title: 'Pricing — Trend Chasers Trading Journal',
     description:
-      'Free forever with manual entry and the full P&L calendar. Paid plans add broker sync, execution analytics and the AI assistant. No credit card to start.',
+      // Not 'No credit card to start'. True of the free journal, and this is the description of
+      // the page that takes a card: the free trial runs through checkout and converts on day 7.
+      'Free forever with manual entry and the full P&L calendar. Paid plans add broker sync, execution analytics and the AI assistant. The journal needs no card.',
     path: '/pricing',
   },
   'help-center': {

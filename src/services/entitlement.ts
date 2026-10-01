@@ -1,6 +1,5 @@
 import { sendEmailVerification } from 'firebase/auth';
 import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebase';
-import { getVisitorId } from './visitorAnalytics';
 import { reportErrorSilently } from './errorReporting';
 import { limitsFor, MARKET_REPLAY_LIVE, type Tier, type TierLimits } from '../config/tiers';
 
@@ -49,8 +48,10 @@ export interface EntitlementSnapshot {
   /** Why the trial is not on offer, when it isn't. */
   trialBlockedReason?: string | null;
   trialBlockedMessage?: string | null;
-  /** The live complimentary access is a self-serve trial, not a gift. */
+  /** A Creem free trial is running: a real subscription that has not been charged yet. */
   onTrial?: boolean;
+  /** The day that trial ends and the card is charged. Null when no trial is running. */
+  trialEndsAt?: string | null;
   usage: EntitlementUsage;
 }
 
@@ -180,43 +181,13 @@ export async function fetchPaymentsStatus(): Promise<PaymentsStatus | null> {
 }
 
 /**
- * Starts the free trial for the signed-in user.
+ * The trial is Creem's, so there is no function here that starts one.
  *
- * The server decides eligibility; this just asks. A 409 comes back when the account is not in a
- * state where a trial means anything — already paying, already comped, or has had one before —
- * and the message it carries is the one to show.
+ * There was: startFreeTrial() POSTed to /api/start-trial, which granted a week of complimentary
+ * Silver with no card. When the trial moved onto the Creem product only the button was repointed,
+ * at choosePlan(TRIAL_TIER) above — this wrapper lost its last caller and the endpoint behind it
+ * stayed live and reachable. Both are gone now. StartTrialButton is the only way in.
  */
-export async function startFreeTrial(): Promise<{ tier: Tier; until: string; message: string }> {
-  if (!isFirebaseConfigured()) throw new Error('Sign in to start your trial.');
-  const user = getFirebaseAuth().currentUser;
-  if (!user) throw new Error('Sign in to start your trial.');
-
-  // The browser's own id, the same one the visitor analytics use. Sent so a second trial from
-  // one browser is visible to an admin; it is never a reason to refuse, because a shared browser
-  // is a library computer or a couple at a kitchen table far more often than it is abuse.
-  const visitorId = getVisitorId();
-
-  const res = await fetch('/api/start-trial', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${await user.getIdToken()}`,
-      'Content-Type': 'application/json',
-      ...(visitorId ? { 'X-Visitor-Id': visitorId } : {}),
-    },
-  });
-
-  const data = (await res.json().catch(() => ({}))) as {
-    tier?: Tier;
-    until?: string;
-    message?: string;
-    error?: string;
-  };
-
-  if (!res.ok || !data.tier || !data.until) {
-    throw new Error(data.error ?? 'Could not start your trial.');
-  }
-  return { tier: data.tier, until: data.until, message: data.message ?? 'Your trial has started.' };
-}
 
 /**
  * Sends the confirmation link, then tells the caller whether it worked.

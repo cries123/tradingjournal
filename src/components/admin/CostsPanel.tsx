@@ -95,7 +95,12 @@ export function CostsPanel({ report, error, loading, onOpenUser, canOpenUser }: 
             label: 'Run rate',
             value: `${money(report.mrrNow)}/mo`,
             tone: 'text-text-primary',
-            note: `${report.subscribers} paid subscriber${report.subscribers === 1 ? '' : 's'}`,
+            note:
+              `${report.subscribers} paid subscriber${report.subscribers === 1 ? '' : 's'}` +
+              // Named on the tile rather than left to the paragraph: a trial is the one reason this
+              // number can be lower than the subscriptions visible in Creem, and that discrepancy
+              // is what sends somebody looking for a bug.
+              (report.onTrial ? ` · ${report.onTrial} on trial` : ''),
           },
         ].map((tile) => (
           <div key={tile.label} className="panel-card rounded-xl p-4">
@@ -108,7 +113,8 @@ export function CostsPanel({ report, error, loading, onOpenUser, canOpenUser }: 
 
       <p className="text-[11px] text-text-secondary -mt-3 leading-relaxed">
         Collected is money Creem actually charged, from the billing ledger. Run rate is what the
-        live subscriptions bill per month — hand-granted tiers are excluded from both. Months
+        live subscriptions bill per month — hand-granted tiers and subscriptions still inside their
+        free trial are excluded from both, because neither has been charged. Months
         before the ledger existed show no revenue, because nothing recorded it.{' '}
         {report.connectedNow} broker connection{report.connectedNow === 1 ? '' : 's'} live now;
         SnapTrade only bills for people who have actually connected one.

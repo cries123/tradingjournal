@@ -7,6 +7,7 @@ import {
   effectiveTier,
   readEntitlement,
   subscribedTier,
+  trialUntil,
 } from '../../server/entitlements';
 import { readUsed, readUserCredits, usageResetsAt } from '../../server/usage';
 import { limitsFor, MARKET_REPLAY_LIVE } from '../../src/config/tiers';
@@ -73,7 +74,16 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
         // just hiding the button and leaving somebody to wonder where their trial went.
         trialBlockedReason: trial.eligible ? null : trial.reason,
         trialBlockedMessage: trial.eligible ? null : trial.message,
-        onTrial: record?.comp?.trial === true && Boolean(complimentaryUntil(record)),
+        /*
+         * Whether a free trial is running, and when the card is charged.
+         *
+         * This used to read comp.trial, which only a self-serve trial endpoint nothing called ever
+         * wrote — so it was false for everybody, and the three screens that show a trial countdown
+         * had never once rendered. A Creem trial is an ordinary active subscription with a date
+         * attached, which is what these two now carry.
+         */
+        onTrial: Boolean(trialUntil(record)),
+        trialEndsAt: trialUntil(record),
         usage: {
           aiMessagesUsed: aiUsed,
           aiMessagesRemaining: Math.max(0, limits.aiMessagesPerDay - aiUsed) + aiCredits,

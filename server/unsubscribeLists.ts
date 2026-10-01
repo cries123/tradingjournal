@@ -16,7 +16,7 @@
  * it is testable; the handler is not.
  */
 
-export type UnsubscribeList = 'recap' | 'rule-alerts';
+export type UnsubscribeList = 'recap' | 'rule-alerts' | 'trial';
 
 export interface ListDefinition {
   /** Where the preference lives, relative to the user. */
@@ -25,6 +25,24 @@ export interface ListDefinition {
   field: string;
   /** What the confirmation page says was stopped. */
   stopped: string;
+  /**
+   * What still arrives, said on the confirmation page beside what stopped.
+   *
+   * Empty for the lists that really do stop everything. The trial welcome does not: the two notices
+   * saying when the card is charged ignore this preference on purpose, and a page that claims the
+   * trial mail has stopped followed by an email naming a charge is a spam complaint from somebody
+   * who already clicked unsubscribe.
+   */
+  stillArrives: string;
+  /**
+   * Whether Settings has a control for this list.
+   *
+   * Both pages this endpoint renders tell the reader they can turn these emails off in Settings,
+   * and for a list with no toggle that sentence is simply false. It is a property of the list
+   * rather than a line in the handler because the two have to agree, and the handler is the half
+   * that cannot be tested.
+   */
+  inSettings: boolean;
 }
 
 export const UNSUBSCRIBE_LISTS: Record<UnsubscribeList, ListDefinition> = {
@@ -39,6 +57,8 @@ export const UNSUBSCRIBE_LISTS: Record<UnsubscribeList, ListDefinition> = {
     target: 'emailPrefs',
     field: 'recap',
     stopped: 'the weekly recap',
+    stillArrives: '',
+    inSettings: true,
   },
 
   /*
@@ -53,6 +73,35 @@ export const UNSUBSCRIBE_LISTS: Record<UnsubscribeList, ListDefinition> = {
     target: 'preferences',
     field: 'ruleAlertsEnabled',
     stopped: 'the rule alerts',
+    stillArrives: '',
+    inSettings: true,
+  },
+
+  /*
+   * The welcome note a day into a free trial, and only that one.
+   *
+   * The other two trial emails say when the card on file is charged and how to stop it, and they
+   * carry no link — the same reasoning the broker-link notices are written under: letting somebody
+   * opt out of a warning and then be surprised by what it warned about serves nobody. So this list
+   * is one email long, which is also why it has no toggle in Settings. A permanent checkbox for a
+   * seven-day sequence would sit there forever for the accounts that will never see it.
+   *
+   * Written only by this endpoint, through the Admin SDK, which is what keeps firestore.rules out
+   * of it: the emailPrefs rules pin a client write to uid/recap/updatedAt, and adding a key a
+   * client never sends would have meant a rules edit pasted by hand after the deploy, with a window
+   * in between where the toggle it was for threw permission-denied.
+   */
+  trial: {
+    target: 'emailPrefs',
+    field: 'trial',
+    // The WELCOME, named precisely. 'the free-trial reminders' would be a lie on the confirmation
+    // page: the link only ever appears in the welcome, the welcome is already deduped once sent, and
+    // the two notices about the charge ignore the preference by design. Clicking it stops exactly
+    // one future email — the welcome of a later trial — and the page now says so.
+    stopped: 'the free-trial welcome note',
+    stillArrives:
+      'The two notes telling you when your card is charged and how to stop it are not part of this list — you will still get those.',
+    inSettings: false,
   },
 };
 
@@ -65,6 +114,6 @@ export function resolveList(purpose: string | undefined): UnsubscribeList | null
    * cannot be identified should say so, because the alternative is confidently stopping a list the
    * reader never asked about.
    */
-  if (purpose === 'recap' || purpose === 'rule-alerts') return purpose;
+  if (purpose === 'recap' || purpose === 'rule-alerts' || purpose === 'trial') return purpose;
   return null;
 }

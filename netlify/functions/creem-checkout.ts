@@ -171,7 +171,12 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
       await changeSubscriptionPlan(route.subscriptionId, productId, route.direction);
       // Applied locally too rather than waiting on the webhook: the user is watching the page, and
       // the webhook confirming the same tier a second later is a harmless no-op.
-      await writeEntitlement(uid, { tier, status: 'active', source: 'purchase' });
+      //
+      // trialEndsAt is cleared because this path is reachable DURING a trial — a trialist is status
+      // active with a subscription id, which is all planChangeRoute asks for. The response one line
+      // below tells them we have charged the difference, so leaving the marker standing would have
+      // the app and the three trial emails go on counting down to a first charge that just happened.
+      await writeEntitlement(uid, { tier, status: 'active', source: 'purchase', trialEndsAt: null });
 
       return {
         statusCode: 200,

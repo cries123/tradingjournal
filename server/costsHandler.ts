@@ -54,6 +54,15 @@ export interface CostReport {
   mrrNow: number;
   /** How many people that run rate comes from. */
   subscribers: number;
+  /**
+   * Subscriptions inside their free trial, excluded from the two numbers above.
+   *
+   * A trial is an active subscription with a real id, so it used to be counted at full price —
+   * run rate that nobody had paid, next to a collected figure from the ledger that correctly said
+   * zero. Reported rather than silently dropped, because "why is run rate lower than the plans I
+   * can see" is the next question.
+   */
+  onTrial: number;
   topUsers: { uid: string; aiMessages: number; syncs: number; cost: number }[];
   /** Who bought what, newest first. Straight from the ledger, so it is money, not entitlement. */
   purchases: { uid: string; email: string; tier: string; amount: number; at: string }[];
@@ -145,29 +154,49 @@ async function readMonth(month: string): Promise<RawMonth> {
  * This is a RATE — what the active subscriptions bill per month — not what was collected. What was
  * collected comes from the ledger.
  */
-async function readSubscriptionRunRate(): Promise<{ mrr: number; subscribers: number }> {
+async function readSubscriptionRunRate(): Promise<{ mrr: number; subscribers: number; onTrial: number }> {
   const { TIER_PLANS } = await import('../src/config/tiers');
   const snap = await getAdminFirestore().collection('entitlements').get();
+  const nowIso = new Date().toISOString();
 
   let mrr = 0;
   let subscribers = 0;
+  let onTrial = 0;
   for (const doc of snap.docs) {
     const data = doc.data() as {
       tier?: string;
       status?: string;
       source?: string;
       creemSubscriptionId?: string;
+      trialEndsAt?: string;
     };
     if (data.status !== 'active') continue;
     if (data.source !== 'purchase') continue;
     if (!data.creemSubscriptionId) continue;
+
+    /*
+     * A running trial is not run rate.
+     *
+     * A trialling subscription is status active with a real subscription id — creemClient maps
+     * 'trialing' to active on purpose — so every live trial was counted here at full list price and
+     * as a paid subscriber, while the ledger beside it correctly booked the $0. The two tiles
+     * disagreed by the price of a plan per trial, and resolved themselves a week later either way,
+     * which is the kind of error that is never caught because it is never there when you look.
+     *
+     * Compared as ISO strings rather than parsed: these are the dates the webhook stored verbatim,
+     * and a string compare cannot throw on a value Creem formatted unexpectedly.
+     */
+    if (typeof data.trialEndsAt === 'string' && data.trialEndsAt > nowIso) {
+      onTrial += 1;
+      continue;
+    }
 
     const plan = TIER_PLANS[data.tier as keyof typeof TIER_PLANS];
     if (!plan || plan.price <= 0) continue;
     mrr += plan.price;
     subscribers += 1;
   }
-  return { mrr, subscribers };
+  return { mrr, subscribers, onTrial };
 }
 
 /**
@@ -231,8 +260,8 @@ export async function buildCostReport(): Promise<CostReport> {
   const thisMonth = monthKey(new Date());
   const from = launchMonth() || EARLIEST_MONTH;
 
-  const [{ mrr, subscribers }, connectedNow, purchases] = await Promise.all([
-    readSubscriptionRunRate().catch(() => ({ mrr: 0, subscribers: 0 })),
+  const [{ mrr, subscribers, onTrial }, connectedNow, purchases] = await Promise.all([
+    readSubscriptionRunRate().catch(() => ({ mrr: 0, subscribers: 0, onTrial: 0 })),
     readConnectedNow().catch(() => 0),
     readPurchases().catch(() => []),
   ]);
@@ -331,6 +360,7 @@ export async function buildCostReport(): Promise<CostReport> {
     connectedNow,
     mrrNow: mrr,
     subscribers,
+    onTrial,
     topUsers: ranked,
     purchases,
     warning,

@@ -11,9 +11,8 @@ import {
   parseBrokerStatusOverrides,
   resolveBrokerStatus,
 } from '../src/data/brokerStatusOverrides';
-import { readEntitlement, resolveAccess } from './entitlements';
+import { readEntitlement, resolveAccess, trialUntil } from './entitlements';
 import { brokerageKey, brokerageOwner, claimBrokerage } from './trialGuards';
-import { compIsLive } from '../src/config/accessExtension';
 import { consumeDaily, refundDaily, type SpendSource } from './usage';
 import {
   refundNotice,
@@ -407,6 +406,14 @@ async function handleStatus(uid: string): Promise<BrokerConnectResult> {
  * Enforced ONLY against a trial. A paying customer who opens a second account, or comes back
  * after deleting one, must never be told their own brokerage is spoken for — the whole point is
  * to stop free weeks being farmed, not to stop anybody paying us.
+ *
+ * The message matters more than it used to. This branch had never run: it keyed on a comp written
+ * by a trial endpoint nothing called, so for the whole life of the feature it refused nobody. It
+ * runs now, and under the Creem trial the person it refuses HAS a card on file — so the old line,
+ * "subscribe to any paid plan and it will sync straight away", told a subscriber to buy something
+ * they had already bought, and following it was impossible: the plan-change route answers their own
+ * tier with "you're already on Silver". What it says instead is the thing that is actually true,
+ * which is that the wait is until the trial becomes a paid month.
  */
 async function assertBrokerageNotAlreadyTrialled(
   uid: string,
@@ -426,7 +433,7 @@ async function assertBrokerageNotAlreadyTrialled(
 
     if (onTrial) {
       throw new BrokerRequestError(
-        'This brokerage account has already been used with another Trend Chasers account, so it is not eligible for a second free trial. Subscribe to any paid plan and it will sync straight away.',
+        'This brokerage account has already been used for a free trial on another Trend Chasers account, so it will not sync during a second one. It starts syncing as soon as your trial becomes a paid month — nothing to do, and nothing extra to buy.',
         409,
       );
     }
@@ -436,8 +443,12 @@ async function assertBrokerageNotAlreadyTrialled(
 /** True when what is granting this account its plan right now is a self-serve trial. */
 async function isOnTrial(uid: string): Promise<boolean> {
   try {
+    // trialUntil, not comp.trial. The comp was written by a self-serve trial endpoint that
+    // nothing ever called, so this returned false for every trial that has ever run and the guard
+    // below — the one thing stopping a brokerage being used for a free week under a second signup —
+    // had never once fired.
     const record = await readEntitlement(uid);
-    return record?.comp?.trial === true && compIsLive(record.comp, Date.now());
+    return Boolean(trialUntil(record));
   } catch {
     // Unreadable means "assume they are paying". Blocking a real customer over a Firestore blip
     // is the more expensive mistake by a distance.

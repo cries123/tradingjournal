@@ -14,9 +14,27 @@ import { createHmac, timingSafeEqual } from 'crypto';
 
 const SECRET_ENV = 'EMAIL_TOKEN_SECRET';
 
+/**
+ * Logged once per cold start when it is missing, because the failure is otherwise total and silent.
+ *
+ * With no secret, every token and every URL comes back null, and the footer simply omits the link —
+ * so every recap and every rule alert ships with no way out and nothing anywhere says so. Not
+ * thrown: an unsubscribe link that cannot be minted must never stop an email somebody is waiting
+ * for, and the one-line warning is enough to find it.
+ */
+let warned = false;
+
 function secret(): string | null {
   const value = process.env[SECRET_ENV]?.trim();
-  return value && value.length >= 16 ? value : null;
+  if (value && value.length >= 16) return value;
+
+  if (!warned) {
+    warned = true;
+    console.warn(
+      `[unsubscribe] ${SECRET_ENV} is missing or under 16 characters — every email will ship without an unsubscribe link`,
+    );
+  }
+  return null;
 }
 
 export function unsubscribeToken(uid: string, purpose = 'recap'): string | null {

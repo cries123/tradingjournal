@@ -14,6 +14,15 @@ export interface CostReport {
   connectedNow: number;
   mrrNow: number;
   subscribers: number;
+  /**
+   * Subscriptions inside their free trial, excluded from the two numbers above.
+   *
+   * A trial is an active subscription with a real id, so it used to be counted at full price —
+   * run rate that nobody had paid, next to a collected figure from the ledger that correctly said
+   * zero. Reported rather than silently dropped, because "why is run rate lower than the plans I
+   * can see" is the next question.
+   */
+  onTrial: number;
   topUsers: { uid: string; aiMessages: number; syncs: number; cost: number }[];
   purchases: { uid: string; email: string; tier: string; amount: number; at: string }[];
   warning: string | null;

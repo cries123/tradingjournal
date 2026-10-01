@@ -52,8 +52,6 @@ export function brokerageKey(institution: string | null, accountNumber: string |
 export interface TrialClaim {
   uid: string;
   claimedAt: string;
-  /** Signals worth a look, never a reason to refuse on their own. */
-  flags: string[];
 }
 
 function claimDoc(mailbox: string) {
@@ -68,64 +66,27 @@ export async function findTrialClaim(mailbox: string): Promise<TrialClaim | null
   return {
     uid: typeof data.uid === 'string' ? data.uid : '',
     claimedAt: typeof data.claimedAt === 'string' ? data.claimedAt : '',
-    flags: Array.isArray(data.flags) ? data.flags.filter((f): f is string => typeof f === 'string') : [],
   };
 }
 
-export interface ClaimSignals {
-  /** The browser's own long-lived id, as the visitor analytics already know it. */
-  visitorId?: string | null;
-  ip?: string | null;
-}
-
 /**
- * Signals that this claim resembles one already made.
+ * Records the claim. Written after Creem says the trial started, so a write failure cannot deny one.
  *
- * Deliberately advisory. A shared browser is a library computer or a couple at a kitchen table,
- * and a shared IP is an office, a phone network or a household — blocking on either refuses more
- * real customers than it stops abusers. Recorded so a human can look, and so a pattern across
- * twenty accounts is visible as a pattern rather than as twenty unremarkable signups.
+ * The mailbox and nothing else. It used to store a hash of the browser id and the caller IP too, and
+ * a set of advisory flags derived from them — "same browser as an earlier trial", "several trials
+ * from one network" — read from the request that granted the trial. That request is now Creem's
+ * webhook: there is no browser, and the IP is Creem's, so every trial would have been flagged as
+ * coming from one network. Capturing those signals again would mean recording them at checkout,
+ * where the person actually is, and passing them through the subscription metadata.
  */
-export async function flagsForClaim(uid: string, signals: ClaimSignals): Promise<string[]> {
-  const db = getAdminFirestore();
-  const flags: string[] = [];
-
-  const browser = signals.visitorId ? identityHash(signals.visitorId) : null;
-  const network = signals.ip ? identityHash(signals.ip) : null;
-
-  const [sameBrowser, sameNetwork] = await Promise.all([
-    browser
-      ? db.collection('trialClaims').where('browser', '==', browser).limit(2).get()
-      : null,
-    network ? db.collection('trialClaims').where('network', '==', network).limit(4).get() : null,
-  ]);
-
-  if (sameBrowser?.docs.some((d) => (d.data() as { uid?: string }).uid !== uid)) {
-    flags.push('same-browser-as-an-earlier-trial');
-  }
-  const otherOnNetwork = sameNetwork?.docs.filter((d) => (d.data() as { uid?: string }).uid !== uid) ?? [];
-  if (otherOnNetwork.length >= 3) flags.push('several-trials-from-one-network');
-
-  return flags;
-}
-
-/** Records the claim. Written after the trial is granted, so a write failure cannot deny one. */
-export async function recordTrialClaim(
-  mailbox: string,
-  uid: string,
-  signals: ClaimSignals,
-  flags: string[],
-): Promise<void> {
-  await claimDoc(mailbox).set(
-    {
-      uid,
-      claimedAt: new Date().toISOString(),
-      flags,
-      ...(signals.visitorId ? { browser: identityHash(signals.visitorId) } : {}),
-      ...(signals.ip ? { network: identityHash(signals.ip) } : {}),
-    },
-    { merge: true },
-  );
+export async function recordTrialClaim(mailbox: string, uid: string): Promise<void> {
+  // create-only, like claimBrokerage below and for the same reason: the FIRST account to claim a
+  // mailbox keeps it. With set+merge, a second signup on the same address would quietly take the
+  // record over and reset its date — rewriting the one row an admin opens to investigate farming,
+  // using the farming itself.
+  await claimDoc(mailbox)
+    .create({ uid, claimedAt: new Date().toISOString() })
+    .catch(() => undefined);
 }
 
 /* ------------------------------------------------------------------ brokerages */

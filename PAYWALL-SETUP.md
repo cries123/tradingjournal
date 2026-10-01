@@ -39,7 +39,17 @@ product ids, so don't mix them.
 Webhook URL: `https://trendchasers.net/api/creem-webhook`
 
 Subscribe to the subscription events (active / paid / cancelled / expired /
-past due). Copy the signing secret into `CREEM_WEBHOOK_SECRET`.
+past due) **and `subscription.trialing`**. Copy the signing secret into
+`CREEM_WEBHOOK_SECRET`.
+
+`subscription.trialing` is the only event that says a subscription is in its
+free trial, and the entitlement has no other way to find out — Creem reports a
+trialling subscription as active, which is correct for access and useless for
+everything else. Without it the three trial emails never send, the run rate
+counts a trial as paid revenue, and the app tells a triallist their plan
+"renews" on the day their card is first charged. To check it is arriving, look
+for `trialing=true` in the `[creem-webhook]` log line after a test-mode trial
+checkout; the daily `[trial-nudges]` line says so too when it matches nobody.
 
 Without that secret the endpoint refuses **every** webhook — which is the right
 failure, since the signature is the only thing stopping a stranger from POSTing

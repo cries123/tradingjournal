@@ -284,12 +284,10 @@ export async function adminEmailUser(
   return adminApiPost({ action: 'emailUser', targetUid, subject, message });
 }
 
-/* ------------------------------------------------------------------ trial abuse signals */
+/* ------------------------------------------------------------------ trial history */
 
 export interface TrialClaimView {
   claimedAt: string;
-  /** Signals worth a look. Never a reason the trial was refused — it was granted. */
-  flags: string[];
 }
 
 /**

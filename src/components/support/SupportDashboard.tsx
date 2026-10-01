@@ -99,8 +99,18 @@ function QuickAction({
  */
 export function SupportDashboard({ onBack, onBrokers, onRequestBroker }: SupportDashboardProps) {
   const { user, username } = useAuth();
-  const { tier, limits, usage, status, source, currentPeriodEnd, complimentaryUntil, onTrial, loaded } =
-    useEntitlement();
+  const {
+    tier,
+    limits,
+    usage,
+    status,
+    source,
+    currentPeriodEnd,
+    complimentaryUntil,
+    onTrial,
+    trialEndsAt,
+    loaded,
+  } = useEntitlement();
 
   /* A counter, not just a category: choosing "Report a bug" twice in a row has to reopen the form
      the second time, and a bare category would be the same value and remount nothing. */
@@ -111,12 +121,15 @@ export function SupportDashboard({ onBack, onBrokers, onRequestBroker }: Support
   const plan = TIER_PLANS[tier];
   const renewal = shortDate(currentPeriodEnd);
   const compUntil = shortDate(complimentaryUntil);
+  // A trial's first charge is not a renewal, and this screen called it one. The date is the same
+  // currentPeriodEnd either way, so only the word was wrong — on the one line that shows it.
+  const trialEnd = shortDate(trialEndsAt);
 
   const planHint =
     source === 'admin'
       ? 'Granted to your account'
-      : onTrial && compUntil
-        ? `Free trial through ${compUntil}`
+      : onTrial && trialEnd
+        ? `Free trial — ${plan.price} on ${trialEnd}`
         : source === 'comp' && compUntil
           ? `On us through ${compUntil}`
           : status === 'past_due'

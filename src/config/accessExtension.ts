@@ -20,8 +20,6 @@ export interface ComplimentaryAccess {
   grantedBy: string;
   grantedAt: string;
   reason?: string;
-  /** Set by the self-serve free trial, so the UI can count it down as one rather than call it a gift. */
-  trial?: boolean;
 }
 
 /** The shape of an entitlement record this module needs to reason about. */

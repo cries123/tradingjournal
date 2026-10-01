@@ -27,8 +27,10 @@ export interface EntitlementContextValue {
   /** Why not, when not — 'email-unverified' is the one the page can do something about. */
   trialBlockedReason: string | null;
   trialBlockedMessage: string | null;
-  /** What is running is a self-serve trial rather than something granted by hand. */
+  /** A free trial is running — a real subscription with a card on it that has not been charged. */
   onTrial: boolean;
+  /** The day it ends and the card is charged. */
+  trialEndsAt: string | null;
   usage: EntitlementSnapshot['usage'];
   loading: boolean;
   /** True only once a real answer has come back, so the UI can avoid flashing a locked state. */

@@ -33,12 +33,21 @@ function day(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function describe(record: AdminEntitlementView | null): string {
+function describe(record: AdminEntitlementView | null, now: number): string {
   if (!record) return 'Free — never paid, never granted.';
   const name = TIER_PLANS[record.tier].name;
   if (record.source === 'admin') return `${name}, granted by hand. Billing can't override it.`;
   if (record.tier === 'free') return 'Free — nothing paid for.';
   if (record.status === 'active') {
+    /*
+     * A trial reads as an ordinary active subscription — creemClient maps 'trialing' to active so
+     * that a triallist passes every gate a subscriber passes — so without this line the panel said
+     * "paid subscription — renews" about somebody who has never been charged, on the screen that
+     * exists to answer exactly that question.
+     */
+    if (record.trialEndsAt && Date.parse(record.trialEndsAt) > now) {
+      return `${name}, free trial — first charge ${day(record.trialEndsAt)}. Nothing collected yet.`;
+    }
     return record.currentPeriodEnd
       ? `${name}, paid subscription — renews ${day(record.currentPeriodEnd)}.`
       : `${name}, paid subscription.`;
@@ -200,7 +209,7 @@ export function AdminUserPlanSection({ uid, onDone, onError, onAudit }: AdminUse
         {record?.source === 'admin' && (
           <BadgeCheck size={15} className="mt-0.5 shrink-0 text-emerald-400" aria-hidden />
         )}
-        <span>{loading ? 'Checking…' : describe(record)}</span>
+        <span>{loading ? 'Checking…' : describe(record, now)}</span>
       </p>
 
       {liveComp && (

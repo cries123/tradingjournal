@@ -1,5 +1,6 @@
 import { LegalPageLayout } from './LegalPageLayout';
 import { LEGAL_ENTITY, REFUND_WINDOW_DAYS, SUPPORT_EMAIL } from '../config/legal';
+import { TRIAL_DAYS } from '../config/trial';
 import type { ExtraNavRoute } from '../hooks/useRoute';
 
 interface RefundPolicyPageProps {
@@ -62,6 +63,27 @@ export function RefundPolicyPage({
           Refunds are issued within 5 business days of your request. Once issued, the money takes a
           further 5 to 10 business days to appear, depending on your bank or card issuer — that part
           is outside our control.
+        </p>
+      </section>
+
+      {/*
+        The disclosure that settles most disputes, and it was in none of the three places a customer
+        or a processor would look: not here, not in the Terms, and not in the trial emails. The
+        trial is a real subscription with the card taken at checkout, so the first charge is not a
+        renewal and arrives on day 8 unless somebody cancels.
+      */}
+      <section>
+        <h2>Free trials</h2>
+        <p>
+          The {TRIAL_DAYS}-day free trial starts at checkout and takes your card at the time. We
+          charge nothing while it runs. On the day it ends, the card is charged the plan's normal
+          monthly price and the subscription carries on month to month.
+        </p>
+        <p>
+          Cancel at any point before that day and nothing is charged — you keep the plan until the
+          trial ends either way. If a first charge catches you by surprise, the{' '}
+          {REFUND_WINDOW_DAYS}-day guarantee above covers it in full: email us and we will refund
+          it.
         </p>
       </section>
 

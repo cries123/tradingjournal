@@ -1,5 +1,8 @@
 import type { WeeklyRecap } from '../src/utils/insights';
 import { TIER_PLANS, type Tier } from '../src/config/tiers';
+// The refund promise is made publicly on /refund-policy, so the one email that offers it reads the
+// window from the same constant rather than restating a number the page could later disagree with.
+import { REFUND_WINDOW_DAYS } from '../src/config/legal';
 
 /**
  * The two emails this product sends, as one small layout and two bodies.
@@ -425,17 +428,48 @@ export interface TrialProgress {
   imported: number;
   connected: boolean;
 }
-
 /**
  * The three notes a trial gets: get started, two days left, last day.
  *
- * Each has one job, and none of them is "please buy". Somebody who connected a broker and watched
- * a month of trades appear already knows what it is worth; somebody who never connected is not
- * going to be argued into it, but they might be reminded that they never finished setting it up.
+ * Every one of these used to describe a different trial from the one the product sells. They were
+ * written for a complimentary week with no card, and what runs is a Creem subscription with the
+ * card taken at checkout — so the welcome said "nothing to cancel and no card on file", and the
+ * note two days before the charge said "nothing happens if you don't". The last thing a customer
+ * would have read before a $9 line on their statement was an explicit promise that no charge was
+ * coming. Nothing had ever been sent, because the job looked for a record only a dead endpoint
+ * wrote; the copy was a chargeback waiting for the day somebody wired it up.
+ *
+ * So the job of these three is now: get them connected, say when the card is charged, say it again
+ * on the last day it can still be stopped. The amount and the date are in the subject line of the
+ * two that carry them, which is the cheapest chargeback insurance there is.
  */
 export function trialEmail(options: {
   stage: 'started' | 'ending' | 'last-day';
   daysLeft: number;
+  /**
+   * The day the trial ends and the card is charged.
+   *
+   * A date, not "in 2 days". The vague form is what let the old copy avoid saying a charge was
+   * coming at all, and a dated disclosure is the one a processor accepts.
+   */
+  endsAt: string;
+  /**
+   * When this is being sent.
+   *
+   * Only so the last-day note can tell "ends today" from "ends tomorrow": its stage boundary rounds
+   * up, so it fires within a day of the end rather than on the day.
+   */
+  sentAt: string;
+  /**
+   * Whether the card is charged when it ends.
+   *
+   * False once the subscription says cancelled. It is not knowable in every case — Creem's
+   * `subscription.scheduled_cancel` is deliberately ignored upstream, so somebody who cancels
+   * mid-trial can still look active here — which is why the body says "unless you have already
+   * cancelled" rather than relying on this alone. The flag only ever makes the copy MORE definite,
+   * never less.
+   */
+  willCharge: boolean;
   /**
    * The tier, not a rendered name.
    *
@@ -450,14 +484,41 @@ export function trialEmail(options: {
   tier: Tier;
   progress: TrialProgress;
   siteUrl: string;
+  /**
+   * Only the welcome carries one.
+   *
+   * The other two say when a card is charged and how to stop it. Letting somebody opt out of that
+   * and then charging them is the surprise the notice exists to prevent — the same reasoning the
+   * broker-link notices above are written under.
+   */
+  unsubscribeUrl?: string | null;
 }): TicketReplyEmail {
-  const { stage, daysLeft, tier, progress, siteUrl } = options;
+  const { stage, daysLeft, endsAt, sentAt, willCharge, tier, progress, siteUrl, unsubscribeUrl } =
+    options;
   const plan = TIER_PLANS[tier];
   const tierName = plan.name;
   const price = `$${plan.price}`;
   const connect = `${siteUrl}/brokers`;
-  const pricing = `${siteUrl}/pricing`;
+  const account = `${siteUrl}/app`;
+  const when = friendlyDate(endsAt);
   const days = daysLeft === 1 ? '1 day' : `${daysLeft} days`;
+
+  /*
+   * Whether the trial really ends today, rather than within a day.
+   *
+   * decideNudge reaches the last-day stage at daysLeft <= 1, and daysLeft rounds UP — so a trial
+   * ending at 6am tomorrow is "1 day" on a run at 3pm today. Creem sets the end time, the job runs
+   * at a fixed hour, and for roughly half of all end times the last-day note would have gone out
+   * with "ends today" in the subject beside TOMORROW'S date, in the one email whose entire job is
+   * to deliver a date the reader can trust.
+   */
+  const endsToday = friendlyDate(endsAt) === friendlyDate(sentAt);
+  const todayOrTomorrow = endsToday ? 'today' : 'tomorrow';
+
+  // Where to cancel, named as a route through the app rather than a link, because the billing
+  // portal is opened by a signed-in call to Creem and there is no URL that can be put in an email.
+  const howToCancel =
+    'open the account menu, pick Subscription, then Manage billing or cancel';
 
   // What they actually got out of it, or what they have not done yet. The difference decides
   // every one of these emails.
@@ -469,33 +530,78 @@ export function trialEmail(options: {
 
   const doneText = done.replace(/<[^>]+>/g, '');
 
+  // What happens on the day, in both directions. Said the same way in all three so nobody can
+  // read two of them and come away with different answers.
+  const charge = willCharge
+    ? `On <strong>${when}</strong> the card you used at checkout is charged ${price} and ${tierName} carries on month to month.`
+    : `Your subscription is already cancelled, so nothing is charged on <strong>${when}</strong>.`;
+  const chargeText = charge.replace(/<[^>]+>/g, '');
+
+  const whatStops = `${tierName} stays on until ${when} either way. After that the automatic importing stops and the brokerage connection is removed a few days later — and everything already in your journal, every trade, note and screenshot, stays exactly where it is, free, for as long as you want it.`;
+
+  /*
+   * The hedge, on the two emails that claim a charge is coming.
+   *
+   * willCharge is right whenever Creem tells us a subscription was cancelled, and Creem's
+   * `subscription.scheduled_cancel` is deliberately ignored upstream — matching it would revoke
+   * access weeks early for anybody leaving at the end of a paid period. So somebody who cancels
+   * mid-trial can still look active here, and this sentence is what stops them being told a charge
+   * is coming after they have already stopped it.
+   */
+  const ifAlreadyCancelled = willCharge
+    ? ' If you have already cancelled, nothing is taken and you can ignore this.'
+    : '';
+
+  // The welcome, for the two different people who can receive it. Somebody who cancelled on day one
+  // still gets it the next morning, and telling them to go and cancel a subscription they have
+  // already cancelled is how one email becomes two support tickets.
+  const notYet = willCharge ? ' Nothing has been charged yet.' : '';
+  const whatNow = willCharge
+    ? `If you would rather it stopped there, ${howToCancel} — any time before ${when}.`
+    : `There is nothing else to do: ${tierName} stays on until ${when} and then your journal goes back to free.`;
+
   if (stage === 'started') {
     return {
-      subject: `Your ${tierName} trial is running`,
+      subject: `Your ${tierName} trial is running until ${when}`,
       html: layout({
-        title: `${tierName} is yours for ${days}`,
+        title: `${tierName} is yours until ${when}`,
         body: `
           <p style="margin:0 0 12px 0;">${done}</p>
-          <p style="margin:0 0 12px 0;">Nothing to cancel and no card on file — it ends by itself, and your journal stays free either way.</p>`,
+          <p style="margin:0 0 12px 0;">${charge}${notYet}</p>
+          <p style="margin:0;">${whatNow}</p>`,
         ctaLabel: progress.connected ? 'Open your journal' : 'Connect your broker',
-        ctaUrl: progress.connected ? `${siteUrl}/app` : connect,
+        ctaUrl: progress.connected ? account : connect,
         footerNote: 'You are getting this because you started a free trial on Trend Chasers.',
+        unsubscribeUrl,
       }),
-      text: [`${tierName} is yours for ${days}.`, '', doneText, '', `Start here: ${progress.connected ? `${siteUrl}/app` : connect}`].join('\n'),
+      text: [
+        `${tierName} is yours until ${when}.`,
+        '',
+        doneText,
+        '',
+        `${chargeText}${notYet}`,
+        '',
+        whatNow,
+        '',
+        `Start here: ${progress.connected ? account : connect}`,
+        unsubscribeUrl ? `\nUnsubscribe from the welcome note: ${unsubscribeUrl}` : '',
+      ].join('\n'),
     };
   }
 
   if (stage === 'ending') {
     return {
-      subject: `${days} left on your ${tierName} trial`,
+      subject: willCharge
+        ? `${days} left on your ${tierName} trial — ${price} on ${when}`
+        : `${days} left on your ${tierName} trial`,
       html: layout({
         title: `${days} left on your trial`,
         body: `
           <p style="margin:0 0 12px 0;">${done}</p>
-          <p style="margin:0 0 12px 0;">When the trial ends your journal keeps everything in it — every trade, note and screenshot. What stops is the automatic importing, and the brokerage connection is removed a few days later.</p>
-          <p style="margin:0;">${tierName} is ${price} a month if you want to keep it running. Nothing happens if you don't.</p>`,
-        ctaLabel: `Keep ${tierName}`,
-        ctaUrl: pricing,
+          <p style="margin:0 0 12px 0;">${charge}</p>
+          <p style="margin:0;">To stop it, ${howToCancel} before ${when}. ${whatStops}${ifAlreadyCancelled}</p>`,
+        ctaLabel: 'Manage your subscription',
+        ctaUrl: account,
         footerNote: 'You are getting this because you started a free trial on Trend Chasers.',
       }),
       text: [
@@ -503,33 +609,42 @@ export function trialEmail(options: {
         '',
         doneText,
         '',
-        'When it ends your journal keeps everything in it. What stops is the automatic importing.',
+        chargeText,
         '',
-        `Keep it: ${pricing}`,
+        `To stop it, ${howToCancel} before ${when}. ${whatStops}${ifAlreadyCancelled}`,
+        '',
+        `Manage your subscription: ${account}`,
       ].join('\n'),
     };
   }
 
   return {
-    subject: `Your ${tierName} trial ends today`,
+    subject: willCharge
+      ? `Your ${tierName} trial ends ${todayOrTomorrow} — ${price} on ${when}`
+      : `Your ${tierName} trial ends ${todayOrTomorrow}`,
     html: layout({
-      title: 'Your trial ends today',
+      title: `Your trial ends ${todayOrTomorrow}`,
       body: `
         <p style="margin:0 0 12px 0;">${done}</p>
-        <p style="margin:0 0 12px 0;"><strong>Nothing disappears.</strong> Your journal, your notes and every trade already imported stay exactly where they are, free, for as long as you want them.</p>
-        <p style="margin:0;">What stops today is the automatic importing. If you would rather it kept going, ${tierName} is ${price} a month.</p>`,
-      ctaLabel: `Keep ${tierName}`,
-      ctaUrl: pricing,
+        <p style="margin:0 0 12px 0;">${charge}${willCharge ? ` ${endsToday ? 'Today' : 'Tomorrow'} is the last day to stop that.` : ''}</p>
+        <p style="margin:0 0 12px 0;">${willCharge ? `To stop it, ${howToCancel}. ` : ''}${whatStops}${ifAlreadyCancelled}</p>
+        <p style="margin:0;">If a charge lands that you did not want, reply to this email — the ${REFUND_WINDOW_DAYS}-day money-back guarantee covers it and we refund in full.</p>`,
+      ctaLabel: 'Manage your subscription',
+      ctaUrl: account,
       footerNote: 'You are getting this because you started a free trial on Trend Chasers.',
     }),
     text: [
-      `Your ${tierName} trial ends today.`,
+      `Your ${tierName} trial ends ${todayOrTomorrow}.`,
+      '',
+      `${chargeText}${willCharge ? ` ${endsToday ? 'Today' : 'Tomorrow'} is the last day to stop that.` : ''}`,
       '',
       doneText,
       '',
-      'Nothing disappears — your journal and every trade already imported stay, free.',
+      `${willCharge ? `To stop it, ${howToCancel}. ` : ''}${whatStops}${ifAlreadyCancelled}`,
       '',
-      `Keep the automatic importing: ${pricing}`,
+      `If a charge lands that you did not want, reply to this email — the ${REFUND_WINDOW_DAYS}-day money-back guarantee covers it.`,
+      '',
+      `Manage your subscription: ${account}`,
     ].join('\n'),
   };
 }
@@ -639,7 +754,13 @@ export function ruleAlertEmail(options: {
     `That day: ${tradeCount} trade${tradeCount === 1 ? '' : 's'}, ${money(dayPnl)}`,
     '',
     'Your limits are in Settings if they are the wrong ones.',
-  ].join('\n');
+    // The HTML footer has carried the link from the start and the text part never did, so a reader
+    // on a text-only client had no way out of a DAILY email. That is how a sending domain gets
+    // blacklisted, which would take the password resets and the payment-failed notices with it.
+    options.unsubscribeUrl ? `\nUnsubscribe: ${options.unsubscribeUrl}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   return {
     subject: one ? `You broke a rule on ${when}` : `You broke ${breaches.length} rules on ${when}`,
@@ -715,6 +836,8 @@ export function aiRecapEmail(options: {
     `Trades: ${recap.tradeCount}`,
     `Green/red days: ${recap.greenDays}/${recap.redDays}`,
     delta !== null ? `vs last week: ${delta >= 0 ? '+' : ''}${money(delta)}` : '',
+    // Same gap the rule alert had: the HTML footer linked out and the text part did not.
+    options.unsubscribeUrl ? `\nUnsubscribe: ${options.unsubscribeUrl}` : '',
   ]
     .filter(Boolean)
     .join('\n');

@@ -344,6 +344,17 @@ export interface ParsedBillingEvent {
   creemSubscriptionId?: string;
   creemCustomerId?: string;
   currentPeriodEnd?: string;
+  /**
+   * Whether this event says the subscription is inside its free trial.
+   *
+   * Separate from `status`, which is 'active' for a trial and has to be: a triallist has handed
+   * over a card and has paid-tier access, so every gate in the product should treat them as a
+   * subscriber. The fact that it is a TRIAL was simply dropped — which is why nothing downstream
+   * could count the days, and why the three trial emails have never been sent to anybody.
+   *
+   * On a trialing event `currentPeriodEnd` is the date the trial ends and the card is charged.
+   */
+  trialing: boolean;
 }
 
 /**
@@ -422,6 +433,17 @@ export function parseBillingEvent(event: CreemWebhookEvent): ParsedBillingEvent 
     creemSubscriptionId: subscriptionIdFrom(event),
     creemCustomerId: readId(obj.customer),
     currentPeriodEnd: obj.current_period_end_date ?? undefined,
+    /*
+     * Read from the event type AND the object's own status.
+     *
+     * `subscription.trialing` is one of the fourteen events enabled in the Creem dashboard, so the
+     * first test is the one that normally fires. The second is there because a trial purchase also
+     * emits `checkout.completed`, and if Creem ever stops sending the dedicated event the object's
+     * status is the only remaining way to know. Missing it costs the three trial emails; a false
+     * positive would tell a paying customer their card is about to be charged for the first time,
+     * so neither test is loosened to anything vaguer than the literal word.
+     */
+    trialing: type.includes('trialing') || obj.status === 'trialing',
   };
 }
 

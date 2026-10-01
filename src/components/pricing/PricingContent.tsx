@@ -82,7 +82,10 @@ export function PricingContent({
     source,
     refresh,
     onTrial,
-    complimentaryUntil,
+    trialEndsAt,
+    // Named explicitly. Without it `status` silently resolves to the DOM global of that name, which
+    // is a string and typechecks clean — so the cancelled-trial branch below would simply never run.
+    status: planStatus,
     canManageBilling,
     trialAvailable,
     trialBlockedReason,
@@ -361,7 +364,11 @@ export function PricingContent({
               <div className={`flex items-center gap-2 ${accent.text}`}>
                 <Icon className="w-4 h-4" aria-hidden />
                 <h2 className="text-sm font-semibold uppercase tracking-[0.14em]">{plan.name}</h2>
-                {tier === TRIAL_TIER && !yearly && (
+                {/* Not shown to somebody the server has already refused. The badge used to be gated
+                    on the tier alone, so an ex-triallist saw "7-day free trial" above an ordinary
+                    buy button with nothing explaining the difference. Signed-out visitors keep it:
+                    the public page is advertising to people who have no record yet. */}
+                {tier === TRIAL_TIER && !yearly && (!user || trialOnOffer) && (
                   <span className="ml-auto rounded-full bg-emerald-400/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
                     {TRIAL_DAYS}-day free trial
                   </span>
@@ -420,8 +427,12 @@ export function PricingContent({
                   <div className="w-full rounded-lg border border-emerald-400/40 bg-emerald-400/10 px-4 py-2.5 text-center text-sm font-medium text-emerald-300">
                     {source === 'admin'
                       ? 'Granted to your account'
-                      : onTrial
-                        ? `Free trial — ${plan.name} until ${new Date(complimentaryUntil ?? '').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+                      : onTrial && trialEndsAt
+                        ? // Cancelled trials run to their end date too, and must not be told a charge
+                          // is coming — the same gate SubscriptionContent already has.
+                          planStatus === 'active'
+                          ? `Free trial — ${plan.name}, ${plan.price} on ${new Date(trialEndsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+                          : `Free trial — cancelled, ${plan.name} until ${new Date(trialEndsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
                         : source === 'comp'
                           ? 'Yours for now, on us'
                           : 'Current plan'}
@@ -444,7 +455,14 @@ export function PricingContent({
                    * with Creem's trial on the front of it, so a second "subscribe now" underneath
                    * would send them to exactly the same place while implying it skipped the trial.
                    */
-                  <StartTrialButton showTerms={false} />
+                  /* showTerms ON. The prop exists for places where the surrounding copy already
+                     says it, and this card does not: the badge reads "7-day free trial" and nothing
+                     beside it mentions a card or what happens on day 8. The button renders its own
+                     terms line naming the monthly price and the fact that cancelling before the end
+                     costs nothing — the only honest disclosure anywhere in the product, and it was
+                     switched off on the page where most trials start. (No price written here: a
+                     literal in this file is what pricingClaims.test.ts exists to catch.) */
+                  <StartTrialButton showTerms />
                 ) : (
                   <button
                     type="button"

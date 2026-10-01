@@ -78,7 +78,8 @@ function daysLeft(until: string): string {
  */
 export function PlanBadge() {
   const { user } = useAuth();
-  const { tier, limits, usage, loaded, source, status, complimentaryUntil, onTrial } = useEntitlement();
+  const { tier, limits, usage, loaded, source, status, complimentaryUntil, onTrial, trialEndsAt } =
+    useEntitlement();
 
   if (!user || !loaded) return null;
 
@@ -141,20 +142,38 @@ export function PlanBadge() {
       {source === 'admin' && (
         <p className="text-[11px] text-text-secondary leading-snug">Granted to your account — nothing to pay.</p>
       )}
-      {source === 'comp' && complimentaryUntil && (
+      {/*
+        A trial is a real subscription with a card behind it, so it is NOT the comp branch below.
+        This used to be nested inside it, reading comp.trial — a field only a dead endpoint ever
+        wrote — so a trialling customer saw the ordinary paid badge and nothing in the app ever
+        mentioned the charge that was coming.
+      */}
+      {onTrial && trialEndsAt && (
         <p className="text-[11px] text-text-secondary leading-snug">
-          {onTrial ? (
+          {/* Days to decide by, then the date the money moves. Days alone is what let the emails
+              avoid saying a charge was coming at all.
+
+              Gated on status, because a cancelled trial still runs to its end date: telling somebody
+              their card is about to be charged, in the app they opened to check the cancellation
+              took, is the one thing worse than not mentioning the charge at all. */}
+          {status === 'active' ? (
             <>
-              {/* Days, not a date: "3 days left" is the number that makes somebody decide, and a
-                  date four weeks out reads as forever. */}
-              Free trial — {daysLeft(complimentaryUntil)} left. Subscribe any time to keep it.
+              Free trial — {daysLeft(trialEndsAt)} left, then{' '}
+              {new Date(trialEndsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}{' '}
+              your card is charged. Cancel any time before then.
             </>
           ) : (
             <>
-              On us until{' '}
-              {new Date(complimentaryUntil).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} — nothing to pay.
+              Free trial — cancelled, so nothing is charged. Yours until{' '}
+              {new Date(trialEndsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}.
             </>
           )}
+        </p>
+      )}
+      {source === 'comp' && complimentaryUntil && (
+        <p className="text-[11px] text-text-secondary leading-snug">
+          On us until{' '}
+          {new Date(complimentaryUntil).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} — nothing to pay.
         </p>
       )}
     </div>

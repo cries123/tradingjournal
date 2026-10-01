@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Ban, Flag, KeyRound, Mail, Trash2, Unplug, User, UserCheck, X } from 'lucide-react';
+import { Ban, Flag, KeyRound, Mail, Trash2, Unplug, User, UserCheck, X } from 'lucide-react';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { AdminUserPlanSection } from './AdminUserPlanSection';
 import { AdminUserUsageSection } from './AdminUserUsageSection';
@@ -364,19 +364,6 @@ export function AdminUserDetailModal({
                 <dt className="text-xs text-text-secondary uppercase tracking-wider">Free trial</dt>
                 <dd className="mt-0.5">
                   Started {formatDateTime(trialClaim.claimedAt)}
-                  {trialClaim.flags.length > 0 && (
-                    <span className="mt-1 flex flex-wrap gap-1">
-                      {trialClaim.flags.map((flag) => (
-                        <span
-                          key={flag}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 text-[10px] font-medium"
-                        >
-                          <AlertTriangle size={10} aria-hidden />
-                          {flag.replaceAll('-', ' ')}
-                        </span>
-                      ))}
-                    </span>
-                  )}
                 </dd>
               </div>
             )}

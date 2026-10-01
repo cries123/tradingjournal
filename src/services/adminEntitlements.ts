@@ -12,6 +12,14 @@ export interface AdminEntitlementView extends AccessRecord {
   updatedAt?: string;
   /** Time-limited access given by hand, if any. Checked against the clock by the reader. */
   comp?: ComplimentaryAccess | null;
+  /**
+   * When a Creem free trial ends, if one is running. Checked against the clock by the reader.
+   *
+   * This view rebuilds the document field by field rather than spreading it, so a field added on
+   * the server is invisible here until it is named — which is why the admin panel showed a
+   * trialling customer as an ordinary paying subscriber.
+   */
+  trialEndsAt?: string | null;
 }
 
 /**
@@ -80,6 +88,7 @@ function readEntitlementDoc(data: Partial<AdminEntitlementView>): AdminEntitleme
     grantedBy: data.grantedBy,
     updatedAt: data.updatedAt,
     comp: readComp(data.comp),
+    trialEndsAt: typeof data.trialEndsAt === 'string' ? data.trialEndsAt : null,
   };
 }
 

@@ -23,6 +23,7 @@ describe('resolveList', () => {
   it('accepts the two lists that exist', () => {
     expect(resolveList('recap')).toBe('recap');
     expect(resolveList('rule-alerts')).toBe('rule-alerts');
+    expect(resolveList('trial')).toBe('trial');
   });
 
   it('refuses anything else rather than falling back to the recap', () => {
@@ -31,7 +32,7 @@ describe('resolveList', () => {
      * so, because the alternative is confidently stopping a list the reader never asked about — and
      * that is precisely what happened for every rule alert ever sent.
      */
-    for (const bad of [undefined, '', 'recaps', 'RECAP', 'trial', 'rule_alerts']) {
+    for (const bad of [undefined, '', 'recaps', 'RECAP', 'trials', 'rule_alerts']) {
       expect(resolveList(bad), String(bad)).toBeNull();
     }
   });
@@ -48,6 +49,8 @@ describe('what each list turns off', () => {
       target: 'preferences',
       field: 'ruleAlertsEnabled',
       stopped: 'the rule alerts',
+      inSettings: true,
+      stillArrives: '',
     });
   });
 
@@ -55,6 +58,23 @@ describe('what each list turns off', () => {
     // Top-level emailPrefs, because the weekly job queries across everybody.
     expect(UNSUBSCRIBE_LISTS.recap.target).toBe('emailPrefs');
     expect(UNSUBSCRIBE_LISTS.recap.field).toBe('recap');
+  });
+
+  it('names the trial list as the welcome note, because that is all it stops', () => {
+    /*
+     * The link only ever appears in the welcome, the welcome is deduped once sent, and the two
+     * notes about the charge ignore the preference by design. 'the free-trial reminders' on the
+     * confirmation page would be a promise that the trial mail has stopped, followed days later by
+     * an email naming a charge — a spam complaint from somebody who already clicked unsubscribe.
+     */
+    expect(UNSUBSCRIBE_LISTS.trial.stopped).toBe('the free-trial welcome note');
+    expect(UNSUBSCRIBE_LISTS.trial.stillArrives).toContain('card is charged');
+    expect(UNSUBSCRIBE_LISTS.trial.inSettings).toBe(false);
+  });
+
+  it('has the endpoint saying what still arrives', () => {
+    const endpoint = readFileSync('netlify/functions/email-unsubscribe.ts', 'utf8');
+    expect(endpoint).toContain('definition.stillArrives');
   });
 
   it('says which list was stopped, for the confirmation page', () => {

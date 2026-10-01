@@ -524,9 +524,14 @@ export function LandingPage({
             <BrandLogo size="lg" variant="full" />
           </div>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-8">Ready to track your edge?</h2>
+          {/*
+            "No credit card" scoped to the journal, as it is twelve hundred lines above — the same
+            sentence named broker sync and then said no card was needed, and connecting a broker
+            always needs one. The last unscoped instance on the page, and the final CTA on it.
+          */}
           <p className="mt-4 text-text-secondary text-base md:text-lg">
-            Open your journal, connect a broker or log this month&apos;s trades yourself, and see your
-            performance on the calendar. No credit card. Just your data, your way.
+            Open your journal and log this month&apos;s trades yourself, free and with no credit
+            card, or connect a broker and let them import themselves. Just your data, your way.
           </p>
           <button type="button" onClick={onLaunch} className="btn-primary text-base px-8 py-3.5 mt-8">
             Open Trend Chasers

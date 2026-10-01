@@ -1,146 +1,74 @@
-import type { IncomingHttpHeaders } from 'http';
-import { assertCallerUid, BrokerRequestError } from './snaptradeAuth';
 import { getAdminAuth } from './firebaseAdmin';
-import { readEntitlement, writeEntitlement } from './entitlements';
-import { decideTrial, refuse, TRIAL_DAYS, type TrialDecision } from '../src/config/trial';
-import { TIER_PLANS } from '../src/config/tiers';
-import type { ComplimentaryAccess } from '../src/config/accessExtension';
-import {
-  findTrialClaim,
-  flagsForClaim,
-  mailboxKey,
-  recordTrialClaim,
-  type ClaimSignals,
-} from './trialGuards';
+import { readEntitlement } from './entitlements';
+import { decideTrial, refuse, type TrialDecision } from '../src/config/trial';
+import { findTrialClaim, mailboxKey, recordTrialClaim } from './trialGuards';
 
 /**
- * Starting the free trial.
+ * Whether this account may start the free trial, and the record that it has.
  *
- * The entitlement rule (decideTrial) stops one ACCOUNT taking two. The checks here stop one
- * PERSON taking one per account: the address has to be confirmed, and it has to be a mailbox that
- * has never had a trial under any login — with plus-addressing and Gmail dots collapsed, since
- * "jay+1@, jay+2@" is the whole technique.
+ * The trial itself belongs to Creem — it is attached to the Silver product, so it is redeemed by
+ * going through checkout and the card is taken up front. There is nothing here that grants one.
  *
- * None of it is a wall. It is sized against what abuse costs, which is about a dollar of
- * SnapTrade fees per trial that actually connects a broker, and against the far worse outcome of
- * refusing a real customer.
+ * There used to be. `POST /api/start-trial` granted seven days of complimentary Silver, no card,
+ * to any signed-in account that asked; when the trial moved to Creem only the BUTTON was changed,
+ * so the endpoint stayed routed and reachable for anyone who knew the path. It also merged a comp
+ * onto a record the webhook writes to, so an account could hold a free week and a paid
+ * subscription at once — counted as a trial by the emails and as revenue by the costs screen.
+ * That endpoint and its handler are gone; what is left is the question the pricing page asks.
  */
-export interface TrialResult {
-  statusCode: number;
-  body: Record<string, unknown>;
-}
-
-/** The caller's own network address, as the platform reports it. */
-function callerIp(headers: IncomingHttpHeaders): string | null {
-  const forwarded = headers['x-nf-client-connection-ip'] ?? headers['x-forwarded-for'];
-  const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-  return typeof raw === 'string' && raw.trim() ? raw.split(',')[0].trim() : null;
-}
 
 /**
  * Everything about the account that decides eligibility, in the order it should be asked.
  *
- * Split out so the entitlement endpoint can ask the same question to decide whether to draw the
- * button, and get the same answer this endpoint would give.
+ * Read on every authenticated entitlement load, which is the hottest signed-in endpoint there is,
+ * so the order is also a cost: the cheap local rule is asked before the Auth lookup, and the
+ * mailbox lookup only happens for someone who could otherwise have one.
  */
 export async function trialEligibility(
   uid: string,
   now: number,
 ): Promise<{ decision: TrialDecision; mailbox: string | null }> {
-  const account = await getAdminAuth().getUser(uid);
-
   const record = await readEntitlement(uid);
   const fromRecord = decideTrial(record, now);
   // Asked first, so somebody who has already used their trial is told that rather than being sent
-  // off to confirm an address that will not help them.
+  // off to confirm an address that will not help them — and so the common case, a subscriber,
+  // costs one Firestore read and nothing else.
   if (!fromRecord.eligible) return { decision: fromRecord, mailbox: null };
+
+  const account = await getAdminAuth().getUser(uid);
 
   // Google sign-ins arrive verified. An email/password signup does not, and an address nobody has
   // proved they can read is not an identity — it is a string somebody typed.
   if (!account.emailVerified) return { decision: refuse('email-unverified'), mailbox: null };
 
   const mailbox = mailboxKey(account.email);
-  if (!mailbox) return { decision: refuse('email-unverified'), mailbox: null };
+  if (!mailbox) return { decision: refuse('email-unverified'), mailbox };
 
+  /*
+   * One trial per mailbox, with plus-addressing and Gmail dots collapsed.
+   *
+   * The entitlement rule above stops one ACCOUNT taking two. This is the other half: one PERSON
+   * taking one per account, which "jay+1@, jay+2@" makes free. It only became real when the Creem
+   * webhook started recording a claim — before that nothing ever wrote to trialClaims, so this
+   * query could only ever miss and the whole defence protected nothing.
+   */
   const claim = await findTrialClaim(mailbox);
   if (claim && claim.uid !== uid) return { decision: refuse('email-already-used'), mailbox };
 
   return { decision: fromRecord, mailbox };
 }
 
-export async function handleStartTrial(headers: IncomingHttpHeaders): Promise<TrialResult> {
-  let uid: string;
-  try {
-    uid = await assertCallerUid(headers);
-  } catch (err) {
-    const status = err instanceof BrokerRequestError ? err.statusCode : 401;
-    return {
-      statusCode: status,
-      body: { error: err instanceof Error ? err.message : 'Sign in required' },
-    };
-  }
+/**
+ * Remembers that this mailbox has had a trial. Called when Creem says one has started.
+ *
+ * No browser or network signals, deliberately. The caller is Creem's server, so the IP on the
+ * request is Creem's — recording it would mark every trial as coming from the same network and
+ * flag the lot. The signals are only ever advisory anyway; what matters is the mailbox.
+ */
+export async function rememberTrial(uid: string): Promise<void> {
+  const account = await getAdminAuth().getUser(uid);
+  const mailbox = mailboxKey(account.email);
+  if (!mailbox) return;
 
-  try {
-    const now = Date.now();
-    const { decision, mailbox } = await trialEligibility(uid, now);
-
-    if (!decision.eligible) {
-      // 409, not 403: nothing is wrong with the request or the caller, the account is simply not
-      // in a state where a trial means anything.
-      return { statusCode: 409, body: { error: decision.message, reason: decision.reason } };
-    }
-
-    const startedAt = new Date(now).toISOString();
-    const comp: ComplimentaryAccess = {
-      tier: decision.tier,
-      until: decision.until,
-      grantedBy: 'trial',
-      grantedAt: startedAt,
-      reason: `${TRIAL_DAYS}-day free trial`,
-      trial: true,
-    };
-
-    // trialStartedAt is written in the same call as the comp. Written separately, a failure
-    // between the two would either hand out a trial that never counted against them, or count one
-    // they never got.
-    const existing = await readEntitlement(uid);
-    await writeEntitlement(
-      uid,
-      existing
-        ? { comp, trialStartedAt: startedAt }
-        : { tier: 'free', source: 'purchase', status: 'active', comp, trialStartedAt: startedAt },
-    );
-
-    /*
-     * The claim is recorded after the grant, and its failure is swallowed.
-     *
-     * The order matters in one direction only: a claim written before a grant that then fails
-     * would burn somebody's one trial without giving it to them. This way the worst case is a
-     * trial that our records forget to count, which costs a dollar.
-     */
-    if (mailbox) {
-      const signals: ClaimSignals = {
-        visitorId: typeof headers['x-visitor-id'] === 'string' ? headers['x-visitor-id'] : null,
-        ip: callerIp(headers),
-      };
-      try {
-        await recordTrialClaim(mailbox, uid, signals, await flagsForClaim(uid, signals));
-      } catch (err) {
-        console.error('[start-trial] could not record the claim:', err);
-      }
-    }
-
-    return {
-      statusCode: 200,
-      body: {
-        ok: true,
-        tier: decision.tier,
-        until: decision.until,
-        message: `${TIER_PLANS[decision.tier].name} is yours for the next ${TRIAL_DAYS} days.`,
-      },
-    };
-  } catch (err) {
-    console.error('[start-trial] failed:', err);
-    return { statusCode: 500, body: { error: 'Could not start your trial. Try again shortly.' } };
-  }
+  await recordTrialClaim(mailbox, uid);
 }

@@ -11,8 +11,17 @@ import { TIER_PLANS, type Tier } from './tiers';
  *
  * The trial itself belongs to CREEM, attached to the Silver product, so it is redeemed by going
  * through checkout: the card is taken up front and the person becomes a real subscriber straight
- * away, which is why nothing here needs a special case for them — the reaper, the plan badge and
- * effectiveTier all see an ordinary subscription.
+ * away. ACCESS needs no special case for that — the reaper and effectiveTier should see an ordinary
+ * subscription, because a triallist has handed over a card and is entitled to what they are
+ * trialling.
+ *
+ * Everything else does. "No special case anywhere" was taken literally for a year: the webhook
+ * flattened `trialing` into `active` and kept no trace, so nothing could tell a trial from a paid
+ * month. The three trial emails never sent, the "one trial per brokerage" guard never fired, the
+ * admin run rate counted money nobody had paid, and every screen said "renews" about a first
+ * charge. The entitlement now carries trialStartedAt and trialEndsAt, and everything that needs to
+ * know reads them through trialUntil() — deliberately outside the access decision, so a stale date
+ * can never become free access to the one feature this product charges for.
  *
  * TRIAL_DAYS therefore has to MATCH the Creem product's own trial setting. It is the number the
  * site promises, and Creem is the one that honours it; if the two disagree the site is lying, and

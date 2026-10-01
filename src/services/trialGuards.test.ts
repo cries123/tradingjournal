@@ -57,7 +57,6 @@ import {
   brokerageOwner,
   claimBrokerage,
   findTrialClaim,
-  flagsForClaim,
   identityHash,
   mailboxKey,
   recordTrialClaim,
@@ -125,10 +124,20 @@ describe('identifying a brokerage account across two signups', () => {
 describe('remembering a claim', () => {
   it('finds the claim on a mailbox, whichever way the address was spelled', async () => {
     const key = mailboxKey('jay+one@gmail.com') as string;
-    await recordTrialClaim(key, 'u1', {}, []);
+    await recordTrialClaim(key, 'u1');
 
     const claim = await findTrialClaim(mailboxKey('j.ay@googlemail.com') as string);
     expect(claim?.uid).toBe('u1');
+  });
+
+  it('keeps the first account to claim a mailbox, like the brokerage claim above', async () => {
+    // With set+merge a second signup on the same address would take the record over and reset its
+    // date — rewriting the one row an admin opens to investigate farming, using the farming itself.
+    const key = mailboxKey('shared@example.com') as string;
+    await recordTrialClaim(key, 'first');
+    await recordTrialClaim(key, 'second');
+
+    expect((await findTrialClaim(key))?.uid).toBe('first');
   });
 
   it('has nothing to say about a mailbox that has never claimed one', async () => {
@@ -136,41 +145,3 @@ describe('remembering a claim', () => {
   });
 });
 
-describe('the flags, which never refuse anybody', () => {
-  const claimFrom = async (uid: string, visitorId: string, ip: string) => {
-    const key = mailboxKey(`${uid}@example.com`) as string;
-    await recordTrialClaim(key, uid, { visitorId, ip }, []);
-  };
-
-  it('says nothing about the first trial from a browser', async () => {
-    expect(await flagsForClaim('u1', { visitorId: 'browser-a', ip: '1.2.3.4' })).toEqual([]);
-  });
-
-  it('notices a second trial from the same browser', async () => {
-    await claimFrom('u1', 'browser-a', '1.2.3.4');
-    expect(await flagsForClaim('u2', { visitorId: 'browser-a', ip: '9.9.9.9' })).toEqual([
-      'same-browser-as-an-earlier-trial',
-    ]);
-  });
-
-  it('does not flag somebody for their own earlier claim', async () => {
-    await claimFrom('u1', 'browser-a', '1.2.3.4');
-    expect(await flagsForClaim('u1', { visitorId: 'browser-a', ip: '1.2.3.4' })).toEqual([]);
-  });
-
-  it('tolerates a household or an office, and notices a farm', async () => {
-    // Two people behind one address is a couple, a family, a small office. Not a signal.
-    await claimFrom('u1', 'browser-a', '1.2.3.4');
-    await claimFrom('u2', 'browser-b', '1.2.3.4');
-    expect(await flagsForClaim('u3', { visitorId: 'browser-c', ip: '1.2.3.4' })).toEqual([]);
-
-    await claimFrom('u3', 'browser-c', '1.2.3.4');
-    expect(await flagsForClaim('u4', { visitorId: 'browser-d', ip: '1.2.3.4' })).toEqual([
-      'several-trials-from-one-network',
-    ]);
-  });
-
-  it('says nothing when the browser and address are unknown', async () => {
-    expect(await flagsForClaim('u1', {})).toEqual([]);
-  });
-});

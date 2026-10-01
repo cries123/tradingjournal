@@ -7,8 +7,8 @@ import { resolveList, UNSUBSCRIBE_LISTS } from '../../server/unsubscribeLists';
 /**
  * The unsubscribe link at the bottom of the mail this app sends.
  *
- * Two lists reach here — the weekly recap and the rule alerts — and which one is in the link, inside
- * its signature. See server/unsubscribeLists.ts for why that matters and what it used to do instead.
+ * Three lists reach here — the weekly recap, the rule alerts and the free-trial welcome note — and
+ * which one is in the link, inside its signature. See server/unsubscribeLists.ts for why that matters and what it used to do instead.
  *
  * A GET that works in one click with no sign-in, because an unsubscribe that asks someone to log
  * in first is an unsubscribe that doesn't work — and a list nobody can leave is how a sending
@@ -48,14 +48,23 @@ export const handler: Handler = async (event) => {
   const list = resolveList(event.queryStringParameters?.p);
 
   if (!uid || !token || !list || !verifyUnsubscribeToken(uid, token, list)) {
+    /*
+     * No list is known on this path — the link is the thing that failed — so this one cannot name a
+     * Settings control, and no longer claims there is one for whatever the reader was holding. The
+     * trial reminders deliberately have no toggle, so the old sentence was false for them.
+     */
     return page(
       'That link didn’t work',
-      'It may have expired or been copied incompletely. You can turn these emails off in Settings at any time.',
+      'It may have expired or been copied incompletely. Reply to any email from us and we will turn it off by hand.',
       400,
     );
   }
 
   const definition = UNSUBSCRIBE_LISTS[list];
+  // Where to send somebody whose write failed. Only true for the lists that have a control.
+  const elsewhere = definition.inSettings
+    ? `Turn ${definition.stopped} off in Settings and it will stick.`
+    : `Reply to the email you clicked this from and we will turn ${definition.stopped} off by hand.`;
 
   try {
     const db = getAdminFirestore();
@@ -74,16 +83,12 @@ export const handler: Handler = async (event) => {
 
     return page(
       'Unsubscribed',
-      `You won’t get ${definition.stopped} any more. Support replies about your own tickets will still reach you — those aren’t part of this list.`,
+      `You won’t get ${definition.stopped} any more. ${definition.stillArrives ? `${definition.stillArrives} ` : ''}Support replies about your own tickets will still reach you — those aren’t part of this list.`,
       200,
     );
   } catch (err) {
     console.error('[email-unsubscribe] failed:', err);
     await logServerError('email-unsubscribe', err);
-    return page(
-      'We couldn’t save that',
-      `Something went wrong on our end. Turn ${definition.stopped} off in Settings and it will stick.`,
-      500,
-    );
+    return page('We couldn’t save that', `Something went wrong on our end. ${elsewhere}`, 500);
   }
 };

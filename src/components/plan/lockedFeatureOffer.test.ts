@@ -28,8 +28,25 @@ vi.mock('../../context/useAuth', () => ({
   useAuth: () => ({ user: { uid: 'u1' }, username: 'u1', loading: false, profileLoading: false }),
 }));
 
+/*
+ * Eligible as well as signed in.
+ *
+ * The trial button now refuses to render for an account the server would refuse, because the
+ * "you have already had one" rule fires for the first time: the Creem webhook records a trial, and
+ * this card gates on the FEATURE being locked rather than on eligibility. Mutable so the last case
+ * can flip it.
+ */
+let trialAvailable = true;
+
 vi.mock('../../context/useEntitlement', () => ({
-  useEntitlement: () => ({ has: () => false, loaded: true, marketReplayLive: false }),
+  useEntitlement: () => ({
+    has: () => false,
+    loaded: true,
+    marketReplayLive: false,
+    get trialAvailable() {
+      return trialAvailable;
+    },
+  }),
 }));
 
 const { LockedFeature } = await import('./LockedFeature');
@@ -83,6 +100,23 @@ describe('LockedFeature upgrade offer', () => {
       if (tierHas(TRIAL_TIER, feature)) continue;
       const html = cardFor(feature);
       expect(html, feature).not.toContain(`Try ${TIER_PLANS[TRIAL_TIER].name} free`);
+    }
+  });
+
+  it('offers the buy button instead when the account has already had its trial', () => {
+    /*
+     * The card is drawn because the FEATURE is locked, which says nothing about eligibility. An
+     * ex-triallist used to be promised a free week here and then sent to a pricing page that does
+     * not offer one — and the button's own terms line says cancelling costs nothing, which would
+     * have been false for them.
+     */
+    trialAvailable = false;
+    try {
+      const html = cardFor('brokerSync');
+      expect(html).not.toContain(`Try ${TIER_PLANS[TRIAL_TIER].name} free for`);
+      expect(html).toContain('Unlock with');
+    } finally {
+      trialAvailable = true;
     }
   });
 

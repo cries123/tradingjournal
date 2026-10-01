@@ -96,6 +96,7 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
       trialBlockedReason: snapshot.trialBlockedReason ?? null,
       trialBlockedMessage: snapshot.trialBlockedMessage ?? null,
       onTrial: snapshot.onTrial ?? false,
+      trialEndsAt: snapshot.trialEndsAt ?? null,
       usage: snapshot.usage,
       loading,
       loaded,

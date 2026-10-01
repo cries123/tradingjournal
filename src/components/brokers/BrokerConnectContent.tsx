@@ -4,6 +4,7 @@ import { ArrowLeft, CheckCircle2, ExternalLink, Link2, Loader2, RefreshCw, Unlin
 import { BrokerLogo } from './BrokerLogo';
 import { useEntitlement } from '../../context/useEntitlement';
 import { StartTrialButton } from '../plan/StartTrialButton';
+import { goToPricing } from '../../utils/navigateToPath';
 import { TRIAL_DAYS } from '../../config/trial';
 import { brokersLabel, syncsLabel, TIER_PLANS } from '../../config/tiers';
 import { useAuth } from '../../context/useAuth';
@@ -156,7 +157,7 @@ export function BrokerConnectContent({
     () => buildBrokerCopy(applyBrokerStatusOverrides(statusOverrides)),
     [statusOverrides],
   );
-  const { noteUsage, limits, tier, usage, refresh } = useEntitlement();
+  const { noteUsage, limits, tier, usage, refresh, trialAvailable } = useEntitlement();
   const [available, setAvailable] = useState<boolean | null>(null);
   const [status, setStatus] = useState<{ registered: boolean; accounts: BrokerAccountSummary[] } | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -453,11 +454,31 @@ export function BrokerConnectContent({
             <p className="text-sm font-medium text-text-primary mb-1">
               Broker sync isn&apos;t on your plan yet
             </p>
+            {/* The free week is only promised to somebody who can actually have one. The server's
+                "you have already had a trial" rule fires for the first time now that the Creem
+                webhook records one, and this card gated on the FEATURE being locked, not on
+                eligibility — so an ex-triallist was offered a free week and then sent to a pricing
+                page that does not offer it. */}
             <p className="text-sm text-text-secondary leading-relaxed mb-4">
               Connect your brokerage and your fills import themselves, matched into round trips with
-              fees worked out. Try it free for {TRIAL_DAYS} days and see your own calendar fill in.
+              fees worked out.{' '}
+              {trialAvailable
+                ? `Try it free for ${TRIAL_DAYS} days and see your own calendar fill in.`
+                : 'It is on every paid plan.'}
             </p>
-            <StartTrialButton viaPricing className="max-w-sm" />
+            <StartTrialButton
+              viaPricing
+              className="max-w-sm"
+              fallback={
+                <button
+                  type="button"
+                  onClick={goToPricing}
+                  className="btn-primary w-full max-w-sm py-2.5 text-sm font-semibold"
+                >
+                  See the plans
+                </button>
+              }
+            />
           </div>
         )}
 

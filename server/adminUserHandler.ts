@@ -230,11 +230,11 @@ async function readTrialClaimFor(targetUid: string) {
     .get();
   if (snap.empty) return null;
 
-  const data = snap.docs[0].data() as { claimedAt?: string; flags?: unknown };
-  return {
-    claimedAt: typeof data.claimedAt === 'string' ? data.claimedAt : '',
-    flags: Array.isArray(data.flags) ? data.flags.filter((f): f is string => typeof f === 'string') : [],
-  };
+  // claimedAt and nothing else. The advisory flags that used to sit beside it were derived from a
+  // browser id and a caller IP, neither of which exists on the Creem webhook that now records the
+  // claim — so they could only ever have rendered an empty row.
+  const data = snap.docs[0].data() as { claimedAt?: string };
+  return { claimedAt: typeof data.claimedAt === 'string' ? data.claimedAt : '' };
 }
 
 /* ------------------------------------------------------------------ complimentary access */

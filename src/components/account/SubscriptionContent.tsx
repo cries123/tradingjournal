@@ -45,6 +45,8 @@ export function SubscriptionContent({ onBack, onOrderHistory }: SubscriptionCont
     source,
     currentPeriodEnd,
     complimentaryUntil,
+    onTrial,
+    trialEndsAt,
     loaded,
   } = useEntitlement();
   const [busy, setBusy] = useState(false);
@@ -113,7 +115,17 @@ export function SubscriptionContent({ onBack, onOrderHistory }: SubscriptionCont
             Cancelled — you keep {plan.name} until {renewsOn}, and you will not be charged again.
           </p>
         )}
-        {status === 'active' && paying && renewsOn && (
+        {/*
+          A trial has not renewed anything — the first charge is the first charge. This screen said
+          "Renews" beside the trial end date, which is the one place a triallist would have gone
+          looking for the answer to "when does this cost me money".
+        */}
+        {status === 'active' && paying && onTrial && trialEndsAt && (
+          <p className="text-sm text-text-secondary">
+            Free trial — your card is charged ${subscribedPlan.price} on {formatDate(trialEndsAt)}.
+          </p>
+        )}
+        {status === 'active' && paying && !onTrial && renewsOn && (
           <p className="text-sm text-text-secondary">Renews {renewsOn}.</p>
         )}
         {status === 'past_due' && (
@@ -127,7 +139,7 @@ export function SubscriptionContent({ onBack, onOrderHistory }: SubscriptionCont
       {paying ? (
         <AccountPanel
           title="Manage or cancel"
-          description="Cancelling, changing your card and downloading invoices all happen on your billing page. Cancel any time — your plan runs to the end of the period you have already paid for."
+          description={`Cancelling, changing your card and downloading invoices all happen on your billing page. Cancel any time — ${onTrial ? 'nothing is charged and you keep the plan to the end of the trial' : 'your plan runs to the end of the period you have already paid for'}.`}
         >
           <FormNote error={error} />
           <button

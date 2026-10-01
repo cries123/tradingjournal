@@ -1,6 +1,7 @@
 import { getAdminFirestore } from './firebaseAdmin';
 import { isTier, limitsFor, type Tier, type TierLimits } from '../src/config/tiers';
-import { compIsLive, tierWithComp, type ComplimentaryAccess } from '../src/config/accessExtension';
+import { compIsLive, DAY_MS, tierWithComp, type ComplimentaryAccess } from '../src/config/accessExtension';
+import { TRIAL_DAYS } from '../src/config/trial';
 
 /**
  * What a user is entitled to, and why.
@@ -40,8 +41,28 @@ export interface Entitlement {
    * overwritten — and an account whose trial has run out looks, from every other field, exactly
    * like one that never had a trial. This is the only thing standing between one free week and
    * an unlimited supply of them.
+   *
+   * Written by the Creem webhook on a `subscription.trialing` event. It used to be written by a
+   * second, self-serve trial endpoint that nothing ever called, so until that was removed this
+   * field was never set on anybody and the rule above had never once fired.
    */
   trialStartedAt?: string | null;
+  /**
+   * When the Creem trial ends, as Creem reports it. Never cleared.
+   *
+   * This is the whole marker. A trialling subscription is `status: 'active'` like any other — the
+   * webhook maps `subscription.trialing` to active deliberately, because a triallist has paid-tier
+   * access — so without a date written down nothing downstream can tell a trial from a paid month.
+   * That is why the three trial emails had never sent: they looked for a field only the dead
+   * endpoint wrote.
+   *
+   * Dated rather than cleared on purpose. One purchase emits several events in no guaranteed order
+   * (`checkout.completed` and `subscription.trialing` both, per creemClient), so any rule of the
+   * form "a non-trial event ends the trial" would wipe the marker depending on which arrived
+   * second. A date in the past is simply not a live trial, and nothing has to run for that to
+   * become true.
+   */
+  trialEndsAt?: string | null;
   /**
    * What billing said before a hand-grant covered it over, so removing the grant can put it back.
    *
@@ -167,6 +188,21 @@ export function complimentaryUntil(e: Entitlement | null, now: number = Date.now
   return e && compIsLive(e.comp, now) ? e.comp.until : null;
 }
 
+/**
+ * When the Creem free trial on this record ends, or null if one is not running.
+ *
+ * Deliberately outside the access decision. effectiveTier reads tier, status, currentPeriodEnd and
+ * comp and must go on reading only those: a trialling subscriber has handed over a card and is
+ * entitled to exactly what they are paying to trial, so this answers "should we say trial and count
+ * down to a charge", never "may they sync". Wiring it into entitlement would turn a stale date into
+ * free access to the one feature this product charges for.
+ */
+export function trialUntil(e: Entitlement | null, now: number = Date.now()): string | null {
+  if (!e?.trialEndsAt) return null;
+  const ends = Date.parse(e.trialEndsAt);
+  return Number.isFinite(ends) && ends > now ? e.trialEndsAt : null;
+}
+
 /** A stored comp, or null for anything that is not one. A half-written record grants nothing. */
 export function readComp(value: unknown): ComplimentaryAccess | null {
   const c = value as Partial<ComplimentaryAccess> | null | undefined;
@@ -177,7 +213,6 @@ export function readComp(value: unknown): ComplimentaryAccess | null {
     grantedBy: typeof c.grantedBy === 'string' ? c.grantedBy : '',
     grantedAt: typeof c.grantedAt === 'string' ? c.grantedAt : '',
     ...(typeof c.reason === 'string' && c.reason ? { reason: c.reason } : {}),
-    ...(c.trial === true ? { trial: true } : {}),
   };
 }
 
@@ -214,6 +249,9 @@ export async function readEntitlement(uid: string): Promise<Entitlement | null> 
     comp: readComp(data.comp),
     preGrant: readPreGrant(data.preGrant),
     trialStartedAt: typeof data.trialStartedAt === 'string' ? data.trialStartedAt : null,
+    // Both dates are normalised the same way: anything that is not a string reads as "no trial",
+    // so a half-written record can never make decideNudge count down at somebody.
+    trialEndsAt: typeof data.trialEndsAt === 'string' ? data.trialEndsAt : null,
   } as Entitlement;
 }
 
@@ -252,6 +290,63 @@ export async function writeEntitlement(uid: string, patch: Partial<Entitlement>)
  * Returns whether it wrote. Grandfathered accounts are deliberately immune: someone given Diamond
  * for free has no subscription, so a webhook about a lapsed or absent one must not take it away.
  */
+/**
+ * The trial half of a billing update.
+ *
+ * Only ever ADDS, and only ever inside a window. A trial ends by its date passing, not by anything
+ * clearing a flag: one purchase emits checkout.completed and subscription.trialing in no
+ * guaranteed order, so a rule like "a non-trial event ends the trial" would wipe the marker on
+ * whichever arrived second and the emails would go back to never sending. A date in the past is
+ * already not a live trial.
+ *
+ * The window is the other half of that, and it is the dangerous one. The trialing flag is read
+ * from the event name OR the object's status — so a later event whose object snapshot still says
+ * trialing while carrying an ordinary month-long period end would otherwise re-arm a full countdown
+ * on somebody who has already been charged, and mail them three warnings about a first charge that
+ * happened weeks ago. A trial cannot end further out than it can run, so anything beyond that is
+ * not a trial period and is refused.
+ *
+ * trialStartedAt is written even when the end date is unusable, because it answers a different
+ * question — has this account ever had a trial — and that answer should not depend on a field
+ * Creem might omit or format differently.
+ */
+
+/** How far past TRIAL_DAYS an end date may sit and still be believed, in days. */
+const TRIAL_END_SLACK_DAYS = 2;
+
+export function trialPatch(
+  event: { trialing: boolean; currentPeriodEnd?: string },
+  nowIso: string,
+  existing: Entitlement | null,
+): Partial<Entitlement> {
+  if (!event.trialing) return {};
+
+  const patch: Partial<Entitlement> = {
+    // Set once. Creem can deliver more than one trialing event for a subscription, and re-stamping
+    // this would move the start forward under a trial that is already running — which is what the
+    // welcome note's "a day in" boundary is measured from.
+    trialStartedAt: existing?.trialStartedAt ?? nowIso,
+  };
+
+  const ends = Date.parse(event.currentPeriodEnd ?? '');
+  if (!Number.isFinite(ends)) return patch;
+
+  const now = Date.parse(nowIso);
+  const furthest = now + (TRIAL_DAYS + TRIAL_END_SLACK_DAYS) * DAY_MS;
+  if (ends > furthest) return patch;
+
+  /*
+   * Normalised, never stored as Creem spelled it.
+   *
+   * Three readers compare this value three different ways — a Firestore range (lexicographic), a
+   * string compare in the costs tile, and Date.parse in the app. Date.parse accepts '10/08/2026'
+   * and '2026-10-08T01:00+02:00' as readily as a UTC ISO string, and either of those sorts wrong:
+   * the query would match nobody and the emails would go silent while every screen kept showing the
+   * countdown correctly. One toISOString here removes the whole class.
+   */
+  return { ...patch, trialEndsAt: new Date(ends).toISOString() };
+}
+
 export async function applyBillingUpdate(
   uid: string,
   patch: Partial<Entitlement>,
