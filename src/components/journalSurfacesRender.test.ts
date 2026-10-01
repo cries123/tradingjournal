@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
@@ -532,5 +533,59 @@ describe('StatsCards', () => {
     const html = paint(createElement(StatsCards, { stats: stats([]) }));
     expect(html).not.toContain('NaN');
     expect(html).not.toContain('Infinity');
+  });
+});
+
+describe('the CSV importer is reachable', () => {
+  /*
+   * CsvImportModal, parseCsvRouter and all three parsers were in the tree with nothing linking to
+   * them. The entry point was wired in JournalApp until the commit that added broker sync, which
+   * dropped it — while the terms of service and the Brokers page went on telling customers CSV
+   * import works. On the Brokers page that sentence is specifically the answer given to visitors
+   * whose broker is NOT connectable yet, for whom a CSV is the only way in at all.
+   *
+   * A unit test cannot click a button, so this asserts the two halves that were actually missing:
+   * the screen offers it, and the page that owns the modal still renders one.
+   */
+  it('offers an import on the first screen of an empty journal', async () => {
+    const { EmptyDashboard } = await import('./EmptyDashboard');
+    const html = paint(
+      createElement(EmptyDashboard, {
+        onAddTrade: noop,
+        onConnectBroker: noop,
+        onImportCsv: noop,
+      }),
+    );
+
+    expect(html).toContain('Import a CSV');
+  });
+
+  it('leaves the button out when no handler is passed', () => {
+    // Optional so a caller that genuinely has no importer does not render a dead control.
+    const htmlPromise = import('./EmptyDashboard').then(({ EmptyDashboard }) =>
+      paint(createElement(EmptyDashboard, { onAddTrade: noop, onConnectBroker: noop })),
+    );
+
+    return htmlPromise.then((html) => expect(html).not.toContain('Import a CSV'));
+  });
+
+  it('still has JournalApp rendering the modal it links to', () => {
+    /*
+     * The half that broke before: a button is useless if nothing renders the modal, and a modal is
+     * dead code if nothing renders the button. Asserted on the source because JournalApp needs
+     * Firestore, auth and a router to paint at all.
+     */
+    const page = readFileSync('src/pages/JournalApp.tsx', 'utf8');
+
+    expect(page).toContain("import { CsvImportModal } from '../components/CsvImportModal'");
+    expect(page).toContain('<CsvImportModal');
+    expect(page).toMatch(/onImportCsv=\{\(\) => openImportCsv\(\)\}/);
+  });
+
+  it('does not resurrect the screenshot importer', () => {
+    // Deliberately left retired. If that changes it should be a decision, not a side effect of
+    // wiring the CSV path back up.
+    const page = readFileSync('src/pages/JournalApp.tsx', 'utf8');
+    expect(page).not.toContain('ScreenshotImportModal');
   });
 });

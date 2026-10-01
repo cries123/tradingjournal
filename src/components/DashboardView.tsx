@@ -41,6 +41,8 @@ interface DashboardViewProps {
   onSelectMonth: (month: number) => void;
   onAddTrade: () => void;
   onConnectBroker: () => void;
+  /** Opens the CSV importer. See EmptyDashboard for why this screen carries it. */
+  onImportCsv?: () => void;
   sampleActive?: boolean;
   onLoadSample?: () => void;
   onClearSample?: () => void;
@@ -71,6 +73,7 @@ export function DashboardView({
   onSelectMonth,
   onAddTrade,
   onConnectBroker,
+  onImportCsv,
   sampleActive = false,
   onLoadSample,
   onClearSample,
@@ -186,6 +189,7 @@ export function DashboardView({
         <EmptyDashboard
           onAddTrade={onAddTrade}
           onConnectBroker={onConnectBroker}
+          onImportCsv={onImportCsv}
           onLoadSample={onLoadSample}
         />
       )}

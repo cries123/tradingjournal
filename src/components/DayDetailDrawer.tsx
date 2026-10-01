@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pencil, Plus, Share2, X } from 'lucide-react';
+import { Pencil, Plus, Share2, Upload, X } from 'lucide-react';
 import { TradeListItem } from './TradeListItem';
 import type { Trade } from '../types';
 import { useAuth } from '../context/useAuth';
@@ -19,6 +19,8 @@ interface DayDetailDrawerProps {
   onDelete: (id: string) => void;
   onEdit: (trade: Trade) => void;
   onAddTrade: () => void;
+  /** Opens the CSV importer for THIS day. Optional so a caller can leave it out. */
+  onImportCsv?: () => void;
 }
 
 export function DayDetailDrawer({
@@ -28,6 +30,7 @@ export function DayDetailDrawer({
   onDelete,
   onEdit,
   onAddTrade,
+  onImportCsv,
 }: DayDetailDrawerProps) {
   const { settings } = useSettings();
   const { user, firebaseEnabled } = useAuth();
@@ -248,7 +251,7 @@ export function DayDetailDrawer({
           )}
         </div>
 
-        <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] border-t border-border/60 shrink-0">
+        <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] border-t border-border/60 shrink-0 space-y-2">
           <button
             type="button"
             onClick={onAddTrade}
@@ -257,6 +260,18 @@ export function DayDetailDrawer({
             <Plus size={16} />
             Log trade
           </button>
+          {onImportCsv && (
+            // Secondary, and scoped to this day: a CSV row with no date of its own lands here rather
+            // than on today, which is what the importer's targetDate is for.
+            <button
+              type="button"
+              onClick={onImportCsv}
+              className="w-full flex items-center justify-center gap-2 py-2 btn-secondary text-sm"
+            >
+              <Upload size={15} />
+              Import a CSV
+            </button>
+          )}
         </div>
       </aside>
 

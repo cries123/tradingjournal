@@ -1,8 +1,17 @@
-import { ArrowRight, Link2, Plus, Sparkles } from 'lucide-react';
+import { ArrowRight, Link2, Plus, Sparkles, Upload } from 'lucide-react';
 
 interface EmptyDashboardProps {
   onAddTrade: () => void;
   onConnectBroker: () => void;
+  /**
+   * Import a broker CSV.
+   *
+   * This screen is where the person who most needs it arrives: the Brokers page tells visitors whose
+   * broker is not connectable yet that "manual entry and CSV import work for these today", and for
+   * them a CSV is the only way to get a year of history in. The importer existed and worked and
+   * nothing linked to it, so that promise was false for exactly the people it was written for.
+   */
+  onImportCsv?: () => void;
   onLoadSample?: () => void;
 }
 
@@ -21,7 +30,12 @@ const PREVIEW_POINTS = [
  * the product first. Connecting a broker and logging a trade stay one tap away for people who
  * already know they want in.
  */
-export function EmptyDashboard({ onAddTrade, onConnectBroker, onLoadSample }: EmptyDashboardProps) {
+export function EmptyDashboard({
+  onAddTrade,
+  onConnectBroker,
+  onImportCsv,
+  onLoadSample,
+}: EmptyDashboardProps) {
   return (
     <div className="panel-card p-5 md:p-8 shrink-0">
       <div className="max-w-2xl mx-auto">
@@ -31,8 +45,8 @@ export function EmptyDashboard({ onAddTrade, onConnectBroker, onLoadSample }: Em
           </div>
           <h3 className="text-lg md:text-xl font-semibold mb-1.5">Start your journal</h3>
           <p className="text-sm text-text-secondary leading-relaxed">
-            Connect a broker and import your trades, log a session by hand, or take a look around
-            with an example month first.
+            Connect a broker, import a CSV from one we cannot connect to yet, log a session by hand,
+            or take a look around with an example month first.
           </p>
         </div>
 
@@ -75,6 +89,16 @@ export function EmptyDashboard({ onAddTrade, onConnectBroker, onLoadSample }: Em
             <Link2 size={16} />
             Connect broker
           </button>
+          {onImportCsv && (
+            <button
+              type="button"
+              onClick={onImportCsv}
+              className="flex items-center justify-center gap-2 btn-secondary py-2.5 text-sm flex-1"
+            >
+              <Upload size={16} />
+              Import a CSV
+            </button>
+          )}
           <button
             type="button"
             onClick={onAddTrade}

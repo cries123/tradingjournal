@@ -32,6 +32,7 @@ import { SubscriptionContent } from '../components/account/SubscriptionContent';
 import { OrderHistoryContent } from '../components/account/OrderHistoryContent';
 import { PerformanceContent } from '../components/PerformanceContent';
 import { RequestBrokerContent } from '../components/support/RequestBrokerContent';
+import { CsvImportModal } from '../components/CsvImportModal';
 import { TradeModal } from '../components/TradeModal';
 import { UsernameSetupModal } from '../components/UsernameSetupModal';
 import { useAuth } from '../context/useAuth';
@@ -110,6 +111,9 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   /** Back: the screen before this one, whatever it was. */
   const goBackView = () => setViewStack((stack) => popView(stack, 'dashboard'));
   const [showTradeModal, setShowTradeModal] = useState(false);
+  const [showCsvModal, setShowCsvModal] = useState(false);
+  /** The day a CSV import was started from, so rows with no date of their own land there. */
+  const [importTargetDate, setImportTargetDate] = useState<string | undefined>(undefined);
   const [tradeModalDate, setTradeModalDate] = useState<string | undefined>();
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -200,6 +204,27 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
     setShowTradeModal(false);
     setTradeModalDate(undefined);
     setEditingTrade(null);
+  };
+
+  /*
+   * The CSV importer, reachable again.
+   *
+   * It was wired here until the commit that added broker sync, which dropped the entry point and
+   * left the modal and all three parsers in the tree with nothing linking to them. Meanwhile the
+   * terms of service and the Brokers page both went on telling customers CSV import works — and on
+   * the Brokers page that sentence is the answer given to visitors whose broker is not connectable
+   * yet, for whom a CSV is the only way in at all.
+   *
+   * The screenshot importer stays retired, deliberately.
+   */
+  const openImportCsv = (date?: string) => {
+    setImportTargetDate(date);
+    setShowCsvModal(true);
+  };
+
+  const closeImportCsv = () => {
+    setShowCsvModal(false);
+    setImportTargetDate(undefined);
   };
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
@@ -479,6 +504,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                   onSelectMonth={setMonth}
                   onAddTrade={() => openAddTrade()}
                   onConnectBroker={() => openView('connect-broker')}
+                  onImportCsv={() => openImportCsv()}
                   sampleActive={sampleActive}
                   onLoadSample={loadSampleData}
                   onClearSample={clearSampleData}
@@ -588,6 +614,19 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
         />
       )}
 
+      {showCsvModal && (
+        <CsvImportModal
+          targetDate={importTargetDate}
+          onClose={closeImportCsv}
+          onSave={(imported) => {
+            // addTrades is the same path the broker sync writes through, so the dedupe, the journal
+            // assignment and the Firestore batching are all the ones already in use.
+            void addTrades(imported);
+            closeImportCsv();
+          }}
+        />
+      )}
+
       {selectedDay && (
         <DayDetailDrawer
           date={selectedDay}
@@ -595,6 +634,10 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
           onClose={() => setSelectedDay(null)}
           onDelete={deleteTrade}
           onEdit={openEditTrade}
+          onImportCsv={() => {
+            openImportCsv(selectedDay);
+            setSelectedDay(null);
+          }}
           onAddTrade={() => {
             openAddTrade(selectedDay);
             setSelectedDay(null);
