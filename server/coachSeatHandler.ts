@@ -60,11 +60,45 @@ async function readSeat(ownerUid: string): Promise<CoachSeat | null> {
   return snap.exists ? ({ ownerUid, ...snap.data() } as CoachSeat) : null;
 }
 
+/**
+ * The caller's address, ONLY once they have proved they can read it.
+ *
+ * A pending seat is matched by email — that is what lets somebody invited before they had an account
+ * sign up and find the journal waiting. Unverified, that is a way in: an address nobody has proved
+ * they own is a string somebody typed, and Firebase only stops a SECOND account on the same address,
+ * so between the invitation being sent and the real coach signing up the address is unclaimed. Whoever
+ * registers it first gets the trader's entire journal and a writable coaching thread.
+ *
+ * The trial rule already refuses an unverified address, for a far smaller prize, in those words. Google
+ * sign-ins arrive verified, so the only people this stops are the ones who have not opened the link.
+ *
+ * Returns null when unverified, which makes mayCoach's email branch fail closed. Once a seat is bound
+ * to a uid the email is not consulted at all, so an accepted coach is unaffected.
+ */
+async function verifiedCallerEmail(uid: string): Promise<string | null> {
+  try {
+    const account = await getAdminAuth().getUser(uid);
+    return account.emailVerified ? account.email ?? null : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The caller's address whether or not it is verified — for checks ABOUT the caller, never for access. */
 async function callerEmail(uid: string): Promise<string | null> {
   try {
     return (await getAdminAuth().getUser(uid)).email ?? null;
   } catch {
     return null;
+  }
+}
+
+/** Whether the caller has confirmed their address, for a message that says what to do about it. */
+async function callerEmailVerified(uid: string): Promise<boolean> {
+  try {
+    return (await getAdminAuth().getUser(uid)).emailVerified === true;
+  } catch {
+    return false;
   }
 }
 
@@ -96,8 +130,21 @@ async function assertEntitled(uid: string): Promise<void> {
  */
 async function assertCoachOf(callerUid: string, ownerUid: string): Promise<CoachSeat> {
   const seat = await readSeat(ownerUid);
-  const email = await callerEmail(callerUid);
+  const email = await verifiedCallerEmail(callerUid);
   if (!mayCoach(seat, { uid: callerUid, email })) {
+    /*
+     * One exception to the deliberately vague refusal below, and it leaks nothing: if the caller has
+     * not confirmed their own address, that is a fact about THEM, not about whether any seat exists.
+     * Without it, somebody invited while unverified is told they have no access to a journal they were
+     * genuinely invited to, with nothing to act on.
+     */
+    if (!seat?.coachUid && !(await callerEmailVerified(callerUid))) {
+      throw new BrokerRequestError(
+        'Confirm your email address first — a coach invitation is matched to a confirmed address.',
+        403,
+      );
+    }
+
     // Deliberately the same message and status whether the seat is missing, belongs to somebody
     // else, or the journal does not exist. Distinguishing them turns this into a way to ask
     // whether a given account has a coach.
@@ -172,7 +219,9 @@ async function handleRevoke(uid: string): Promise<CoachSeatResult> {
 
 /** The journals this caller has been invited to coach. */
 async function handleCoaching(uid: string): Promise<CoachSeatResult> {
-  const email = await callerEmail(uid);
+  // Verified only, for the same reason assertCoachOf uses it: this list is the door, and a pending
+  // seat is matched by address. An unconfirmed address would list somebody else's journal here.
+  const email = await verifiedCallerEmail(uid);
   const seats = new Map<string, CoachSeat>();
 
   const byUid = await db().collection('coachSeats').where('coachUid', '==', uid).get();
