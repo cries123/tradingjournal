@@ -1,6 +1,7 @@
-import type { Config, Context } from '@netlify/functions';
+import type { Config } from '@netlify/functions';
 import { openModelStream, prepareAssistantStream } from '../../server/aiAssistantHandler';
 import { refundDaily } from '../../server/usage';
+import { needsEmptyError, shouldRefundStream } from '../../src/utils/streamRefund';
 
 /**
  * Streaming variant of the assistant.
@@ -12,7 +13,7 @@ import { refundDaily } from '../../server/usage';
  * It re-uses the normal path's preflight, so auth, length limits and the daily cap are enforced
  * identically. A streaming endpoint that skipped them would be an unmetered door to the same model.
  */
-export default async (req: Request, _context: Context): Promise<Response> => {
+export default async (req: Request): Promise<Response> => {
   if (req.method !== 'POST') {
     return Response.json({ error: 'Method not allowed' }, { status: 405 });
   }
@@ -35,6 +36,26 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     );
   }
 
+  let errorSent = false;
+
+  /*
+   * Hands the message back, once.
+   *
+   * The spend happens in the preflight, before a single token exists, so that a failing request
+   * cannot be retried for free in a loop. That means every failure after this point is a message the
+   * trader paid for and did not receive — and because the client restarts an errored stream on the
+   * buffered endpoint, which spends again, not refunding here costs them two.
+   *
+   * Best effort by the same reasoning refundDaily itself uses: if the refund fails the trader is out
+   * one message, which is not worth failing a response they are already reading.
+   */
+  const handBack = async () => {
+    if (!pre.uid) return;
+    await refundDaily('ai', pre.uid, pre.spentFrom).catch((err: unknown) => {
+      console.error('[ai-assistant-stream] refund failed:', err);
+    });
+  };
+
   const upstream = await openModelStream(pre.messages);
   if (!upstream.ok || !upstream.body) {
     const detail = await upstream.text().catch(() => '');
@@ -42,7 +63,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     // Nothing was generated, so the message the preflight counted was never delivered. The client
     // retries on the non-streaming endpoint, which counts its own — without this refund a single
     // upstream hiccup silently costs the user two of their daily messages.
-    if (pre.uid) await refundDaily('ai', pre.uid, pre.spentFrom);
+    await handBack();
     // 502 tells the client to retry on the non-streaming endpoint, which has the model fallback
     // and the empty-answer retry that a stream can't do halfway through.
     return Response.json(
@@ -100,9 +121,10 @@ export default async (req: Request, _context: Context): Promise<Response> => {
           }
         }
 
-        if (!produced) {
+        if (needsEmptyError({ tokensDelivered: produced })) {
           // The reasoning-budget failure, arriving as a clean but empty stream. Say so rather than
           // ending on silence the UI would render as a blank reply.
+          errorSent = true;
           controller.enqueue(
             encoder.encode(`event: error\ndata: ${JSON.stringify({ error: 'empty' })}\n\n`),
           );
@@ -110,10 +132,19 @@ export default async (req: Request, _context: Context): Promise<Response> => {
         controller.enqueue(encoder.encode('event: done\ndata: {}\n\n'));
       } catch (err) {
         console.error('[ai-assistant-stream] stream broke:', err);
+        errorSent = true;
         controller.enqueue(
           encoder.encode(`event: error\ndata: ${JSON.stringify({ error: 'interrupted' })}\n\n`),
         );
       } finally {
+        /*
+         * Decided after the stream has ended, because only then is it known whether the trader got
+         * an answer. Both error events above used to leave the message charged, and the client
+         * treats either as a reason to start over on the buffered endpoint, which charges again.
+         */
+        if (shouldRefundStream({ tokensDelivered: produced, errorSent })) {
+          await handBack();
+        }
         controller.close();
       }
     },
