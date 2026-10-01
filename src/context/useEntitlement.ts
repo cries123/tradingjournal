@@ -13,6 +13,10 @@ export interface EntitlementContextValue {
   tier: Tier;
   limits: TierLimits;
   status: EntitlementSnapshot['status'];
+  /** What the subscription is for, which is not what it grants once a payment has failed. */
+  subscribedTier: Tier;
+  /** There is a billing account to open. Server-decided: see the snapshot field. */
+  canManageBilling: boolean;
   /** 'admin' means grandfathered, 'comp' means complimentary for a while — neither has a subscription to manage. */
   source: EntitlementSnapshot['source'];
   currentPeriodEnd: string | null;

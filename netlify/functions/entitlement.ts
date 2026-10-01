@@ -1,6 +1,13 @@
 import type { Handler, HandlerResponse } from '@netlify/functions';
 import { assertCallerUid, BrokerRequestError } from '../../server/snaptradeAuth';
-import { accessSource, complimentaryUntil, effectiveTier, readEntitlement } from '../../server/entitlements';
+import {
+  accessSource,
+  canManageBilling,
+  complimentaryUntil,
+  effectiveTier,
+  readEntitlement,
+  subscribedTier,
+} from '../../server/entitlements';
 import { readUsed, readUserCredits, usageResetsAt } from '../../server/usage';
 import { limitsFor, MARKET_REPLAY_LIVE } from '../../src/config/tiers';
 import { trialEligibility } from '../../server/trialHandler';
@@ -52,6 +59,10 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
         limits,
         marketReplayLive: MARKET_REPLAY_LIVE,
         status: record?.status ?? 'active',
+        // Both of these answer questions the effective tier cannot, for a customer whose payment
+        // has failed. The reasoning is with the functions, in server/entitlements.ts.
+        subscribedTier: subscribedTier(record),
+        canManageBilling: canManageBilling(record),
         source: accessSource(record),
         currentPeriodEnd: record?.currentPeriodEnd ?? null,
         complimentaryUntil: complimentaryUntil(record),

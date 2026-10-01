@@ -37,12 +37,38 @@ function formatDate(iso: string | null): string | null {
  */
 export function SubscriptionContent({ onBack, onOrderHistory }: SubscriptionContentProps) {
   const { user } = useAuth();
-  const { tier, status, source, currentPeriodEnd, complimentaryUntil, loaded } = useEntitlement();
+  const {
+    tier,
+    subscribedTier,
+    canManageBilling,
+    status,
+    source,
+    currentPeriodEnd,
+    complimentaryUntil,
+    loaded,
+  } = useEntitlement();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const plan = TIER_PLANS[tier];
-  const paying = Boolean(user) && loaded && source === 'purchase' && tier !== 'free';
+  /*
+   * The plan the subscription is for, which is what this screen is about.
+   *
+   * A failed payment drops the effective tier to free, so every line here that named `plan` was
+   * telling a Gold customer about the Free plan — including, absurdly, "update your card to keep
+   * Free".
+   */
+  const subscribedPlan = TIER_PLANS[subscribedTier];
+
+  /*
+   * Whether there is a billing account to manage, asked of the server.
+   *
+   * This was `source === 'purchase' && tier !== 'free'`, which hid the button from the one person
+   * who most needs it: a past_due customer has an effective tier of free, so the panel told them to
+   * update their card and then offered no way to do it. Their only route was to buy a second
+   * subscription.
+   */
+  const paying = Boolean(user) && loaded && canManageBilling;
   const renewsOn = formatDate(currentPeriodEnd);
   const compUntil = formatDate(complimentaryUntil ?? null);
 
@@ -92,7 +118,8 @@ export function SubscriptionContent({ onBack, onOrderHistory }: SubscriptionCont
         )}
         {status === 'past_due' && (
           <p className="text-sm text-red-400">
-            Your last payment did not go through. Update your card to keep {plan.name}.
+            Your last payment did not go through, so {subscribedPlan.name} features are paused.
+            Update your card below to turn them back on.
           </p>
         )}
       </AccountPanel>

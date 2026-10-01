@@ -84,6 +84,11 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
       tier: snapshot.tier,
       limits: snapshot.limits,
       status: snapshot.status,
+      // Both default rather than assert: an older cached response, or a 500 falling back to
+      // FREE_SNAPSHOT, simply has no opinion — and the safe reading of "no opinion" is a free plan
+      // with nothing to manage.
+      subscribedTier: snapshot.subscribedTier ?? snapshot.tier,
+      canManageBilling: snapshot.canManageBilling ?? false,
       source: snapshot.source,
       currentPeriodEnd: snapshot.currentPeriodEnd,
       complimentaryUntil: snapshot.complimentaryUntil ?? null,

@@ -36,7 +36,21 @@ vi.mock('../../services/account', () => ({
 
 const entitlement = {
   tier: 'gold' as const,
-  status: 'active' as const,
+  /*
+   * What the subscription is for, next to what it currently grants.
+   *
+   * These differ exactly when a payment has failed, which is the case the screen used to get wrong,
+   * so they are separate fields here rather than one.
+   */
+  subscribedTier: 'gold' as const,
+  /*
+   * Whether there is a billing account to open, as the server reports it.
+   *
+   * The screen used to infer this from `tier !== 'free'`, which hid the portal from a past_due
+   * customer on the same panel that asked them to update their card.
+   */
+  canManageBilling: true,
+  status: 'active' as 'active' | 'canceled' | 'past_due' | 'expired',
   source: 'purchase' as const,
   currentPeriodEnd: '2026-10-01T00:00:00.000Z',
   complimentaryUntil: null,
@@ -127,6 +141,8 @@ describe('SubscriptionContent', () => {
   it('offers plans rather than a cancel button to somebody on free', () => {
     const restoreTier = entitlement.tier;
     entitlement.tier = 'free' as typeof entitlement.tier;
+    // No subscription, so the server reports no billing account either.
+    entitlement.canManageBilling = false;
 
     const html = paint(
       createElement(SubscriptionContent, { onBack: noop, onOrderHistory: noop }),
@@ -136,11 +152,15 @@ describe('SubscriptionContent', () => {
     expect(html).toContain('See plans');
 
     entitlement.tier = restoreTier;
+    entitlement.canManageBilling = true;
   });
 
   it('tells an admin-granted plan there is no subscription behind it', () => {
     const restore = entitlement.source;
     entitlement.source = 'admin' as typeof entitlement.source;
+    // creem-portal refuses an admin grant outright, so the server reports it as unmanageable and
+    // the screen must not offer a button that would come back 409.
+    entitlement.canManageBilling = false;
 
     const html = paint(
       createElement(SubscriptionContent, { onBack: noop, onOrderHistory: noop }),
@@ -149,6 +169,31 @@ describe('SubscriptionContent', () => {
     expect(html).not.toContain('Manage billing or cancel');
 
     entitlement.source = restore;
+    entitlement.canManageBilling = true;
+  });
+
+  it('gives a declined payment a way to fix itself', () => {
+    /*
+     * The bug. past_due drops the EFFECTIVE tier to free, and this screen gated the billing portal
+     * on `tier !== 'free'` — so the customer whose card had just failed was told to update it on a
+     * panel offering no way to, and their only route back was buying a second subscription.
+     *
+     * The same substitution made the message absurd: it named the effective plan, so it read
+     * "update your card to keep Free".
+     */
+    entitlement.status = 'past_due';
+    entitlement.tier = 'free' as typeof entitlement.tier;
+
+    const html = paint(
+      createElement(SubscriptionContent, { onBack: noop, onOrderHistory: noop }),
+    );
+
+    expect(html).toContain('Manage billing or cancel');
+    expect(html).toContain('Gold features are paused');
+    expect(html).not.toContain('keep Free');
+
+    entitlement.status = 'active';
+    entitlement.tier = 'gold';
   });
 });
 

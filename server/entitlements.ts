@@ -114,6 +114,34 @@ export function accessSource(e: Entitlement | null, now: number = Date.now()): '
   return e.source;
 }
 
+/**
+ * The tier the SUBSCRIPTION is for, whatever it currently confers.
+ *
+ * billingTier answers "what can they use", which is what nearly everything wants. This answers
+ * "what did they buy", which only the account screen wants — and only because a declined payment
+ * makes those two different. Without it, the line asking a Gold customer to update their card read
+ * "update your card to keep Free".
+ */
+export function subscribedTier(e: Entitlement | null): Tier {
+  return e?.tier ?? 'free';
+}
+
+/**
+ * Whether there is a billing account to open a portal for.
+ *
+ * Decided here because only here knows: the browser was inferring it from the effective tier, which
+ * is free for a past_due customer — so the one person who urgently needs the portal was shown no
+ * way to reach it, on the same panel that told them to update their card.
+ *
+ * The two false cases are deliberately the two that creem-portal itself refuses, so the button and
+ * the endpoint behind it cannot disagree: an admin grant has no subscription, and no Creem customer
+ * id means Creem has never heard of this account. Status is NOT consulted — past_due and expired
+ * both still have a portal, which is the whole point, and a cancelled customer may want an invoice.
+ */
+export function canManageBilling(e: Entitlement | null): boolean {
+  return e?.source === 'purchase' && Boolean(e.creemCustomerId);
+}
+
 /** When the complimentary access runs out, if it is live. */
 export function complimentaryUntil(e: Entitlement | null, now: number = Date.now()): string | null {
   return e && compIsLive(e.comp, now) ? e.comp.until : null;

@@ -85,14 +85,51 @@ describe('who can start a trial', () => {
     expect(decideTrial(cancelled, NOW).eligible).toBe(false);
   });
 
-  it('would offer one to a subscriber whose plan has fully lapsed, if they had never used it', () => {
-    // Not a loophole: anyone who subscribed after trialling carries trialStartedAt, and the first
-    // rule catches them. This covers the person who paid from day one and later lapsed.
-    const lapsed = record({ tier: 'silver', status: 'canceled', currentPeriodEnd: at(-30) });
-    expect(decideTrial(lapsed, NOW).eligible).toBe(true);
+  it('refuses a subscriber whose plan has fully lapsed', () => {
+    /*
+     * This used to be allowed, on the reasoning that "anyone who subscribed after trialling carries
+     * trialStartedAt, so the first rule catches them". That reasoning does not hold in this product:
+     * the live trial belongs to Creem and is redeemed through checkout, so it never sets
+     * trialStartedAt and the first rule has never fired for anybody.
+     *
+     * creemSubscriptionId is the durable trace of having been a customer — a cancellation does not
+     * clear it — so it is what the rule reads.
+     */
+    const lapsed = record({
+      tier: 'silver',
+      status: 'canceled',
+      currentPeriodEnd: at(-30),
+      creemSubscriptionId: 'sub_123',
+    });
+    expect(decideTrial(lapsed, NOW).eligible).toBe(false);
 
     const lapsedAfterTrial = record({ ...lapsed, trialStartedAt: at(-200) });
     expect(decideTrial(lapsedAfterTrial, NOW).eligible).toBe(false);
+  });
+
+  it('refuses a customer whose card has just been declined', () => {
+    /*
+     * The one that was actually on screen. past_due leaves the tier set but makes the effective tier
+     * free, so neither the paying check nor the trial-history check fired — and the pricing page
+     * offered a free trial directly beneath the banner asking them to update their card. Taking it
+     * would have opened a second subscription rather than fixing the first.
+     */
+    const declined = record({
+      tier: 'gold',
+      status: 'past_due',
+      creemSubscriptionId: 'sub_123',
+    });
+
+    const decision = decideTrial(declined, NOW);
+    expect(decision.eligible).toBe(false);
+    expect(decision.eligible === false && decision.message).toMatch(/never subscribed/i);
+  });
+
+  it('still offers one to a free account that has never been through checkout', () => {
+    // The rule is "has been a customer", not "has a lapsed-looking record": an account whose tier
+    // was set by hand and later cleared has never paid for anything.
+    const neverPaid = record({ tier: 'free', status: 'expired' });
+    expect(decideTrial(neverPaid, NOW).eligible).toBe(true);
   });
 
   it('checks the history before anything else, so the answer never changes with time', () => {

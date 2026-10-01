@@ -14,7 +14,7 @@ import { REFUND_WINDOW_DAYS } from '../../config/legal';
 import { BROKER_COUNT_PHRASE } from '../../data/brokerCopy';
 import { useAuth } from '../../context/useAuth';
 import { useEntitlement } from '../../context/useEntitlement';
-import { TRIAL_DAYS, TRIAL_TIER } from '../../config/trial';
+import { REFUSALS, TRIAL_DAYS, TRIAL_TIER } from '../../config/trial';
 import {
   CheckoutError,
   choosePlan,
@@ -83,6 +83,9 @@ export function PricingContent({
     refresh,
     onTrial,
     complimentaryUntil,
+    canManageBilling,
+    trialAvailable,
+    trialBlockedReason,
   } = useEntitlement();
   const [busy, setBusy] = useState<Tier | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -145,13 +148,28 @@ export function PricingContent({
   const checkoutPaused = payments?.checkoutEnabled === false;
   /** Paying customer with a real subscription — as opposed to free, or a hand-granted tier. */
   const subscribed = Boolean(user) && loaded && source === 'purchase' && currentTier !== 'free';
+  /*
+   * Whether there is a billing page to send them to, which is not the same question as `subscribed`.
+   *
+   * A declined payment drops the effective tier to free, so `subscribed` goes false and the link to
+   * the billing portal disappeared from the one person who needed it. Decided on the server, where
+   * the Creem customer id is.
+   */
+  const hasBillingAccount = Boolean(user) && loaded && canManageBilling;
 
   /*
-   * The trial rides on Creem's checkout, so it is offered to anybody who could buy this plan —
-   * Creem is the one that decides whether a given customer is owed a trial, and it knows things
-   * this page does not, like whether they have had one on a card before.
+   * The trial is offered when the server says this account may have one.
+   *
+   * It used to be offered to anybody who was not currently subscribed, on the reasoning that Creem
+   * decides. Creem does decide what it charges — but the page decides what it promises, and
+   * "not currently subscribed" includes the customer whose card was just declined. They were shown
+   * a free trial directly beneath a banner asking them to update that card, and taking it would
+   * have opened a second subscription rather than fixing the first.
+   *
+   * trialAvailable comes from the same rule the claim endpoint enforces, so the button is offered
+   * exactly when it would be honoured, and trialBlockedMessage says why when it is not.
    */
-  const trialOnOffer = Boolean(user) && loaded && !subscribed && currentTier !== TRIAL_TIER;
+  const trialOnOffer = Boolean(user) && loaded && trialAvailable;
 
   const handlePortal = async () => {
     setError(null);
@@ -452,15 +470,26 @@ export function PricingContent({
                             : `Add ${plan.name} to cart`}
                   </button>
                 )}
+
+                {/* The one refusal the visitor can do something about. Everything else -- already
+                    subscribed, already trialled -- is said by the plan state above, but an
+                    unconfirmed address just made the trial vanish with no explanation. */}
+                {tier === TRIAL_TIER && !trialOnOffer && trialBlockedReason === 'email-unverified' && (
+                  <p className="mt-2.5 text-xs text-amber-300 text-center">
+                    {REFUSALS['email-unverified']} Then reload this page to start your free trial.
+                  </p>
+                )}
               </div>
             </section>
           );
         })}
       </div>
 
-      {subscribed && (
+      {hasBillingAccount && (
         <p className="mt-5 text-sm text-text-secondary">
-          Changing plans moves your existing subscription — you are never billed for two.{' '}
+          {subscribed
+            ? 'Changing plans moves your existing subscription — you are never billed for two. '
+            : 'Your subscription needs attention — update your card or review your invoices. '}
           <button
             type="button"
             onClick={() => void handlePortal()}

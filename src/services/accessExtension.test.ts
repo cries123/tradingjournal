@@ -11,7 +11,15 @@ import {
   validExtensionDays,
   type AccessRecord,
 } from '../config/accessExtension';
-import { accessSource, complimentaryUntil, effectiveTier, readComp, type Entitlement } from '../../server/entitlements';
+import {
+  accessSource,
+  canManageBilling,
+  complimentaryUntil,
+  effectiveTier,
+  readComp,
+  subscribedTier,
+  type Entitlement,
+} from '../../server/entitlements';
 
 const NOW = Date.parse('2026-09-03T18:00:00.000Z');
 const iso = (offsetDays: number) => new Date(NOW + offsetDays * DAY_MS).toISOString();
@@ -121,6 +129,54 @@ describe('effectiveTier on the server, end to end', () => {
     expect(effectiveTier(e, NOW + 15 * DAY_MS)).toBe('free');
     expect(accessSource(e, NOW + 15 * DAY_MS)).toBe('purchase');
     expect(complimentaryUntil(e, NOW + 15 * DAY_MS)).toBeNull();
+  });
+
+  /*
+   * The two fields the account screen needs that the effective tier cannot answer.
+   *
+   * Both exist because of one state: a declined payment. past_due leaves the subscription intact
+   * while making the effective tier free, and the screen had only the effective tier to read — so it
+   * hid the billing portal from the one customer who needed it and told them to "update your card to
+   * keep Free".
+   */
+  it('remembers what the subscription is for after a payment fails', () => {
+    const declined: Entitlement = {
+      ...base,
+      tier: 'gold',
+      source: 'purchase',
+      status: 'past_due',
+      creemCustomerId: 'cus_1',
+    };
+
+    expect(effectiveTier(declined, NOW)).toBe('free');
+    expect(subscribedTier(declined)).toBe('gold');
+  });
+
+  it('keeps the billing portal open to a declined or lapsed customer', () => {
+    // The portal is where a card gets fixed and where invoices live, so status is deliberately not
+    // consulted. Gating it on the effective tier is what broke it.
+    for (const status of ['active', 'past_due', 'expired', 'canceled'] as const) {
+      const e: Entitlement = {
+        ...base,
+        tier: 'gold',
+        source: 'purchase',
+        status,
+        creemCustomerId: 'cus_1',
+      };
+      expect(canManageBilling(e), status).toBe(true);
+    }
+  });
+
+  it('offers no portal where there is no subscription behind it', () => {
+    // These are the two cases creem-portal itself refuses with a 409 and a 404, so the button has to
+    // agree with it — otherwise it is a button that reports an error for a living.
+    const granted: Entitlement = { ...base, tier: 'diamond', source: 'admin', status: 'active' };
+    const neverCheckedOut: Entitlement = { ...base, tier: 'free', source: 'purchase', status: 'active' };
+
+    expect(canManageBilling(granted)).toBe(false);
+    expect(canManageBilling(neverCheckedOut)).toBe(false);
+    expect(canManageBilling(null)).toBe(false);
+    expect(subscribedTier(null)).toBe('free');
   });
 
   it('reads a half-written comp as no comp at all', () => {

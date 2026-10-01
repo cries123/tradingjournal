@@ -21,6 +21,24 @@ export interface EntitlementSnapshot {
   limits: TierLimits;
   marketReplayLive: boolean;
   status: 'active' | 'canceled' | 'past_due' | 'expired';
+  /**
+   * The tier the SUBSCRIPTION is for, whatever it currently confers.
+   *
+   * `tier` above is what they can use today, which is what almost everything should read — but a
+   * failed payment drops that to free while the subscription is still a Gold subscription, and the
+   * screen that has to say "update your card to keep Gold" needs the other number. Without it that
+   * line read "update your card to keep Free".
+   */
+  subscribedTier?: Tier;
+  /**
+   * Whether there is a billing account to open a portal for.
+   *
+   * Decided on the server, from the source and whether Creem knows this customer, because the
+   * client cannot tell: the screen used to infer it from `tier !== 'free'`, so a past_due customer
+   * — the one person who urgently needs the portal — was shown no way to reach it, on the same
+   * panel that told them to update their card. An expired subscription keeps it too, for invoices.
+   */
+  canManageBilling?: boolean;
   /** 'comp' when complimentary access is what confers the tier — nothing to pay, nothing to cancel. */
   source: 'purchase' | 'admin' | 'comp' | null;
   currentPeriodEnd: string | null;
@@ -42,6 +60,8 @@ export const FREE_SNAPSHOT: EntitlementSnapshot = {
   limits: limitsFor('free'),
   marketReplayLive: MARKET_REPLAY_LIVE,
   status: 'active',
+  subscribedTier: 'free',
+  canManageBilling: false,
   source: null,
   currentPeriodEnd: null,
   complimentaryUntil: null,

@@ -30,6 +30,7 @@ export function trialOffer(): string {
 export type TrialRefusal =
   | 'already-used'
   | 'already-paid'
+  | 'subscribed-before'
   | 'already-comped'
   | 'email-unverified'
   | 'email-already-used';
@@ -38,6 +39,13 @@ export type TrialRefusal =
 export interface TrialRecord extends AccessRecord {
   tier: Tier;
   trialStartedAt?: string | null;
+  /**
+   * Set once Creem has ever opened a subscription for this account, and never cleared by a
+   * cancellation. It is the only durable trace that this account has been a customer, which is what
+   * the lapsed-subscriber rule below needs — `tier` and `status` both decay back towards a record
+   * that looks like a fresh free account.
+   */
+  creemSubscriptionId?: string;
 }
 
 export type TrialDecision =
@@ -47,6 +55,8 @@ export type TrialDecision =
 export const REFUSALS: Record<TrialRefusal, string> = {
   'already-used': 'You have already had a free trial on this account.',
   'already-paid': 'Your plan already includes broker sync — there is nothing to trial.',
+  'subscribed-before':
+    'Free trials are for accounts that have never subscribed. Pick a plan, or update your card if a payment failed.',
   'already-comped': 'You already have complimentary access, so a trial would give you nothing.',
   'email-unverified': 'Confirm your email address first — we have sent you a link.',
   'email-already-used': 'This email address has already been used for a free trial.',
@@ -74,9 +84,7 @@ export function decideTrial(record: TrialRecord | null, now: number): TrialDecis
     return refuse('already-comped');
   }
 
-  // Anyone who is paying, or was granted a plan by hand, already has what the trial would give
-  // them. A lapsed or cancelled subscriber is NOT excluded here — but they will have used their
-  // trial before they ever subscribed, so the first rule catches them.
+  // Anyone who is paying, or was granted a plan by hand, already has what the trial would give them.
   if (record && record.tier !== 'free') {
     const paid = record.source === 'admin' || record.status === 'active';
     const withinPaidPeriod =
@@ -86,6 +94,26 @@ export function decideTrial(record: TrialRecord | null, now: number): TrialDecis
     if (paid || withinPaidPeriod) {
       return refuse('already-paid');
     }
+  }
+
+  /*
+   * And anyone who has ever been a subscriber.
+   *
+   * This used to be waved off with "they will have used their trial before they subscribed, so the
+   * first rule catches them" — which is not true of this product. The live trial belongs to Creem
+   * and goes through checkout, so it never sets trialStartedAt; the first rule has never fired for
+   * anybody. Meanwhile a failed payment leaves tier set but status past_due, which the rule above
+   * does not catch either.
+   *
+   * The result was a customer whose card had just been declined being offered a free trial on the
+   * pricing page, beside a banner asking them to update that card. Taking it would have opened a
+   * second subscription rather than fixing the first.
+   *
+   * creemSubscriptionId is the durable trace: a cancellation does not clear it, so "has been a
+   * customer" survives everything that decays tier and status back towards a free account.
+   */
+  if (record?.creemSubscriptionId) {
+    return refuse('subscribed-before');
   }
 
   return {
