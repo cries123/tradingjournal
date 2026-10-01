@@ -16,9 +16,21 @@ export interface RuleViolation {
  * agree what the sequence is. Two copies of an ordering rule drifting is the same shape of bug as
  * the two chunk-error lists.
  *
- * entryTime where it exists, recorded order where it does not. Schwab's feed sends a date with no
- * fill time, so for most journals here the recorded order — the matcher's order for an import, the
- * order they were written for hand entry — is the only signal there is.
+ * entryTime where it exists, import sequence where it does not. Schwab's feed sends a date with no
+ * fill time, so for most journals here the sequence the importer produced — it walks the broker's
+ * activity rows in order — is the only signal there is.
+ *
+ * That sequence lives in the document id, and reading it needs the tie-break below. Without one, this
+ * sorted on entryTime alone, which is undefined for every Schwab fill, so a stable sort left whatever
+ * order the caller happened to have — for a Firestore snapshot, lexicographic document id. The
+ * importer's index was not padded either, so `_10` came before `_2` and an eleven-trade day replayed
+ * in an order that was not even the importer's. On a day of (+500, −100, −100, −900) with a cap of
+ * two, that is the difference between the simulator reporting +$1,000 saved and −$400 lost: the same
+ * trades, the opposite conclusion, rendered in green with a plus sign either way.
+ *
+ * It is still an approximation for a broker that sends no times, and the panels built on it say "the
+ * next trade" rather than claiming a clock. But it is now the importer's actual order rather than an
+ * artefact of string collation, and the same order every time it is asked.
  */
 export function tradesByDay(trades: Trade[]): Map<string, Trade[]> {
   const byDay = new Map<string, Trade[]>();
@@ -31,7 +43,12 @@ export function tradesByDay(trades: Trade[]): Map<string, Trade[]> {
   }
 
   for (const list of byDay.values()) {
-    list.sort((a, b) => (a.entryTime ?? '').localeCompare(b.entryTime ?? ''));
+    list.sort((a, b) => {
+      const byTime = (a.entryTime ?? '').localeCompare(b.entryTime ?? '');
+      if (byTime !== 0) return byTime;
+      // Both without a time, or the same time: fall back to the id, which carries the import index.
+      return (a.id ?? '').localeCompare(b.id ?? '');
+    });
   }
   return byDay;
 }

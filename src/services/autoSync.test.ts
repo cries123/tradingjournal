@@ -325,7 +325,28 @@ describe('autoSyncTradeId', () => {
 
   it('still says it was automatic', () => {
     // Provenance after the prefix the check needs, so both facts fit in one id.
-    expect(autoSyncTradeId('acct', 1234, 9)).toBe('snaptrade_acct_auto1234_9');
+    expect(autoSyncTradeId('acct', 1234, 9)).toBe('snaptrade_acct_auto1234_0009');
+  });
+
+  it('sorts in import order as a string, which is how it is read back', () => {
+    /*
+     * The id IS the import sequence. Firestore returns a collection with no orderBy in document-id
+     * order — lexicographic — and the trade list is then sorted by date alone, a stable sort, so
+     * within a day the id order is what survives and what the rule simulator replays.
+     *
+     * Unpadded, `_10` sorted before `_2`. So any day with eleven or more trades replayed in an order
+     * that was not even the importer's — and those are exactly the days a maxTradesPerDay rule acts
+     * on, the only days that contribute to the simulator's headline figure.
+     */
+    const ids = Array.from({ length: 12 }, (_, i) => autoSyncTradeId('acct', 1234, i));
+
+    expect([...ids].sort()).toEqual(ids);
+  });
+
+  it('keeps sorting in order across a long day', () => {
+    // Four digits, so the padding does not run out before a plausible day does.
+    const ids = Array.from({ length: 300 }, (_, i) => autoSyncTradeId('acct', 1234, i));
+    expect([...ids].sort()).toEqual(ids);
   });
 
   it('gives every trade in a run its own id', () => {

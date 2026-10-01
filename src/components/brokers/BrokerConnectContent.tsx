@@ -310,7 +310,10 @@ export function BrokerConnectContent({
         (t, i) =>
           ({
             ...t,
-            id: `snaptrade_${account.id}_${Date.now()}_${i}`,
+            // Zero-padded for the same reason autoSyncTradeId pads: this id IS the import sequence,
+            // and unpadded it collates `_10` before `_2`, scrambling exactly the busy days the rule
+            // simulator and the tilt panels draw their conclusions from.
+            id: `snaptrade_${account.id}_${Date.now()}_${String(i).padStart(4, '0')}`,
           }) as Trade,
       );
       // Awaited: the message below is a claim that these trades are in the journal, so it must

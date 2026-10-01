@@ -12,8 +12,29 @@ import { amountFromEvent, parseBillingEvent } from '../../server/creemClient';
 describe('isPaymentEvent', () => {
   it('books a payment', () => {
     expect(isPaymentEvent('subscription.paid')).toBe(true);
-    expect(isPaymentEvent('checkout.completed')).toBe(true);
     expect(isPaymentEvent('SUBSCRIPTION.PAID')).toBe(true);
+    expect(isPaymentEvent('invoice.paid')).toBe(true);
+  });
+
+  it('does not book a checkout session finishing', () => {
+    /*
+     * This test asserted the opposite, and that is what let the bug stand.
+     *
+     * One purchase emits BOTH checkout.completed and subscription.paid — creemClient's own comment
+     * states it as a fact of this integration — with two distinct event ids, so the per-event dedupe
+     * does not collapse them. Booking both wrote two rows for one charge, at full price either way
+     * because whichever event carried no amount fell back to the list price. Every new sale counted
+     * twice in the admin revenue tile and in the customer's "Total paid", on the one screen built to
+     * answer "did you charge me twice".
+     */
+    expect(isPaymentEvent('checkout.completed')).toBe(false);
+  });
+
+  it('books one row for the pair a single purchase emits', () => {
+    // The invariant, stated as the pair rather than as two separate facts: exactly one of the two
+    // events a purchase produces may book money.
+    const purchaseEmits = ['checkout.completed', 'subscription.paid'];
+    expect(purchaseEmits.filter(isPaymentEvent)).toEqual(['subscription.paid']);
   });
 
   it('does not book a subscription merely turning active', () => {

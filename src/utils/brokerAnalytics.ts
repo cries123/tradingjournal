@@ -73,6 +73,17 @@ export function orderTrades(trades: Trade[]): Trade[] {
       const at = minutesOfDay(a.trade.entryTime);
       const bt = minutesOfDay(b.trade.entryTime);
       if (at !== null && bt !== null && at !== bt) return at - bt;
+      /*
+       * The id before the caller's index.
+       *
+       * "The order the caller had them in" is only the import order if the caller preserved it, and
+       * the main caller does not: a Firestore snapshot arrives in lexicographic document-id order and
+       * is then sorted by date alone. The id is where the import index actually lives, so reading it
+       * here is what makes the paragraph above true. The caller's index stays as the last resort for
+       * hand-entered trades, which have no sortable id.
+       */
+      const byId = (a.trade.id ?? '').localeCompare(b.trade.id ?? '');
+      if (byId !== 0) return byId;
       return a.index - b.index;
     })
     .map((entry) => entry.trade);

@@ -166,6 +166,63 @@ describe('simulateRules', () => {
     expect(result.simulatedPnl).toBe(-900);
   });
 
+  it('answers the same whatever order the journal arrives in', () => {
+    /*
+     * The failure this pins. "Recorded order" meant the order of the array, and the array comes from
+     * a Firestore snapshot sorted by DATE alone — a stable sort, so within a day what survives is the
+     * snapshot's own order, which for a query with no orderBy is lexicographic document id.
+     *
+     * So the replay order was an artefact of string collation, and two loads could disagree. With a
+     * cap of two on (+500, −100, −100, −900) that is +$1,000 saved or −$400 lost from the same
+     * trades — rendered in green with a plus sign either way, on the one screen in this product that
+     * makes a counterfactual claim somebody will change how they trade because of.
+     *
+     * The id carries the import index, so it is the tie-break, and the importer pads it.
+     */
+    const imported = (index: number, pnl: number): Trade =>
+      ({
+        id: `snaptrade_acct_1700000000000_${String(index).padStart(4, '0')}`,
+        date: '2026-09-01',
+        symbol: 'SPY',
+        pnl,
+      }) as Trade;
+
+    const inOrder = [imported(0, 500), imported(1, -100), imported(2, -100), imported(3, -900)];
+    const shuffled = [inOrder[3]!, inOrder[0]!, inOrder[2]!, inOrder[1]!];
+
+    const a = simulateRules(inOrder, rules({ maxTradesPerDay: 2 }));
+    const b = simulateRules(shuffled, rules({ maxTradesPerDay: 2 }));
+
+    expect(b.simulatedPnl).toBe(a.simulatedPnl);
+    expect(b.difference).toBe(a.difference);
+    // And the answer is the one the import sequence gives: the first two trades, +500 and -100.
+    expect(a.simulatedPnl).toBe(400);
+    expect(a.difference).toBe(1000);
+  });
+
+  it('replays an eleven-trade day in the importer sequence, not in string order', () => {
+    /*
+     * The specific day the old ids broke. The importer's index was not zero-padded, so `_10` collated
+     * before `_2` — and a day with eleven or more trades is exactly the day a maxTradesPerDay rule
+     * acts on. The days that decided the headline figure were the days whose order was scrambled.
+     *
+     * Padded ids sort as the sequence, so the first two trades of the day are the first two taken.
+     */
+    const day = Array.from({ length: 12 }, (_, i) =>
+      ({
+        id: `snaptrade_acct_1700000000000_${String(i).padStart(4, '0')}`,
+        date: '2026-09-01',
+        symbol: 'SPY',
+        // +100 first, then eleven losses. A cap of one keeps only the winner.
+        pnl: i === 0 ? 100 : -50,
+      }) as Trade,
+    );
+
+    const result = simulateRules([...day].reverse(), rules({ maxTradesPerDay: 1 }));
+
+    expect(result.simulatedPnl).toBe(100);
+  });
+
   it('puts the worst actual day first', () => {
     const journal = [
       trade('2026-09-01', -200, '09:30'), trade('2026-09-01', -200, '10:00'),

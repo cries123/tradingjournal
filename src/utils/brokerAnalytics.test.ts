@@ -451,3 +451,53 @@ describe('costStats', () => {
     expect(costStats(Array.from({ length: 10 }, () => trade({ pnl: 10 })))).toBeNull();
   });
 });
+
+describe('ordering is not an artefact of how the journal arrived', () => {
+  /*
+   * orderTrades fell back to "the order the caller had them in", and the main caller does not
+   * preserve the import order: a Firestore snapshot arrives in lexicographic document-id order and is
+   * then sorted by DATE alone — a stable sort, so within a day the snapshot's own order survives.
+   *
+   * Every panel built on this reads a sequence. tiltStats pairs each trade with the one before it, so
+   * reordering a day does not merely shuffle the output — it changes which trades follow a loss, and
+   * with MIN_PER_GROUP gates it can take a real answer to null. The id carries the importer's index,
+   * so it is now the tie-break ahead of the caller's.
+   */
+  const imported = (index: number, pnl: number, date = '2026-08-03'): Trade =>
+    ({
+      id: `snaptrade_acct_1700000000000_${String(index).padStart(4, '0')}`,
+      date,
+      symbol: 'SPY',
+      pnl,
+    }) as Trade;
+
+  /** Alternating win/loss so both tilt groups clear MIN_PER_GROUP. */
+  const day = [
+    imported(0, 100), imported(1, -50), imported(2, 100), imported(3, -50),
+    imported(4, 100), imported(5, -50), imported(6, 100), imported(7, -50),
+  ];
+
+  it('puts an import back into its sequence whatever order it is handed in', () => {
+    const shuffled = [day[5]!, day[2]!, day[7]!, day[0]!, day[3]!, day[6]!, day[1]!, day[4]!];
+    expect(orderTrades(shuffled).map((t) => t.id)).toEqual(day.map((t) => t.id));
+  });
+
+  it('gives the same tilt answer from the same trades in any order', () => {
+    const shuffled = [...day].reverse();
+
+    const straight = tiltStats(day);
+    const jumbled = tiltStats(shuffled);
+
+    expect(straight).not.toBeNull();
+    expect(jumbled).toEqual(straight);
+  });
+
+  it('still prefers a real fill time over the id', () => {
+    // The id is the FALLBACK. A journal that has times must be ordered by them, or a hand-entered
+    // afternoon trade sorts by whenever its row happened to be written.
+    const morning = { ...imported(9, 100), entryTime: '09:31' } as Trade;
+    const afternoon = { ...imported(1, -50), entryTime: '14:05' } as Trade;
+
+    expect(orderTrades([afternoon, morning]).map((t) => t.entryTime)).toEqual(['09:31', '14:05']);
+  });
+});

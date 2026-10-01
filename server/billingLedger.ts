@@ -32,7 +32,23 @@ export function isPaymentEvent(eventType: string | undefined): boolean {
    */
   if (type.includes('unpaid') || type.includes('failed') || type.includes('refund')) return false;
 
-  return type.includes('paid') || type.includes('completed');
+  /*
+   * A PAYMENT books money. A completed checkout does not.
+   *
+   * This also returned true for anything containing "completed", and one purchase emits BOTH
+   * `checkout.completed` and `subscription.paid` — creemClient's own comment states that as a fact of
+   * this integration. Two distinct event ids, so the per-event dedupe does not collapse them and the
+   * ledger wrote two rows for one charge. Whichever of the pair carried no amount fell back to the
+   * list price, so the extra row was full price either way: every new sale counted twice in the admin
+   * revenue tile and in the customer's own "Total paid" — on the single screen that exists to answer
+   * "did you charge me twice". Renewals were right, because a renewal emits no checkout.
+   *
+   * A checkout session finishing is not a charge; the subscription being paid is. If Creem ever stops
+   * emitting subscription.paid for an initial charge the symptom is the opposite and just as visible —
+   * a new sale booking nothing at all on the revenue tile the day it happens — so this is worth a
+   * glance in the dashboard after the next sale.
+   */
+  return type.includes('paid');
 }
 
 /**
