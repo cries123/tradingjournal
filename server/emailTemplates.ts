@@ -1,4 +1,5 @@
 import type { WeeklyRecap } from '../src/utils/insights';
+import { TIER_PLANS, type Tier } from '../src/config/tiers';
 
 /**
  * The two emails this product sends, as one small layout and two bodies.
@@ -435,11 +436,25 @@ export interface TrialProgress {
 export function trialEmail(options: {
   stage: 'started' | 'ending' | 'last-day';
   daysLeft: number;
-  tierName: string;
+  /**
+   * The tier, not a rendered name.
+   *
+   * The caller used to pass TIER_PLANS[tier].name while the price in the body was typed in by hand —
+   * and the hand-typed one said five dollars a month for a plan that costs nine. Two of the three
+   * emails quoted it, to everybody whose trial was ending, which is the worst possible audience for
+   * a wrong price.
+   *
+   * Taking the tier means both come out of tiers.ts, which the file says is the only source of truth
+   * for the ladder.
+   */
+  tier: Tier;
   progress: TrialProgress;
   siteUrl: string;
 }): TicketReplyEmail {
-  const { stage, daysLeft, tierName, progress, siteUrl } = options;
+  const { stage, daysLeft, tier, progress, siteUrl } = options;
+  const plan = TIER_PLANS[tier];
+  const tierName = plan.name;
+  const price = `$${plan.price}`;
   const connect = `${siteUrl}/brokers`;
   const pricing = `${siteUrl}/pricing`;
   const days = daysLeft === 1 ? '1 day' : `${daysLeft} days`;
@@ -478,7 +493,7 @@ export function trialEmail(options: {
         body: `
           <p style="margin:0 0 12px 0;">${done}</p>
           <p style="margin:0 0 12px 0;">When the trial ends your journal keeps everything in it — every trade, note and screenshot. What stops is the automatic importing, and the brokerage connection is removed a few days later.</p>
-          <p style="margin:0;">${tierName} is $5 a month if you want to keep it running. Nothing happens if you don't.</p>`,
+          <p style="margin:0;">${tierName} is ${price} a month if you want to keep it running. Nothing happens if you don't.</p>`,
         ctaLabel: `Keep ${tierName}`,
         ctaUrl: pricing,
         footerNote: 'You are getting this because you started a free trial on Trend Chasers.',
@@ -502,7 +517,7 @@ export function trialEmail(options: {
       body: `
         <p style="margin:0 0 12px 0;">${done}</p>
         <p style="margin:0 0 12px 0;"><strong>Nothing disappears.</strong> Your journal, your notes and every trade already imported stay exactly where they are, free, for as long as you want them.</p>
-        <p style="margin:0;">What stops today is the automatic importing. If you would rather it kept going, ${tierName} is $5 a month.</p>`,
+        <p style="margin:0;">What stops today is the automatic importing. If you would rather it kept going, ${tierName} is ${price} a month.</p>`,
       ctaLabel: `Keep ${tierName}`,
       ctaUrl: pricing,
       footerNote: 'You are getting this because you started a free trial on Trend Chasers.',

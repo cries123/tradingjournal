@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { escapeHtml, ticketReplyEmail, weeklyRecapEmail } from '../../server/emailTemplates';
+import { escapeHtml, ticketReplyEmail, trialEmail, weeklyRecapEmail } from '../../server/emailTemplates';
+import { TIER_PLANS, type Tier } from '../config/tiers';
 import type { WeeklyRecap } from '../utils/insights';
 
 const SITE = 'https://trendchasers.net';
@@ -100,5 +101,56 @@ describe('weeklyRecapEmail', () => {
     const mail = weeklyRecapEmail({ recap, siteUrl: SITE, unsubscribeUrl: null });
     expect(mail.html).not.toContain('Unsubscribe');
     expect(mail.text).not.toContain('Unsubscribe');
+  });
+});
+
+describe('trialEmail', () => {
+  /*
+   * The price in a trial email was typed in by hand while the plan name came from TIER_PLANS, and the
+   * hand-typed one said five dollars a month for a plan that costs nine. Two of the three stages
+   * quoted it — to everybody whose trial was ending, which is the worst audience there is for a wrong
+   * price.
+   *
+   * Taking the tier rather than a rendered name is what makes that impossible now: both come out of
+   * tiers.ts, which the repo treats as the only source of truth for the ladder.
+   */
+  const progress = { imported: 12, connected: true };
+
+  const email = (stage: 'started' | 'ending' | 'last-day', tier: Tier = 'silver') =>
+    trialEmail({ stage, daysLeft: 2, tier, progress, siteUrl: 'https://trendchasers.net' });
+
+  it('quotes the price the plan actually costs', () => {
+    const price = `$${TIER_PLANS.silver.price}`;
+
+    for (const stage of ['ending', 'last-day'] as const) {
+      const body = email(stage).html;
+      expect(body, stage).toContain(`${TIER_PLANS.silver.name} is ${price} a month`);
+      expect(body, stage).not.toContain('$5 a month');
+    }
+  });
+
+  it('quotes the right price for a trial on a different plan', () => {
+    // The reason this takes a tier: the trial tier is a constant that can move, and a comped trial
+    // can be on any plan at all.
+    const body = email('ending', 'diamond').html;
+    expect(body).toContain(`${TIER_PLANS.diamond.name} is $${TIER_PLANS.diamond.price} a month`);
+  });
+
+  it('names the plan consistently in the subject and the body', () => {
+    const { subject, html } = email('ending');
+    expect(subject).toContain(TIER_PLANS.silver.name);
+    expect(html).toContain(TIER_PLANS.silver.name);
+  });
+
+  it('never promises a price on the welcome note, which has nothing to sell', () => {
+    // The first email's job is to get them to connect a broker. A price in it is a sales pitch at
+    // somebody who has not seen the product work yet.
+    expect(email('started').html).not.toContain('a month');
+  });
+
+  it('always sends a plain-text alternative', () => {
+    for (const stage of ['started', 'ending', 'last-day'] as const) {
+      expect(email(stage).text.length, stage).toBeGreaterThan(0);
+    }
   });
 });

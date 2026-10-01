@@ -5,7 +5,6 @@ import { logServerError } from '../../server/errorReports';
 import { trialEmail, type TrialProgress } from '../../server/emailTemplates';
 import { isMailConfigured, sendEmail, siteUrl } from '../../server/mailer';
 import { decideNudge, nudgeKey } from '../../server/trialNudges';
-import { TIER_PLANS } from '../../src/config/tiers';
 
 /**
  * The three notes a trial gets while it runs.
@@ -91,7 +90,9 @@ async function run(): Promise<{ considered: number; sent: number; skipped: numbe
       const mail = trialEmail({
         stage: decision.stage,
         daysLeft: decision.daysLeft,
-        tierName: TIER_PLANS[entitlement?.comp?.tier ?? 'silver'].name,
+        // The tier itself: the template needs the price as well as the name, and reading both from
+        // tiers.ts is what stops the two disagreeing the way they did.
+        tier: entitlement?.comp?.tier ?? 'silver',
         progress: await progressFor(uid, since),
         siteUrl: siteUrl(),
       });

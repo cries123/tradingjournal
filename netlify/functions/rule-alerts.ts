@@ -125,7 +125,9 @@ async function run(): Promise<{ considered: number; sent: number; skipped: numbe
         dayPnl: trades.reduce((sum, t) => sum + effectivePnl(t), 0),
         tradeCount: trades.length,
         siteUrl: siteUrl(),
-        unsubscribeUrl: unsubscribeUrl(siteUrl(), uid),
+        // Signed for THIS list. It used to take the default purpose, which is the recap, so the
+        // Unsubscribe link in a rule alert turned off the Sunday summary instead.
+        unsubscribeUrl: unsubscribeUrl(siteUrl(), uid, 'rule-alerts'),
       });
 
       const outcome = await sendEmail({

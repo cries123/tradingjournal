@@ -2,9 +2,13 @@ import type { Handler } from '@netlify/functions';
 import { getAdminFirestore } from '../../server/firebaseAdmin';
 import { logServerError } from '../../server/errorReports';
 import { verifyUnsubscribeToken } from '../../server/unsubscribeToken';
+import { resolveList, UNSUBSCRIBE_LISTS } from '../../server/unsubscribeLists';
 
 /**
- * The unsubscribe link at the bottom of the recap email.
+ * The unsubscribe link at the bottom of the mail this app sends.
+ *
+ * Two lists reach here — the weekly recap and the rule alerts — and which one is in the link, inside
+ * its signature. See server/unsubscribeLists.ts for why that matters and what it used to do instead.
  *
  * A GET that works in one click with no sign-in, because an unsubscribe that asks someone to log
  * in first is an unsubscribe that doesn't work — and a list nobody can leave is how a sending
@@ -32,24 +36,45 @@ function page(title: string, message: string, status: number) {
 export const handler: Handler = async (event) => {
   const uid = event.queryStringParameters?.uid ?? '';
   const token = event.queryStringParameters?.t ?? '';
-  const purpose = event.queryStringParameters?.p ?? 'recap';
 
-  if (!uid || !token || !verifyUnsubscribeToken(uid, token, purpose)) {
+  /*
+   * The list comes from the link and is not defaulted.
+   *
+   * It used to default to 'recap' and then be ignored entirely: whatever list the link belonged to,
+   * the endpoint wrote recap: false. So unsubscribing from a rule alert stopped the weekly recap and
+   * left the alerts running — the reader kept getting the mail they had just opted out of and
+   * silently lost the one they had not mentioned.
+   */
+  const list = resolveList(event.queryStringParameters?.p);
+
+  if (!uid || !token || !list || !verifyUnsubscribeToken(uid, token, list)) {
     return page(
       'That link didn’t work',
-      'It may have expired or been copied incompletely. You can turn the weekly recap off in Settings at any time.',
+      'It may have expired or been copied incompletely. You can turn these emails off in Settings at any time.',
       400,
     );
   }
 
+  const definition = UNSUBSCRIBE_LISTS[list];
+
   try {
-    await getAdminFirestore()
-      .doc(`emailPrefs/${uid}`)
-      .set({ uid, recap: false, updatedAt: new Date().toISOString() }, { merge: true });
+    const db = getAdminFirestore();
+    const updatedAt = new Date().toISOString();
+
+    if (definition.target === 'emailPrefs') {
+      await db
+        .doc(`emailPrefs/${uid}`)
+        .set({ uid, [definition.field]: false, updatedAt }, { merge: true });
+    } else {
+      // The rule alerts are a SETTING — the same field the toggle in Settings writes and the one the
+      // alert job actually reads. Writing to emailPrefs here would have reported success and changed
+      // nothing that stops the mail.
+      await db.doc(`users/${uid}/settings/preferences`).set({ [definition.field]: false }, { merge: true });
+    }
 
     return page(
       'Unsubscribed',
-      'You won’t get the weekly recap any more. Support replies about your own tickets will still reach you — those aren’t part of this list.',
+      `You won’t get ${definition.stopped} any more. Support replies about your own tickets will still reach you — those aren’t part of this list.`,
       200,
     );
   } catch (err) {
@@ -57,7 +82,7 @@ export const handler: Handler = async (event) => {
     logServerError('email-unsubscribe', err);
     return page(
       'We couldn’t save that',
-      'Something went wrong on our end. Turn the weekly recap off in Settings and it will stick.',
+      `Something went wrong on our end. Turn ${definition.stopped} off in Settings and it will stick.`,
       500,
     );
   }
