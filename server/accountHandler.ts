@@ -104,9 +104,14 @@ export async function renameUsernameFor(uid: string, requested: string): Promise
  * sure" is a courtesy; this endpoint is reachable without one, and an irreversible action that
  * deletes a person's entire trading history should not be one malformed request away.
  *
- * Deliberately NOT gated on having no subscription. Somebody who wants to leave should not be told
- * to go and cancel first — that reads as an obstacle, and the Creem subscription stops billing when
- * its customer is gone. The UI says so plainly before they confirm.
+ * Deliberately NOT gated on having no subscription: somebody who wants to leave should not be told
+ * to go and cancel first, because that reads as an obstacle.
+ *
+ * The reason given here used to be that "the Creem subscription stops billing when its customer is
+ * gone", which is false — deleting a Firebase user tells Creem nothing, and the subscription renewed
+ * against an account that could no longer sign in to stop it. purgeAccount cancels it at Creem
+ * first now, and refuses the whole deletion if that cancel fails, which is what makes the promise on
+ * the dialog true.
  */
 export async function deleteOwnAccount(uid: string, confirmation: string): Promise<{ message: string }> {
   if (confirmation.trim().toUpperCase() !== 'DELETE') {

@@ -207,6 +207,31 @@ export async function changeSubscriptionPlan(
 }
 
 /**
+ * Cancels a subscription outright. The ONE place this app cancels rather than sending them to the
+ * portal, and it exists for a single caller: deleting an account.
+ *
+ * The portal remains the route for a customer who chooses to cancel — see below, and that reasoning
+ * has not changed. But a deleted account cannot visit a portal. Deleting the Firebase user tells
+ * Creem nothing at all, so without this the subscription went on renewing forever against a person
+ * who no longer had an account to sign into, while the screen that deleted it promised "any
+ * subscription stops billing".
+ *
+ * `immediate` because the access is going now. Scheduling it for the period end would keep billing a
+ * customer for a journal that no longer exists. Whether the unused part of an already-paid period is
+ * refunded is a support decision, not something to decide silently here.
+ *
+ * Throws like every other call in this file. The caller must NOT swallow it: a failure here means the
+ * subscription is still live, and that has to stop the deletion rather than be logged.
+ */
+export async function cancelSubscription(subscriptionId: string): Promise<void> {
+  await creemPost(
+    `/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`,
+    { mode: 'immediate' },
+    'Could not cancel the subscription.',
+  );
+}
+
+/**
  * A link to Creem's own billing portal, where the customer manages their card and cancels.
  *
  * Deliberately not rebuilt in-app. Card details and cancellation flows are the processor's job,

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /*
@@ -21,6 +22,11 @@ let usernameOwners: Record<string, string> = {};
 
 let deleted: string[] = [];
 let brokerLinkReset: string[] = [];
+/** Subscription ids cancelled at Creem. The money stops here or it does not stop. */
+let cancelled: string[] = [];
+let cancelFails = false;
+/** The entitlement the account holds, read by purgeAccount to find the subscription. */
+let entitlement: Record<string, unknown> | null = null;
 let authDeleted: string[] = [];
 /** Set to a Firebase error code to make the Auth delete fail that way. */
 let authFailsWith: string | null = null;
@@ -85,6 +91,18 @@ vi.mock('../../server/firebaseAdmin', () => ({
   }),
 }));
 
+vi.mock('../../server/creemClient', () => ({
+  cancelSubscription: async (id: string) => {
+    if (cancelFails) throw new Error('Could not cancel the subscription.');
+    cancelled.push(id);
+    sequence.push('cancel:' + id);
+  },
+}));
+
+vi.mock('../../server/entitlements', () => ({
+  readEntitlement: async () => entitlement,
+}));
+
 vi.mock('../../server/adminAccountActions', () => ({
   resetBrokerLink: async (uid: string) => {
     brokerLinkReset.push(uid);
@@ -107,6 +125,9 @@ beforeEach(() => {
   usernameOwners = {};
   deleted = [];
   brokerLinkReset = [];
+  cancelled = [];
+  cancelFails = false;
+  entitlement = null;
   authDeleted = [];
   authFailsWith = null;
   sequence = [];
@@ -210,5 +231,98 @@ describe('purgeAccount', () => {
     authFailsWith = 'auth/internal-error';
 
     await expect(purgeAccount('u1')).rejects.toThrow(/auth refused/);
+  });
+});
+
+describe('the subscription behind a deleted account', () => {
+  /*
+   * Deleting a Firebase Auth user tells Creem nothing. So this routine removed the journal, the
+   * notes, the brokerage link and the sign-in, and left the subscription renewing every month against
+   * somebody with no account to sign in with — no portal, no checkout, no way to stop it — while the
+   * delete dialog promised "Any subscription stops billing." The comment in accountHandler justifying
+   * the lack of a subscription check asserted the same false thing.
+   */
+  it('is cancelled at the processor', async () => {
+    entitlement = { tier: 'gold', source: 'purchase', status: 'active', creemSubscriptionId: 'sub_123' };
+
+    await purgeAccount('u1');
+
+    expect(cancelled).toEqual(['sub_123']);
+  });
+
+  it('is cancelled BEFORE the account it belongs to is taken apart', async () => {
+    // Afterwards there is no entitlement to read the subscription id from, and no sign-in behind
+    // which anybody could cancel it by hand.
+    entitlement = { tier: 'gold', source: 'purchase', status: 'active', creemSubscriptionId: 'sub_123' };
+
+    await purgeAccount('u1');
+
+    expect(sequence[0]).toBe('cancel:sub_123');
+    expect(sequence.indexOf('cancel:sub_123')).toBeLessThan(sequence.indexOf('auth:u1'));
+  });
+
+  it('stops the whole deletion when the cancel fails', async () => {
+    /*
+     * The one step here that is deliberately not best-effort. If the cancel fails the money is still
+     * moving, and a deletion that succeeded anyway would destroy the only account from which the
+     * charge could be reached. Refusing lets them cancel in Manage billing and try again.
+     */
+    entitlement = { tier: 'gold', source: 'purchase', status: 'active', creemSubscriptionId: 'sub_123' };
+    cancelFails = true;
+
+    await expect(purgeAccount('u1')).rejects.toThrow(/cancel the subscription/i);
+
+    // And nothing was destroyed on the way to that refusal.
+    expect(deleted).toEqual([]);
+    expect(authDeleted).toEqual([]);
+  });
+
+  it('deletes an account that never subscribed without calling Creem at all', async () => {
+    entitlement = { tier: 'free', source: 'purchase', status: 'active' };
+
+    await purgeAccount('u1');
+
+    expect(cancelled).toEqual([]);
+    expect(authDeleted).toEqual(['u1']);
+  });
+
+  it('removes the entitlement row, which nothing else ever did', async () => {
+    /*
+     * It outlived every deleted account, and readSubscriptionRunRate counts any row with status
+     * 'active', source 'purchase' and a subscription id — so a deleted customer went on being counted
+     * in the admin MRR and subscriber totals for good.
+     */
+    entitlement = { tier: 'gold', source: 'purchase', status: 'active', creemSubscriptionId: 'sub_123' };
+
+    await purgeAccount('u1');
+
+    expect(deleted).toContain('entitlements/u1');
+  });
+});
+
+describe('the cancel call itself', () => {
+  /*
+   * Asserted against the source, because every test above mocks the Creem client — its four lines
+   * cannot be exercised without a live payment API, and a mutation run confirmed that: pointing the
+   * cancel at the UPGRADE path, or scheduling it instead of taking effect now, both survived every
+   * test in this file.
+   *
+   * Both are silent in production. The upgrade path would return a success for a call that changes
+   * no plan, and a scheduled cancel keeps billing a customer for a journal that no longer exists.
+   */
+  const client = readFileSync('server/creemClient.ts', 'utf8');
+
+  it('posts to the cancel endpoint, not the upgrade one beside it', () => {
+    expect(client).toContain('/subscriptions/${encodeURIComponent(subscriptionId)}/cancel');
+  });
+
+  it('takes effect now, because the access is going now', () => {
+    expect(client).toMatch(/cancelSubscription[\s\S]{0,400}mode: 'immediate'/);
+  });
+
+  it('throws rather than reporting a cancel it did not make', () => {
+    // creemPost throws on a non-2xx; the point here is that cancelSubscription does not catch it.
+    const fn = client.slice(client.indexOf('export async function cancelSubscription'));
+    expect(fn.slice(0, 400)).not.toContain('catch');
   });
 });

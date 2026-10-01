@@ -1,5 +1,7 @@
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin';
 import { resetBrokerLink } from './adminAccountActions';
+import { cancelSubscription } from './creemClient';
+import { readEntitlement } from './entitlements';
 
 /**
  * Everything an account leaves behind, removed.
@@ -16,6 +18,24 @@ import { resetBrokerLink } from './adminAccountActions';
  */
 export async function purgeAccount(uid: string): Promise<void> {
   const db = getAdminFirestore();
+
+  /*
+   * The subscription first, and allowed to stop everything else.
+   *
+   * Deleting a Firebase Auth user tells Creem nothing. So this routine removed the journal, the
+   * notes, the brokerage link and the sign-in, and left the subscription renewing every month
+   * against somebody who no longer had an account to sign in with — no portal, no checkout, no way
+   * to stop it, and the delete dialog had told them "Any subscription stops billing." The comment
+   * in accountHandler justifying no subscription check said the same thing and was equally wrong.
+   *
+   * Deliberately NOT best-effort, unlike the broker link below. If the cancel fails the money is
+   * still moving, and the right outcome is a deletion that refuses and says so — they can cancel in
+   * Manage billing and try again — rather than one that succeeds into a charge they cannot reach.
+   */
+  const entitlement = await readEntitlement(uid).catch(() => null);
+  if (entitlement?.creemSubscriptionId) {
+    await cancelSubscription(entitlement.creemSubscriptionId);
+  }
 
   await deleteCollectionDocs(`users/${uid}/trades`);
   await deleteCollectionDocs(`users/${uid}/settings`);
@@ -81,6 +101,15 @@ export async function purgeAccount(uid: string): Promise<void> {
   });
   await db.doc(`brokerConnections/${uid}`).delete().catch(() => undefined);
   await db.doc(`usageCredits/${uid}`).delete().catch(() => undefined);
+  /*
+   * The entitlement row, which nothing else ever removed.
+   *
+   * It outlived every deleted account, and readSubscriptionRunRate counts any row with status
+   * 'active', source 'purchase' and a subscription id — so every deleted customer went on being
+   * counted in the admin MRR and subscriber totals for good. Safe to drop now that the subscription
+   * above is actually cancelled: the record described a subscription that no longer exists.
+   */
+  await db.doc(`entitlements/${uid}`).delete().catch(() => undefined);
 
   try {
     await getAdminAuth().deleteUser(uid);
