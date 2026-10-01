@@ -501,3 +501,48 @@ describe('ordering is not an artefact of how the journal arrived', () => {
     expect(orderTrades([afternoon, morning]).map((t) => t.entryTime)).toEqual(['09:31', '14:05']);
   });
 });
+
+describe('what the commission percentage is a percentage of', () => {
+  /*
+   * The fees were summed over the trades that CARRY a fee and the gross over every trade in the
+   * journal, so the percentage described two different populations. Any journal mixing synced trades
+   * with hand-entered ones — or with CSV imports, which recorded no fee at all until today — diluted
+   * it, and the sentence on screen reads "Commissions took 4% of your gross profit … not what is
+   * deciding your year". It was small because the denominator had grown.
+   */
+  const withFee = (pnl: number, fees: number): Trade =>
+    trade({ pnl: pnl - fees, grossPnl: pnl, fees });
+
+  it('is the same answer whether or not fee-less trades sit beside it', () => {
+    const synced = [withFee(20, 4), withFee(20, 4), withFee(20, 4), withFee(20, 4), withFee(20, 4)];
+    const alone = costStats(synced);
+    const diluted = costStats([
+      ...synced,
+      trade({ pnl: 20 }),
+      trade({ pnl: 20 }),
+      trade({ pnl: 20 }),
+      trade({ pnl: 20 }),
+      trade({ pnl: 20 }),
+    ]);
+
+    expect(alone).not.toBeNull();
+    expect(diluted!.shareOfGross).toBeCloseTo(alone!.shareOfGross, 10);
+  });
+
+  it('reports the share of the gross the fees were actually taken from', () => {
+    // $20 of fees against $100 of gross on the trades that paid them: 20%, not 4%.
+    const stats = costStats([withFee(20, 4), withFee(20, 4), withFee(20, 4), withFee(20, 4), withFee(20, 4)]);
+    expect(stats!.fees).toBeCloseTo(20, 10);
+    expect(stats!.grossProfit).toBeCloseTo(100, 10);
+    expect(stats!.shareOfGross).toBeCloseTo(20, 10);
+  });
+
+  it('counts only the trades it says it counts', () => {
+    // `covered` is rendered as "across N trades", so it has to describe the same set as the figure.
+    const stats = costStats([
+      withFee(20, 4), withFee(20, 4), withFee(20, 4), withFee(20, 4), withFee(20, 4),
+      trade({ pnl: 500 }),
+    ]);
+    expect(stats!.covered).toBe(5);
+  });
+});

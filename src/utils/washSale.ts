@@ -19,9 +19,31 @@ function dayDiff(a: string, b: string): number {
   return Math.round(ms / (24 * 60 * 60 * 1000));
 }
 
-/** Detect wash sales: loss followed by repurchase of same symbol within ±30 days */
+/**
+ * What counts as "the same security" for the 30-day rule.
+ *
+ * The contract, not the underlying. This compared `symbol`, which for an option is the ticker — so
+ * every SPY option was substantially identical to every other SPY option regardless of strike, expiry
+ * or whether it was a call or a put.
+ *
+ * For a 0DTE trader, which is most of this app's users, that means any winner in the same underlying
+ * within a month flags any loss: the detector fired on 100% of losses and the tax CSV stamped REVIEW
+ * on every red row. A flag that fires on everything is noise, not the "look at this one" the module
+ * is for. Matching the contract collapses it to the case that genuinely looks like a wash — the same
+ * strike and expiry re-traded inside the window.
+ *
+ * Equities are unaffected: mapSnapTradeActivities sets contract to the underlying symbol for stock,
+ * so the key is the ticker exactly as before.
+ */
+function securityKey(trade: Trade): string {
+  return trade.contract?.trim() || trade.symbol;
+}
+
+/** Detect wash sales: a loss and a repurchase of the same contract within ±30 days. */
 export function detectWashSales(trades: Trade[]): WashSaleMatch[] {
-  const sorted = [...trades].sort((a, b) => a.date.localeCompare(b.date) || a.symbol.localeCompare(b.symbol));
+  const sorted = [...trades].sort(
+    (a, b) => a.date.localeCompare(b.date) || securityKey(a).localeCompare(securityKey(b)),
+  );
   const matches: WashSaleMatch[] = [];
   const matchedLossIds = new Set<string>();
 
@@ -33,7 +55,7 @@ export function detectWashSales(trades: Trade[]): WashSaleMatch[] {
     for (let j = 0; j < sorted.length; j++) {
       if (i === j) continue;
       const rep = sorted[j];
-      if (rep.symbol !== loss.symbol) continue;
+      if (securityKey(rep) !== securityKey(loss)) continue;
       const apart = Math.abs(dayDiff(loss.date, rep.date));
       if (apart > WASH_SALE_WINDOW_DAYS) continue;
       if (rep.date < loss.date && dayDiff(rep.date, loss.date) > WASH_SALE_WINDOW_DAYS) continue;

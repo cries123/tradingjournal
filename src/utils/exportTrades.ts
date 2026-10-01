@@ -1,5 +1,6 @@
 import type { Trade } from '../types';
 import type { TradingStats } from './stats';
+import { csvCell } from './csvCell';
 import { formatCurrency, formatMonthYear } from './format';
 import type { CurrencyCode } from '../types/settings';
 import { buildTaxReport, taxReportCsv } from './taxReport';
@@ -28,11 +29,8 @@ const CSV_HEADERS = [
   'accountId',
 ];
 
-function csvCell(val: unknown): string {
-  if (val === undefined || val === null) return '';
-  const str = Array.isArray(val) ? val.join(';') : String(val);
-  return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
-}
+// The escaper is shared with the tax report now. There were two, and only one of them escaped a
+// newline — see csvCell.ts for what that did to this file's twenty-one columns.
 
 export function exportTradesCsv(trades: Trade[], filename = 'trades.csv'): void {
   const rows = trades.map((t) =>

@@ -171,3 +171,68 @@ describe('parseSchwabCsv parsing', () => {
     expect(() => parseSchwabCsv('Date,Amount')).toThrow(/Account Trade History/);
   });
 });
+
+describe('the commission is recorded, not just subtracted', () => {
+  /*
+   * The importer worked out a per-contract fee, took it off the P&L, and then wrote neither the gross
+   * nor the fee onto the trade. So an estimate the app had already applied to somebody's numbers was
+   * invisible and uncorrectable, the costs panel reported commissions over a denominator that
+   * included these fee-less trades, and the tax export printed $0.00 of fees beside a P&L that had
+   * fees inside it.
+   */
+  const roundTrip = () =>
+    parseSchwabCsv(
+      csv([
+        call('09:31:05', 'BUY', '+10', 'TO OPEN', '2.00'),
+        call('09:44:00', 'SELL', '-10', 'TO CLOSE', '2.30'),
+      ]),
+    )[0]!;
+
+  it('writes the fee it charged', () => {
+    // Ten contracts in and ten out, at $0.65 each.
+    expect(roundTrip().fees).toBe(13);
+  });
+
+  it('writes the gross it computed', () => {
+    expect(roundTrip().grossPnl).toBe(300);
+  });
+
+  it('still nets to the same P&L it always did', () => {
+    const trade = roundTrip();
+    expect(trade.pnl).toBe(287);
+    // The invariant that makes this safe: effectivePnl recomputes gross - fees, and must agree with
+    // the stored net rather than charging the fee a second time.
+    expect(trade.grossPnl! - trade.fees!).toBeCloseTo(trade.pnl, 10);
+  });
+
+  it('records no fee on an equity round trip, because there is none', () => {
+    const stockTrade = parseSchwabCsv(
+      csv([
+        stock('09:31:05', 'BUY', '+500', 'TO OPEN', '220.00'),
+        stock('15:52:10', 'SELL', '-500', 'TO CLOSE', '221.00'),
+      ]),
+    )[0]!;
+
+    expect(stockTrade.fees).toBe(0);
+    expect(stockTrade.grossPnl).toBe(500);
+    expect(stockTrade.pnl).toBe(500);
+  });
+
+  it('splits the fee across the lots a close covers, to the cent', () => {
+    // Six contracts changed hands, so $3.90 of commission exists in total and must be apportioned
+    // rather than counted per row.
+    const trades = parseSchwabCsv(
+      csv([
+        call('09:31:05', 'BUY', '+2', 'TO OPEN', '1.00'),
+        call('09:32:00', 'BUY', '+1', 'TO OPEN', '2.00'),
+        call('10:15:00', 'SELL', '-3', 'TO CLOSE', '3.00'),
+      ]),
+    );
+
+    const totalFees = trades.reduce((sum, t) => sum + (t.fees ?? 0), 0);
+    expect(totalFees).toBeCloseTo(6 * 0.65, 10);
+    for (const t of trades) {
+      expect(t.grossPnl! - t.fees!).toBeCloseTo(t.pnl, 10);
+    }
+  });
+});

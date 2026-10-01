@@ -249,7 +249,7 @@ function matchRoundTrips(executions: RawExecution[]): ParsedTradeInput[] {
         (lot.fees * (matched / lot.qty)) + (closeFees * (matched / exec.qty));
       const pnl = grossPnl - feeShare;
 
-      trades.push(buildTrade(lot.exec, exec, matched, pnl));
+      trades.push(buildTrade(lot.exec, exec, matched, pnl, grossPnl, feeShare));
 
       lot.qty -= matched;
       remaining -= matched;
@@ -260,11 +260,15 @@ function matchRoundTrips(executions: RawExecution[]): ParsedTradeInput[] {
   return trades;
 }
 
+const cents = (value: number): number => Math.round(value * 100) / 100;
+
 function buildTrade(
   open: RawExecution,
   close: RawExecution,
   qty: number,
   pnl: number,
+  grossPnl: number,
+  fees: number,
 ): ParsedTradeInput {
   const optionType = open.type === 'PUT' ? 'put' : open.type === 'CALL' ? 'call' : undefined;
   const contract = isOption(open.type)
@@ -273,7 +277,22 @@ function buildTrade(
 
   return {
     symbol: open.symbol,
-    pnl: Math.round(pnl * 100) / 100,
+    pnl: cents(pnl),
+    /*
+     * The commission is RECORDED, not just subtracted.
+     *
+     * This importer worked out a fee per contract, took it off the P&L, and then wrote neither the
+     * gross nor the fee onto the trade — so an estimate the app had already applied to somebody's
+     * numbers was invisible and uncorrectable. The costs panel then reported commissions over a
+     * denominator that included these fee-less trades, and the tax export printed $0.00 of fees
+     * beside a P&L that had fees in it.
+     *
+     * effectivePnl returns the same net as before, because it recomputes gross − fees and that is
+     * exactly how pnl was derived above. mapSnapTradeActivities writes both fields for the same
+     * reason.
+     */
+    grossPnl: cents(grossPnl),
+    fees: cents(fees),
     date: close.date,
     side: open.side === 'BUY' ? 'long' : 'short',
     contract,

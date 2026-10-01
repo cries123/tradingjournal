@@ -510,7 +510,20 @@ export function costStats(trades: Trade[]): CostStats | null {
   const fees = withFees.reduce((sum, t) => sum + (t.fees ?? 0), 0);
   if (fees <= 0) return null;
 
-  const grossProfit = trades
+  /*
+   * The gross comes from the SAME trades the fees do.
+   *
+   * It was summed over every trade in the journal while the fees were summed over only the ones that
+   * carry a fee, so the percentage described two different populations. Any journal mixing synced
+   * trades with hand-entered ones — or with CSV imports, which record no fee at all — diluted it:
+   * five synced trades with $20 of fees on $100 gross report 20%, and the same five beside five
+   * fee-less ones report 4%.
+   *
+   * That number is rendered as "Commissions took 4% of your gross profit … not what is deciding your
+   * year", and the same figure gates the assistant's finding at 20%. Both were being told the
+   * commissions were small because the denominator had grown, not because the fees had shrunk.
+   */
+  const grossProfit = withFees
     .map((t) => (t.grossPnl != null ? t.grossPnl : effectivePnl(t) + (t.fees ?? 0)))
     .filter((g) => g > 0)
     .reduce((a, b) => a + b, 0);

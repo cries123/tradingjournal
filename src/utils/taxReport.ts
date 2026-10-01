@@ -1,4 +1,5 @@
 import type { Trade } from '../types';
+import { csvCell } from './csvCell';
 import { effectivePnl } from './tradeHelpers';
 import { detectWashSales, type WashSaleMatch } from './washSale';
 
@@ -104,7 +105,16 @@ export function buildTaxReport(trades: Trade[], year: number): TaxYearReport {
       return {
         date: t.date,
         symbol: t.symbol,
-        realizedPnl: t.grossPnl ?? t.pnl,
+        /*
+         * Gross on every row, so Realized − Fees = Net reads true down the whole column.
+         *
+         * This was `t.grossPnl ?? t.pnl`, which is gross on a synced row and NET on a hand-entered
+         * one — and the CSV prints realized, fees and net side by side. A trade typed in with fees
+         * filled and gross left blank printed "−400, 12, −400": three columns that do not reconcile,
+         * in the file somebody hands to an accountant. Adding the fees back is what makes the typed
+         * row's first column mean the same thing as the synced row's.
+         */
+        realizedPnl: t.grossPnl ?? t.pnl + (t.fees ?? 0),
         fees: t.fees ?? 0,
         netPnl: effectivePnl(t),
         assetClass: t.assetClass ?? t.assetType ?? 'stock',
@@ -147,11 +157,9 @@ export function buildTaxReport(trades: Trade[], year: number): TaxYearReport {
   };
 }
 
-function cell(value: unknown): string {
-  if (value === undefined || value === null) return '';
-  const str = String(value);
-  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
-}
+// One escaper, shared with the trade export. This copy was the correct one; the other let a newline
+// through, and the two drifting is exactly the shape of bug the chunk-error note warns about.
+const cell = csvCell;
 
 function money(value: number): string {
   return value.toFixed(2);
