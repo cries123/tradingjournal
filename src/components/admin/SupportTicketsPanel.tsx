@@ -34,7 +34,16 @@ interface SupportTicketsPanelProps {
 function formatWhen(iso: string): string {
   if (!iso) return '';
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleString();
+  // No seconds and no year. toLocaleString() gives "9/30/2026, 3:00:00 AM", which is eleven
+  // characters of noise on the line that has to fit an email address beside it on a phone.
+  return Number.isNaN(d.getTime())
+    ? ''
+    : d.toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      });
 }
 
 function waitingHours(iso: string): number {
@@ -240,17 +249,31 @@ export function SupportTicketsPanel({
                 )}
               </button>
 
-              <p className="text-xs text-text-secondary mt-1.5 flex items-center gap-1.5 flex-wrap">
-                <User size={11} />
-                <AdminUserRef uid={ticket.uid} onOpen={onOpenUser} canOpen={canOpenUser}>
-                  {ticket.email}
-                  {ticket.username ? ` (@${ticket.username})` : ''}
-                </AdminUserRef>
-                {' · '}
-                {ticket.messageCount} message{ticket.messageCount === 1 ? '' : 's'}
-                {' · last '}
-                {formatWhen(ticket.lastMessageAt)}
-              </p>
+              {/*
+                Two lines on a phone, one from sm up — and not a flex row of text nodes.
+
+                Each ' · ' was its own flex item, so on a 390px screen the wrap put the icon alone on
+                one line and a leading separator at the start of the next. The name is the part worth
+                its own line; the counts are a plain sentence underneath that wraps like prose.
+              */}
+              <div className="mt-1.5 text-xs text-text-secondary">
+                <p className="flex items-center gap-1.5">
+                  <User size={11} className="shrink-0" />
+                  <AdminUserRef
+                    uid={ticket.uid}
+                    onOpen={onOpenUser}
+                    canOpen={canOpenUser}
+                    className="truncate"
+                  >
+                    {ticket.email}
+                    {ticket.username ? ` (@${ticket.username})` : ''}
+                  </AdminUserRef>
+                </p>
+                <p className="mt-0.5">
+                  {ticket.messageCount} message{ticket.messageCount === 1 ? '' : 's'} · last{' '}
+                  {formatWhen(ticket.lastMessageAt)}
+                </p>
+              </div>
               </div>
 
               <select

@@ -73,6 +73,8 @@ import {
 import { SupportTicketsPanel } from '../components/admin/SupportTicketsPanel';
 import { ErrorEventsPanel } from '../components/admin/ErrorEventsPanel';
 import { CostsPanel } from '../components/admin/CostsPanel';
+import { AdminTabBar } from '../components/admin/AdminTabBar';
+import type { AdminTab } from '../components/admin/adminTabs';
 import { BrokerStatusPanel } from '../components/admin/BrokerStatusPanel';
 import { fetchCostReport, type CostReport } from '../services/adminCosts';
 import {
@@ -505,18 +507,6 @@ function StatusFilterBar({
   );
 }
 
-type AdminTab = 'overview' | 'users' | 'support' | 'requests' | 'errors' | 'costs' | 'content';
-
-const ADMIN_TABS: { id: AdminTab; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'users', label: 'Users' },
-  { id: 'support', label: 'Support' },
-  { id: 'requests', label: 'Requests' },
-  { id: 'errors', label: 'Errors' },
-  { id: 'costs', label: 'Costs' },
-  { id: 'content', label: 'Content' },
-];
-
 /**
  * Splits the panel into four views instead of one continuous scroll.
  *
@@ -526,91 +516,6 @@ const ADMIN_TABS: { id: AdminTab; label: string }[] = [
  * Grouping by job is most of the fix; the badge does the rest, making "something needs you"
  * visible from every tab instead of only after scrolling to it.
  */
-function AdminTabBar({
-  tab,
-  onChange,
-  openCount,
-  userCount,
-  ticketsWaiting,
-  openErrors,
-}: {
-  tab: AdminTab;
-  onChange: (tab: AdminTab) => void;
-  openCount: number;
-  userCount: number;
-  ticketsWaiting: number;
-  openErrors: number;
-}) {
-  const badgeFor = (id: AdminTab): string | null => {
-    if (id === 'requests' && openCount > 0) return String(openCount);
-    if (id === 'support' && ticketsWaiting > 0) return String(ticketsWaiting);
-    if (id === 'errors' && openErrors > 0) return String(openErrors);
-    if (id === 'users') return String(userCount);
-    return null;
-  };
-
-  /*
-   * Sticky, and it scrolls the active tab into view.
-   *
-   * Seven tabs do not fit a 375px phone — Costs and Content sit off the right edge, so two of the
-   * seven were only reachable by a horizontal swipe nobody signals. Worse, "Review →" in the
-   * attention banner switches tab without moving the strip, so the tab you just landed on could be
-   * off-screen while its panel was on it.
-   *
-   * scrollIntoView on the active button fixes the second; sticky keeps the nav reachable once a long
-   * queue has been scrolled, which is the state it is most wanted in.
-   *
-   * Near-opaque rather than blurred: a backdrop-filter here would make this the containing block for
-   * any fixed-position descendant, which is the bug that has already bitten this panel twice.
-   */
-  const activeRef = useRef<HTMLButtonElement | null>(null);
-
-  useEffect(() => {
-    activeRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  }, [tab]);
-
-  return (
-    <div className="sticky top-0 z-20 flex items-center gap-1 border-b border-border/60 mb-6 overflow-x-auto bg-bg-primary/95">
-      {ADMIN_TABS.map((t) => {
-        const active = t.id === tab;
-        const badge = badgeFor(t.id);
-        return (
-          <button
-            key={t.id}
-            ref={active ? activeRef : undefined}
-            type="button"
-            onClick={() => onChange(t.id)}
-            aria-current={active ? 'page' : undefined}
-            className={`relative shrink-0 px-3.5 py-2.5 text-sm font-medium transition-colors focus-ring rounded-t-lg ${
-              active ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            <span className="flex items-center gap-1.5">
-              {t.label}
-              {badge && (
-                <span
-                  className={`text-[10px] font-semibold tabular-nums rounded-full px-1.5 py-0.5 ${
-                    t.id === 'errors'
-                      ? 'bg-red-500/15 text-red-400'
-                      : t.id === 'requests' || t.id === 'support'
-                        ? 'bg-amber-500/15 text-amber-400'
-                        : 'bg-bg-tertiary text-text-secondary'
-                  }`}
-                >
-                  {badge}
-                </span>
-              )}
-            </span>
-            {active && (
-              <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-emerald-400" />
-            )}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 /**
  * The one strip that answers "is there anything I have to do right now".
  *
@@ -1445,6 +1350,9 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
     return ready.users.filter((u) => (u.createdAt ?? '') >= cutoff).length;
   }, [ready]);
   const ticketsWaiting = ready?.tickets.filter((t) => t.unreadForSupport && t.status !== 'closed').length ?? 0;
+  /* Bug reports from anyone signed in, which arrive as tickets rather than in the bugReports
+     collection the Requests tab lists. Counted so that panel can say where they went. */
+  const bugTickets = ready?.tickets.filter((t) => t.category === 'bug' && t.status === 'open').length ?? 0;
   const openErrorCount = ready?.errorEvents.filter((e) => e.status === 'open').length ?? 0;
 
   const usersWithTrades = ready?.users.filter((u) => u.tradeCount > 0).length ?? 0;
@@ -1469,21 +1377,29 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         and the marketing pages already use, and the grids below were already written with lg:
         breakpoints they never had room to reach.
       */}
-      <main className="relative z-10 flex-1 max-w-[1680px] mx-auto px-4 md:px-6 py-8 md:py-12 w-full">
+      <main className="relative z-10 flex-1 max-w-[1680px] mx-auto px-4 md:px-6 py-4 md:py-12 w-full">
         <button
           type="button"
           onClick={back.goBack}
-          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-emerald-400 transition-colors mb-8"
+          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-emerald-400 transition-colors mb-4 md:mb-8"
         >
           <ArrowLeft size={16} />
           {back.label}
         </button>
 
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+        {/*
+          Smaller and tighter on a phone.
+
+          The first screen of a 390px device was almost entirely chrome: a back link with 32px under
+          it, a 30px title beside a boxed icon, then an identity line, a build stamp and two buttons —
+          four stacked rows before a single number. The icon and the display size are what a desktop
+          page has room for, so they stay behind md.
+        */}
+        <div className="flex items-center gap-2.5 mb-2 md:gap-3">
+          <div className="hidden rounded-lg bg-emerald-500/10 p-2 text-emerald-400 md:block">
             <ShieldCheck size={22} />
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Admin</h1>
+          <h1 className="text-xl font-bold tracking-tight md:text-4xl">Admin</h1>
         </div>
 
         {state.phase === 'loading' && (
@@ -1532,7 +1448,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
 
             {/* One header bar: who you are, what build is live, and the utilities. Export used to
                 be a panel of its own, competing for attention with the data it exports. */}
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-4 md:mb-5">
               {/*
                 Who is signed in, not a second title.
 
@@ -1549,8 +1465,10 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
               <div className="flex flex-wrap items-center gap-2">
                 {/* Which bundle is actually running. Makes "I deployed but nothing changed"
                     a one-glance check instead of a guess. */}
+                {/* Hidden on a phone. Useful, but not worth a row of the first screen — and the
+                    question it answers ("did my deploy land") is one you ask at a desk. */}
                 <span
-                  className="text-[11px] text-text-secondary/70 tabular-nums mr-1"
+                  className="mr-1 hidden text-[11px] tabular-nums text-text-secondary/70 sm:inline"
                   title={`Bundle built ${BUILD_TIME} from commit ${BUILD_SHA}`}
                 >
                   Build {formatBuildStamp()}
@@ -2308,12 +2226,37 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
               )}
 
 
-              <h2 className="text-base font-semibold mb-2">Bug reports</h2>
+              {/*
+                This list is signed-OUT visitors only, and said so nowhere.
+
+                A signed-in trader who reports a bug gets a support TICKET — ReportBugContent routes
+                them to SupportTicketsContent with the bug category, because a bug report is the
+                start of a conversation. Only the anonymous form still writes to the bugReports
+                collection this reads. So every report filed since that changed has been sitting in
+                Support while this panel, the one headed "Bug reports", said there were none.
+              */}
+              <h2 className="text-base font-semibold mb-1">Bug reports from signed-out visitors</h2>
+              <p className="text-xs text-text-secondary mb-3">
+                Anyone signed in gets a support ticket instead, so their report can be replied to.{' '}
+                {bugTickets > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setTab('support')}
+                    className="text-emerald-400 hover:text-emerald-300 transition-colors focus-ring rounded"
+                  >
+                    {bugTickets} open bug ticket{bugTickets === 1 ? '' : 's'} in Support &rarr;
+                  </button>
+                ) : (
+                  'There are none open in Support right now.'
+                )}
+              </p>
               <StatusFilterBar value={bugFilter} onChange={setBugFilter} counts={bugFilterCounts} />
 
               {filteredBugs.length === 0 ? (
                 <div className="panel-card rounded-xl p-8 text-center text-text-secondary text-sm">
-                  {ready.reports.length === 0 ? 'No bug reports yet.' : 'No reports match this filter.'}
+                  {ready.reports.length === 0
+                    ? 'Nothing here. Reports from signed-out visitors land in this list.'
+                    : 'No reports match this filter.'}
                 </div>
               ) : (
                 <div className="space-y-4">
