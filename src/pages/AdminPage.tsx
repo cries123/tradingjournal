@@ -74,6 +74,17 @@ import { SupportTicketsPanel } from '../components/admin/SupportTicketsPanel';
 import { ErrorEventsPanel } from '../components/admin/ErrorEventsPanel';
 import { CostsPanel } from '../components/admin/CostsPanel';
 import { AdminTabBar } from '../components/admin/AdminTabBar';
+import { MoneyAtRiskPanel } from '../components/admin/MoneyAtRiskPanel';
+import { MrrMovementPanel } from '../components/admin/MrrMovementPanel';
+import { TrialFunnelPanel } from '../components/admin/TrialFunnelPanel';
+import { DormantSubscribersPanel } from '../components/admin/DormantSubscribersPanel';
+import { AdminAuditPanel } from '../components/admin/AdminAuditPanel';
+import {
+  dormantSubscribers,
+  moneyAtRisk,
+  mrrMovement,
+  trialStats,
+} from '../utils/adminRisk';
 import type { AdminTab } from '../components/admin/adminTabs';
 import { BrokerStatusPanel } from '../components/admin/BrokerStatusPanel';
 import { fetchCostReport, type CostReport } from '../services/adminCosts';
@@ -668,6 +679,10 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
   const { user, username, loading, firebaseEnabled, logout } = useAuth();
   const [state, setState] = useState<AdminState>({ phase: 'loading', step: 'access' });
   const [tab, setTab] = useState<AdminTab>('overview');
+  /* One clock for every derivation on the page. Read once rather than per render: react-hooks/purity
+     forbids Date.now() during render, and two panels disagreeing about "today" by a few ms would
+     round a deadline differently on each. */
+  const [now] = useState(() => Date.now());
   /** Busy state for a silent refresh, which leaves the panel on screen rather than replacing it. */
   const [refreshing, setRefreshing] = useState(false);
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
@@ -1355,6 +1370,48 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
   const bugTickets = ready?.tickets.filter((t) => t.category === 'bug' && t.status === 'open').length ?? 0;
   const openErrorCount = ready?.errorEvents.filter((e) => e.status === 'open').length ?? 0;
 
+  /*
+   * The four derivations that turn the panel from a report into a worklist.
+   *
+   * All of them read data the page already had — the entitlement map, the user list, the broker
+   * map and the cost report. Nothing here adds a request.
+   */
+  const riskRows = useMemo(
+    () =>
+      ready?.entitlements
+        ? moneyAtRisk(ready.users, ready.entitlements, (uid) => Boolean(brokerByUid.get(uid)?.connected), now)
+        : [],
+    // [ready] rather than its parts, like every other memo on this page: narrowing ready?.x inside
+    // the callback is something the compiler cannot carry into the dependency list.
+    [ready, brokerByUid, now],
+  );
+
+  /*
+   * Who has ever actually been charged, from the ledger.
+   *
+   * Never from the plan: a trialling subscription is status 'active' on a paid tier, exactly like a
+   * paying one, so reading conversion off the tier would score every trial as converted on day one.
+   */
+  const everPaid = useMemo(
+    () => new Set((ready?.costs?.purchases ?? []).filter((p) => p.amount > 0).map((p) => p.uid)),
+    [ready],
+  );
+
+  const trials = useMemo(
+    () => trialStats(ready?.entitlements ?? new Map(), (uid) => everPaid.has(uid), now),
+    [ready, everPaid, now],
+  );
+
+  const movement = useMemo(
+    () => (ready?.costs ? mrrMovement(ready.costs.months, ready.costs.purchases) : []),
+    [ready],
+  );
+
+  const dormant = useMemo(
+    () => (ready?.entitlements ? dormantSubscribers(ready.users, ready.entitlements, now) : []),
+    [ready, now],
+  );
+
   const usersWithTrades = ready?.users.filter((u) => u.tradeCount > 0).length ?? 0;
   const maxDailySignup = Math.max(1, ...(signupStats?.dailyLast7.map((d) => d.count) ?? [1]));
   const maxDailyVisitors = Math.max(
@@ -1535,6 +1592,25 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
 
             {tab === 'overview' && (
               <>
+              {/*
+                The worklist, above the charts.
+
+                Everything below this point answers "how is it going"; these two answer "what should
+                I do now", and those were the two questions the panel could not answer at all. A
+                growth chart is worth less than one declined card nobody knew about.
+              */}
+              <div className="mb-6 space-y-4">
+                <MoneyAtRiskPanel
+                  rows={riskRows}
+                  onOpenUser={openUserByUid}
+                  canOpenUser={canOpenUserByUid}
+                />
+                <DormantSubscribersPanel
+                  rows={dormant}
+                  onOpenUser={openUserByUid}
+                  canOpenUser={canOpenUserByUid}
+                />
+              </div>
 
               {/*
                 The card when the check has not answered — not nothing.
@@ -1697,14 +1773,25 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                 </div>
               )}
 
-              <AcquisitionFunnel
-                visitors={ready.visitorStats}
-                serverStats={ready.serverStats}
-                annualSignups={annualSignups}
-                visitorError={ready.visitorStatsError}
-                serverError={ready.serverStatsError}
-                loading={ready.funnel === 'loading'}
-              />
+              {/*
+                Beside the funnel, because it IS the next stage of it.
+
+                AcquisitionFunnel runs Visitors → Opened → Signed up → Connected a broker and stops
+                one step short of the only transition that earns anything. It cannot simply gain a
+                fifth bar: the funnel measures a rolling year from the visitor counters, and trials
+                are only visible from the day the webhook started recording their dates.
+              */}
+              <div className="grid gap-4 mb-8 xl:grid-cols-[2fr_1fr]">
+                <AcquisitionFunnel
+                  visitors={ready.visitorStats}
+                  serverStats={ready.serverStats}
+                  annualSignups={annualSignups}
+                  visitorError={ready.visitorStatsError}
+                  serverError={ready.serverStatsError}
+                  loading={ready.funnel === 'loading'}
+                />
+                <TrialFunnelPanel stats={trials} loaded={ready.entitlements !== null} />
+              </div>
 
               <div className="grid xl:grid-cols-2 gap-4 mb-8">
                 {/* Both read serverStats, which arrives with the funnel's group. */}
@@ -1922,6 +2009,15 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                 )}
               </div>
                 </div>
+              {/*
+                Last on the Overview. Every entry here was already being written and already being
+                loaded — fetchRecentAuditLog runs in the panel's first wave — and nothing rendered a
+                single one of them. The per-user history in the modal answers "what happened to this
+                person"; nothing answered "what did I change on Tuesday".
+              */}
+              <div className="mb-8">
+                <AdminAuditPanel entries={ready.auditLog} />
+              </div>
               </>
             )}
 
@@ -2125,13 +2221,18 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
             )}
 
             {tab === 'costs' && (
-              <CostsPanel
-                report={ready.costs}
-                error={ready.costsError}
-                loading={ready.extras === 'loading'}
-                onOpenUser={openUserByUid}
-                canOpenUser={canOpenUserByUid}
-              />
+              <div className="space-y-8">
+                <CostsPanel
+                  report={ready.costs}
+                  error={ready.costsError}
+                  loading={ready.extras === 'loading'}
+                  onOpenUser={openUserByUid}
+                  canOpenUser={canOpenUserByUid}
+                />
+                {/* Under the month table, which gives totals. This one gives the direction, which a
+                    total cannot: two flat months can be stable or half of everyone leaving. */}
+                <MrrMovementPanel rows={movement} />
+              </div>
             )}
 
             {tab === 'errors' && (

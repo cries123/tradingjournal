@@ -121,7 +121,79 @@ export function CostsPanel({ report, error, loading, onOpenUser, canOpenUser }: 
       </p>
 
       {/* Month by month */}
-      <div className="panel-card rounded-xl overflow-hidden">
+      {/*
+        Cards on a phone, the table from md up.
+
+        Ten columns cannot be read on a 390px screen. It scrolled sideways, which meant the month
+        name left the viewport before the money columns arrived — so the one thing every number
+        needed to be read against was the one thing you could not see at the same time.
+
+        The cards carry the same figures in the same two groups the header row names, which is why
+        that grouping is the thing worth keeping in sync between the two.
+      */}
+      <div className="space-y-3 md:hidden">
+        {report.months.length === 0 && (
+          <div className="panel-card rounded-xl p-6 text-center text-sm text-text-secondary">
+            No usage recorded yet.
+          </div>
+        )}
+        {report.months.map((m) => (
+          <div key={m.month} className="panel-card rounded-xl p-4">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-sm font-semibold">
+                {monthLabel(m.month)}
+                {m.partial && <span className="ml-1.5 text-[10px] text-text-secondary">so far</span>}
+              </p>
+              <p className="text-sm font-semibold tabular-nums text-emerald-400">
+                {m.counts.revenue > 0 ? money(m.counts.revenue) : '—'}
+                <span className="ml-1 text-[10px] font-normal uppercase tracking-wider text-text-secondary">
+                  in
+                </span>
+              </p>
+            </div>
+
+            <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-border/40 pt-3 text-[11px] tabular-nums">
+              <div>
+                <dt className="text-text-secondary">AI msgs</dt>
+                <dd>{m.counts.aiMessages.toLocaleString()}</dd>
+              </div>
+              <div>
+                <dt className="text-text-secondary">Syncs</dt>
+                <dd>{m.counts.syncs.toLocaleString()}</dd>
+              </div>
+              <div>
+                <dt className="text-text-secondary">Users</dt>
+                <dd>{m.counts.syncingUsers}</dd>
+              </div>
+            </dl>
+
+            <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 border-t border-border/40 pt-2 text-[11px] tabular-nums">
+              <div className="flex justify-between">
+                <dt className="text-text-secondary">AI</dt>
+                <dd>{money(m.breakdown.ai)}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-text-secondary">Syncs</dt>
+                <dd>{money(m.breakdown.syncs)}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-text-secondary">SnapTrade</dt>
+                <dd>{money(m.breakdown.connectedUsers)}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-text-secondary">Fees</dt>
+                <dd>{money(m.breakdown.processor)}</dd>
+              </div>
+              <div className="col-span-2 flex justify-between border-t border-border/30 pt-1 font-semibold">
+                <dt>Spend</dt>
+                <dd>{money(m.breakdown.total)}</dd>
+              </div>
+            </dl>
+          </div>
+        ))}
+      </div>
+
+      <div className="panel-card hidden rounded-xl overflow-hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             {/*

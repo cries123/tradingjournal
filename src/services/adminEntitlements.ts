@@ -20,6 +20,8 @@ export interface AdminEntitlementView extends AccessRecord {
    * trialling customer as an ordinary paying subscriber.
    */
   trialEndsAt?: string | null;
+  /** When this account started its one free trial. Set once by the webhook, never cleared. */
+  trialStartedAt?: string | null;
 }
 
 /**
@@ -89,6 +91,7 @@ function readEntitlementDoc(data: Partial<AdminEntitlementView>): AdminEntitleme
     updatedAt: data.updatedAt,
     comp: readComp(data.comp),
     trialEndsAt: typeof data.trialEndsAt === 'string' ? data.trialEndsAt : null,
+    trialStartedAt: typeof data.trialStartedAt === 'string' ? data.trialStartedAt : null,
   };
 }
 
