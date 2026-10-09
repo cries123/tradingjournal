@@ -103,6 +103,50 @@ const IGNORED_STACK_PATTERNS: RegExp[] = [
   /^\s*at <anonymous>:\d+:\d+\s*$/i,
 ];
 
+/*
+ * Scripts this site loads but does not own.
+ *
+ * Tawk is the only one today (src/hooks/useLiveChat.ts). Its loader sets `crossorigin` on the script
+ * tag — Tawk's own embed snippet does — so the browser reports Tawk's exceptions with a full stack
+ * instead of the anonymous "Script error." the message list above already drops. Which meant the
+ * one rule written for exactly this case never saw it: a WebSocket failure entirely inside
+ * twk-main.js, on a visitor's browser, arrived on the admin panel as a production error with nothing
+ * anybody here could change.
+ *
+ * Matched as the host or a subdomain of it, never a substring, so a look-alike such as
+ * `tawk.to.example.com` cannot buy its way into silence.
+ */
+const THIRD_PARTY_SCRIPT_HOSTS = ['tawk.to'];
+
+const isThirdPartyHost = (host: string): boolean =>
+  THIRD_PARTY_SCRIPT_HOSTS.some((v) => host === v || host.endsWith(`.${v}`));
+
+/**
+ * True when every stack frame that names a file is on a third-party host.
+ *
+ * EVERY frame, not any. A single frame from our own bundle means our code is on the path — calling
+ * Tawk_API at the wrong moment, say — and that is ours to fix, so it still reports. Only a stack that
+ * starts and ends inside somebody else's script is dropped.
+ *
+ * Frame lines only. The first line of a V8 stack is the message, and a message is free to quote a
+ * URL; reading hosts out of it would let "could not load https://embed.tawk.to/…" thrown by our own
+ * code look like Tawk's. A stack with no URL-bearing frames at all says nothing either way, so this
+ * rule leaves it alone.
+ */
+export function entirelyThirdParty(stack: string): boolean {
+  const hosts: string[] = [];
+
+  for (const line of stack.split('\n')) {
+    const t = line.trim();
+    // V8 frames start "at "; WebKit and Gecko frames are "fn@url".
+    const isFrame = t.startsWith('at ') || /@https?:\/\//.test(t);
+    if (!isFrame) continue;
+    for (const m of t.matchAll(/https?:\/\/([^/\s:)]+)/gi)) hosts.push(m[1].toLowerCase());
+  }
+
+  return hosts.length > 0 && hosts.every(isThirdPartyHost);
+}
+
 /** True when this is worth a row in the admin panel. */
 export function shouldReport(input: FingerprintInput): boolean {
   const message = (input.message ?? '').trim();
@@ -124,6 +168,7 @@ export function shouldReport(input: FingerprintInput): boolean {
 
   const stack = input.stack ?? '';
   if (stack && IGNORED_STACK_PATTERNS.some((re) => re.test(stack))) return false;
+  if (stack && entirelyThirdParty(stack)) return false;
 
   return true;
 }

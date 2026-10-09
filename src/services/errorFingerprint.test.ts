@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  entirelyThirdParty,
   fingerprint,
   normalizeError,
   normalizeMessage,
@@ -270,5 +271,71 @@ describe('safePath', () => {
 
   it('falls back to / for something unparseable', () => {
     expect(safePath('')).toBe('/');
+  });
+});
+
+describe('errors that start and end inside a script we do not own', () => {
+  /*
+   * The report that prompted this, verbatim. Every frame is Tawk's twk-main.js; it arrived with a
+   * full stack only because the loader sets `crossorigin` on Tawk's script, which is what keeps it
+   * from being the anonymous "Script error." the message list already drops.
+   */
+  const MESSAGE =
+    "Failed to construct 'WebSocket': Failed to create a WebSocket: the provided URL is invalid.";
+  const TAWK = 'https://embed.tawk.to/_s/v4/app/6ab62d2918b/js/twk-main.js';
+  const TAWK_STACK = [
+    `SyntaxError: ${MESSAGE}`,
+    `    at p.doOpen (${TAWK}:22:7878)`,
+    `    at r.open (${TAWK}:21:40063)`,
+    `    at p.open (${TAWK}:21:33306)`,
+    `    at new p (${TAWK}:21:31957)`,
+    `    at new i (${TAWK}:22:22845)`,
+    `    at lh.connect (${TAWK}:24:17094)`,
+    `    at ur.createUI (${TAWK}:25:11164)`,
+    `    at ${TAWK}:25:9249`,
+  ].join('\n');
+
+  const OURS = 'https://trendchasers.net/assets/index-Bx81kQ2a.js';
+
+  it('drops the Tawk WebSocket failure from the admin feed', () => {
+    expect(shouldReport({ kind: 'promise', name: 'SyntaxError', message: MESSAGE, stack: TAWK_STACK })).toBe(false);
+  });
+
+  it('still reports it when one frame is ours, because then we are on the path', () => {
+    // Calling Tawk_API at the wrong moment would look exactly like this, and that one is ours to fix.
+    const stack = `${TAWK_STACK}\n    at useLiveChat (${OURS}:3:1201)`;
+    expect(entirelyThirdParty(stack)).toBe(false);
+    expect(shouldReport({ kind: 'promise', name: 'SyntaxError', message: MESSAGE, stack })).toBe(true);
+  });
+
+  it('reads WebKit and Gecko frames, which have no "at "', () => {
+    const stack = [`doOpen@${TAWK}:22:7878`, `open@${TAWK}:21:40063`].join('\n');
+    expect(entirelyThirdParty(stack)).toBe(true);
+  });
+
+  it('covers Tawk subdomains but not a host that only looks like it', () => {
+    expect(entirelyThirdParty('    at x (https://va.tawk.to/v1/x.js:1:1)')).toBe(true);
+    // A substring match would let these buy their way into silence.
+    expect(entirelyThirdParty('    at x (https://tawk.to.example.com/x.js:1:1)')).toBe(false);
+    expect(entirelyThirdParty('    at x (https://nottawk.to/x.js:1:1)')).toBe(false);
+  });
+
+  it('ignores a URL quoted in the message line, which is not a frame', () => {
+    /*
+     * Our own code throwing "could not load <tawk url>" must not read as Tawk's failure. With only
+     * native frames under it there is no file evidence at all, and counting the message's URL as a
+     * frame would make the whole stack look like Tawk's and silence it.
+     *
+     * Written this way because the obvious version — the same message over one of OUR frames —
+     * passes whether or not the message line is read, since our frame alone makes the answer false.
+     */
+    const stack = [`Error: could not load ${TAWK}`, '    at Array.forEach (<anonymous>)'].join('\n');
+    expect(entirelyThirdParty(stack)).toBe(false);
+  });
+
+  it('says nothing about a stack with no file in it', () => {
+    // No evidence either way, so this rule leaves the decision to the others.
+    expect(entirelyThirdParty('Error: boom\n    at Array.forEach (<anonymous>)')).toBe(false);
+    expect(shouldReport({ kind: 'window', message: 'boom', stack: 'Error: boom\n    at Array.forEach (<anonymous>)' })).toBe(true);
   });
 });
