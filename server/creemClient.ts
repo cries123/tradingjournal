@@ -184,6 +184,33 @@ export async function createCheckout(args: CreateCheckoutArgs): Promise<{ url: s
   return { url, id: parsed.id ?? '' };
 }
 
+/**
+ * One subscription, as Creem holds it now. Read-only and free.
+ *
+ * Used to find trials the webhook never marked (server/trialBackfill.ts), so only the two fields
+ * that question needs are typed.
+ */
+export async function getSubscription(
+  subscriptionId: string,
+): Promise<{ status?: string; current_period_end_date?: string }> {
+  if (!CREEM_CONFIGURED) {
+    throw new CreemError('Payments are not configured yet.', 503);
+  }
+  const res = await fetch(
+    `${CREEM_BASE_URL}/subscriptions?subscription_id=${encodeURIComponent(subscriptionId)}`,
+    { headers: { 'x-api-key': CREEM_API_KEY } },
+  );
+  const text = await res.text();
+  if (!res.ok) {
+    throw new CreemError('Could not read the subscription.', 502, `Creem returned ${res.status}: ${text.slice(0, 300)}`);
+  }
+  try {
+    return JSON.parse(text) as { status?: string; current_period_end_date?: string };
+  } catch {
+    throw new CreemError('Payment provider returned an unreadable response.', 502);
+  }
+}
+
 /** Shared plumbing for the authenticated Creem calls that aren't checkout. */
 async function creemPost(
   path: string,

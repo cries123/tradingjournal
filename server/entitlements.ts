@@ -53,6 +53,11 @@ export interface Entitlement {
    */
   trialStartedAt?: string | null;
   /**
+   * When Creem was last asked whether this subscription is a trial — see server/trialBackfill.ts.
+   * Set once per account, so a paying customer is looked up a single time, ever.
+   */
+  trialCheckedAt?: string | null;
+  /**
    * When the Creem trial ends, as Creem reports it. Never cleared.
    *
    * This is the whole marker. A trialling subscription is `status: 'active'` like any other — the

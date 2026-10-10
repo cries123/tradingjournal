@@ -1,6 +1,9 @@
 import { schedule, type Handler } from '@netlify/functions';
 import { getAdminAuth, getAdminFirestore } from '../../server/firebaseAdmin';
-import { readEntitlement } from '../../server/entitlements';
+import { readEntitlement, writeEntitlement, type Entitlement } from '../../server/entitlements';
+import { backfillTrialMarkers } from '../../server/trialBackfill';
+import { CREEM_CONFIGURED, getSubscription } from '../../server/creemClient';
+import { rememberTrial } from '../../server/trialHandler';
 import { logServerError } from '../../server/errorReports';
 import { trialEmail, type TrialProgress } from '../../server/emailTemplates';
 import { isMailConfigured, sendEmail, siteUrl } from '../../server/mailer';
@@ -69,6 +72,37 @@ async function run(): Promise<{ considered: number; sent: number; skipped: numbe
 
   const db = getAdminFirestore();
   const now = Date.now();
+
+  /*
+   * First, any trial the webhook missed — see server/trialBackfill.ts.
+   *
+   * Before the query below, so a trial found this morning is mailed this morning. Never allowed to
+   * stop the run: the trials that ARE marked still have to hear from us.
+   */
+  if (CREEM_CONFIGURED) {
+    try {
+      const backfill = await backfillTrialMarkers({
+        // An equality on one field rides the automatic index. Purchased records only — a gift or a
+        // free account has no Creem subscription to ask about.
+        candidates: async () => {
+          const snap = await db.collection('entitlements').where('source', '==', 'purchase').get();
+          return snap.docs.map((d) => ({ uid: d.id, entitlement: d.data() as Entitlement }));
+        },
+        fetchSubscription: getSubscription,
+        write: (uid, patch) => writeEntitlement(uid, patch),
+        rememberTrial,
+        nowIso: new Date(now).toISOString(),
+      });
+      if (backfill.checked || backfill.failed) {
+        console.info(
+          `[trial-nudges] asked Creem about ${backfill.checked} subscription(s): ${backfill.found} unmarked trial(s) found, ${backfill.failed} lookup(s) failed`,
+        );
+      }
+    } catch (err) {
+      console.error('[trial-nudges] trial backfill failed:', err);
+      await logServerError('trial-backfill', err);
+    }
+  }
 
   /*
    * Everyone whose trial has not ended yet.
