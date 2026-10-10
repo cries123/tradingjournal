@@ -30,7 +30,7 @@ scripts/    prerender
 ## Commands
 
 ```bash
-npm test                       # vitest, 698 tests, node environment
+npm test                       # vitest, ~1,500 tests, node environment
 npm run lint                   # eslint
 npx tsc -p tsconfig.app.json --noEmit      # and .node / .server / .test — all four must pass
 npm run build
@@ -54,6 +54,13 @@ SKIP_PRERENDER=1 npx vite build --outDir "$HOME/bc" --emptyOutDir
   or `new Date()` during render — use `const [now] = useState(() => Date.now())`),
   `react-hooks/set-state-in-effect`, `preserve-caught-error`, `react-refresh/only-export-components`
   (so a non-component export in a `.tsx` file is an error — put shared helpers in a `.ts`).
+- **The landing page entry must not import Firestore or Storage.** Code reachable from
+  `src/main.tsx` reads Firestore through `src/lib/lazyFirestore.ts` and auth through
+  `src/lib/firebaseAuth.ts`; `src/lib/entryWeight.test.ts` walks the import graph and fails on a
+  static `firebase/firestore` import. It halved what the marketing pages download.
+- **firebase-admin through its modular entry points only** (`firebase-admin/app`, `/auth`,
+  `/firestore`). A test fails on `import admin from 'firebase-admin'`; v14 drops that API and needs
+  Node 22 on Netlify first — steps in RECOVERY.md.
 - **Sentinels, never `Infinity`.** `UNLIMITED_BROKERS` / `UNLIMITED_JOURNALS` are
   `Number.MAX_SAFE_INTEGER`, because limits are JSON-serialised to the browser and
   `JSON.stringify(Infinity)` is `null` — which would arrive as "no limit at all".
@@ -109,6 +116,20 @@ hides rather than concluding anything from four trades. Setups, R multiples, MAE
 still need hand entry — a coverage panel names what the broker did not send instead of drawing a
 blank chart.
 
+### SnapTrade credentials — never delete a stored secret to "recover"
+
+`resetSnapTradeUserSecret` needs the user's CURRENT secret. Once a `users/{uid}/private/snaptrade`
+secret is gone, the only fix is deleting the user at SnapTrade and reconnecting (admin → Reset broker
+link). Recovery used to delete first and re-register after; when SnapTrade refused the app's client
+id (401 "Invalid clientId provided", code 1083) every call looked like a dead user secret and each one
+was deleted. The rules now, in `server/snaptradeCredentials.ts` (tested against fakes):
+
+- a stored secret is only overwritten by one SnapTrade has just issued — never deleted;
+- `isClientRejected` (server/upstreamErrors.ts) separates "SnapTrade refused the app" from "refused
+  this user", and recovery never starts for the former; users get a 503 saying it is our side;
+- `upstreamSummary` is what the admin Errors list records ("SnapTrade 401 · POST /… · reason (code)"),
+  never the SDK's message, which is a status line plus a header dump.
+
 ## Deploy sequencing — this order, always
 
 1. Push → Netlify deploys.
@@ -153,6 +174,12 @@ server, no auth and no data:
    (`executablePath: '/opt/pw-browsers/chromium'`).
 3. Move the temp test out of `src/` afterwards — it must not stay in the suite.
 
+For a true **before**, render the same harness in a second checkout of the old commit:
+`git worktree add --detach <dir> <commit>`, then a junction from `<dir>/node_modules` to this repo's
+`node_modules`, build its CSS to its own `--outDir`, and run the harness there. Remove the junction
+with `cmd /c rmdir <dir>\node_modules` **before** `git worktree remove` — removing the worktree
+with the junction still in place can delete through it into the real `node_modules`.
+
 ## Environment gotchas (Cowork device bridge)
 
 - The shell on Jay's machine **cannot delete files** — `rm` fails with "Operation not permitted".
@@ -171,12 +198,20 @@ server, no auth and no data:
 
 ## Open items
 
-- Market replay is sold on the Diamond card but not built — `MARKET_REPLAY_LIVE = false` in
-  `tiers.ts` is the single flag to flip when it ships.
-- Annual billing is built and off: `ANNUAL_BILLING_LIVE = false`, needs three Creem product ids.
-- `Strategy.criteria` is declared in `src/types/strategy.ts` and written as `[]` everywhere, and
-  `checklistScore` is a percentage typed into a box — which is why the Discipline panel is dead for
-  every user. Finishing the playbook is the most-requested Gold feature on the list.
-- A rule simulator (replay "stop at 4 trades a day" against real history) is the proposed Gold
-  headline feature. Jay's own numbers are the pitch: −$496/day on 11+ trade days vs +$163 on 1–2
-  trade days; he needs a 47.2% win rate to break even and hits 39.9%.
+- Market replay is **not built and not on any card**. Diamond still grants it, so shipping is
+  `MARKET_REPLAY_LIVE = true` in `tiers.ts` and the line returns to the card by itself. It needs
+  licensed intraday data; don't relist it as "coming soon" — that is still selling it.
+- Annual billing is built and **switches itself on** once `CREEM_PRODUCT_SILVER_ANNUAL`,
+  `_GOLD_ANNUAL` and `_DIAMOND_ANNUAL` are set in Netlify (distinct from the monthly ids) —
+  `/api/payments-status` reports `annualReady`, the pricing toggle sells from it, and the admin
+  health panel names what is missing. There is no flag. Moving a LIVE subscription between monthly
+  and yearly is refused on purpose (cross-interval proration in Creem is untested); support does it.
+- The playbook is done: rules per strategy in Settings, ticked on the trade form, stored on the trade
+  as `checklist` (a snapshot — editing rules never rewrites old trades), scored rule-by-rule in the
+  Discipline panel (`src/utils/playbook.ts`). Rule-by-rule results are not yet in the assistant's
+  facts.
+- The rule simulator shipped on Gold. Jay's own numbers were the pitch: −$496/day on 11+ trade days
+  vs +$163 on 1–2 trade days; he needs a 47.2% win rate to break even and hits 39.9%.
+- Trial emails key on `trialEndsAt`, written by the webhook on a "trialing" signal. The daily
+  trial-nudges run also asks Creem once per paying account whether it is a trial the webhook missed
+  (`server/trialBackfill.ts`).
