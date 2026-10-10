@@ -4,6 +4,12 @@ export type OptionType = 'call' | 'put';
 export type TradeGrade = 'A' | 'B' | 'C' | 'D' | 'F';
 export type AssetClass = 'stock' | 'option' | 'future' | 'forex' | 'crypto';
 
+/** One playbook rule on one trade. See utils/playbook.ts. */
+export interface ChecklistTick {
+  rule: string;
+  met: boolean;
+}
+
 export interface Trade {
   id: string;
   date: string;
@@ -64,8 +70,13 @@ export interface Trade {
   mfe?: number;
   rMultiple?: number;
   grade?: TradeGrade;
-  /** 0–100 checklist adherence */
+  /**
+   * 0–100 checklist adherence. Counted from `checklist` when the trade has one (see
+   * utils/playbook.ts); typed by hand only on trades whose strategy has no rules.
+   */
   checklistScore?: number;
+  /** The strategy's rules as they stood when this trade was logged, each ticked or not. */
+  checklist?: ChecklistTick[];
   roundTripId?: string;
   assetClass?: AssetClass;
   tickValue?: number;

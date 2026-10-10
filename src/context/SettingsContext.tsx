@@ -10,6 +10,7 @@ import type { ThemeAccent, UserSettings } from '../types/settings';
 import { DEFAULT_SETTINGS } from '../types/settings';
 import type { Strategy } from '../types/strategy';
 import { loadSettings, saveSettings } from '../utils/settingsStorage';
+import { cleanRules } from '../utils/playbook';
 import { stripUndefinedDeep } from '../utils/firestoreData';
 import { reportErrorSilently } from '../services/errorReporting';
 
@@ -183,9 +184,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   );
 
   const addStrategy = useCallback(
-    (name: string, description?: string) => {
+    (name: string, description?: string): string | null => {
       const trimmed = name.trim();
-      if (!trimmed) return;
+      if (!trimmed) return null;
       const strategy: Strategy = {
         id: crypto.randomUUID(),
         name: trimmed,
@@ -194,6 +195,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         defaultTags: [],
       };
       persist({ ...settings, strategies: [...settings.strategies, strategy] });
+      return strategy.id;
     },
     [settings, persist],
   );
@@ -201,6 +203,29 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const removeStrategy = useCallback(
     (id: string) => {
       persist({ ...settings, strategies: settings.strategies.filter((s) => s.id !== id) });
+    },
+    [settings, persist],
+  );
+
+  /*
+   * Trades keep the checklist they were ticked against (see utils/playbook.ts), so changing a
+   * strategy's rules here changes what future trades are asked, never what past ones recorded.
+   */
+  const updateStrategy = useCallback(
+    (id: string, patch: { name?: string; description?: string; criteria?: string[] }) => {
+      persist({
+        ...settings,
+        strategies: settings.strategies.map((s) =>
+          s.id !== id
+            ? s
+            : {
+                ...s,
+                ...(patch.name !== undefined && patch.name.trim() ? { name: patch.name.trim() } : {}),
+                ...(patch.description !== undefined ? { description: patch.description.trim() || undefined } : {}),
+                ...(patch.criteria !== undefined ? { criteria: cleanRules(patch.criteria) } : {}),
+              },
+        ),
+      });
     },
     [settings, persist],
   );
@@ -264,6 +289,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       removeSetupTag,
       addStrategy,
       removeStrategy,
+      updateStrategy,
       addAccount,
       removeAccount,
       setActiveAccount,
@@ -279,6 +305,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       removeSetupTag,
       addStrategy,
       removeStrategy,
+      updateStrategy,
       addAccount,
       removeAccount,
       setActiveAccount,

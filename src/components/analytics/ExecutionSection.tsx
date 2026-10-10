@@ -167,6 +167,9 @@ const GRADE_CLASS: Record<string, string> = {
   F: 'bg-loss-bright/20 text-loss-bright',
 };
 
+/** Enough to name the worst habits without turning the panel into the whole checklist. */
+const RULES_SHOWN = 4;
+
 function DisciplinePanel({ data, currency }: { data: DisciplineStats; currency: Currency }) {
   const both = data.followedPerTrade !== null && data.ignoredPerTrade !== null;
   const disciplinePays = both && data.followedPerTrade! > data.ignoredPerTrade!;
@@ -221,6 +224,30 @@ function DisciplinePanel({ data, currency }: { data: DisciplineStats; currency: 
               ? 'Sticking to the checklist is worth money here, which is the argument for keeping it.'
               : 'The trades that ignored the checklist did better. Either the rules need changing, or this is a small sample being read too hard.'}
           </p>
+        </div>
+      )}
+
+      {/* One level below the percentage: which rule, when skipped, costs money. The most expensive
+          rule to break sorts first, because that is the one worth stopping. */}
+      {data.rules.length > 0 && (
+        <div className="mt-2.5">
+          <p className="text-[10px] text-text-secondary mb-1.5">Rule by rule · per trade</p>
+          <ul className="space-y-2">
+            {data.rules.slice(0, RULES_SHOWN).map((row) => (
+              <li key={row.rule} className="rounded-lg bg-bg-primary/60 p-2">
+                <p className="text-[11px] font-medium leading-snug break-words">{row.rule}</p>
+                <p className="text-[10px] text-text-secondary mt-0.5 tabular-nums">
+                  Followed {row.followed}: {formatCurrency(row.followedPerTrade, currency)} · Skipped {row.skipped}:{' '}
+                  {formatCurrency(row.skippedPerTrade, currency)}
+                </p>
+                <p className={`text-[10px] mt-0.5 font-semibold ${row.costOfSkipping > 0 ? 'text-loss-bright' : 'text-text-secondary'}`}>
+                  {row.costOfSkipping > 0
+                    ? `Skipping it costs ${formatCurrency(row.costOfSkipping, currency)} a trade`
+                    : 'Skipping it has not cost you so far'}
+                </p>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </PanelShell>
@@ -383,7 +410,7 @@ export function ExecutionPrompts({ trades }: ExecutionSectionProps) {
       title: 'Did following the plan pay?',
       icon: <ListChecks size={14} />,
       needs:
-        'Needs a grade or a checklist score on at least five trades. Grading takes a second per trade and answers the hardest question there is: whether your rules make money.',
+        'Needs a grade or a ticked checklist on at least five trades. Give a strategy its rules under Settings → Strategy playbook, pick it on a trade, and tick what you did — this then shows which rule costs you money when you skip it.',
     });
   }
 

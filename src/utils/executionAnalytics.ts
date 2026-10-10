@@ -1,3 +1,4 @@
+import { ruleByRule, type RuleRow } from './playbook';
 import type { Trade, TradeGrade } from '../types';
 import { effectivePnl, tradeTags } from './tradeHelpers';
 
@@ -211,6 +212,8 @@ export interface DisciplineStats {
   followedCount: number;
   ignoredCount: number;
   coveredGrades: number;
+  /** Per playbook rule, followed against skipped — see utils/playbook.ts ruleByRule. */
+  rules: RuleRow[];
 }
 
 const GRADES: TradeGrade[] = ['A', 'B', 'C', 'D', 'F'];
@@ -249,6 +252,7 @@ export function disciplineStats(trades: Trade[]): DisciplineStats | null {
     followedCount: followed.length,
     ignoredCount: ignored.length,
     coveredGrades: graded.length,
+    rules: ruleByRule(trades),
   };
 }
 

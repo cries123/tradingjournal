@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 import { useSettings } from '../context/useSettings';
-import type { Trade, TradeGrade, TradeSide, AssetClass } from '../types';
+import type { ChecklistTick, Trade, TradeGrade, TradeSide, AssetClass } from '../types';
 import { useEscapeToClose } from '../hooks/useEscapeToClose';
 import { readTradeForm } from '../utils/tradeFormValues';
 import { reportErrorSilently } from '../services/errorReporting';
+import { checklistScoreOf, ticksFor } from '../utils/playbook';
 
 interface TradeModalProps {
   trade?: Trade;
@@ -44,6 +45,21 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
   const [checklistScore, setChecklistScore] = useState(trade?.checklistScore != null ? String(trade.checklistScore) : '');
   const [assetClass, setAssetClass] = useState<AssetClass | ''>(trade?.assetClass ?? '');
   const [ivRank, setIvRank] = useState(trade?.ivRank != null ? String(trade.ivRank) : '');
+  /*
+   * The chosen strategy's rules, ticked or not. Seeded from the trade when it was already ticked
+   * against this strategy, so editing an old trade shows the rules it was logged under rather than
+   * today's — see ticksFor.
+   */
+  const [ticks, setTicks] = useState<ChecklistTick[]>(() =>
+    ticksFor(settings.strategies.find((s) => s.id === (trade?.strategyId ?? '')), trade),
+  );
+  const chooseStrategy = (id: string) => {
+    setStrategyId(id);
+    setTicks(ticksFor(settings.strategies.find((s) => s.id === id), trade));
+  };
+  /** When the strategy has rules, the score is counted from the ticks and the typed box goes away. */
+  const ticked = ticks.length > 0;
+  const countedScore = checklistScoreOf(ticks);
   /* Errors appear only once someone has tried to save. Marking a field red while it is still
      being typed into is nagging, not help. */
   const [submitAttempted, setSubmitAttempted] = useState(false);
@@ -56,14 +72,15 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
   // resyncing state from props on every render.
 
   const reading = readTradeForm({
-    symbol, pnl, grossPnl, fees, mae, mfe, rMultiple, checklistScore, ivRank,
+    // A hidden box must not be able to fail validation, so it is read as empty while the ticks decide.
+    symbol, pnl, grossPnl, fees, mae, mfe, rMultiple, checklistScore: ticked ? '' : checklistScore, ivRank,
   });
   const { derivedNet, netRaw, errors } = reading;
 
   /** So collapsing Advanced does not hide the fact that something is in there. */
   const advancedFilled = [
-    extraTags, strategyId, grossPnl, fees, entryTime, exitTime,
-    mae, mfe, rMultiple, grade, checklistScore, assetClass,
+    extraTags, grossPnl, fees, entryTime, exitTime,
+    mae, mfe, rMultiple, grade, ticked ? '' : checklistScore, assetClass,
   ].filter((v) => String(v).trim()).length;
 
   /* Errors stay quiet until someone has actually tried to save. Marking a field red while it is
@@ -110,7 +127,8 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
       mfe: reading.values.mfe,
       rMultiple: reading.values.rMultiple,
       grade: grade || undefined,
-      checklistScore: reading.values.checklistScore,
+      checklistScore: ticked ? countedScore : reading.values.checklistScore,
+      checklist: ticked ? ticks : undefined,
       assetClass: assetClass || undefined,
       ivRank: reading.values.ivRank,
       accountId: trade?.accountId,
@@ -234,6 +252,46 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
               </select>
             </Field>
           </div>
+          {/* Out from under Advanced: the playbook is the question a trader should be asked on every
+              trade, and a checklist behind a collapsed toggle is a checklist nobody ticks. */}
+          {settings.strategies.length > 0 && (
+            <Field label="Strategy">
+              <select value={strategyId} onChange={(e) => chooseStrategy(e.target.value)} className="input-field">
+                <option value="">None</option>
+                {settings.strategies.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {strategyId && !ticked && (
+            <p className="text-[11px] text-text-secondary -mt-1 leading-relaxed">
+              This strategy has no rules yet. Add them under Settings → Strategy playbook and they
+              appear here as boxes to tick.
+            </p>
+          )}
+          {ticked && (
+            <fieldset className="rounded-lg border border-border/60 p-3">
+              <legend className="px-1 text-xs text-text-secondary">
+                Playbook — tick what you actually did · {countedScore}%
+              </legend>
+              <div className="space-y-1.5">
+                {ticks.map((tick, i) => (
+                  <label key={tick.rule} className="flex items-start gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={tick.met}
+                      onChange={(e) =>
+                        setTicks((prev) => prev.map((t, j) => (j === i ? { ...t, met: e.target.checked } : t)))
+                      }
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-[color:var(--color-accent)]"
+                    />
+                    <span className="min-w-0 break-words">{tick.rule}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
           <Field label="Notes (optional)">
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="input-field resize-none" placeholder="Setup context, mistakes, etc." />
           </Field>
@@ -260,16 +318,6 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
               <Field label="Extra tags (comma-separated)">
                 <input type="text" value={extraTags} onChange={(e) => setExtraTags(e.target.value)} className="input-field" placeholder="GAP, REVERSAL" />
               </Field>
-              {settings.strategies.length > 0 && (
-                <Field label="Strategy">
-                  <select value={strategyId} onChange={(e) => setStrategyId(e.target.value)} className="input-field">
-                    <option value="">None</option>
-                    {settings.strategies.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
-                </Field>
-              )}
               <div className="grid grid-cols-2 gap-3">
                 <NumericField label="Gross P/L" value={grossPnl} onChange={setGrossPnl} error={show(errors.grossPnl)} placeholder="300.00" />
                 <NumericField label="Fees" value={fees} onChange={setFees} error={show(errors.fees)} placeholder="5.00" />
@@ -303,7 +351,13 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
                     ))}
                   </select>
                 </Field>
-                <NumericField label="Checklist %" value={checklistScore} onChange={setChecklistScore} error={show(errors.checklistScore)} />
+                {ticked ? (
+                  <Field label="Checklist %">
+                    <input type="text" value={`${countedScore}%`} readOnly className={inputClass(undefined, true)} aria-label="Checklist score, counted from the ticks above" />
+                  </Field>
+                ) : (
+                  <NumericField label="Checklist %" value={checklistScore} onChange={setChecklistScore} error={show(errors.checklistScore)} />
+                )}
                 <NumericField label="IV rank" value={ivRank} onChange={setIvRank} error={show(errors.ivRank)} />
               </div>
               <Field label="Asset class">

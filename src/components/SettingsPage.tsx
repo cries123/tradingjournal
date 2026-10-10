@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useRef } from 'react';
 import { ArrowLeft, Check, CloudOff, Download, FileText, Plus, Trash2, Upload, X } from 'lucide-react';
 import { useSettings } from '../context/useSettings';
 import { DiamondSection } from './settings/DiamondSection';
+import { PlaybookSection } from './settings/PlaybookSection';
 import { useAuth } from '../context/useAuth';
 import { useEntitlement } from '../context/useEntitlement';
 import { journalsUnlimited, tierHas, TIER_PLANS } from '../config/tiers';
@@ -88,7 +89,6 @@ export function SettingsPage({
 }: SettingsPageProps) {
   const {
     settings, saveState, updateSettings, addSetupTag, renameSetupTag, removeSetupTag,
-    addStrategy, removeStrategy,
     addAccount, removeAccount, setActiveAccount, journalLimit, canAddJournal,
   } = useSettings();
   const { username, user, firebaseEnabled } = useAuth();
@@ -120,7 +120,6 @@ export function SettingsPage({
   const [orphanMoved, setOrphanMoved] = useState(0);
 
   const [newAccount, setNewAccount] = useState('');
-  const [newStrategy, setNewStrategy] = useState('');
   const [pendingBackup, setPendingBackup] = useState<ParsedBackup | null>(null);
   const [restoring, setRestoring] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
@@ -807,39 +806,7 @@ export function SettingsPage({
           </p>
         </section>
 
-        <section className="panel-card p-5 space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Strategy playbook</h2>
-          <p className="text-xs text-text-secondary">Define setups and link them to trades in the advanced trade form.</p>
-          <div className="space-y-2">
-            {settings.strategies.map((s) => (
-              <div key={s.id} className="flex items-center gap-2 p-2 rounded-lg border border-border/60">
-                <span className="flex-1 text-sm font-medium">{s.name}</span>
-                <button type="button" onClick={() => removeStrategy(s.id)} className="text-text-secondary hover:text-loss-bright p-1">
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newStrategy}
-              onChange={(e) => setNewStrategy(e.target.value)}
-              placeholder="Strategy name"
-              className="input-field flex-1"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                addStrategy(newStrategy);
-                setNewStrategy('');
-              }}
-              className="btn-secondary px-4 py-2 text-sm"
-            >
-              Add
-            </button>
-          </div>
-        </section>
+        <PlaybookSection />
 
         <section className="panel-card p-5 space-y-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Goals & reminders</h2>

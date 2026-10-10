@@ -1,5 +1,7 @@
+import { Check, X } from 'lucide-react';
 import type { Trade } from '../types';
 import { formatCurrency } from '../utils/format';
+import { readChecklist } from '../utils/playbook';
 import { marketSessionFromTime, tradeTags } from '../utils/tradeHelpers';
 
 interface TradeDetailsProps {
@@ -65,7 +67,10 @@ export function TradeDetails({ trade, compact }: TradeDetailsProps) {
     rows.push({ label: 'Greeks', value: greeks.join(' · ') });
   }
 
-  if (rows.length === 0 && !trade.notes) return null;
+  // The rules themselves, not just the percentage: "67%" says something was skipped, the list says what.
+  const ticks = readChecklist(trade.checklist);
+
+  if (rows.length === 0 && !trade.notes && ticks.length === 0) return null;
 
   return (
     <div className={`${compact ? 'mt-2' : 'mt-3'} space-y-1`}>
@@ -75,6 +80,20 @@ export function TradeDetails({ trade, compact }: TradeDetailsProps) {
           <span className="text-text-primary">{value}</span>
         </div>
       ))}
+      {ticks.length > 0 && (
+        <ul className="pl-[5.5rem] space-y-0.5" aria-label="Playbook rules">
+          {ticks.map((tick) => (
+            <li key={tick.rule} className="flex items-start gap-1.5 text-xs">
+              {tick.met ? (
+                <Check size={12} className="mt-0.5 shrink-0 text-profit-bright" aria-label="Followed" />
+              ) : (
+                <X size={12} className="mt-0.5 shrink-0 text-loss-bright" aria-label="Skipped" />
+              )}
+              <span className={tick.met ? 'text-text-primary' : 'text-text-secondary'}>{tick.rule}</span>
+            </li>
+          ))}
+        </ul>
+      )}
       {trade.notes && (
         <p className="text-xs text-text-secondary mt-1">{trade.notes}</p>
       )}

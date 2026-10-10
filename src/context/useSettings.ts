@@ -26,8 +26,11 @@ export interface SettingsContextValue {
   /** Renames a tag and rewrites it on every trade that used it. */
   renameSetupTag: (from: string, to: string) => void;
   removeSetupTag: (tag: string) => void;
-  addStrategy: (name: string, description?: string) => void;
+  /** Returns the new strategy's id, or null when the name was blank. */
+  addStrategy: (name: string, description?: string) => string | null;
   removeStrategy: (id: string) => void;
+  /** Renames a strategy or replaces its rules. Rules are cleaned (trimmed, deduped, capped) on the way in. */
+  updateStrategy: (id: string, patch: { name?: string; description?: string; criteria?: string[] }) => void;
   /** Adds a journal. False when the name was blank or the plan's allowance is full. */
   addAccount: (name: string) => boolean;
   removeAccount: (id: string) => void;
