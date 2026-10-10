@@ -4,13 +4,15 @@ import { useSettings } from '../context/useSettings';
 import type { Trade, TradeGrade, TradeSide, AssetClass } from '../types';
 import { useEscapeToClose } from '../hooks/useEscapeToClose';
 import { readTradeForm } from '../utils/tradeFormValues';
+import { reportErrorSilently } from '../services/errorReporting';
 
 interface TradeModalProps {
   trade?: Trade;
   defaultDate?: string;
   onClose: () => void;
-  onSave: (trade: Omit<Trade, 'id'>) => void;
-  onUpdate?: (trade: Trade) => void;
+  /** Resolves once the write has landed; rejects if it did not. The modal waits for it. */
+  onSave: (trade: Omit<Trade, 'id'>) => Promise<void> | void;
+  onUpdate?: (trade: Trade) => Promise<void> | void;
 }
 
 const GRADES: TradeGrade[] = ['A', 'B', 'C', 'D', 'F'];
@@ -45,6 +47,8 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
   /* Errors appear only once someone has tried to save. Marking a field red while it is still
      being typed into is nagging, not help. */
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Field state is seeded straight from `trade` above. The parent remounts this
   // component (via `key={trade?.id ?? 'new'}`) whenever it switches which trade
@@ -66,9 +70,11 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
      still being typed into is nagging, not help. */
   const show = (error?: string) => (submitAttempted ? error : undefined);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     setSubmitAttempted(true);
+    setSaveError(null);
 
     /* Previously this returned with no explanation, so the Save button simply did nothing and left
        the person to guess which field it disliked. */
@@ -129,12 +135,32 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
       contractSize: trade?.contractSize,
     };
 
-    if (isEdit && trade && onUpdate) {
-      onUpdate({ ...trade, ...payload });
-    } else {
-      onSave(payload);
+    /*
+     * Waits for the write, and only closes once it has landed.
+     *
+     * It used to fire the save and close in the same breath. The write goes through runCloudWrite,
+     * which marks the sync as failed and then RETHROWS — so a refused write (rules not yet published
+     * after a deploy, a quota error) closed the modal as if it had saved, lost what was typed, and
+     * landed in the admin error feed as an anonymous async rejection with no hint of where from.
+     * Offline is not a failure here: Firestore queues the write and resolves, so this only stops on
+     * a real refusal.
+     */
+    setSaving(true);
+    try {
+      if (isEdit && trade && onUpdate) {
+        await onUpdate({ ...trade, ...payload });
+      } else {
+        await onSave(payload);
+      }
+      onClose();
+    } catch (err) {
+      reportErrorSilently(err, 'promise', isEdit ? 'trade-modal-update' : 'trade-modal-save');
+      setSaveError(
+        "That trade didn't save. It's still here — try again, and if it keeps failing, copy it somewhere before closing.",
+      );
+    } finally {
+      setSaving(false);
     }
-    onClose();
   };
 
   return (
@@ -291,9 +317,19 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
             </div>
           )}
 
+          {saveError && (
+            <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+              {saveError}
+            </p>
+          )}
+
           <div className="flex gap-3 pt-2">
-            <button type="submit" className="flex-1 btn-primary py-2.5 text-sm">
-              {isEdit ? 'Save changes' : 'Save Trade'}
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 btn-primary py-2.5 text-sm disabled:opacity-60"
+            >
+              {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Save Trade'}
             </button>
             <button type="button" onClick={onClose} className="px-4 py-2.5 btn-secondary text-sm">Cancel</button>
           </div>

@@ -7,6 +7,11 @@ interface TrialFunnelPanelProps {
   stats: TrialStats;
   /** False while the entitlement map is still loading — a zero funnel would be a claim, not a count. */
   loaded: boolean;
+  /**
+   * Whether the payment ledger was read. Conversion is "went on to pay", and without the ledger
+   * there is no way to know — so the rate shows as unknown rather than as a confident 0%.
+   */
+  paidKnown: boolean;
 }
 
 /**
@@ -21,7 +26,7 @@ interface TrialFunnelPanelProps {
  * after that shipped, so for the first few weeks a small "started" is the instrumentation catching
  * up, not a collapse in signups.
  */
-export function TrialFunnelPanel({ stats, loaded }: TrialFunnelPanelProps) {
+export function TrialFunnelPanel({ stats, loaded, paidKnown }: TrialFunnelPanelProps) {
   const plan = TIER_PLANS[TRIAL_TIER];
 
   return (
@@ -45,12 +50,14 @@ export function TrialFunnelPanel({ stats, loaded }: TrialFunnelPanelProps) {
           <p className="text-3xl font-bold tracking-tight tabular-nums">
             {/* Null, not zero. A 0% on the day the first trial starts reads as "nobody ever
                 converts", which is a different and much worse claim than "nothing has finished". */}
-            {stats.conversionRate === null ? '—' : `${Math.round(stats.conversionRate)}%`}
+            {!paidKnown || stats.conversionRate === null ? '—' : `${Math.round(stats.conversionRate)}%`}
           </p>
           <p className="mt-2 text-xs text-text-secondary">
-            {stats.conversionRate === null
-              ? `No trial has finished yet. ${stats.live} running.`
-              : `${stats.converted} of ${stats.converted + stats.lapsed} finished trials went on to pay`}
+            {!paidKnown
+              ? 'The payment ledger did not load, so who went on to pay is unknown.'
+              : stats.conversionRate === null
+                ? `No trial has finished yet. ${stats.live} running.`
+                : `${stats.converted} of ${stats.converted + stats.lapsed} finished trials went on to pay`}
           </p>
 
           <dl className="mt-3 space-y-0.5 border-t border-border/40 pt-2.5 text-[11px] tabular-nums text-text-secondary">
@@ -64,11 +71,11 @@ export function TrialFunnelPanel({ stats, loaded }: TrialFunnelPanelProps) {
             </div>
             <div className="flex justify-between">
               <dt>Converted</dt>
-              <dd className="text-emerald-400">{stats.converted}</dd>
+              <dd className="text-emerald-400">{paidKnown ? stats.converted : '—'}</dd>
             </div>
             <div className="flex justify-between">
               <dt>Ended without paying</dt>
-              <dd>{stats.lapsed}</dd>
+              <dd>{paidKnown ? stats.lapsed : '—'}</dd>
             </div>
           </dl>
 

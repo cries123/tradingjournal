@@ -53,7 +53,8 @@ export function ShareCardModal({ period, stats, dateKey = '', year, month = 0, o
   useEscapeToClose(onClose);
   const { settings, updateSettings } = useSettings();
   const { user, username: profileUsername, firebaseEnabled } = useAuth();
-  const [copied, setCopied] = useState(false);
+  /* Three states, because the clipboard can refuse: 'copied', 'failed', or nothing to say yet. */
+  const [copied, setCopied] = useState<'copied' | 'failed' | null>(null);
   const [saveHint, setSaveHint] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -169,10 +170,23 @@ export function ShareCardModal({ period, stats, dateKey = '', year, month = 0, o
     }
   };
 
+  /*
+   * The clipboard is allowed to say no.
+   *
+   * writeText rejects when the page lacks clipboard permission — an iPhone outside a direct tap, a
+   * browser with it turned off, an embedded webview. That rejection had nowhere to go: the button
+   * looked dead and the global handler filed it in the admin error feed as an anonymous async
+   * failure. A refusal is the reader's browser setting, not a bug, so it is said on the button and
+   * not reported.
+   */
   const copyText = async () => {
-    await navigator.clipboard.writeText(shareText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(shareText);
+      setCopied('copied');
+    } catch {
+      setCopied('failed');
+    }
+    setTimeout(() => setCopied(null), 2000);
   };
 
   /**
@@ -325,7 +339,7 @@ export function ShareCardModal({ period, stats, dateKey = '', year, month = 0, o
           </button>
           <button type="button" onClick={() => void copyText()} className="flex flex-col items-center gap-1 py-3 btn-secondary text-xs">
             <Copy size={16} />
-            {copied ? 'Copied!' : 'Copy text'}
+            {copied === 'copied' ? 'Copied!' : copied === 'failed' ? "Couldn't copy" : 'Copy text'}
           </button>
           <button
             type="button"

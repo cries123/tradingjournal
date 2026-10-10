@@ -2,6 +2,7 @@ import { assertCallerIsAdmin, AdminRequestError, getBearerToken } from './adminA
 import { getAdminFirestore } from './firebaseAdmin';
 import { logServerError } from './errorReports';
 import { readMonthRevenue } from './billingLedger';
+import { mrrMovement, type MonthMovement } from '../src/utils/mrrMovement';
 import { getAdminAuth } from './firebaseAdmin';
 import {
   COST_RATES,
@@ -63,6 +64,10 @@ export interface CostReport {
    * can see" is the next question.
    */
   onTrial: number;
+  /** Every uid with a non-zero charge in the whole ledger. Null when the ledger could not be read. */
+  everPaid: string[] | null;
+  /** New against stopped-paying, month by month, from the whole ledger. Null when unreadable. */
+  movement: MonthMovement[] | null;
   topUsers: { uid: string; aiMessages: number; syncs: number; cost: number }[];
   /** Who bought what, newest first. Straight from the ledger, so it is money, not entitlement. */
   purchases: { uid: string; email: string; tier: string; amount: number; at: string }[];
@@ -255,15 +260,43 @@ async function readPurchases(limit = 50) {
   return rows;
 }
 
+/**
+ * Every charge ever booked, as uid and date — for the two numbers that need all of them.
+ *
+ * Trial conversion ("has this account ever paid") and the month-on-month movement ("paid last month,
+ * not this one") were computed in the browser from `purchases`, which is the newest FIFTY charges —
+ * a display list, capped for the screen. Past fifty charges, somebody who converted long ago counted
+ * as "ended without paying", and the oldest month in view counted every returning customer as new.
+ *
+ * One read per ledger row, with only three fields fetched. The ledger is one row per payment, so
+ * this stays in the hundreds for a long time; it is still far cheaper than the user list, and it is
+ * the only way to answer a question about all of history from all of history.
+ */
+async function readChargeLedger(): Promise<{ uid: string; at: string }[]> {
+  const snap = await getAdminFirestore().collection('billingCharges').select('uid', 'amount', 'at').get();
+
+  const rows: { uid: string; at: string }[] = [];
+  for (const doc of snap.docs) {
+    const data = doc.data() as { uid?: string; amount?: number; at?: string };
+    // A zero-amount row is a trial start or a fully discounted month: not a payment, so not a payer.
+    if (!data.uid || typeof data.amount !== 'number' || data.amount <= 0) continue;
+    rows.push({ uid: data.uid, at: data.at ?? '' });
+  }
+  return rows;
+}
+
 export async function buildCostReport(): Promise<CostReport> {
   const db = getAdminFirestore();
   const thisMonth = monthKey(new Date());
   const from = launchMonth() || EARLIEST_MONTH;
 
-  const [{ mrr, subscribers, onTrial }, connectedNow, purchases] = await Promise.all([
+  const [{ mrr, subscribers, onTrial }, connectedNow, purchases, ledger] = await Promise.all([
     readSubscriptionRunRate().catch(() => ({ mrr: 0, subscribers: 0, onTrial: 0 })),
     readConnectedNow().catch(() => 0),
     readPurchases().catch(() => []),
+    // null, not [], on failure: an empty ledger would read as "nobody has ever paid", which turns
+    // every finished trial into a lapse. Unknown has to stay unknown.
+    readChargeLedger().catch(() => null),
   ]);
 
   const months: MonthCosts[] = [];
@@ -361,6 +394,9 @@ export async function buildCostReport(): Promise<CostReport> {
     mrrNow: mrr,
     subscribers,
     onTrial,
+    // From the full ledger, never from `purchases` above, which is capped for display.
+    everPaid: ledger ? [...new Set(ledger.map((c) => c.uid))] : null,
+    movement: ledger ? mrrMovement(months, ledger) : null,
     topUsers: ranked,
     purchases,
     warning,

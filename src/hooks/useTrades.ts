@@ -237,9 +237,11 @@ export function useTrades() {
   );
 
   const addTrade = useCallback(
-    (trade: Omit<Trade, 'id'>) => {
+    // Returned, not voided: the trade modal waits on it so a refused write keeps the form open.
+    // Voided, the rejection had nowhere to go but the global handler.
+    async (trade: Omit<Trade, 'id'>) => {
       const newTrade: Trade = { ...withAccount(trade), id: crypto.randomUUID() };
-      void persistTrade(newTrade);
+      await persistTrade(newTrade);
     },
     [persistTrade, withAccount],
   );

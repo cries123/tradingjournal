@@ -79,12 +79,7 @@ import { MrrMovementPanel } from '../components/admin/MrrMovementPanel';
 import { TrialFunnelPanel } from '../components/admin/TrialFunnelPanel';
 import { DormantSubscribersPanel } from '../components/admin/DormantSubscribersPanel';
 import { AdminAuditPanel } from '../components/admin/AdminAuditPanel';
-import {
-  dormantSubscribers,
-  moneyAtRisk,
-  mrrMovement,
-  trialStats,
-} from '../utils/adminRisk';
+import { dormantSubscribers, moneyAtRisk, trialStats } from '../utils/adminRisk';
 import type { AdminTab } from '../components/admin/adminTabs';
 import { BrokerStatusPanel } from '../components/admin/BrokerStatusPanel';
 import { fetchCostReport, type CostReport } from '../services/adminCosts';
@@ -1273,9 +1268,15 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
   }, [ready?.serverStats?.brokerUsers]);
 
   /* False whenever the stats call failed or an older function build is deployed — in that case the
-     rows say nothing rather than claiming nobody is connected. */
-  const brokerDataLoaded = (ready?.serverStats?.brokerUsers?.length ?? 0) > 0
-    || (ready?.serverStats?.brokerRegisteredCount ?? 0) === 0;
+     rows say nothing rather than claiming nobody is connected.
+
+     serverStats has to EXIST first. With it null — still loading, or the call failed — the old test
+     fell through to `brokerRegisteredCount ?? 0`, read 0, decided "SnapTrade has nobody registered,
+     so an empty list is genuinely empty", and reported the data as loaded. That is the exact case
+     this flag exists to catch, answered the wrong way round. */
+  const brokerDataLoaded = ready?.serverStats != null
+    && ((ready.serverStats.brokerUsers?.length ?? 0) > 0
+      || (ready.serverStats.brokerRegisteredCount ?? 0) === 0);
 
   const visibleUsers = useMemo(() => {
     if (!ready) return [];
@@ -1379,11 +1380,19 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
   const riskRows = useMemo(
     () =>
       ready?.entitlements
-        ? moneyAtRisk(ready.users, ready.entitlements, (uid) => Boolean(brokerByUid.get(uid)?.connected), now)
+        ? moneyAtRisk(
+            ready.users,
+            ready.entitlements,
+            // Unknown, not false, until the broker stats have actually arrived — otherwise every
+            // running trial is listed as "no broker connected" for the first seconds of every visit,
+            // and for good if the stats call fails.
+            (uid) => (brokerDataLoaded ? Boolean(brokerByUid.get(uid)?.connected) : null),
+            now,
+          )
         : [],
     // [ready] rather than its parts, like every other memo on this page: narrowing ready?.x inside
     // the callback is something the compiler cannot carry into the dependency list.
-    [ready, brokerByUid, now],
+    [ready, brokerByUid, brokerDataLoaded, now],
   );
 
   /*
@@ -1393,19 +1402,22 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
    * paying one, so reading conversion off the tier would score every trial as converted on day one.
    */
   const everPaid = useMemo(
-    () => new Set((ready?.costs?.purchases ?? []).filter((p) => p.amount > 0).map((p) => p.uid)),
+    // The whole ledger, computed on the server. This used to be built from `purchases`, the newest
+    // fifty charges kept for display — so past fifty, an old conversion read as a lapse.
+    () => new Set(ready?.costs?.everPaid ?? []),
     [ready],
   );
+  /* Unknown, not "nobody has paid", when the ledger did not load: an empty set would turn every
+     finished trial into a lapse and print a confident 0%. */
+  const paidKnown = Boolean(ready?.costs?.everPaid);
 
   const trials = useMemo(
     () => trialStats(ready?.entitlements ?? new Map(), (uid) => everPaid.has(uid), now),
     [ready, everPaid, now],
   );
 
-  const movement = useMemo(
-    () => (ready?.costs ? mrrMovement(ready.costs.months, ready.costs.purchases) : []),
-    [ready],
-  );
+  // From the server, over the whole ledger, for the same reason as everPaid above.
+  const movement = ready?.costs?.movement ?? [];
 
   const dormant = useMemo(
     () => (ready?.entitlements ? dormantSubscribers(ready.users, ready.entitlements, now) : []),
@@ -1790,7 +1802,11 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                   serverError={ready.serverStatsError}
                   loading={ready.funnel === 'loading'}
                 />
-                <TrialFunnelPanel stats={trials} loaded={ready.entitlements !== null} />
+                <TrialFunnelPanel
+                  stats={trials}
+                  loaded={ready.entitlements !== null && ready.extras !== 'loading'}
+                  paidKnown={paidKnown}
+                />
               </div>
 
               <div className="grid xl:grid-cols-2 gap-4 mb-8">

@@ -627,12 +627,10 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
         <CsvImportModal
           targetDate={importTargetDate}
           onClose={closeImportCsv}
-          onSave={(imported) => {
-            // addTrades is the same path the broker sync writes through, so the dedupe, the journal
-            // assignment and the Firestore batching are all the ones already in use.
-            void addTrades(imported);
-            closeImportCsv();
-          }}
+          // addTrades is the same path the broker sync writes through, so the dedupe, the journal
+          // assignment and the Firestore batching are all the ones already in use. The modal awaits
+          // it and closes itself on success; on failure it stays open with the preview intact.
+          onSave={(imported) => addTrades(imported)}
         />
       )}
 

@@ -76,6 +76,16 @@ describe('money at risk', () => {
     expect(rows[0].value).toBe(0);
   });
 
+  it('says nothing about a trial while it cannot yet tell whether a broker is connected', () => {
+    /*
+     * The broker stats arrive in the page's second wave and can fail. Reading "not loaded" as "not
+     * connected" listed every running trial as at risk for the first seconds of each visit, and for
+     * good whenever the stats call failed.
+     */
+    const unknown = () => null;
+    expect(moneyAtRisk([user('a')], map([['a', plan({ trialEndsAt: at(3) })]]), unknown, NOW)).toEqual([]);
+  });
+
   it('says nothing about a trial that has connected and is running fine', () => {
     expect(moneyAtRisk([user('a')], map([['a', plan({ trialEndsAt: at(3) })]]), allConnected, NOW)).toEqual([]);
   });

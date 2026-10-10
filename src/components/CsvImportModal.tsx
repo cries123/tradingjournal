@@ -11,10 +11,12 @@ import {
   type CsvImportPreview,
 } from '../utils/parseCsvRouter';
 import { useEscapeToClose } from '../hooks/useEscapeToClose';
+import { reportErrorSilently } from '../services/errorReporting';
 
 interface CsvImportModalProps {
   onClose: () => void;
-  onSave: (trades: Omit<Trade, 'id'>[]) => void;
+  /** Resolves once the batch has landed; rejects if it did not. The modal waits for it. */
+  onSave: (trades: Omit<Trade, 'id'>[]) => Promise<void> | void;
   targetDate?: string;
 }
 
@@ -35,6 +37,7 @@ export function CsvImportModal({ onClose, onSave, targetDate }: CsvImportModalPr
   const [fileName, setFileName] = useState('');
   const [detectedFormat, setDetectedFormat] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [trades, setTrades] = useState<CsvImportPreview[]>([]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [dragOver, setDragOver] = useState(false);
@@ -91,7 +94,8 @@ export function CsvImportModal({ onClose, onSave, targetDate }: CsvImportModalPr
 
   const selectedCount = trades.filter((t) => t.selected).length;
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (saving) return;
     const toSave = trades
       .filter((t) => t.selected)
       .map((row) => {
@@ -106,8 +110,22 @@ export function CsvImportModal({ onClose, onSave, targetDate }: CsvImportModalPr
       return;
     }
 
-    onSave(toSave);
-    onClose();
+    /*
+     * Waits for the batch before closing — the same fix as the trade modal, and worth more here: a
+     * CSV is often a whole month of fills, and closing on a refused write threw all of them away
+     * while the preview that held them disappeared.
+     */
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(toSave);
+      onClose();
+    } catch (err) {
+      reportErrorSilently(err, 'promise', 'csv-import-save');
+      setError("Those trades didn't save. Nothing was lost from this preview — try Import again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const totalPnl = trades.filter((t) => t.selected).reduce((s, t) => s + t.pnl, 0);
@@ -219,8 +237,13 @@ export function CsvImportModal({ onClose, onSave, targetDate }: CsvImportModalPr
             </p>
 
             <div className="flex gap-3">
-              <button type="button" onClick={handleSave} className="flex-1 py-2.5 btn-primary text-sm">
-                Import {selectedCount} Trades
+              <button
+                type="button"
+                onClick={() => void handleSave()}
+                disabled={saving}
+                className="flex-1 py-2.5 btn-primary text-sm disabled:opacity-60"
+              >
+                {saving ? 'Importing…' : `Import ${selectedCount} Trades`}
               </button>
               <button type="button" onClick={() => { setStep('upload'); setError(null); }} className="px-4 py-2.5 btn-secondary text-sm">
                 Back

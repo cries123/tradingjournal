@@ -1,5 +1,6 @@
 import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebase';
 import type { CostBreakdown, CostRates, UsageCounts } from '../config/costs';
+import type { MonthMovement } from '../utils/mrrMovement';
 
 export interface MonthCosts {
   month: string;
@@ -23,6 +24,10 @@ export interface CostReport {
    * can see" is the next question.
    */
   onTrial: number;
+  /** Every uid with a non-zero charge in the whole ledger. Null when the ledger could not be read. */
+  everPaid: string[] | null;
+  /** New against stopped-paying, month by month, from the whole ledger. Null when unreadable. */
+  movement: MonthMovement[] | null;
   topUsers: { uid: string; aiMessages: number; syncs: number; cost: number }[];
   purchases: { uid: string; email: string; tier: string; amount: number; at: string }[];
   warning: string | null;
