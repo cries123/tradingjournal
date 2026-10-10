@@ -103,24 +103,134 @@ export function describeHttpError(err: unknown): HttpErrorDescription {
 }
 
 /**
+ * Whether SnapTrade refused the APP, rather than one user.
+ *
+ * Every request is signed with the app's client id and consumer key, and only some also carry a
+ * user's secret. When the app's half is refused, every user fails identically at once, and nothing
+ * about any one user's stored secret is wrong. The recovery below used to read that 401 as "this
+ * user's secret is dead", delete it, and try to mint a new one — which, with the app's own keys
+ * refused, could not succeed. One afternoon of a rejected client id was on course to strip the
+ * stored secret from every user who touched a broker screen, and a deleted secret cannot be
+ * recovered: SnapTrade's reset call requires the current one.
+ *
+ * Two signs, either sufficient:
+ *  - the reason names the client id or consumer key ("Invalid clientId provided - …", code 1083);
+ *  - the refused call was registerUser, which is signed with the app's keys and nothing else, so a
+ *    401 or 403 there cannot be about a user.
+ *
+ * The code alone is deliberately not trusted. SnapTrade does not document 1083, and a code shared
+ * with a per-user refusal would turn every dead user secret into an app-wide alarm.
+ */
+export function isClientRejected(err: unknown): boolean {
+  if (isUpstreamOutage(err)) return false;
+
+  const { status, body, url } = describeHttpError(err);
+  if (status !== 401 && status !== 403) return false;
+
+  if (/\/snapTrade\/registerUser/i.test(url ?? '')) return true;
+
+  // The first line of the message only: the SDK appends the response headers after it, and a
+  // header could mention anything.
+  const firstLine = err instanceof Error ? err.message.split('\n')[0] : '';
+  return /client ?id|consumer ?key/i.test(`${body} ${firstLine}`);
+}
+
+/** The reason in a JSON error body, with its code — or the body itself, squeezed onto one line. */
+function bodyReason(body: string): string {
+  if (!body) return '';
+  try {
+    const parsed = JSON.parse(body) as { detail?: unknown; message?: unknown; error?: unknown; code?: unknown } | null;
+    const text = [parsed?.detail, parsed?.message, parsed?.error].find(
+      (v): v is string => typeof v === 'string' && v.trim() !== '',
+    );
+    if (text) {
+      const code = typeof parsed?.code === 'string' || typeof parsed?.code === 'number' ? parsed.code : null;
+      return code !== null ? `${text.trim()} (code ${code})` : text.trim();
+    }
+  } catch {
+    // Not JSON — an HTML error page, a plain-text gateway message. Shown as it came.
+  }
+  return body.replace(/\s+/g, ' ').trim().slice(0, 300);
+}
+
+/**
+ * One line saying who refused what, and why — or null for a failure that never got an answer.
+ *
+ * "SnapTrade 401 · POST /api/v1/snapTrade/registerUser · Invalid clientId provided - … (code 1083)".
+ *
+ * Written for the admin panel's error list, which showed a SnapTrade failure as the SDK's message:
+ * "Request failed with status code 401" and then forty lines of response headers, with the one
+ * sentence that explained it cut off below them. Two things follow from building it from fields
+ * rather than from that message. It names the reason. And it groups: the header dump carries a
+ * date and a request id, so every occurrence of one fault fingerprinted as a new row.
+ *
+ * The path only, never the query, because the SDK signs requests in the query string — see
+ * SECRET_PARAMS above.
+ */
+export function upstreamSummary(err: unknown): string | null {
+  const { status, body, method, url } = describeHttpError(err);
+  if (typeof status !== 'number') return null;
+
+  const path = (url ?? '').split('?')[0].replace(/^https?:\/\/[^/]+/i, '');
+  const isSnaptrade =
+    (err as { name?: unknown } | null)?.name === 'SnaptradeError' || /snaptrade\.com/i.test(url ?? '');
+
+  return [
+    `${isSnaptrade ? 'SnapTrade' : 'HTTP'} ${status}`,
+    path ? [method?.toUpperCase(), path].filter(Boolean).join(' ') : '',
+    bodyReason(body),
+  ]
+    .filter(Boolean)
+    .join(' · ')
+    .slice(0, 500);
+}
+
+/**
+ * The same failure with upstreamSummary as its message, for anything that records errors.
+ *
+ * The stack keeps its frames and loses its first line, which on an SDK error is the header dump
+ * again. Anything without an HTTP status is returned untouched.
+ */
+export function readableUpstreamError(err: unknown): unknown {
+  const summary = upstreamSummary(err);
+  if (!summary) return err;
+
+  const name = err instanceof Error && err.name ? err.name : 'Error';
+  const frames = (err instanceof Error && typeof err.stack === 'string' ? err.stack : '')
+    .split('\n')
+    .filter((line) => line.trim().startsWith('at '));
+
+  const readable = new Error(summary);
+  readable.name = name;
+  readable.stack = [`${name}: ${summary}`, ...frames].join('\n');
+  return readable;
+}
+
+/**
  * Whether SnapTrade rejected the credentials themselves, as opposed to failing the request.
  *
- * A stored userSecret can stop being valid without anything about it changing: rotating the
- * consumer key, or moving the app between SnapTrade's test and production environments, leaves
- * every secret in Firestore issued against credentials that no longer recognise it. Nothing in the
- * old flow noticed — getOrRegisterCreds returns a cached secret without ever validating it, so the
- * user would keep hitting auth errors forever with no path back.
+ * A stored userSecret can stop being valid without anything about it changing: moving the app
+ * between SnapTrade's test and production environments leaves every secret in Firestore issued by
+ * an environment that no longer knows the user. Nothing in the old flow noticed — getOrRegisterCreds
+ * returns a cached secret without ever validating it, so the user would keep hitting auth errors
+ * forever with no path back.
+ *
+ * A true answer starts recovery (server/snaptradeCredentials.ts), which tries to register the user
+ * again. That is no longer destructive — the stored secret is only replaced once SnapTrade has
+ * issued a new one — but it is still a SnapTrade call per failure, so this stays strict.
  */
 export function isRejectedCredential(err: unknown): boolean {
-  // An outage is never evidence that this user's secret is wrong, and the recovery below deletes
-  // it — so a provider having a bad day must not be allowed to look like a bad credential. During
-  // an outage a degraded API can answer 401 or "user not found" for reasons that have nothing to
-  // do with the caller, and re-registering on that would break connections that were working.
+  // An outage is never evidence that this user's secret is wrong. During one a degraded API can
+  // answer 401 or "user not found" for reasons that have nothing to do with the caller, and the
+  // admin panel would mark every such user as needing to reconnect.
   if (isUpstreamOutage(err)) return false;
+
+  // Nor is a refusal of the app's own keys — see isClientRejected. That one is everybody at once.
+  if (isClientRejected(err)) return false;
 
   const { status, body } = describeHttpError(err);
 
-  // 401 is unambiguous: the credentials were not accepted.
+  // Otherwise a 401 is unambiguous: this user's credentials were not accepted.
   if (status === 401) return true;
 
   /*

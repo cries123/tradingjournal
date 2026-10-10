@@ -1,5 +1,6 @@
 import type { Trade } from '../src/types';
 import { tierHas, type Tier } from '../src/config/tiers';
+import { upstreamSummary } from './upstreamErrors';
 
 /**
  * The automatic morning import — Diamond's reason to exist.
@@ -203,6 +204,20 @@ export interface AutoSyncDeps {
   maxUsers?: number;
   /** Decide and log without pulling anything — for looking before leaping. */
   dryRun?: boolean;
+  /**
+   * Puts one user's failure in the admin panel's error list. Must not throw.
+   *
+   * The failures only went to the function log, which nobody reads at six in the morning. When
+   * SnapTrade refused the app's keys, every Diamond user's import failed every morning and the panel
+   * showed nothing, because the run itself completed: one row per user failing, grouped by reason,
+   * is what makes "everyone, since Tuesday" visible.
+   */
+  reportFailure?: (uid: string, err: unknown) => Promise<void>;
+}
+
+/** The reason a user's import failed, in one line — SnapTrade's own words when it gave any. */
+function failureReason(err: unknown, fallback: string): string {
+  return upstreamSummary(err) ?? (err instanceof Error ? err.message : fallback);
 }
 
 const NO_SKIPS: Record<SkipReason, number> = {
@@ -247,8 +262,9 @@ export async function runAutoSync(deps: AutoSyncDeps): Promise<AutoSyncSummary> 
         uid: subject.uid,
         imported: 0,
         accounts: 0,
-        error: err instanceof Error ? err.message : 'could not read the account',
+        error: failureReason(err, 'could not read the account'),
       });
+      await deps.reportFailure?.(subject.uid, err);
       continue;
     }
 
@@ -285,8 +301,9 @@ export async function runAutoSync(deps: AutoSyncDeps): Promise<AutoSyncSummary> 
         uid: subject.uid,
         imported: 0,
         accounts: 0,
-        error: err instanceof Error ? err.message : 'import failed',
+        error: failureReason(err, 'import failed'),
       });
+      await deps.reportFailure?.(subject.uid, err);
     }
   }
 

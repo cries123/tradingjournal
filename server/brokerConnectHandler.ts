@@ -21,7 +21,13 @@ import {
   type SyncOutcome,
 } from '../src/utils/syncRefund';
 import { recordJournalEvent } from './journalEvents';
-import { describeHttpError, isRejectedCredential, isUpstreamOutage } from './upstreamErrors';
+import { isClientRejected, isUpstreamOutage, upstreamSummary } from './upstreamErrors';
+import {
+  getOrRegisterCreds as getOrRegisterCredsWith,
+  withCredentialRecovery as withCredentialRecoveryUsing,
+  type CredentialDeps,
+  type SnaptradeCreds,
+} from './snaptradeCredentials';
 import { brokersUnlimited, lowestTierWith, TIER_PLANS, type Tier } from '../src/config/tiers';
 
 export type SupportedBroker = string;
@@ -42,11 +48,6 @@ export interface BrokerConnectResult {
   body: Record<string, unknown>;
 }
 
-interface SnaptradeCreds {
-  userId: string;
-  userSecret: string;
-}
-
 // Stored under a private subcollection (not `users/{uid}` itself) so the client-side Firestore
 // rules never need to, and never accidentally do, expose this secret — only the admin SDK (this
 // server code) can reach `users/{uid}/private/*`, since no client-facing rule matches that path.
@@ -55,87 +56,37 @@ function privateSnaptradeDoc(uid: string) {
 }
 
 /**
- * True when SnapTrade is telling us this user is already registered with them.
- *
- * This is the state you land in when our stored secret and SnapTrade's records disagree: we think
- * the user is new, SnapTrade knows they aren't, and registering again is rejected forever. Without
- * recovery it is a permanent dead end — every Connect attempt fails identically, with a 500 that
- * says nothing useful.
+ * The Firestore and SnapTrade halves of credential handling. The rules about when a stored secret
+ * may be replaced live in snaptradeCredentials.ts, where they are tested.
  */
-function isAlreadyRegistered(err: unknown): boolean {
-  const status = (err as { status?: number; response?: { status?: number } } | null)?.response
-    ?.status ?? (err as { status?: number } | null)?.status;
-  const message = err instanceof Error ? err.message.toLowerCase() : '';
-  return (
-    status === 400 &&
-    (message.includes('already') || message.includes('exist') || message.includes('registered'))
-  );
+const credentialDeps: CredentialDeps = {
+  read: async (uid) => {
+    const snap = await privateSnaptradeDoc(uid).get();
+    return (snap.data() ?? null) as SnaptradeCreds | null;
+  },
+  write: async (uid, creds) => {
+    await privateSnaptradeDoc(uid).set(creds);
+  },
+  register: async (uid) => {
+    const res = await getSnaptrade().authentication.registerSnapTradeUser({ userId: uid });
+    if (!res.data.userSecret) throw new Error('SnapTrade registered the user but returned no secret');
+    return res.data.userSecret;
+  },
+  reportResetNeeded: async (uid, err) => {
+    await logServerError('broker-credentials', err, { uid });
+  },
+};
+
+function getOrRegisterCreds(uid: string): Promise<SnaptradeCreds> {
+  return getOrRegisterCredsWith(uid, credentialDeps);
 }
 
-async function getOrRegisterCreds(uid: string): Promise<SnaptradeCreds> {
-  const ref = privateSnaptradeDoc(uid);
-  const snap = await ref.get();
-  const existing = (snap.data() ?? null) as SnaptradeCreds | null;
-  if (existing?.userSecret) return existing;
-
-  const snaptrade = getSnaptrade();
-
-  try {
-    const res = await snaptrade.authentication.registerSnapTradeUser({ userId: uid });
-    const creds: SnaptradeCreds = { userId: uid, userSecret: res.data.userSecret! };
-    await ref.set(creds);
-    return creds;
-  } catch (err) {
-    if (!isAlreadyRegistered(err)) throw err;
-
-    // SnapTrade has this user but we've lost the secret — ask for a new one rather than leaving
-    // the account permanently unable to connect. The old secret is invalidated by this call, which
-    // is fine: we didn't have it. Existing brokerage authorizations survive.
-    console.warn(`[broker-connect] ${uid} exists at SnapTrade but we have no secret — resetting.`);
-    const reset = await snaptrade.authentication.resetSnapTradeUserSecret({
-      userId: uid,
-      userSecret: existing?.userSecret ?? '',
-    });
-    const creds: SnaptradeCreds = { userId: uid, userSecret: reset.data.userSecret! };
-    await ref.set(creds);
-    return creds;
-  }
-}
-
-/**
- * Runs an authenticated SnapTrade call, and treats a rejected secret as recoverable exactly once.
- *
- * The retry re-registers the user, which mints a working secret but does NOT restore their
- * brokerage authorizations — those live in the environment the connection was made against. So a
- * successful retry still means "you are known to us again, now reconnect your broker", and the
- * caller surfaces that rather than pretending the sync worked.
- */
-async function withCredentialRecovery<T>(
+function withCredentialRecovery<T>(
   uid: string,
   creds: SnaptradeCreds,
   call: (creds: SnaptradeCreds) => Promise<T>,
 ): Promise<T> {
-  try {
-    return await call(creds);
-  } catch (err) {
-    if (!isRejectedCredential(err)) throw err;
-
-    console.warn(`[broker-connect] stored secret for ${uid} was rejected — re-registering.`);
-    await privateSnaptradeDoc(uid).delete().catch(() => {});
-
-    const fresh = await getOrRegisterCreds(uid);
-    try {
-      return await call(fresh);
-    } catch (retryErr) {
-      if (!isRejectedCredential(retryErr)) throw retryErr;
-      // The new secret is valid; what is missing is the brokerage connection itself. Say that,
-      // rather than handing the user a SnapTrade signature error to interpret.
-      throw new BrokerRequestError(
-        'Your broker connection needs to be set up again. Open Connect Broker and reconnect your account.',
-        409,
-      );
-    }
-  }
+  return withCredentialRecoveryUsing(uid, creds, call, credentialDeps);
 }
 
 async function getCredsIfRegistered(uid: string): Promise<SnaptradeCreds | null> {
@@ -201,6 +152,18 @@ function assertBrokerSyncIncluded(_tier: Tier, brokers: number): void {
     402,
   );
 }
+
+/**
+ * What a user sees while SnapTrade is refusing the app's own keys.
+ *
+ * Every user hits this at the same moment, and the generic "Broker connect request failed. Please
+ * try again." sent each of them to check a connection that was fine, and to retry a thing that
+ * could not work. The failure is reported to the admin panel on the way here; the user has nothing
+ * to do, and is told so.
+ */
+const APP_KEYS_REJECTED_MESSAGE =
+  'Broker sync is unavailable right now because of a problem on our side, not with your broker. ' +
+  'Nothing has been disconnected and no syncs were used. It has been reported — there is nothing you need to do.';
 
 /**
  * A sync failure that also reports where the user's allowance actually stands.
@@ -508,13 +471,22 @@ async function handleSync(uid: string, accountId?: string, startDate?: string, e
   try {
     return await pullActivities(uid, creds, accountId, startDate, endDate, spend.remaining, limits.syncsPerDay, tier, spend.credits, syncedInstitution, spend.source);
   } catch (err) {
-    if (isUpstreamOutage(err)) {
+    // Two failures that are nobody's fault on the user's side: no answer at all, and SnapTrade
+    // refusing the app. The listing above usually catches the second before anything is spent;
+    // this is for the keys being refused between the listing and the pull.
+    const appKeys = isClientRejected(err);
+    if (isUpstreamOutage(err) || appKeys) {
       // The user paid for a request nobody answered. Give it back before the error goes out, so
       // the remaining count on the response is the one they actually have.
       await refundDaily('sync', uid, spend.source);
-      console.warn(`[broker-connect] refunded a sync for ${uid} — upstream failure, not a rejected call.`);
+      console.warn(`[broker-connect] refunded a sync for ${uid} — ${appKeys ? 'app keys refused' : 'upstream failure'}, not a rejected call.`);
+      // A BrokerSyncError is expected control flow and is never logged by the handler, so the
+      // one that means "every user is down" is logged here.
+      if (appKeys) await logServerError('broker-connect', err, { uid });
       throw new BrokerSyncError(
-        'Your broker could not be reached just now. This did not use one of your syncs — try again shortly.',
+        appKeys
+          ? APP_KEYS_REJECTED_MESSAGE
+          : 'Your broker could not be reached just now. This did not use one of your syncs — try again shortly.',
         503,
         spend.remaining + 1,
         limits.syncsPerDay,
@@ -742,10 +714,7 @@ function isDatastoreUnavailable(err: unknown): boolean {
  * date, a content-type and a server name, which is everything except the answer.
  */
 function failureDetail(err: unknown, fallback: string): string {
-  const { status, body, method, url } = describeHttpError(err);
-  const where = method && url ? `${method} ${url}` : '';
-  const parts = [status ? `HTTP ${status}` : '', where, body].filter(Boolean);
-  return (parts.length ? parts.join(' — ') : fallback).slice(0, 600);
+  return (upstreamSummary(err) ?? fallback).slice(0, 600);
 }
 
 /**
@@ -967,6 +936,15 @@ export async function handleBrokerConnectRequest(
             'Your broker connection can\u2019t be read right now because the database is unavailable \u2014 ' +
             'this is not a problem with your broker, and nothing has been disconnected. Try again shortly.',
         },
+      };
+    }
+
+    // Already reported above. The site admin also gets the reason inline, since the fix is theirs.
+    if (isClientRejected(err)) {
+      const detail = callerUid && (await isSiteAdmin(callerUid)) ? failureDetail(err, message) : undefined;
+      return {
+        statusCode: 503,
+        body: { error: APP_KEYS_REJECTED_MESSAGE, ...(detail ? { detail } : {}) },
       };
     }
 

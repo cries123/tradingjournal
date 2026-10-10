@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   describeHttpError,
+  isClientRejected,
   isRejectedCredential,
   isUpstreamOutage,
+  readableUpstreamError,
   redactUrl,
+  upstreamSummary,
 } from '../../server/upstreamErrors';
+import { normalizeError } from './errorFingerprint';
 
 /**
  * This predicate decides whether a user gets their sync back. Too strict and they pay for an
@@ -232,5 +236,149 @@ describe('a stale-environment secret is recognised, not treated as a failed chec
     // Here the cache is the best information available and keeping it is correct.
     expect(isRejectedCredential(sdkError(503, 'upstream unavailable'))).toBe(false);
     expect(isRejectedCredential(Object.assign(new Error('fetch failed'), { code: 'ETIMEDOUT' }))).toBe(false);
+  });
+});
+
+/**
+ * The October outage: SnapTrade answered every call with 401 "Invalid clientId provided", code 1083.
+ * Nothing was wrong with any user. The recovery path read each 401 as one user's dead secret and
+ * deleted it — so this is the predicate that has to say "the app", not "this user".
+ */
+describe('isClientRejected', () => {
+  const sdkError = (status: number, responseBody: unknown, url = 'https://api.snaptrade.com/api/v1/accounts?clientId=TC&userSecret=s3cret', headers = '{}') =>
+    Object.assign(new Error(`Request failed with status code ${status}\nRESPONSE HEADERS:\n${headers}`), {
+      name: 'SnaptradeError',
+      status,
+      responseBody,
+      method: 'GET',
+      url,
+    });
+
+  const refusedClient = () =>
+    sdkError(401, { detail: 'Invalid clientId provided - TREND-CHASERS-TNNCU', status_code: 401, code: '1083' });
+
+  it('recognises a refused client id', () => {
+    expect(isClientRejected(refusedClient())).toBe(true);
+  });
+
+  it('recognises a refused consumer key', () => {
+    expect(isClientRejected(sdkError(403, { detail: 'Invalid consumer key' }))).toBe(true);
+  });
+
+  it('treats any refusal of registerUser as the app, whatever the body says', () => {
+    // registerUser is signed with the app's keys and nothing else — there is no user to blame.
+    const err = sdkError(401, { detail: 'Unauthorized' }, 'https://api.snaptrade.com/api/v1/snapTrade/registerUser?clientId=TC');
+    expect(isClientRejected(err)).toBe(true);
+  });
+
+  it('is not triggered by the code alone', () => {
+    // SnapTrade does not document 1083. If it is shared with a per-user refusal, keying on it would
+    // turn every dead user secret into an app-wide alarm.
+    const err = sdkError(401, { detail: 'Invalid userID or userSecret provided', code: '1083' });
+    expect(isClientRejected(err)).toBe(false);
+    expect(isRejectedCredential(err)).toBe(true);
+  });
+
+  it('ignores a header that happens to mention a client id', () => {
+    // The SDK appends every response header to the message. Only the first line is the message.
+    const err = sdkError(401, { detail: 'Unable to verify signature' }, undefined, '{"x-snaptrade-clientid":"TREND-CHASERS-TNNCU"}');
+    expect(isClientRejected(err)).toBe(false);
+  });
+
+  it('is not a refused user secret, so recovery leaves it alone', () => {
+    expect(isRejectedCredential(refusedClient())).toBe(false);
+  });
+
+  it('is never an outage, an entitlement refusal or a bad request', () => {
+    expect(isClientRejected(sdkError(503, 'clientId service down'))).toBe(false);
+    expect(isClientRejected(sdkError(403, { detail: 'Subscription unavailable' }))).toBe(false);
+    expect(isClientRejected(sdkError(400, { detail: 'clientId is required' }))).toBe(false);
+    expect(isClientRejected(null)).toBe(false);
+  });
+});
+
+/**
+ * What the admin panel's error list shows for an upstream failure. It showed the SDK's message:
+ * the status line, then forty lines of response headers, with the reason cut off below them.
+ */
+describe('upstreamSummary', () => {
+  const sdkError = (status: number, responseBody: unknown, date = 'Sat, 10 Oct 2026 14:02:11 GMT') =>
+    Object.assign(
+      new Error(`Request failed with status code ${status}\nRESPONSE HEADERS:\n{"date":"${date}","x-request-id":"7521a30cb4fd08ce751c77b5242c72ee"}`),
+      {
+        name: 'SnaptradeError',
+        status,
+        responseBody,
+        method: 'post',
+        url: 'https://api.snaptrade.com/api/v1/snapTrade/registerUser?clientId=TC&timestamp=1791640931&userSecret=s3cret',
+      },
+    );
+
+  it('says who refused what, and SnapTrade’s reason with its code', () => {
+    expect(upstreamSummary(sdkError(401, { detail: 'Invalid clientId provided - TREND-CHASERS-TNNCU', code: '1083' }))).toBe(
+      'SnapTrade 401 · POST /api/v1/snapTrade/registerUser · Invalid clientId provided - TREND-CHASERS-TNNCU (code 1083)',
+    );
+  });
+
+  it('never carries the query string, which holds the signed secret', () => {
+    const line = upstreamSummary(sdkError(401, { detail: 'nope' }))!;
+    expect(line).not.toContain('s3cret');
+    expect(line).not.toContain('?');
+  });
+
+  it('never carries the headers', () => {
+    expect(upstreamSummary(sdkError(401, { detail: 'nope' }))).not.toMatch(/RESPONSE HEADERS|x-request-id/);
+  });
+
+  it('shows a body that is not JSON as it came, on one line', () => {
+    expect(upstreamSummary(sdkError(502, '<html>\n  Bad gateway\n</html>'))).toBe(
+      'SnapTrade 502 · POST /api/v1/snapTrade/registerUser · <html> Bad gateway </html>',
+    );
+  });
+
+  it('labels a non-SnapTrade failure as plain HTTP', () => {
+    expect(upstreamSummary({ response: { status: 500, data: 'boom' } })).toBe('HTTP 500 · boom');
+  });
+
+  it('is null when nothing answered, so the original message is kept', () => {
+    expect(upstreamSummary(Object.assign(new Error('fetch failed'), { code: 'ECONNRESET' }))).toBeNull();
+    expect(upstreamSummary(null)).toBeNull();
+  });
+});
+
+describe('readableUpstreamError', () => {
+  const sdkError = (date: string) => {
+    const err = Object.assign(
+      new Error(`Request failed with status code 401\nRESPONSE HEADERS:\n{"date":"${date}"}`),
+      {
+        name: 'SnaptradeError',
+        status: 401,
+        responseBody: { detail: 'Invalid clientId provided - TREND-CHASERS-TNNCU', code: '1083' },
+        method: 'POST',
+        url: 'https://api.snaptrade.com/api/v1/snapTrade/registerUser',
+      },
+    );
+    err.stack = `SnaptradeError: ${err.message}\n    at registerFresh (server/snaptradeCredentials.ts:70:5)\n    at handleConnect (server/brokerConnectHandler.ts:250:3)`;
+    return err;
+  };
+
+  it('groups every occurrence of one fault into one admin row', () => {
+    // The header dump carries the date of each response, so the raw messages differ every time.
+    const a = normalizeError(readableUpstreamError(sdkError('Sat, 10 Oct 2026 14:02:11 GMT')), 'server', 'broker-connect');
+    const b = normalizeError(readableUpstreamError(sdkError('Sun, 11 Oct 2026 09:41:57 GMT')), 'server', 'broker-connect');
+    expect(a.fingerprint).toBe(b.fingerprint);
+    expect(a.message).toContain('Invalid clientId provided');
+  });
+
+  it('keeps the frames and drops the header dump from the stack', () => {
+    const readable = readableUpstreamError(sdkError('Sat, 10 Oct 2026 14:02:11 GMT')) as Error;
+    expect(readable.name).toBe('SnaptradeError');
+    expect(readable.stack).toContain('at registerFresh');
+    expect(readable.stack).not.toContain('RESPONSE HEADERS');
+  });
+
+  it('returns anything without a status untouched', () => {
+    const err = new TypeError('x is undefined');
+    expect(readableUpstreamError(err)).toBe(err);
   });
 });

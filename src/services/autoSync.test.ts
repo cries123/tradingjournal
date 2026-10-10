@@ -228,6 +228,52 @@ describe('runAutoSync', () => {
     expect(importFor).not.toHaveBeenCalled();
     expect(summary.failed).toBe(1);
   });
+
+  /*
+   * Failures only reached the function log. When SnapTrade refused the app's keys, every Diamond
+   * user's import failed each morning, the run itself "succeeded", and the admin panel was empty.
+   */
+  it('reports every failed user to the admin panel, with the error that was thrown', async () => {
+    const refused = Object.assign(new Error('Request failed with status code 401\nRESPONSE HEADERS:\n{}'), {
+      name: 'SnaptradeError',
+      status: 401,
+      responseBody: { detail: 'Invalid clientId provided - TREND-CHASERS-TNNCU', code: '1083' },
+      method: 'GET',
+      url: 'https://api.snaptrade.com/api/v1/accounts',
+    });
+    const reportFailure = vi.fn().mockResolvedValue(undefined);
+
+    const summary = await runAutoSync(
+      deps({
+        listConnected: async () => [
+          { uid: 'a', lastRunDate: null },
+          { uid: 'b', lastRunDate: null },
+          { uid: 'unreadable', lastRunDate: null },
+        ],
+        readPreferences: async (uid) => {
+          if (uid === 'unreadable') throw new Error('firestore is down');
+          return { enabled: true, activeAccountId: 'default' };
+        },
+        importFor: async () => {
+          throw refused;
+        },
+        reportFailure,
+      }),
+    );
+
+    expect(summary.failed).toBe(3);
+    expect(reportFailure).toHaveBeenCalledWith('a', refused);
+    expect(reportFailure).toHaveBeenCalledWith('b', refused);
+    expect(reportFailure).toHaveBeenCalledWith('unreadable', expect.any(Error));
+    // The log line says why, not "Request failed with status code 401" and the headers.
+    expect(summary.outcomes[0].error).toContain('Invalid clientId provided');
+  });
+
+  it('reports nothing for a user whose import worked', async () => {
+    const reportFailure = vi.fn();
+    await runAutoSync(deps({ reportFailure }));
+    expect(reportFailure).not.toHaveBeenCalled();
+  });
 });
 
 describe('accountsPerRun', () => {

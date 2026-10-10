@@ -184,6 +184,10 @@ async function run(): Promise<AutoSyncSummary> {
 
     importFor: (uid, activeAccountId) => importFor(uid, activeAccountId, today),
 
+    reportFailure: async (uid, err) => {
+      await logServerError('auto-sync', err, { uid });
+    },
+
     markRun: async (uid, day, imported) => {
       await db.collection('brokerConnections').doc(uid).set(
         {

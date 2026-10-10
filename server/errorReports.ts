@@ -1,6 +1,7 @@
 import admin from 'firebase-admin';
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin';
 import { normalizeError, safePath, shouldReport, type ErrorKind } from '../src/services/errorFingerprint';
+import { readableUpstreamError } from './upstreamErrors';
 
 /**
  * Where production failures are written down.
@@ -139,7 +140,13 @@ export async function recordServerError(
   context: { uid?: string | null; path?: string } = {},
 ): Promise<void> {
   try {
-    const normalized = normalizeError(thrown, 'server', scope);
+    /*
+     * An upstream HTTP failure is recorded as "SnapTrade 401 · POST /…/registerUser · Invalid
+     * clientId provided (code 1083)", not as the SDK's message — which is the status line and then
+     * the response headers, with the reason never reached. The headers also carry a date and a
+     * request id, so the raw message made every occurrence of one fault a new row.
+     */
+    const normalized = normalizeError(readableUpstreamError(thrown), 'server', scope);
     await recordErrorEvent({
       fingerprint: normalized.fingerprint,
       kind: 'server',
