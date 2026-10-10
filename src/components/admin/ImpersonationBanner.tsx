@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { LogOut, ShieldAlert } from 'lucide-react';
 import { signOut } from 'firebase/auth';
-import { getFirebaseAuth, isFirebaseConfigured } from '../../lib/firebase';
+import { getFirebaseAuth, isFirebaseConfigured } from '../../lib/firebaseAuth';
 
 const KEY = 'trend-chasers-impersonating';
 

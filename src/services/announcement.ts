@@ -1,5 +1,6 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
+import { isFirebaseConfigured } from '../lib/firebaseAuth';
+// The landing page's banner reads this, so Firestore arrives on demand — see lib/lazyFirestore.ts.
+import { lazyFirestore } from '../lib/lazyFirestore';
 
 export type AnnouncementTone = 'info' | 'success' | 'warning';
 
@@ -102,7 +103,8 @@ export async function fetchAnnouncement(options?: { fresh?: boolean }): Promise<
   }
 
   try {
-    const snap = await getDoc(doc(getFirebaseDb(), 'config', 'announcement'));
+    const { fs, db } = await lazyFirestore();
+    const snap = await fs.getDoc(fs.doc(db, 'config', 'announcement'));
     const value = snap.exists() ? normalize(snap.data() as Partial<Announcement>) : EMPTY_ANNOUNCEMENT;
     writeCache(value);
     return value;
@@ -128,7 +130,8 @@ export async function saveAnnouncement(
     revision: currentRevision + 1,
     updatedAt: new Date().toISOString(),
   };
-  await setDoc(doc(getFirebaseDb(), 'config', 'announcement'), value);
+  const { fs, db } = await lazyFirestore();
+  await fs.setDoc(fs.doc(db, 'config', 'announcement'), value);
   writeCache(value);
   return value;
 }

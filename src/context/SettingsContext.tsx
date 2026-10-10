@@ -3,13 +3,14 @@ import { SettingsContext } from './useSettings';
 import { useAuth } from './useAuth';
 import { useEntitlement } from './useEntitlement';
 import { hasJournalRoom } from '../config/tiers';
-import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
+import { isFirebaseConfigured } from '../lib/firebaseAuth';
+// A root provider, so Firestore is loaded on demand — see lib/lazyFirestore.ts.
+import { lazyFirestore } from '../lib/lazyFirestore';
 import type { ThemeAccent, UserSettings } from '../types/settings';
 import { DEFAULT_SETTINGS } from '../types/settings';
 import type { Strategy } from '../types/strategy';
 import { loadSettings, saveSettings } from '../utils/settingsStorage';
 import { stripUndefinedDeep } from '../utils/firestoreData';
-import { deleteField, doc, getDoc, setDoc } from 'firebase/firestore';
 import { reportErrorSilently } from '../services/errorReporting';
 
 
@@ -56,8 +57,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
     const loadCloud = async () => {
       try {
-        const db = getFirebaseDb();
-        const snap = await getDoc(doc(db, 'users', user.uid, 'settings', 'preferences'));
+        const { fs, db } = await lazyFirestore();
+        const snap = await fs.getDoc(fs.doc(db, 'users', user.uid, 'settings', 'preferences'));
         if (snap.exists()) {
           const cloud = snap.data() as Partial<UserSettings>;
           const merged = { ...DEFAULT_SETTINGS, ...cloud };
@@ -107,14 +108,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
          * of bug has been fixed twice already in the trade-write paths. The setting is saved
          * locally either way, so the user loses nothing until they open the app elsewhere.
          */
-        void setDoc(
-          doc(getFirebaseDb(), 'users', user.uid, 'settings', 'preferences'),
-          {
-            ...stripUndefinedDeep(next),
-            ...Object.fromEntries(clearedKeys.map((key) => [key, deleteField()])),
-          },
-          { merge: true },
-        )
+        void lazyFirestore()
+          .then(({ fs, db }) =>
+            fs.setDoc(
+              fs.doc(db, 'users', user.uid, 'settings', 'preferences'),
+              {
+                ...stripUndefinedDeep(next),
+                ...Object.fromEntries(clearedKeys.map((key) => [key, fs.deleteField()])),
+              },
+              { merge: true },
+            ),
+          )
           .then(() => setSaveState({ status: 'saved', at: Date.now() }))
           .catch((error: unknown) => {
             console.warn('[settings] could not save to the cloud; kept locally.', error);

@@ -1,5 +1,5 @@
 import { sendEmailVerification } from 'firebase/auth';
-import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebase';
+import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebaseAuth';
 import { reportErrorSilently } from './errorReporting';
 import { limitsFor, MARKET_REPLAY_LIVE, type Tier, type TierLimits } from '../config/tiers';
 

@@ -1,16 +1,5 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  limit,
-  query,
-  runTransaction,
-  serverTimestamp,
-  setDoc,
-  where,
-} from 'firebase/firestore';
-import { getFirebaseDb } from '../lib/firebase';
+// Reached from the root auth context, so Firestore is loaded on demand — see lib/lazyFirestore.ts.
+import { lazyFirestore } from '../lib/lazyFirestore';
 import { normalizeUsername, validateUsername } from '../utils/usernameValidation';
 
 export class UsernameTakenError extends Error {
@@ -56,7 +45,8 @@ export async function isUsernameAvailable(username: string, currentUid?: string)
   if (!currentUid) return false;
 
   try {
-    const snap = await getDoc(doc(getFirebaseDb(), 'usernames', normalized));
+    const { fs, db } = await lazyFirestore();
+    const snap = await fs.getDoc(fs.doc(db, 'usernames', normalized));
     return (snap.data() as { uid?: string } | undefined)?.uid === currentUid;
   } catch {
     // Signed in but refused: treat it as taken rather than claiming a handle that is not theirs.
@@ -69,10 +59,11 @@ export async function claimUsername(uid: string, rawUsername: string): Promise<s
   if (!validation.ok) throw new Error(validation.error);
 
   const normalized = validation.normalized;
-  const usernameRef = doc(getFirebaseDb(), 'usernames', normalized);
-  const userRef = doc(getFirebaseDb(), 'users', uid);
+  const { fs, db } = await lazyFirestore();
+  const usernameRef = fs.doc(db, 'usernames', normalized);
+  const userRef = fs.doc(db, 'users', uid);
 
-  await runTransaction(getFirebaseDb(), async (tx) => {
+  await fs.runTransaction(db, async (tx) => {
     const existing = await tx.get(usernameRef);
     if (existing.exists()) {
       const owner = existing.data()?.uid as string | undefined;
@@ -81,7 +72,7 @@ export async function claimUsername(uid: string, rawUsername: string): Promise<s
       tx.set(usernameRef, {
         uid,
         username: normalized,
-        createdAt: serverTimestamp(),
+        createdAt: fs.serverTimestamp(),
       });
     }
     tx.set(userRef, { username: normalized }, { merge: true });
@@ -92,9 +83,9 @@ export async function claimUsername(uid: string, rawUsername: string): Promise<s
 }
 
 export async function fetchUsername(uid: string): Promise<string | null> {
-  const db = getFirebaseDb();
-  const userRef = doc(db, 'users', uid);
-  const snap = await getDoc(userRef);
+  const { fs, db } = await lazyFirestore();
+  const userRef = fs.doc(db, 'users', uid);
+  const snap = await fs.getDoc(userRef);
 
   if (snap.exists()) {
     const fromProfile = (snap.data() as { username?: string }).username?.trim();
@@ -102,14 +93,14 @@ export async function fetchUsername(uid: string): Promise<string | null> {
   }
 
   // Fallback: username may exist in usernames/{name} but not yet on users/{uid}
-  const usernameQuery = query(collection(db, 'usernames'), where('uid', '==', uid), limit(1));
-  const usernameSnap = await getDocs(usernameQuery);
+  const usernameQuery = fs.query(fs.collection(db, 'usernames'), fs.where('uid', '==', uid), fs.limit(1));
+  const usernameSnap = await fs.getDocs(usernameQuery);
   if (!usernameSnap.empty) {
     const match = usernameSnap.docs[0]!;
     const fromRegistry =
       (match.data() as { username?: string }).username?.trim() || match.id.trim();
     if (fromRegistry) {
-      await setDoc(userRef, { username: fromRegistry }, { merge: true });
+      await fs.setDoc(userRef, { username: fromRegistry }, { merge: true });
       return fromRegistry;
     }
   }

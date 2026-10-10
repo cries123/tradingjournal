@@ -1,5 +1,3 @@
-import { initializeApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, type Auth } from 'firebase/auth';
 import {
   getFirestore,
   initializeFirestore,
@@ -8,37 +6,20 @@ import {
   type Firestore,
 } from 'firebase/firestore';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
+import { getFirebaseApp } from './firebaseAuth';
 
-const config = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-};
+/*
+ * The app and sign-in live in firebaseAuth.ts, which the public pages import on their own so they do
+ * not pull Firestore into the entry. Re-exported here so everything already importing them from this
+ * module — all of it inside lazily-loaded chunks — keeps working unchanged.
+ *
+ * Do not import this module from anything reachable from src/main.tsx without a dynamic import():
+ * this file imports Firestore and Storage statically, and that is the whole point of the split.
+ */
+export { getFirebaseApp, getFirebaseAuth, isFirebaseConfigured } from './firebaseAuth';
 
-export function isFirebaseConfigured(): boolean {
-  return Boolean(config.apiKey && config.projectId && config.appId);
-}
-
-let app: FirebaseApp | null = null;
-let auth: Auth | null = null;
 let db: Firestore | null = null;
 let storage: FirebaseStorage | null = null;
-
-export function getFirebaseApp(): FirebaseApp {
-  if (!isFirebaseConfigured()) {
-    throw new Error('Firebase is not configured');
-  }
-  if (!app) app = initializeApp(config);
-  return app;
-}
-
-export function getFirebaseAuth(): Auth {
-  if (!auth) auth = getAuth(getFirebaseApp());
-  return auth;
-}
 
 /**
  * Firestore with an on-disk cache, which is the difference between a journal that costs pennies

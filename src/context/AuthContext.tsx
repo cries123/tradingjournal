@@ -23,7 +23,7 @@ import {
   verifyBeforeUpdateEmail,
   type User,
 } from 'firebase/auth';
-import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebase';
+import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebaseAuth';
 import { isAccountDeleted } from '../services/deletedAccounts';
 import { ensureUserProfile } from '../services/userProfile';
 import { reportErrorSilently } from '../services/errorReporting';

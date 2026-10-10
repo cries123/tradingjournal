@@ -1,5 +1,5 @@
-import { doc, getDoc } from 'firebase/firestore';
-import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
+import { isFirebaseConfigured } from '../lib/firebaseAuth';
+import { lazyFirestore } from '../lib/lazyFirestore';
 import { COMING_SOON_BROKERS, SUPPORTED_BROKERS } from '../data/brokers';
 
 export interface BrokerConfig {
@@ -24,7 +24,9 @@ export async function fetchBrokersConfig(): Promise<BrokersConfigDoc> {
   if (!isFirebaseConfigured()) return fallback;
 
   try {
-    const snap = await getDoc(doc(getFirebaseDb(), 'config', 'brokers'));
+    // The landing page reads this, so Firestore arrives on demand — see lib/lazyFirestore.ts.
+    const { fs, db } = await lazyFirestore();
+    const snap = await fs.getDoc(fs.doc(db, 'config', 'brokers'));
     if (!snap.exists()) return fallback;
 
     const data = snap.data() as Partial<BrokersConfigDoc>;

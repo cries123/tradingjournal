@@ -1,4 +1,4 @@
-import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebase';
+import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebaseAuth';
 import type { Tier } from '../config/tiers';
 
 /**

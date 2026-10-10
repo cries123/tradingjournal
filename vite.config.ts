@@ -54,6 +54,21 @@ export default defineConfig({
            *
            * The import was the bug and is fixed; this is so the next one cannot hide.
            */
+          /*
+           * Firestore and Storage in chunks of their own, apart from the app and auth.
+           *
+           * One 'firebase' chunk held all of it, and because the landing page needs auth, the entry
+           * preloaded the lot: 194 KB compressed before a marketing page was interactive, 135 KB of it
+           * the database client. Firestore now loads on demand from the public pages (see
+           * src/lib/lazyFirestore.ts), which only helps if it is not sitting in the same chunk as the
+           * auth code the entry does need.
+           */
+          if (/node_modules\/(@firebase\/firestore|firebase\/firestore)/.test(id)) {
+            return 'firestore'
+          }
+          if (/node_modules\/(@firebase\/storage|firebase\/storage)/.test(id)) {
+            return 'firebase-storage'
+          }
           if (/node_modules\/(firebase|@firebase)\//.test(id)) {
             return 'firebase'
           }

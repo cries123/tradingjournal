@@ -1,27 +1,29 @@
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
-import { getFirebaseDb } from '../lib/firebase';
+import { lazyFirestore } from '../lib/lazyFirestore';
 import { getVisitorId, markVisitorConverted } from './visitorAnalytics';
 
+// Reached from the root auth context, so Firestore is loaded on demand — see lib/lazyFirestore.ts.
+
 export async function ensureUserProfile(user: User, isNewUser = false): Promise<void> {
-  const ref = doc(getFirebaseDb(), 'users', user.uid);
-  const existing = await getDoc(ref);
+  const { fs, db } = await lazyFirestore();
+  const ref = fs.doc(db, 'users', user.uid);
+  const existing = await fs.getDoc(ref);
   const existingUsername = existing.exists()
     ? (existing.data() as { username?: string }).username?.trim()
     : undefined;
 
   const visitorId = isNewUser ? getVisitorId() : null;
 
-  await setDoc(
+  await fs.setDoc(
     ref,
     {
       email: user.email ?? '',
       displayName: user.displayName ?? '',
       photoURL: user.photoURL ?? '',
       ...(existingUsername ? { username: existingUsername } : {}),
-      ...(isNewUser ? { createdAt: serverTimestamp() } : {}),
+      ...(isNewUser ? { createdAt: fs.serverTimestamp() } : {}),
       ...(isNewUser && visitorId ? { visitorId } : {}),
-      lastLoginAt: serverTimestamp(),
+      lastLoginAt: fs.serverTimestamp(),
     },
     { merge: true },
   );

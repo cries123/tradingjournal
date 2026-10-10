@@ -1,14 +1,7 @@
-import {
-  collection,
-  doc,
-  getCountFromServer,
-  getDocs,
-  query,
-  setDoc,
-  updateDoc,
-  where,
-} from 'firebase/firestore';
-import { getFirebaseAuth, getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
+import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebaseAuth';
+// Runs on every public page view, so Firestore is loaded on demand — see lib/lazyFirestore.ts. The
+// visit is recorded after the page is up rather than holding the page up to record it.
+import { lazyFirestore } from '../lib/lazyFirestore';
 
 const VISITOR_ID_KEY = 'tc_visitor_id';
 /** Last UTC date this browser successfully wrote a daily visit doc for. */
@@ -149,7 +142,14 @@ export async function recordAnonymousVisit(path: string): Promise<void> {
   const visitorId = getVisitorId();
   if (!visitorId) return;
 
-  const db = getFirebaseDb();
+  let loaded: Awaited<ReturnType<typeof lazyFirestore>>;
+  try {
+    loaded = await lazyFirestore();
+  } catch {
+    // Best-effort, like everything below: a visit that could not be counted is not an error.
+    return;
+  }
+  const { fs, db } = loaded;
   const now = new Date().toISOString();
   // Anything under /app means they're actually using the journal, not just reading the pitch.
   const openedApp = path === '/app' || path.startsWith('/app/');
@@ -158,14 +158,14 @@ export async function recordAnonymousVisit(path: string): Promise<void> {
   // tried first because it can't clobber the conversion flag; it throws if the profile doesn't
   // exist yet, which is exactly when the create below is the right call.
   try {
-    await updateDoc(doc(db, 'analyticsVisitors', visitorId), {
+    await fs.updateDoc(fs.doc(db, 'analyticsVisitors', visitorId), {
       lastSeenAt: now,
       lastPath: path,
       ...(openedApp ? { openedApp: true } : {}),
     });
   } catch {
     try {
-      await setDoc(doc(db, 'analyticsVisitors', visitorId), {
+      await fs.setDoc(fs.doc(db, 'analyticsVisitors', visitorId), {
         visitorId,
         firstSeenAt: now,
         lastSeenAt: now,
@@ -182,7 +182,7 @@ export async function recordAnonymousVisit(path: string): Promise<void> {
   if (alreadyRecordedToday()) return;
 
   try {
-    await setDoc(doc(db, 'analyticsDailyVisitors', `${todayUtc()}_${visitorId}`), {
+    await fs.setDoc(fs.doc(db, 'analyticsDailyVisitors', `${todayUtc()}_${visitorId}`), {
       visitorId,
       date: todayUtc(),
       path,
@@ -200,8 +200,9 @@ export async function markVisitorConverted(visitorId: string, uid: string): Prom
   if (!isFirebaseConfigured() || !visitorId) return;
 
   try {
-    await setDoc(
-      doc(getFirebaseDb(), 'analyticsVisitors', visitorId),
+    const { fs, db } = await lazyFirestore();
+    await fs.setDoc(
+      fs.doc(db, 'analyticsVisitors', visitorId),
       {
         converted: true,
         convertedAt: new Date().toISOString(),
@@ -221,7 +222,6 @@ export async function fetchVisitorStats(signupsLast7Days: number): Promise<Visit
     return { stats: empty, error: null };
   }
 
-  const db = getFirebaseDb();
   const dayKeys = last7DayKeys();
   const weekStart = dayKeys[0];
 
@@ -234,6 +234,8 @@ export async function fetchVisitorStats(signupsLast7Days: number): Promise<Visit
     const sinceIso = windowStartIso();
     const sinceDay = windowStartDay();
 
+    const { fs, db } = await lazyFirestore();
+    const { collection, getCountFromServer, getDocs, query, where } = fs;
     const [activeSnap, visitsSnap, openedAppDocs, convertedDocs, weekSnap] = await Promise.all([
       getCountFromServer(
         query(collection(db, 'analyticsVisitors'), where('lastSeenAt', '>=', sinceIso)),

@@ -1,14 +1,18 @@
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
+import { isFirebaseConfigured } from '../lib/firebaseAuth';
+import { lazyFirestore } from '../lib/lazyFirestore';
+
+// Reached from the root auth context, so Firestore is loaded on demand — see lib/lazyFirestore.ts.
 
 export async function isAccountDeleted(uid: string): Promise<boolean> {
   if (!isFirebaseConfigured()) return false;
-  const snap = await getDoc(doc(getFirebaseDb(), 'deletedAccounts', uid));
+  const { fs, db } = await lazyFirestore();
+  const snap = await fs.getDoc(fs.doc(db, 'deletedAccounts', uid));
   return snap.exists();
 }
 
 export async function markAccountDeleted(uid: string): Promise<void> {
-  await setDoc(doc(getFirebaseDb(), 'deletedAccounts', uid), {
-    deletedAt: serverTimestamp(),
+  const { fs, db } = await lazyFirestore();
+  await fs.setDoc(fs.doc(db, 'deletedAccounts', uid), {
+    deletedAt: fs.serverTimestamp(),
   });
 }
