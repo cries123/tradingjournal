@@ -211,3 +211,36 @@ a key with no credit fails every call.
 - `vite build` — clean
 - 23 unit assertions across duplicate detection and both dedupe paths, including a reproduction of
   the filter bug proving old behaviour re-imported and new behaviour doesn't
+
+---
+
+## Upgrading firebase-admin to 14 — when you are ready, not urgent
+
+`npm audit` lists moderate advisories in the server SDK's dependency chain (`@google-cloud/*`,
+`google-gax`, `retry-request`, `teeny-request`). Every one of them bottoms out in a single `uuid`
+advisory that only applies when code passes a buffer argument to `uuid` v3/v5/v6 — which nothing in
+this repo does. So it is not exploitable here; it is housekeeping.
+
+The fix is `firebase-admin@14`, which has two requirements:
+
+1. **The modular API** — `firebase-admin/app`, `/auth`, `/firestore` instead of
+   `import admin from 'firebase-admin'`. **Already done**, and it works on 13 too. A test fails if
+   anything goes back to the old import.
+2. **Node 22 or newer for the Netlify functions.** 14 refuses to run on 18 or 20. Nothing in this
+   repo pins the version, so it is whatever Netlify defaults to for your site.
+
+To upgrade:
+
+1. Netlify → Site configuration → Environment variables → add `NODE_VERSION` = `22`
+   (and, if Functions are on a different runtime, `AWS_LAMBDA_JS_RUNTIME` = `nodejs22.x`).
+2. Redeploy once **before** bumping the package, and check one function still answers — e.g.
+   open `/api/health`. That proves the runtime change on its own.
+3. Then `npm install firebase-admin@14`, run the tests, push.
+
+Doing step 1 and the package bump in the same deploy means that if the runtime did not change, every
+function — the Creem webhook and checkout included — fails at once, and you cannot tell which of the
+two changes did it.
+
+`firebase` (the browser SDK) also shows "high" advisories via `@grpc/grpc-js`. There is no fix
+upstream — the newest Firestore release still pins the same `@grpc/grpc-js` range — and that code
+path is Node-only: in the browser Firestore talks to Google over HTTP, not gRPC. Nothing to do.

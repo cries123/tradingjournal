@@ -1,4 +1,4 @@
-import admin from 'firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin';
 import { normalizeError, safePath, shouldReport, type ErrorKind } from '../src/services/errorFingerprint';
 import { readableUpstreamError } from './upstreamErrors';
@@ -79,11 +79,11 @@ export async function recordErrorEvent(input: ErrorReportInput): Promise<RecordO
 
     const used = (budgetSnap.data()?.count as number | undefined) ?? 0;
     if (used >= DAILY_EVENT_BUDGET) {
-      tx.set(budgetRef, { day, dropped: admin.firestore.FieldValue.increment(1) }, { merge: true });
+      tx.set(budgetRef, { day, dropped: FieldValue.increment(1) }, { merge: true });
       return 'over-budget' as const;
     }
 
-    tx.set(budgetRef, { day, count: admin.firestore.FieldValue.increment(1) }, { merge: true });
+    tx.set(budgetRef, { day, count: FieldValue.increment(1) }, { merge: true });
 
     const existing = eventSnap.data();
     const priorUids = (existing?.affectedUids as string[] | undefined) ?? [];
@@ -108,7 +108,7 @@ export async function recordErrorEvent(input: ErrorReportInput): Promise<RecordO
         lastUserAgent: input.userAgent,
         lastSeenAt: nowIso,
         firstSeenAt: (existing?.firstSeenAt as string | undefined) ?? nowIso,
-        count: admin.firestore.FieldValue.increment(1),
+        count: FieldValue.increment(1),
         affectedUids,
         affectedUserCount: affectedUids.length,
         // A bug marked resolved that happens again is not resolved. Reopening it automatically is
