@@ -1,9 +1,17 @@
 import {
   collection,
+  count,
   doc,
+  getAggregateFromServer,
+  getCountFromServer,
   getDoc,
   getDocs,
+  limit,
+  orderBy,
+  query,
   runTransaction,
+  sum,
+  where,
 } from 'firebase/firestore';
 import type { BrokerSupportRequest } from './brokerSupportRequests';
 import type { BugReport } from './bugReports';
@@ -284,7 +292,76 @@ const EMPTY_TRADE_STATS: UserTradeStats = {
   tradesSessionLast7Days: 0,
 };
 
-/** Single scan over a user's trades computing all admin-facing stats. */
+/**
+ * The raw answers the database gives, before they are combined into the admin's view of a user.
+ *
+ * Split out so the combining — win rate, the activity fallback, the empty case — is testable without
+ * a Firestore. Every field here is something the server computes and hands back as one number.
+ */
+export interface TradeAggregates {
+  count: number;
+  totalPnl: number;
+  wins: number;
+  losses: number;
+  savedLast7Days: number;
+  sessionLast7Days: number;
+  /** Latest savedAt across the user's trades, or null when none carries one. */
+  lastSavedAt: string | null;
+  /** Latest and earliest ISO-shaped session dates. */
+  lastDate: string | null;
+  firstDate: string | null;
+}
+
+export function combineTradeAggregates(a: TradeAggregates): UserTradeStats {
+  if (a.count === 0) return EMPTY_TRADE_STATS;
+
+  /*
+   * Activity is the latest save, and only falls back to the session date when nothing was saved
+   * with a timestamp at all — legacy trades from before savedAt existed. The old full scan inferred
+   * per trade; one query cannot see which trades lack the field, so this matches it exactly for an
+   * all-modern or all-legacy journal and differs by at most a day for a mixed one.
+   */
+  const lastTradeActivityAt =
+    a.lastSavedAt ?? (a.lastDate ? sessionDateToActivityIso(a.lastDate) : null);
+
+  const decided = a.wins + a.losses;
+
+  return {
+    tradeCount: a.count,
+    lastTradeDate: a.lastDate,
+    lastTradeActivityAt,
+    firstTradeDate: a.firstDate,
+    totalPnl: a.totalPnl,
+    winRate: decided > 0 ? (a.wins / decided) * 100 : null,
+    tradesSavedLast7Days: a.savedLast7Days,
+    tradesSessionLast7Days: a.sessionLast7Days,
+  };
+}
+
+/*
+ * The bounds that keep a date query to ISO-shaped dates.
+ *
+ * Most trades store YYYY-MM-DD, but normalizeTradeDate exists because some legacy ones store
+ * M/D/YYYY, and a string sort puts "9/30/2026" above every "2026-…". Bounded on both sides, a range
+ * on `date` excludes those: "9/…" sorts above "2999-12-31", and "1/…" below "1900-01-01" because "/"
+ * sorts before any digit. Legacy-dated trades still count towards the totals, which do not read the
+ * date — they are only left out of first and last.
+ */
+const ISO_DATE_FLOOR = '1900-01-01';
+const ISO_DATE_CEILING = '2999-12-31';
+
+/**
+ * A user's trade stats, from the server's own aggregations rather than from every trade document.
+ *
+ * This read every trade of every user on every admin-panel load and every Refresh. Firestore bills
+ * per document read, a year of broker-synced 0DTE fills is thousands of documents for one person,
+ * and this project has been knocked over by read quota before. Counts and sums are now computed by
+ * Firestore and billed at one read per thousand index entries; first, last and latest are one-row
+ * queries. About eight reads a user, whatever the size of their journal.
+ *
+ * Every filter is a single field, so all of it runs on the automatic single-field indexes — nothing
+ * to build by hand in the console.
+ */
 async function fetchUserTradeStats(uid: string): Promise<UserTradeStats> {
   const db = getFirebaseDb();
   const tradesCol = collection(db, 'users', uid, 'trades');
@@ -292,58 +369,58 @@ async function fetchUserTradeStats(uid: string): Promise<UserTradeStats> {
   const savedSince = weekAgoIso();
   const sessionSince = weekAgoDateKey();
 
+  const one = async (q: Parameters<typeof getDocs>[0], field: string): Promise<string | null> => {
+    const snap = await getDocs(q);
+    const value = snap.docs[0]?.get(field);
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+  };
+
+  const n = async (q: Parameters<typeof getCountFromServer>[0]): Promise<number> =>
+    (await getCountFromServer(q)).data().count;
+
   try {
-    const snap = await getDocs(tradesCol);
-    if (snap.empty) return EMPTY_TRADE_STATS;
+    const [totals, wins, losses, savedLast7Days, sessionLast7Days, lastSavedAt, lastDate, firstDate] =
+      await Promise.all([
+        getAggregateFromServer(tradesCol, { count: count(), totalPnl: sum('pnl') }),
+        n(query(tradesCol, where('pnl', '>', 0))),
+        n(query(tradesCol, where('pnl', '<', 0))),
+        n(query(tradesCol, where('savedAt', '>=', savedSince))),
+        n(query(tradesCol, where('date', '>=', sessionSince), where('date', '<=', ISO_DATE_CEILING))),
+        one(query(tradesCol, orderBy('savedAt', 'desc'), limit(1)), 'savedAt'),
+        one(
+          query(
+            tradesCol,
+            where('date', '>=', ISO_DATE_FLOOR),
+            where('date', '<=', ISO_DATE_CEILING),
+            orderBy('date', 'desc'),
+            limit(1),
+          ),
+          'date',
+        ),
+        one(
+          query(
+            tradesCol,
+            where('date', '>=', ISO_DATE_FLOOR),
+            where('date', '<=', ISO_DATE_CEILING),
+            orderBy('date', 'asc'),
+            limit(1),
+          ),
+          'date',
+        ),
+      ]);
 
-    let lastTradeDate: string | null = null;
-    let firstTradeDate: string | null = null;
-    let lastTradeActivityAt: string | null = null;
-    let totalPnl = 0;
-    let wins = 0;
-    let decided = 0;
-    let tradesSavedLast7Days = 0;
-    let tradesSessionLast7Days = 0;
-
-    for (const tradeDoc of snap.docs) {
-      const data = tradeDoc.data() as { date?: string; savedAt?: string; pnl?: number };
-
-      const sessionDate = normalizeTradeDate(data.date);
-      if (sessionDate) {
-        if (!lastTradeDate || sessionDate > lastTradeDate) lastTradeDate = sessionDate;
-        if (!firstTradeDate || sessionDate < firstTradeDate) firstTradeDate = sessionDate;
-        if (sessionDate >= sessionSince) tradesSessionLast7Days++;
-      }
-
-      const savedAt = data.savedAt?.trim() || null;
-      if (savedAt) {
-        if (!lastTradeActivityAt || savedAt > lastTradeActivityAt) lastTradeActivityAt = savedAt;
-        if (savedAt >= savedSince) tradesSavedLast7Days++;
-      } else if (sessionDate) {
-        const inferred = sessionDateToActivityIso(sessionDate);
-        if (!lastTradeActivityAt || inferred > lastTradeActivityAt) {
-          lastTradeActivityAt = inferred;
-        }
-      }
-
-      const pnl = typeof data.pnl === 'number' && Number.isFinite(data.pnl) ? data.pnl : 0;
-      totalPnl += pnl;
-      if (pnl !== 0) {
-        decided++;
-        if (pnl > 0) wins++;
-      }
-    }
-
-    return {
-      tradeCount: snap.size,
-      lastTradeDate,
-      lastTradeActivityAt,
-      firstTradeDate,
-      totalPnl,
-      winRate: decided > 0 ? (wins / decided) * 100 : null,
-      tradesSavedLast7Days,
-      tradesSessionLast7Days,
-    };
+    const t = totals.data();
+    return combineTradeAggregates({
+      count: t.count,
+      totalPnl: typeof t.totalPnl === 'number' ? t.totalPnl : 0,
+      wins,
+      losses,
+      savedLast7Days,
+      sessionLast7Days,
+      lastSavedAt,
+      lastDate,
+      firstDate,
+    });
   } catch {
     return EMPTY_TRADE_STATS;
   }
