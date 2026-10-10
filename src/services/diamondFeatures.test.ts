@@ -44,11 +44,14 @@ describe('the four capabilities that make Diamond a different product', () => {
     }
   });
 
-  it('does not claim market replay works, because it does not', () => {
-    // Selling "coming soon" on a top tier is the likeliest cause of a refund request there is, so
-    // the flag stays honest even while the plan grants it.
+  it('does not sell market replay, not even as coming soon, because it does not exist', () => {
+    // A "coming soon" line on a top tier is still a line someone paid for. The plan keeps granting
+    // it so shipping is a one-flag change; the card says nothing until then.
     expect(tierHas('diamond', 'marketReplay')).toBe(false);
-    expect(featureLines('diamond').find((l) => l.text === 'Market replay')?.soon).toBe(true);
+    for (const tier of ['free', 'silver', 'gold', 'diamond'] as const) {
+      expect(featureLines(tier).some((l) => /replay/i.test(l.text) && !/journal/i.test(l.text))).toBe(false);
+      expect(featureLines(tier).some((l) => l.soon)).toBe(false);
+    }
   });
 });
 

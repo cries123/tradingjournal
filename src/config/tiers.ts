@@ -138,9 +138,14 @@ export interface TierPlan {
  * Market replay is sold as part of Diamond but is not finished.
  *
  * Flipping this to true is the only change needed when it ships — the plan already grants it, the
- * gate already checks it, and nobody has to be re-entitled. Until then the pricing page says
- * "coming soon" against that line rather than implying it works today, which is the difference
- * between anticipation and a refund request.
+ * gate already checks it, and nobody has to be re-entitled, and the line comes back onto the
+ * Diamond card by itself.
+ *
+ * Until then it is not on the card at all. It used to be, marked "coming soon", and that is still
+ * selling it: someone who pays $39 partly for a line on a card has bought it whatever the label
+ * said, and the longer it stays unbuilt the more it reads as a refund owed. It needs licensed
+ * intraday market data, a flat bill that per-seat revenue does not cover yet, so "soon" was not
+ * true either.
  */
 export const MARKET_REPLAY_LIVE = false;
 
@@ -418,7 +423,7 @@ function allFeatureLines(tier: Tier): FeatureLine[] {
   if (l.ruleAlerts) lines.push({ text: 'Risk-rule alerts the moment you break your own limits' });
   if (l.aiReview) lines.push({ text: 'A weekly review written by the assistant, emailed to you' });
 
-  if (l.marketReplay) lines.push({ text: 'Market replay', soon: !MARKET_REPLAY_LIVE });
+  if (l.marketReplay && MARKET_REPLAY_LIVE) lines.push({ text: 'Market replay' });
   return lines;
 }
 
