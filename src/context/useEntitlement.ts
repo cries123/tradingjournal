@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { Feature, Tier, TierLimits } from '../config/tiers';
+import type { BillingInterval, Feature, Tier, TierLimits } from '../config/tiers';
 import type { EntitlementSnapshot } from '../services/entitlement';
 
 /**
@@ -20,6 +20,8 @@ export interface EntitlementContextValue {
   /** 'admin' means grandfathered, 'comp' means complimentary for a while — neither has a subscription to manage. */
   source: EntitlementSnapshot['source'];
   currentPeriodEnd: string | null;
+  /** How the subscription bills — so a yearly subscriber is not shown a monthly price. */
+  billingInterval: BillingInterval;
   /** When complimentary access runs out, if any is live. */
   complimentaryUntil: string | null;
   /** They have never had a free trial and could start one now. */

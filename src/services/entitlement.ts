@@ -1,7 +1,7 @@
 import { sendEmailVerification } from 'firebase/auth';
 import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebaseAuth';
 import { reportErrorSilently } from './errorReporting';
-import { limitsFor, MARKET_REPLAY_LIVE, type Tier, type TierLimits } from '../config/tiers';
+import { limitsFor, MARKET_REPLAY_LIVE, type BillingInterval, type Tier, type TierLimits } from '../config/tiers';
 
 export interface EntitlementUsage {
   aiMessagesUsed: number;
@@ -41,6 +41,8 @@ export interface EntitlementSnapshot {
   /** 'comp' when complimentary access is what confers the tier — nothing to pay, nothing to cancel. */
   source: 'purchase' | 'admin' | 'comp' | null;
   currentPeriodEnd: string | null;
+  /** How the subscription bills. Absent on older responses, all of which were monthly. */
+  billingInterval?: BillingInterval;
   /** When complimentary access runs out, if any is live. Absent on older responses. */
   complimentaryUntil?: string | null;
   /** This account has never had a free trial and could start one now. */
@@ -111,7 +113,7 @@ export type PlanChoiceResult =
   | { kind: 'changed'; tier: Tier; message: string };
 
 /** Buys a plan, or moves an existing subscription onto it. The server decides which. */
-export async function choosePlan(tier: Tier): Promise<PlanChoiceResult> {
+export async function choosePlan(tier: Tier, interval: BillingInterval = 'month'): Promise<PlanChoiceResult> {
   if (!isFirebaseConfigured()) throw new Error('Sign in to upgrade your plan.');
   const user = getFirebaseAuth().currentUser;
   if (!user) throw new Error('Sign in to upgrade your plan.');
@@ -120,7 +122,7 @@ export async function choosePlan(tier: Tier): Promise<PlanChoiceResult> {
   const res = await fetch('/api/creem-checkout', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tier }),
+    body: JSON.stringify({ tier, interval }),
   });
 
   const data = (await res.json()) as {
@@ -167,6 +169,8 @@ export interface PaymentsStatus {
   checkoutEnabled?: boolean;
   /** What to tell buyers while paused. Empty when checkout is open. */
   maintenanceMessage?: string;
+  /** A yearly product exists for every paid plan, so the yearly toggle can sell. */
+  annualReady?: boolean;
 }
 
 /** Public, unauthenticated: which payment env vars the server can see. Booleans and names only. */

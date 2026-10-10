@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { isTier, TIER_PLANS, type Tier } from '../src/config/tiers';
+import { isBillingInterval, isTier, PAID_TIERS, TIER_PLANS, type BillingInterval, type Tier } from '../src/config/tiers';
 
 /**
  * Thin wrapper over the Creem billing API.
@@ -54,24 +54,53 @@ export class CreemError extends Error {
   }
 }
 
-/** The Creem product id backing a paid tier, or null when that tier hasn't been set up yet. */
-export function productIdForTier(tier: Tier): string | null {
-  const envName = TIER_PLANS[tier].productIdEnv;
+/**
+ * The Creem product id backing a paid tier at a billing interval, or null when that product hasn't
+ * been set up yet.
+ */
+export function productIdForTier(tier: Tier, interval: BillingInterval = 'month'): string | null {
+  const envName = interval === 'year' ? TIER_PLANS[tier].annualProductIdEnv : TIER_PLANS[tier].productIdEnv;
   if (!envName) return null;
   return process.env[envName]?.trim() || null;
 }
 
-/** Reverse of productIdForTier — which tier a webhook's product id refers to. */
-export function tierForProductId(productId: string | undefined | null): Tier | null {
+/**
+ * Whether yearly plans can be sold: a yearly product for every paid tier, none of them reusing a
+ * monthly id.
+ *
+ * The second half matters. A monthly id pasted into an annual variable would pass a presence check,
+ * sell "a year" that bills every month, and — because productForId reads the monthly mapping first —
+ * book every such subscriber as monthly. Refusing the configuration is the only safe reading of it.
+ */
+export function annualBillingReady(): boolean {
+  return PAID_TIERS.every((tier) => {
+    const yearly = productIdForTier(tier, 'year');
+    return Boolean(yearly) && !PAID_TIERS.some((t) => productIdForTier(t, 'month') === yearly);
+  });
+}
+
+/** Which plan and interval a webhook's product id refers to. */
+export function productForId(
+  productId: string | undefined | null,
+): { tier: Tier; interval: BillingInterval } | null {
   if (!productId) return null;
-  for (const tier of Object.keys(TIER_PLANS) as Tier[]) {
-    if (productIdForTier(tier) === productId) return tier;
+  for (const interval of ['month', 'year'] as const) {
+    for (const tier of Object.keys(TIER_PLANS) as Tier[]) {
+      if (productIdForTier(tier, interval) === productId) return { tier, interval };
+    }
   }
   return null;
 }
 
+/** Reverse of productIdForTier — which tier a webhook's product id refers to, at either interval. */
+export function tierForProductId(productId: string | undefined | null): Tier | null {
+  return productForId(productId)?.tier ?? null;
+}
+
 export interface CreateCheckoutArgs {
   tier: Tier;
+  /** Monthly unless said otherwise. */
+  interval?: BillingInterval;
   uid: string;
   email?: string;
   successUrl: string;
@@ -90,9 +119,16 @@ export async function createCheckout(args: CreateCheckoutArgs): Promise<{ url: s
     throw new CreemError('Payments are not configured yet. Please try again later.', 503);
   }
 
-  const productId = productIdForTier(args.tier);
+  const interval = args.interval ?? 'month';
+  // Yearly is all-or-nothing (see annualBillingReady), so one plan's yearly id alone does not open it.
+  const productId = interval === 'year' && !annualBillingReady() ? null : productIdForTier(args.tier, interval);
   if (!productId) {
-    throw new CreemError(`The ${TIER_PLANS[args.tier].name} plan isn't available for purchase yet.`, 503);
+    throw new CreemError(
+      interval === 'year'
+        ? 'Yearly billing isn\u2019t available yet. Choose monthly, or check back soon.'
+        : `The ${TIER_PLANS[args.tier].name} plan isn't available for purchase yet.`,
+      503,
+    );
   }
 
   const res = await fetch(`${CREEM_BASE_URL}/checkouts`, {
@@ -104,7 +140,7 @@ export async function createCheckout(args: CreateCheckoutArgs): Promise<{ url: s
       // Duplicated onto the customer object as well because Creem prefills the payment form from
       // there; metadata is for us, customer is for the buyer.
       ...(args.email ? { customer: { email: args.email } } : {}),
-      metadata: { uid: args.uid, tier: args.tier },
+      metadata: { uid: args.uid, tier: args.tier, interval },
     }),
   });
 
@@ -345,6 +381,11 @@ export interface ParsedBillingEvent {
   creemCustomerId?: string;
   currentPeriodEnd?: string;
   /**
+   * Monthly or yearly, when the event's product says. Undefined when it does not — a cancellation
+   * event may not repeat the product, and guessing "month" there would overwrite a yearly record.
+   */
+  interval?: BillingInterval;
+  /**
    * Whether this event says the subscription is inside its free trial.
    *
    * Separate from `status`, which is 'active' for a trial and has to be: a triallist has handed
@@ -421,10 +462,13 @@ export function parseBillingEvent(event: CreemWebhookEvent): ParsedBillingEvent 
 
   // Prefer the product the subscription is actually for; fall back to what checkout was started
   // with, since a webhook for a cancelled subscription may not repeat the product.
-  const tier =
-    tierForProductId(readId(obj.product)) ??
-    (isTier(metadata?.tier) ? (metadata.tier as Tier) : null);
+  const product = productForId(readId(obj.product));
+  const tier = product?.tier ?? (isTier(metadata?.tier) ? (metadata.tier as Tier) : null);
   if (!tier) return null;
+  // The product is the truth; the metadata only says what checkout was started with.
+  const metaInterval = metadata?.interval;
+  const interval: BillingInterval | undefined =
+    product?.interval ?? (isBillingInterval(metaInterval) ? metaInterval : undefined);
 
   return {
     uid,
@@ -433,6 +477,7 @@ export function parseBillingEvent(event: CreemWebhookEvent): ParsedBillingEvent 
     creemSubscriptionId: subscriptionIdFrom(event),
     creemCustomerId: readId(obj.customer),
     currentPeriodEnd: obj.current_period_end_date ?? undefined,
+    ...(interval ? { interval } : {}),
     /*
      * Read from the event type AND the object's own status.
      *

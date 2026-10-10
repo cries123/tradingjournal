@@ -1,11 +1,15 @@
 import { billingTier, subscribedTier, type Entitlement } from './entitlements';
-import { TIER_ORDER, type Tier } from '../src/config/tiers';
+import { TIER_ORDER, type BillingInterval, type Tier } from '../src/config/tiers';
 
 export type PlanRoute =
   | { action: 'checkout' }
   | { action: 'change'; subscriptionId: string; direction: 'upgrade' | 'downgrade' }
   /** `needsPayment` when the subscription exists but is being dunned — a card problem, not a sale. */
   | { action: 'already-on-it'; needsPayment: boolean }
+  /**
+   * A live subscription asked to change how often it bills. Refused for now — see below.
+   */
+  | { action: 'switch-interval'; from: BillingInterval; to: BillingInterval }
   | { action: 'admin-granted'; tier: Tier };
 
 /**
@@ -17,7 +21,11 @@ export type PlanRoute =
  * page — so it is worth being able to test every branch directly rather than through a handler
  * that needs Firestore and a live payment API to run at all.
  */
-export function planChangeRoute(entitlement: Entitlement | null, requested: Tier): PlanRoute {
+export function planChangeRoute(
+  entitlement: Entitlement | null,
+  requested: Tier,
+  interval: BillingInterval = 'month',
+): PlanRoute {
   // A hand-granted tier has no subscription behind it, and billing webhooks are forbidden from
   // touching it. Selling a checkout here would take money and change nothing.
   if (entitlement?.source === 'admin' && entitlement.status === 'active') {
@@ -54,6 +62,23 @@ export function planChangeRoute(entitlement: Entitlement | null, requested: Tier
     current !== 'free';
 
   if (!movable || !entitlement?.creemSubscriptionId) return { action: 'checkout' };
+
+  /*
+   * Monthly to yearly, or back, is not moved automatically.
+   *
+   * Moving a plan within one interval is a proration Creem documents and this app has used since
+   * launch. Moving a live subscription across intervals means charging for a year against a month
+   * already paid for, and how Creem prorates that has never been seen here. Getting it wrong
+   * charges somebody twice, and a second checkout is the same mistake made more slowly. Support
+   * does it by hand until it has been tried once with real money.
+   *
+   * A record from before yearly plans existed has no interval, and every one of those is monthly.
+   */
+  const currentInterval = entitlement.billingInterval ?? 'month';
+  if (interval !== currentInterval) {
+    return { action: 'switch-interval', from: currentInterval, to: interval };
+  }
+
   if (requested === current) {
     return { action: 'already-on-it', needsPayment: entitlement.status === 'past_due' };
   }

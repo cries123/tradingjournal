@@ -91,6 +91,7 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
       canManageBilling: snapshot.canManageBilling ?? false,
       source: snapshot.source,
       currentPeriodEnd: snapshot.currentPeriodEnd,
+      billingInterval: snapshot.billingInterval ?? 'month',
       complimentaryUntil: snapshot.complimentaryUntil ?? null,
       trialAvailable: snapshot.trialAvailable ?? false,
       trialBlockedReason: snapshot.trialBlockedReason ?? null,

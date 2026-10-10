@@ -3,7 +3,7 @@ import { ExternalLink } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
 import { useEntitlement } from '../../context/useEntitlement';
 import { openBillingPortal } from '../../services/entitlement';
-import { TIER_PLANS } from '../../config/tiers';
+import { annualPrice, TIER_PLANS } from '../../config/tiers';
 import { goToPricing } from '../../utils/navigateToPath';
 import { AccountPanel, AccountScreen, FormNote } from './AccountScreen';
 
@@ -44,6 +44,7 @@ export function SubscriptionContent({ onBack, onOrderHistory }: SubscriptionCont
     status,
     source,
     currentPeriodEnd,
+    billingInterval,
     complimentaryUntil,
     onTrial,
     trialEndsAt,
@@ -61,6 +62,9 @@ export function SubscriptionContent({ onBack, onOrderHistory }: SubscriptionCont
    * Free".
    */
   const subscribedPlan = TIER_PLANS[subscribedTier];
+  /** What the subscription charges each time it bills — a yearly price for a yearly plan. */
+  const yearlyPurchase = source === 'purchase' && billingInterval === 'year';
+  const chargeEachTime = yearlyPurchase ? annualPrice(subscribedTier) : subscribedPlan.price;
 
   /*
    * Whether there is a billing account to manage, asked of the server.
@@ -94,7 +98,11 @@ export function SubscriptionContent({ onBack, onOrderHistory }: SubscriptionCont
       <AccountPanel title="Current plan">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="text-2xl font-bold">{plan.name}</span>
-          {plan.price > 0 && <span className="text-sm text-text-secondary">${plan.price}/month</span>}
+          {plan.price > 0 && (
+            <span className="text-sm text-text-secondary">
+              {yearlyPurchase ? `${annualPrice(tier)}/year` : `${plan.price}/month`}
+            </span>
+          )}
         </div>
         <p className="text-sm text-text-secondary leading-relaxed">{plan.tagline}</p>
 
@@ -122,7 +130,7 @@ export function SubscriptionContent({ onBack, onOrderHistory }: SubscriptionCont
         */}
         {status === 'active' && paying && onTrial && trialEndsAt && (
           <p className="text-sm text-text-secondary">
-            Free trial — your card is charged ${subscribedPlan.price} on {formatDate(trialEndsAt)}.
+            Free trial — your card is charged ${chargeEachTime} on {formatDate(trialEndsAt)}.
           </p>
         )}
         {status === 'active' && paying && !onTrial && renewsOn && (

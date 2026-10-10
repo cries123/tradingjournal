@@ -160,7 +160,7 @@ async function readMonth(month: string): Promise<RawMonth> {
  * collected comes from the ledger.
  */
 async function readSubscriptionRunRate(): Promise<{ mrr: number; subscribers: number; onTrial: number }> {
-  const { TIER_PLANS } = await import('../src/config/tiers');
+  const { annualPrice, TIER_PLANS } = await import('../src/config/tiers');
   const snap = await getAdminFirestore().collection('entitlements').get();
   const nowIso = new Date().toISOString();
 
@@ -174,6 +174,7 @@ async function readSubscriptionRunRate(): Promise<{ mrr: number; subscribers: nu
       source?: string;
       creemSubscriptionId?: string;
       trialEndsAt?: string;
+      billingInterval?: string;
     };
     if (data.status !== 'active') continue;
     if (data.source !== 'purchase') continue;
@@ -198,7 +199,9 @@ async function readSubscriptionRunRate(): Promise<{ mrr: number; subscribers: nu
 
     const plan = TIER_PLANS[data.tier as keyof typeof TIER_PLANS];
     if (!plan || plan.price <= 0) continue;
-    mrr += plan.price;
+    // A yearly subscriber is a twelfth of their annual price a month, not the monthly list price:
+    // counting them at list overstates MRR by the two free months they were given.
+    mrr += data.billingInterval === 'year' ? annualPrice(plan.id) / 12 : plan.price;
     subscribers += 1;
   }
   return { mrr, subscribers, onTrial };
@@ -272,15 +275,19 @@ async function readPurchases(limit = 50) {
  * this stays in the hundreds for a long time; it is still far cheaper than the user list, and it is
  * the only way to answer a question about all of history from all of history.
  */
-async function readChargeLedger(): Promise<{ uid: string; at: string }[]> {
-  const snap = await getAdminFirestore().collection('billingCharges').select('uid', 'amount', 'at').get();
+async function readChargeLedger(): Promise<{ uid: string; at: string; interval?: 'month' | 'year' }[]> {
+  const snap = await getAdminFirestore()
+    .collection('billingCharges')
+    .select('uid', 'amount', 'at', 'interval')
+    .get();
 
-  const rows: { uid: string; at: string }[] = [];
+  const rows: { uid: string; at: string; interval?: 'month' | 'year' }[] = [];
   for (const doc of snap.docs) {
-    const data = doc.data() as { uid?: string; amount?: number; at?: string };
+    const data = doc.data() as { uid?: string; amount?: number; at?: string; interval?: string };
     // A zero-amount row is a trial start or a fully discounted month: not a payment, so not a payer.
     if (!data.uid || typeof data.amount !== 'number' || data.amount <= 0) continue;
-    rows.push({ uid: data.uid, at: data.at ?? '' });
+    // Rows from before yearly plans have no interval, and every one of them was a monthly charge.
+    rows.push({ uid: data.uid, at: data.at ?? '', ...(data.interval === 'year' ? { interval: 'year' as const } : {}) });
   }
   return rows;
 }

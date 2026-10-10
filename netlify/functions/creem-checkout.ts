@@ -12,7 +12,7 @@ import { isProtectedGrant, readEntitlement, writeEntitlement } from '../../serve
 import { planChangeRoute } from '../../server/planChangeRoute';
 import { readCheckoutStatus } from '../../server/checkoutStatus';
 import { maintenanceMessage } from '../../src/config/checkoutStatus';
-import { isTier, PAID_TIERS, TIER_PLANS } from '../../src/config/tiers';
+import { isBillingInterval, isTier, PAID_TIERS, TIER_PLANS } from '../../src/config/tiers';
 
 /** Whether this uid is the single site admin. Never throws — a failed check just means "no". */
 async function isSiteAdmin(uid: string): Promise<boolean> {
@@ -81,9 +81,9 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
     };
   }
 
-  let body: { tier?: unknown };
+  let body: { tier?: unknown; interval?: unknown };
   try {
-    body = JSON.parse(event.body || '{}') as { tier?: unknown };
+    body = JSON.parse(event.body || '{}') as { tier?: unknown; interval?: unknown };
   } catch {
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON body' }) };
   }
@@ -91,6 +91,12 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
   const tier = body.tier;
   if (!isTier(tier) || !PAID_TIERS.includes(tier)) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Unknown plan' }) };
+  }
+
+  // Absent means monthly: every client before yearly plans sends only the tier.
+  const interval = body.interval === undefined ? 'month' : body.interval;
+  if (!isBillingInterval(interval)) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Unknown billing period' }) };
   }
 
   /*
@@ -121,7 +127,7 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
    * those is how a young merchant account gets flagged. The decision itself lives in
    * planChangeRoute so every branch of it can be tested without Firestore or a live payment API.
    */
-  const route = planChangeRoute(existing, tier);
+  const route = planChangeRoute(existing, tier, interval);
 
   /*
    * Every route the router can return is answered here.
@@ -143,6 +149,19 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
     };
   }
 
+  if (route.action === 'switch-interval') {
+    return {
+      statusCode: 409,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        error:
+          route.to === 'year'
+            ? 'You already have a monthly subscription. Moving it to yearly is done by hand for now so nobody is charged twice — contact support and we\u2019ll switch it over.'
+            : 'You\u2019re on a yearly plan. Changing it to monthly is done by hand for now — contact support and we\u2019ll sort it out.',
+      }),
+    };
+  }
+
   if (route.action === 'already-on-it') {
     return {
       statusCode: 409,
@@ -158,7 +177,8 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
   }
 
   if (route.action === 'change') {
-    const productId = productIdForTier(tier);
+    // Same interval as the subscription being moved — planChangeRoute refuses a change of interval.
+    const productId = productIdForTier(tier, interval);
     if (!productId) {
       return {
         statusCode: 503,
@@ -223,6 +243,7 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
   try {
     const checkout = await createCheckout({
       tier,
+      interval,
       uid,
       email,
       successUrl: `${origin}/pricing?checkout=success&plan=${tier}`,

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowLeft, BadgeCheck, Check, Clock, Crown, Gem, Medal, Notebook, ShieldCheck, Sparkles } from 'lucide-react';
 import {
-  ANNUAL_BILLING_LIVE,
   ANNUAL_MONTHS_CHARGED,
   annualMonthlyEquivalent,
   annualPrice,
@@ -97,11 +96,12 @@ export function PricingContent({
   const [notice, setNotice] = useState<string | null>(null);
   const [portalBusy, setPortalBusy] = useState(false);
   /*
-   * Yearly is shown but not sold yet.
+   * Yearly is always shown, and sold once the server says it can be.
    *
-   * The prices are real and the saving is real; what does not exist yet is the product in Creem,
-   * so the toggle previews the plan and says so rather than opening a checkout that would fail.
-   * ANNUAL_BILLING_LIVE is the only thing to change when those ids exist.
+   * The prices are real and the saving is real; what may not exist yet is the product in Creem.
+   * Until /api/payments-status reports annualReady the toggle previews the plan and says "coming
+   * soon" rather than opening a checkout that would fail. Creating the three yearly products and
+   * setting their env vars is the whole switch — see the note above ANNUAL_MONTHS_CHARGED.
    */
   const [yearly, setYearly] = useState(false);
 
@@ -149,6 +149,9 @@ export function PricingContent({
   /* Only ever true once the status has actually loaded. Treating "not loaded yet" as paused would
      flash "temporarily unavailable" across every plan on a normal page load. */
   const checkoutPaused = payments?.checkoutEnabled === false;
+  /* Only true once the server has said so. Not loaded yet reads as "coming soon", which is the
+     answer that cannot take anybody's money by mistake. */
+  const annualLive = payments?.annualReady === true;
   /** Paying customer with a real subscription — as opposed to free, or a hand-granted tier. */
   const subscribed = Boolean(user) && loaded && source === 'purchase' && currentTier !== 'free';
   /*
@@ -195,7 +198,7 @@ export function PricingContent({
     }
     setBusy(tier);
     try {
-      const result = await choosePlan(tier);
+      const result = await choosePlan(tier, yearly ? 'year' : 'month');
       if (result.kind === 'checkout') {
         window.location.assign(result.url);
         return;
@@ -262,7 +265,7 @@ export function PricingContent({
           {yearly ? (
             <>
               {12 - ANNUAL_MONTHS_CHARGED} months free on every plan
-              {!ANNUAL_BILLING_LIVE && (
+              {!annualLive && (
                 <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-400/15 text-amber-200">
                   Coming soon
                 </span>
@@ -437,7 +440,7 @@ export function PricingContent({
                           ? 'Yours for now, on us'
                           : 'Current plan'}
                   </div>
-                ) : yearly && !ANNUAL_BILLING_LIVE ? (
+                ) : yearly && !annualLive ? (
                   <div className="w-full rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-center text-sm font-medium text-amber-200">
                     Yearly billing is coming soon
                   </div>
@@ -447,7 +450,7 @@ export function PricingContent({
                   <div className="w-full rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-center text-sm font-medium text-amber-200">
                     Temporarily unavailable
                   </div>
-                ) : tier === TRIAL_TIER && trialOnOffer ? (
+                ) : tier === TRIAL_TIER && trialOnOffer && !yearly ? (
                   /*
                    * Broker sync is the only thing this product charges for, and a free account
                    * cannot touch it — so the one feature worth paying for is the one nobody has

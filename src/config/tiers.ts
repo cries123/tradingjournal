@@ -149,15 +149,24 @@ export interface TierPlan {
  */
 export const MARKET_REPLAY_LIVE = false;
 
-/**
- * Annual billing is built but not switched on.
+/** How often a subscription bills. */
+export type BillingInterval = 'month' | 'year';
+
+export function isBillingInterval(value: unknown): value is BillingInterval {
+  return value === 'month' || value === 'year';
+}
+
+/*
+ * Annual billing switches itself on. There is no flag to flip.
  *
- * Same pattern as market replay above: the plans carry their yearly price, the pricing page can
- * render the toggle, and the only thing standing between here and selling one is three product
- * ids in Creem. Until those exist the page says "coming soon" rather than opening a checkout
- * that would fail — flipping this to true is the whole change.
+ * It sells once the server can see a yearly Creem product for every paid plan
+ * (CREEM_PRODUCT_SILVER_ANNUAL, _GOLD_ANNUAL, _DIAMOND_ANNUAL) — /api/payments-status reports
+ * that as `annualReady`, and the pricing page's yearly toggle sells or says "coming soon" from it.
+ * A constant used to decide this, which meant the product ids and a deploy had to land together; a
+ * flag set true before the ids existed opened checkouts that could only fail.
+ *
+ * All three or none: a yearly toggle that sells two plans out of three is a page that half works.
  */
-export const ANNUAL_BILLING_LIVE = false;
 
 /**
  * Months charged for on an annual plan. Two free is the usual shape, and it is worth more than it

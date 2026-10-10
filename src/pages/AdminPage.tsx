@@ -1736,6 +1736,28 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                     </p>
                   )}
 
+                  {/* Yearly plans switch themselves on when these exist, so this line is the
+                      whole of their setup: what is missing, by name, and nothing else to flip. */}
+                  {ready.health.payments.annualProducts && (
+                    <p className="mt-2 text-xs text-text-secondary">
+                      Yearly plans:{' '}
+                      {ready.health.payments.annualReady ? (
+                        <span className="text-emerald-300">on sale</span>
+                      ) : (
+                        <>
+                          off — add{' '}
+                          <span className="font-mono text-text-primary break-all">
+                            {ready.health.payments.annualProducts
+                              .filter((p) => !p.present && p.envName)
+                              .map((p) => p.envName)
+                              .join(', ') || 'distinct yearly product ids'}
+                          </span>{' '}
+                          and redeploy to sell them.
+                        </>
+                      )}
+                    </p>
+                  )}
+
                   {ready.health.payments.modeMismatch && (
                     <div className="mt-3 rounded-lg border border-loss/40 bg-loss/10 px-3 py-2.5 text-xs leading-relaxed text-loss-bright">
                       Your key looks like a test key but CREEM_TEST_MODE is set to false, so it is

@@ -29,20 +29,38 @@ export interface MonthMovement {
  * the state an account is in NOW — once somebody cancels there is nothing left saying they used to
  * pay, so a month that has already closed cannot be reconstructed from it.
  */
+/** 'YYYY-MM' moved on by some number of months. */
+function addMonths(month: string, count: number): string {
+  const [y, m] = month.split('-').map(Number);
+  const index = y * 12 + (m - 1) + count;
+  return `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}`;
+}
+
 export function mrrMovement(
-  // Only the two fields read, so the cost handler can call this on the server with its own month
+  // Only the fields read, so the cost handler can call this on the server with its own month
   // shape — one tested implementation rather than a second copy that could drift from it.
   months: { month: string; counts: { revenue: number } }[],
-  purchases: { uid: string; at: string }[],
+  purchases: { uid: string; at: string; interval?: 'month' | 'year' }[],
 ): MonthMovement[] {
   const payersByMonth = new Map<string, Set<string>>();
 
   for (const p of purchases) {
     const month = (p.at ?? '').slice(0, 7);
-    if (month.length !== 7 || !p.uid) continue;
-    const set = payersByMonth.get(month) ?? new Set<string>();
-    set.add(p.uid);
-    payersByMonth.set(month, set);
+    if (!/^\d{4}-\d{2}$/.test(month) || !p.uid) continue;
+    /*
+     * A yearly charge pays for the eleven months after it too.
+     *
+     * Counted as the month it landed in only, a yearly subscriber "stopped paying" the month after
+     * paying for a year, and came back as a returning payer twelve months later — every one of them
+     * a false churn on the panel that exists to show direction.
+     */
+    const covered = p.interval === 'year' ? 12 : 1;
+    for (let k = 0; k < covered; k++) {
+      const key = addMonths(month, k);
+      const set = payersByMonth.get(key) ?? new Set<string>();
+      set.add(p.uid);
+      payersByMonth.set(key, set);
+    }
   }
 
   // Oldest first, so "had they ever paid before" is a question about months already walked.

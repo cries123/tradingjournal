@@ -66,6 +66,7 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
         canManageBilling: canManageBilling(record),
         source: accessSource(record),
         currentPeriodEnd: record?.currentPeriodEnd ?? null,
+        billingInterval: record?.billingInterval ?? 'month',
         complimentaryUntil: complimentaryUntil(record),
         // Whether to offer the trial at all. The claim endpoint runs this same rule, so this is a
         // hint for the UI and never the thing that decides.

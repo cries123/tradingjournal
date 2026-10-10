@@ -21,6 +21,9 @@ export interface PaymentsHealth {
   modeMismatch?: boolean;
   /** Names of the environment variables the server can't see. Never any values. */
   missing: string[];
+  /** Yearly plans can be sold. Optional products, so never part of `missing`. */
+  annualReady?: boolean;
+  annualProducts?: { tier: string; envName: string | null; present: boolean }[];
   error?: string;
 }
 

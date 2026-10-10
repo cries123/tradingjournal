@@ -1,5 +1,5 @@
 import { getAdminFirestore } from './firebaseAdmin';
-import { TIER_PLANS, type Tier } from '../src/config/tiers';
+import { annualPrice, TIER_PLANS, type BillingInterval, type Tier } from '../src/config/tiers';
 
 /**
  * A record of money actually collected.
@@ -62,9 +62,11 @@ export function isPaymentEvent(eventType: string | undefined): boolean {
  * is falsy, so the one case this exists to handle would fall straight through to the list price
  * and invent the revenue anyway.
  */
-export function chargeAmount(tier: Tier, amountPaid?: number | null): number {
+export function chargeAmount(tier: Tier, amountPaid?: number | null, interval: BillingInterval = 'month'): number {
   if (typeof amountPaid === 'number' && Number.isFinite(amountPaid)) return amountPaid;
-  return TIER_PLANS[tier]?.price ?? 0;
+  // A yearly charge guessed at the monthly price would book a tenth of it.
+  if (!TIER_PLANS[tier] || TIER_PLANS[tier].price <= 0) return 0;
+  return interval === 'year' ? annualPrice(tier) : TIER_PLANS[tier].price;
 }
 
 export async function recordCharge(input: {
@@ -82,8 +84,10 @@ export async function recordCharge(input: {
    * carried no amount, and the plan's price is the best guess available.
    */
   amountPaid?: number | null;
+  /** Only consulted when the event carried no amount. */
+  interval?: BillingInterval;
 }): Promise<void> {
-  const amount = chargeAmount(input.tier, input.amountPaid);
+  const amount = chargeAmount(input.tier, input.amountPaid, input.interval);
   if (amount <= 0 || !input.eventId) return;
 
   try {
@@ -95,6 +99,8 @@ export async function recordCharge(input: {
           tier: input.tier,
           amount,
           eventType: input.eventType,
+          // Read by the movement panel: one yearly charge is twelve months paid, not one.
+          ...(input.interval ? { interval: input.interval } : {}),
           at: new Date().toISOString(),
         },
         // create-or-overwrite by event id: a retry of the same event rewrites its own row rather

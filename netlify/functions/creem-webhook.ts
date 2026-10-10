@@ -187,6 +187,8 @@ export const handler: Handler = async (event) => {
       creemSubscriptionId: parsed.creemSubscriptionId,
       creemCustomerId: parsed.creemCustomerId,
       currentPeriodEnd: parsed.currentPeriodEnd,
+      // Only when the event's product said. An event without one must not rewrite a yearly record.
+      ...(parsed.interval ? { billingInterval: parsed.interval } : {}),
       ...trial,
     });
 
@@ -205,6 +207,7 @@ export const handler: Handler = async (event) => {
         eventType: payload.eventType ?? '',
         // Read off the event rather than assumed from the plan, so a $0 trial start books nothing.
         amountPaid: amountFromEvent(payload),
+        interval: parsed.interval,
       });
     }
 

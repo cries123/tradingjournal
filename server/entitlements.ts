@@ -1,5 +1,5 @@
 import { getAdminFirestore } from './firebaseAdmin';
-import { isTier, limitsFor, type Tier, type TierLimits } from '../src/config/tiers';
+import { isTier, limitsFor, type BillingInterval, type Tier, type TierLimits } from '../src/config/tiers';
 import { compIsLive, DAY_MS, tierWithComp, type ComplimentaryAccess } from '../src/config/accessExtension';
 import { TRIAL_DAYS } from '../src/config/trial';
 
@@ -25,6 +25,11 @@ export interface Entitlement {
   creemCustomerId?: string;
   /** ISO date the paid period runs to. A canceled subscription stays usable until then. */
   currentPeriodEnd?: string;
+  /**
+   * How often the subscription bills, from the product Creem says it is for. Absent on every
+   * record from before yearly plans existed, all of which are monthly.
+   */
+  billingInterval?: BillingInterval;
   grantedBy?: string;
   /**
    * Time-limited access given by hand, on top of whatever billing says.

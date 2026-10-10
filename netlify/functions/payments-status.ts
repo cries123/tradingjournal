@@ -1,6 +1,6 @@
 import type { Handler } from '@netlify/functions';
 import { PAID_TIERS, TIER_PLANS } from '../../src/config/tiers';
-import { CREEM_BASE_URL, CREEM_MODE_MISMATCH, CREEM_TEST_MODE } from '../../server/creemClient';
+import { annualBillingReady, CREEM_BASE_URL, CREEM_MODE_MISMATCH, CREEM_TEST_MODE } from '../../server/creemClient';
 import { readCheckoutStatus } from '../../server/checkoutStatus';
 import { maintenanceMessage } from '../../src/config/checkoutStatus';
 
@@ -28,6 +28,18 @@ export const handler: Handler = async () => {
       envName: envName ?? null,
       present: envName ? present(envName) : false,
     };
+  });
+
+  /*
+   * Yearly products, reported apart from the monthly ones and never counted as "missing".
+   *
+   * They are optional: a store with no yearly products is a store that sells monthly, not a broken
+   * one, and folding them into `missing` would light the admin panel's payments indicator red until
+   * three products nobody asked for were created.
+   */
+  const annualProducts = PAID_TIERS.map((tier) => {
+    const envName = TIER_PLANS[tier].annualProductIdEnv;
+    return { tier, name: TIER_PLANS[tier].name, envName: envName ?? null, present: envName ? present(envName) : false };
   });
 
   const apiKey = present('CREEM_API_KEY');
@@ -66,6 +78,10 @@ export const handler: Handler = async () => {
       webhookSecret,
       products,
       missing,
+      // What the pricing page's yearly toggle sells from. annualBillingReady also refuses a monthly
+      // id pasted into a yearly variable, which a presence check alone would wave through.
+      annualReady: apiKey && annualBillingReady(),
+      annualProducts,
     }),
   };
 };
