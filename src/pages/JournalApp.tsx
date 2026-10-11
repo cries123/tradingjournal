@@ -31,6 +31,7 @@ import { AccountSettingsContent } from '../components/account/AccountSettingsCon
 import { SubscriptionContent } from '../components/account/SubscriptionContent';
 import { OrderHistoryContent } from '../components/account/OrderHistoryContent';
 import { PerformanceContent } from '../components/PerformanceContent';
+import { MonthlyReportView } from '../components/report/MonthlyReportView';
 import { CsvImportModal } from '../components/CsvImportModal';
 import { TradeModal } from '../components/TradeModal';
 import { UsernameSetupModal } from '../components/UsernameSetupModal';
@@ -59,10 +60,15 @@ type AppView = SidebarAppView;
 export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   const isDesktop = useIsDesktop();
   const { user, loading, firebaseEnabled, needsUsername, profileLoading } = useAuth();
-  const { settings } = useSettings();
+  const { settings, viewingAllJournals } = useSettings();
+  /* The assistant reports breaches of the trader's limits — for one account. In the all-journals
+     view its trades are every journal, so it is given no rules there rather than adding a paper
+     journal's trades to a live account's daily cap. Same reasoning as the breach list. */
+  const assistantRules = viewingAllJournals ? undefined : settings.tradingRules;
   const {
     trades,
     allTrades,
+    activeJournalTrades,
     everyTrade,
     filters,
     setFilters,
@@ -434,7 +440,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
               >
                 <AssistantContent
                   periods={assistantPeriods}
-                  rules={settings.tradingRules}
+                  rules={assistantRules}
                   onBack={goBackView}
                 />
               </LockedFeature>
@@ -454,6 +460,23 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 onBack={goBackView}
                 onBrokers={() => openView('brokers')}
               />
+            ) : appView === 'report' ? (
+              <LockedFeature
+                feature="monthlyReport"
+                title="The monthly report is a paid feature"
+                description="One month of your journal on a page — the figures, the calendar, your symbols and your own rules — downloaded as a PDF to keep or to send to a mentor."
+              >
+                {/* allTrades: the journal as the screens show it, one journal or all of them, and
+                    without the dashboard's filters — a report is the whole month. */}
+                <MonthlyReportView
+                  trades={allTrades}
+                  year={year}
+                  month={month}
+                  onPrevMonth={handlePrevMonth}
+                  onNextMonth={handleNextMonth}
+                  onBack={goBackView}
+                />
+              </LockedFeature>
             ) : appView === 'report-bug' ? (
               <ReportBugContent onBack={goBackView} />
             ) : isLoading ? (
@@ -470,7 +493,9 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                   trade 4 of 4, the next one breaks your own limit" directly above a breach list,
                   computed from the filtered journal, that reported nothing at all.
                 */}
-                <RuleStandingBanner trades={allTrades} />
+                {/* activeJournalTrades, not allTrades: in the all-journals view allTrades is every
+                    journal, and a limit is set for one account. */}
+                <RuleStandingBanner trades={activeJournalTrades} />
                 <CoachNotesPanel />
 
                 {/* Above the dashboard, and only while there is something on it left to do. */}
@@ -500,6 +525,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                   everyTrade={everyTrade}
                   onRemoveTrades={removeTrades}
                   onSyncBroker={() => openView('connect-broker')}
+                  onOpenReport={() => openView('report')}
                   hasBrokerTrades={hasBrokerTrades}
                   trades={trades}
                   hasAnyTrades={allTrades.length > 0}
@@ -547,7 +573,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
         open={assistantOpen}
         onOpenChange={setAssistantOpen}
         periods={assistantPeriods}
-        rules={settings.tradingRules}
+        rules={assistantRules}
         /* No floating bubble while the Assistant tab is open — it would sit on top of the very
            panel it opens. */
         showLauncher={isDesktop && appView !== 'assistant'}
@@ -580,7 +606,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
       {clearConfirmStage === 1 && (
         <ConfirmDialog
           title={`Clear "${activeJournalName}"?`}
-          message={`This deletes all ${allTrades.length} trade${allTrades.length === 1 ? '' : 's'} in "${activeJournalName}" only. Your other journals are not touched.`}
+          message={`This deletes all ${activeJournalTrades.length} trade${activeJournalTrades.length === 1 ? '' : 's'} in "${activeJournalName}" only. Your other journals are not touched.`}
           confirmLabel="Continue"
           danger
           onConfirm={() => setClearConfirmStage(2)}

@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { BookOpen, Check, Plus, X } from 'lucide-react';
 import { useSettings } from '../context/useSettings';
 import { goToPricing } from '../utils/navigateToPath';
+import { AllJournalsNote, AllJournalsOption } from './AllJournalsOption';
 
 interface SidebarJournalPickerProps {
   onNavigate?: () => void;
 }
 
 export function SidebarJournalPicker({ onNavigate }: SidebarJournalPickerProps) {
-  const { settings, setActiveAccount, addAccount, journalLimit, canAddJournal } = useSettings();
+  const { settings, setActiveAccount, addAccount, journalLimit, canAddJournal, viewingAllJournals } = useSettings();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
 
@@ -29,8 +30,10 @@ export function SidebarJournalPicker({ onNavigate }: SidebarJournalPickerProps) 
       </div>
 
       <div className="space-y-1">
+        <AllJournalsOption variant="row" onPicked={onNavigate} />
         {settings.accounts.map((account) => {
-          const active = settings.activeAccountId === account.id;
+          // In the all-journals view no single journal is the one being shown.
+          const active = !viewingAllJournals && settings.activeAccountId === account.id;
           return (
             <button
               key={account.id}
@@ -48,6 +51,7 @@ export function SidebarJournalPicker({ onNavigate }: SidebarJournalPickerProps) 
           );
         })}
       </div>
+      <AllJournalsNote className="mt-1.5 px-1" />
 
       {adding ? (
         <div className="mt-2 flex items-center gap-1">

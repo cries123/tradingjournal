@@ -14,6 +14,7 @@ import {
 import { syncUserTradeActivityFromTrades } from '../services/userTradeActivity';
 import { clearLegacyTradesStorage, clearTrades, loadTrades, saveTrades } from '../utils/storage';
 import { resolveTradeAccountId } from '../utils/accounts';
+import { tradesInView } from '../utils/journalScope';
 import { buildSampleTrades, isSampleTrade } from '../utils/sampleData';
 import { tradeTags } from '../utils/tradeHelpers';
 import { describeJournalWriteError } from '../utils/journalWriteError';
@@ -24,7 +25,7 @@ export type SyncStatus = 'loading' | 'local' | 'cloud' | 'syncing' | 'error';
 
 export function useTrades() {
   const { user, firebaseEnabled, loading: authLoading } = useAuth();
-  const { settings } = useSettings();
+  const { settings, viewingAllJournals } = useSettings();
   const [trades, setTrades] = useState<Trade[]>([]);
   /** Example trades shown in the UI only — never persisted or synced. */
   const [sampleTrades, setSampleTrades] = useState<Trade[]>([]);
@@ -158,10 +159,22 @@ export function useTrades() {
     [trades, sampleTrades],
   );
 
-  const accountTrades = useMemo(() => {
-    const activeId = settings.activeAccountId;
-    return combinedTrades.filter((t) => resolveTradeAccountId(t.accountId) === activeId);
-  }, [combinedTrades, settings.activeAccountId]);
+  /*
+   * What the screens read: the active journal, or all of them in the all-journals view.
+   *
+   * The active journal on its own is kept too (activeJournalTrades below). A risk rule is a limit on
+   * one account — the live one, usually — and the all-journals view must not start counting a
+   * paper journal's trades against it; RuleStandingBanner documents the time that happened.
+   */
+  const accountTrades = useMemo(
+    () => tradesInView(combinedTrades, settings.activeAccountId, viewingAllJournals),
+    [combinedTrades, settings.activeAccountId, viewingAllJournals],
+  );
+
+  const activeJournalTrades = useMemo(
+    () => tradesInView(combinedTrades, settings.activeAccountId, false),
+    [combinedTrades, settings.activeAccountId],
+  );
 
   const filteredTrades = useMemo(() => {
     return accountTrades.filter((trade) => {
@@ -387,6 +400,8 @@ export function useTrades() {
   return {
     trades: filteredTrades,
     allTrades: accountTrades,
+    /** The active journal only, even in the all-journals view — for anything bound to one account. */
+    activeJournalTrades,
     /** Every trade across all journals/accounts — for full backups. */
     everyTrade: trades,
     filters,

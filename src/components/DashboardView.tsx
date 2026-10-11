@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Calendar, Grid3X3, LayoutDashboard, RefreshCw, Share2 } from 'lucide-react';
+import { Calendar, FileText, Grid3X3, LayoutDashboard, RefreshCw, Share2 } from 'lucide-react';
 import type { Filters, Trade } from '../types';
 import { computeStats, getMonthTrades, getYearTrades } from '../utils/stats';
 import { formatCurrency, formatMonthYear } from '../utils/format';
@@ -56,6 +56,8 @@ interface DashboardViewProps {
   onSyncBroker?: () => void;
   /** True once a broker is linked — the sync shortcut is noise for everyone else. */
   hasBrokerTrades?: boolean;
+  /** Opens the monthly report for the month on screen. */
+  onOpenReport?: () => void;
 }
 
 export function DashboardView({
@@ -84,8 +86,9 @@ export function DashboardView({
   onRemoveTrades,
   onSyncBroker,
   hasBrokerTrades = false,
+  onOpenReport,
 }: DashboardViewProps) {
-  const { settings } = useSettings();
+  const { settings, viewingAllJournals } = useSettings();
   const [mode, setMode] = useState<DashboardMode>('month');
   const [showShare, setShowShare] = useState(false);
 
@@ -181,11 +184,24 @@ export function DashboardView({
           </button>
         )}
 
+        {/* Beside Share, and only for a month with trades in it: the report is of one month. On a
+            plan without it the screen it opens explains the plan that has it. */}
+        {onOpenReport && mode === 'month' && monthTrades.length > 0 && (
+          <button
+            type="button"
+            onClick={onOpenReport}
+            className={`${hasBrokerTrades && onSyncBroker ? '' : 'ml-auto '}flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border/60 text-text-secondary hover:text-text-primary hover:border-accent/30 transition-colors focus-ring`}
+          >
+            <FileText size={14} />
+            Monthly report
+          </button>
+        )}
+
         {(mode === 'month' ? monthTrades.length > 0 : yearTrades.length > 0) && (
           <button
             type="button"
             onClick={() => setShowShare(true)}
-            className={`${hasBrokerTrades && onSyncBroker ? '' : 'ml-auto '}flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border/60 text-text-secondary hover:text-text-primary hover:border-accent/30 transition-colors focus-ring`}
+            className={`${(hasBrokerTrades && onSyncBroker) || (onOpenReport && mode === 'month' && monthTrades.length > 0) ? '' : 'ml-auto '}flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border/60 text-text-secondary hover:text-text-primary hover:border-accent/30 transition-colors focus-ring`}
           >
             <Share2 size={14} />
             {mode === 'month' ? 'Share month' : 'Share year'}
@@ -222,7 +238,11 @@ export function DashboardView({
       {hasAnyTrades && (
         <StatsCards
           stats={mode === 'month' ? stats : yearStats}
-          periodLabel={mode === 'month' ? formatMonthYear(year, month) : String(year)}
+          // Says so when the figures are every journal added together, so a combined month is
+          // never mistaken for the active journal's.
+          periodLabel={`${mode === 'month' ? formatMonthYear(year, month) : String(year)}${
+            viewingAllJournals ? ' · All journals' : ''
+          }`}
           streakDays={streakDays}
           goalPnl={mode === 'month' ? settings.monthlyGoalPnl : 0}
           showBenchmark={mode === 'month'}

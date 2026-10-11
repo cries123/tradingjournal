@@ -34,7 +34,8 @@ export type SidebarAppView =
   | 'coach'
   | 'account'
   | 'subscription'
-  | 'order-history';
+  | 'order-history'
+  | 'report';
 
 interface SidebarProps {
   appView: SidebarAppView;

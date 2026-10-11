@@ -38,7 +38,7 @@ function formatDayLabel(iso: string): string {
  * and whether it is getting better, and "Days" what the sessions themselves looked like.
  */
 export function TradingInsightsSection({ trades }: TradingInsightsSectionProps) {
-  const { settings } = useSettings();
+  const { settings, viewingAllJournals } = useSettings();
   const insights = useMemo(() => computeTradingInsights(trades), [trades]);
   const score = useMemo(() => (insights ? computeTradingScore(insights) : null), [insights]);
   const violations = useMemo(
@@ -250,7 +250,17 @@ export function TradingInsightsSection({ trades }: TradingInsightsSectionProps) 
         </div>
       </div>
 
-      {settings.tradingRules.enabled && violations.length > 0 && (
+      {/* A limit is set for one account — the live one, not the paper one beside it — so breaches
+          are checked per journal. In the all-journals view, adding two journals' trades into one
+          day would report breaches neither account had, and disagree with the rule banner, which
+          reads the active journal. Said rather than silently dropped. */}
+      {settings.tradingRules.enabled && viewingAllJournals && (
+        <p className="mt-3 rounded-lg border border-border/40 bg-bg-tertiary/40 px-2.5 py-2 text-[11px] text-text-secondary">
+          Rule breaches are checked one journal at a time — pick a journal to see them.
+        </p>
+      )}
+
+      {settings.tradingRules.enabled && !viewingAllJournals && violations.length > 0 && (
         <Reveal className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 space-y-1">
           <p className="text-xs font-semibold text-amber-300">Rule violations ({violations.length})</p>
           {violations.slice(0, 3).map((v) => (

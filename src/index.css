@@ -462,6 +462,43 @@ body {
   pointer-events: none;
 }
 
+/*
+ * The monthly report's printed copy. MonthlyReportView renders the report a second time straight
+ * into <body>; on screen that copy is hidden, and in print it is the only thing shown. Hiding the
+ * app with display:none rather than visibility:hidden is what stops the PDF trailing blank pages
+ * the height of the app behind it.
+ */
+.report-print {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: letter;
+    margin: 0.5in;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  body > *:not(.report-print) {
+    display: none !important;
+  }
+
+  .report-print {
+    display: block;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* A section that starts at the foot of a page moves to the next one rather than splitting. */
+  .report-print .report-section {
+    break-inside: avoid;
+  }
+}
+
 /* A chat message arriving: a short rise, so a conversation reads as said rather than swapped in. */
 @keyframes msg-in {
   from {

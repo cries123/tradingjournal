@@ -13,6 +13,7 @@ import { loadSettings, saveSettings } from '../utils/settingsStorage';
 import { cleanRules } from '../utils/playbook';
 import { stripUndefinedDeep } from '../utils/firestoreData';
 import { reportErrorSilently } from '../services/errorReporting';
+import { allJournalsView } from '../utils/journalScope';
 
 
 
@@ -273,10 +274,27 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const setActiveAccount = useCallback(
     (id: string) => {
       if (settings.accounts.some((a) => a.id === id)) {
-        persist({ ...settings, activeAccountId: id });
+        persist({ ...settings, activeAccountId: id, viewAllJournals: false });
       }
     },
     [settings, persist],
+  );
+
+  /* The all-journals view, gated here once for every reader — see allJournalsView for why the
+     stored flag on its own is never what anything reads. */
+  const { canView: canViewAllJournals, viewing: viewingAllJournals } = allJournalsView({
+    planIncludesIt: limits.combinedJournals,
+    journalCount: settings.accounts.length,
+    stored: settings.viewAllJournals,
+  });
+
+  const setViewAllJournals = useCallback(
+    (on: boolean) => {
+      if (on && !canViewAllJournals) return;
+      if (settings.viewAllJournals === on) return;
+      persist({ ...settings, viewAllJournals: on });
+    },
+    [settings, persist, canViewAllJournals],
   );
 
   const value = useMemo(
@@ -293,6 +311,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       addAccount,
       removeAccount,
       setActiveAccount,
+      setViewAllJournals,
+      viewingAllJournals,
+      canViewAllJournals,
       journalLimit,
       canAddJournal,
     }),
@@ -309,6 +330,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       addAccount,
       removeAccount,
       setActiveAccount,
+      setViewAllJournals,
+      viewingAllJournals,
+      canViewAllJournals,
       journalLimit,
       canAddJournal,
     ],

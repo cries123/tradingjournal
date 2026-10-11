@@ -55,6 +55,8 @@ vi.mock('../context/useSettings', () => ({
     saveState: { status: 'idle', at: 0 },
     journalLimit: 9007199254740991,
     canAddJournal: true,
+    // Off unless a test turns it on — the all-journals view's label on the Overview.
+    viewingAllJournals: Boolean((globalThis as Record<string, unknown>).__viewingAllJournals),
     updateSettings: () => undefined,
     setActiveAccount: () => undefined,
   }),
@@ -141,6 +143,17 @@ describe('the Overview', () => {
     const html = dashboard(options);
     expect(html).toContain('Calls vs Puts');
     expect(html).not.toContain('Long vs Short');
+  });
+
+  it('says when its figures are every journal added together', () => {
+    const g = globalThis as Record<string, unknown>;
+    g.__viewingAllJournals = true;
+    try {
+      expect(dashboard(options)).toContain('July 2026 · All journals');
+    } finally {
+      g.__viewingAllJournals = false;
+    }
+    expect(dashboard(options)).not.toContain('All journals');
   });
 
   it('keeps long vs short for anyone who sold short', () => {

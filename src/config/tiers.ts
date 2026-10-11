@@ -119,6 +119,23 @@ export interface TierLimits {
    * Costs nothing per publish: one document write, and the page is a public Firestore read.
    */
   trackRecord: boolean;
+  /**
+   * "All journals": one dashboard that adds every journal together.
+   *
+   * Silver and up, because Silver is where it starts to matter — five brokers filed into three
+   * journals, and before this the only way to see the month across Schwab and Robinhood was to
+   * switch between them and add it up by hand. Costs nothing: it reads trades already stored.
+   * Free keeps two journals and switches between them, as it always has.
+   */
+  combinedJournals: boolean;
+  /**
+   * The monthly report: the month's figures, calendar and breakdowns as one printable page, saved
+   * as a PDF from the browser's own print dialog. Something to keep, or to hand a mentor.
+   *
+   * Silver and up, with the Performance screen it summarises. Costs nothing: no server, no PDF
+   * service, no library — the browser renders it.
+   */
+  monthlyReport: boolean;
 }
 
 export interface TierPlan {
@@ -220,6 +237,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     limits: {
       brokers: 0, syncsPerDay: 0, aiMessagesPerDay: 0, marketReplay: false, journals: 2,
       performanceAnalytics: false, ruleSimulator: false, trackRecord: false, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
+      combinedJournals: false, monthlyReport: false,
     },
   },
   silver: {
@@ -230,6 +248,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     limits: {
       brokers: 5, syncsPerDay: 5, aiMessagesPerDay: 0, marketReplay: false, journals: 3,
       performanceAnalytics: true, ruleSimulator: false, trackRecord: true, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
+      combinedJournals: true, monthlyReport: true,
     },
     productIdEnv: 'CREEM_PRODUCT_SILVER',
     annualProductIdEnv: 'CREEM_PRODUCT_SILVER_ANNUAL',
@@ -242,6 +261,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     limits: {
       brokers: 10, syncsPerDay: 10, aiMessagesPerDay: 15, marketReplay: false, journals: 5,
       performanceAnalytics: true, ruleSimulator: true, trackRecord: true, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
+      combinedJournals: true, monthlyReport: true,
     },
     productIdEnv: 'CREEM_PRODUCT_GOLD',
     annualProductIdEnv: 'CREEM_PRODUCT_GOLD_ANNUAL',
@@ -255,6 +275,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
       brokers: UNLIMITED_BROKERS, syncsPerDay: 24, aiMessagesPerDay: 40, marketReplay: true,
       journals: UNLIMITED_JOURNALS,
       performanceAnalytics: true, ruleSimulator: true, trackRecord: true, autoSync: true, coachSeat: true, ruleAlerts: true, aiReview: true,
+      combinedJournals: true, monthlyReport: true,
     },
     productIdEnv: 'CREEM_PRODUCT_DIAMOND',
     annualProductIdEnv: 'CREEM_PRODUCT_DIAMOND_ANNUAL',
@@ -327,7 +348,9 @@ export type Feature =
   | 'autoSync'
   | 'coachSeat'
   | 'ruleAlerts'
-  | 'aiReview';
+  | 'aiReview'
+  | 'combinedJournals'
+  | 'monthlyReport';
 
 /** The limits flag each boolean feature reads, so the three functions below can't disagree. */
 const BOOLEAN_FEATURES: Partial<Record<Feature, keyof TierLimits>> = {
@@ -338,6 +361,8 @@ const BOOLEAN_FEATURES: Partial<Record<Feature, keyof TierLimits>> = {
   coachSeat: 'coachSeat',
   ruleAlerts: 'ruleAlerts',
   aiReview: 'aiReview',
+  combinedJournals: 'combinedJournals',
+  monthlyReport: 'monthlyReport',
 };
 
 /** The lowest tier that includes each feature, derived from the limits rather than hardcoded. */
@@ -411,6 +436,8 @@ function allFeatureLines(tier: Tier): FeatureLine[] {
       text: 'Performance screen — the win rate you need, position sizing, tilt, costs',
     });
   }
+  if (l.combinedJournals) lines.push({ text: 'One dashboard across all your journals' });
+  if (l.monthlyReport) lines.push({ text: 'Monthly performance report — download it as a PDF' });
   if (l.aiMessagesPerDay > 0) {
     lines.push({ text: `AI trade analysis — ${l.aiMessagesPerDay} messages per day` });
   }

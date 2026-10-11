@@ -24,8 +24,18 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
   const { closing, close } = useAnimatedClose(onClose);
   useEscapeToClose(close);
   const isEdit = Boolean(trade);
-  const { settings } = useSettings();
+  const { settings, viewingAllJournals } = useSettings();
   const today = new Date().toISOString().slice(0, 10);
+
+  /*
+   * Which journal a NEW trade goes into, asked only in the all-journals view.
+   *
+   * With one journal on screen the answer is that journal, and the form never asks. With every
+   * journal on screen there is no "this journal" to assume, so it asks, starting on the active one
+   * (the one the picker notes new trades go to). An edit keeps the journal the trade already has.
+   */
+  const askJournal = !trade && viewingAllJournals && settings.accounts.length > 1;
+  const [journalId, setJournalId] = useState(settings.activeAccountId);
 
   const [date, setDate] = useState(trade?.date ?? defaultDate ?? today);
   const [symbol, setSymbol] = useState(trade?.symbol ?? settings.defaultSymbol);
@@ -133,7 +143,7 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
       checklist: ticked ? ticks : undefined,
       assetClass: assetClass || undefined,
       ivRank: reading.values.ivRank,
-      accountId: trade?.accountId,
+      accountId: trade ? trade.accountId : askJournal ? journalId : undefined,
       contract: trade?.contract,
       assetType: trade?.assetType,
       optionType: trade?.optionType,
@@ -196,6 +206,17 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
           </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {askJournal && (
+            <Field label="Journal">
+              <select value={journalId} onChange={(e) => setJournalId(e.target.value)} className="input-field">
+                {settings.accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
           <Field label="Date">
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input-field" required />
           </Field>

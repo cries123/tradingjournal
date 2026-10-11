@@ -34,7 +34,14 @@ export interface SettingsContextValue {
   /** Adds a journal. False when the name was blank or the plan's allowance is full. */
   addAccount: (name: string) => boolean;
   removeAccount: (id: string) => void;
+  /** Switches to one journal, which also leaves the all-journals view. */
   setActiveAccount: (id: string) => void;
+  /** Turns the all-journals view on or off. Ignored when the plan or the journal count rules it out. */
+  setViewAllJournals: (on: boolean) => void;
+  /** The all-journals view is on AND allowed. What every reader should check — never the raw setting. */
+  viewingAllJournals: boolean;
+  /** Whether the all-journals view can be offered: a plan that includes it and more than one journal. */
+  canViewAllJournals: boolean;
   /** How many journals this plan allows. */
   journalLimit: number;
   /** Room for another — read this to say so before the click rather than after it. */

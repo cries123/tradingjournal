@@ -237,8 +237,15 @@ describe('which journal a number covers', () => {
      * limit" above a list reporting no breaches at all.
      */
     const page = codeOnly(readFileSync('src/pages/JournalApp.tsx', 'utf8'));
-    expect(page).toContain('<RuleStandingBanner trades={allTrades} />');
     expect(page).not.toContain('<RuleStandingBanner trades={everyTrade} />');
+    /*
+     * The all-journals view made "the filtered view" every journal too. A limit is for one account,
+     * so the banner reads the active journal on its own, and the breach list — which reads the
+     * dashboard's trades — stands aside in that view rather than adding journals together.
+     */
+    expect(page).toContain('<RuleStandingBanner trades={activeJournalTrades} />');
+    const insights = codeOnly(readFileSync('src/components/analytics/TradingInsightsSection.tsx', 'utf8'));
+    expect(insights).toContain('settings.tradingRules.enabled && !viewingAllJournals && violations.length > 0');
   });
 
   it('names the journal in the year-end tax file', () => {

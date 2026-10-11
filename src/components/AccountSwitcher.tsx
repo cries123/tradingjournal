@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { BookOpen, Check, Plus, X } from 'lucide-react';
 import { useSettings } from '../context/useSettings';
 import { goToPricing } from '../utils/navigateToPath';
+import { AllJournalsNote, AllJournalsOption } from './AllJournalsOption';
 
 export function AccountSwitcher() {
-  const { settings, setActiveAccount, addAccount, journalLimit, canAddJournal } = useSettings();
+  const { settings, setActiveAccount, addAccount, journalLimit, canAddJournal, viewingAllJournals } = useSettings();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
 
@@ -31,8 +32,9 @@ export function AccountSwitcher() {
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+        <AllJournalsOption variant="chip" />
         {settings.accounts.map((account) => {
-          const active = settings.activeAccountId === account.id;
+          const active = !viewingAllJournals && settings.activeAccountId === account.id;
           return (
             <button
               key={account.id}
@@ -101,6 +103,7 @@ export function AccountSwitcher() {
           </button>
         )}
       </div>
+      <AllJournalsNote className="mt-2" />
     </div>
   );
 }

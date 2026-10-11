@@ -17,6 +17,15 @@ export interface UserSettings {
   accounts: JournalAccount[];
   activeAccountId: string;
   /**
+   * Showing every journal added together rather than the active one. Silver and up, and only
+   * with more than one journal — see viewingAllJournals in SettingsContext.
+   *
+   * A view, not a journal: activeAccountId stays a real journal while this is on, because new
+   * trades, CSV imports and "clear this journal" all need one to file into or act on. Picking a
+   * journal in the picker turns it off.
+   */
+  viewAllJournals: boolean;
+  /**
    * Journals the published track record covers. Null means every journal holding
    * broker-imported trades.
    *
@@ -68,6 +77,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   setupTags: ['BREAKOUT', 'FOMO', 'RSI CROSSED', 'REVERSAL'],
   accounts: [{ id: 'default', name: 'Primary journal' }],
   activeAccountId: 'default',
+  viewAllJournals: false,
   strategies: [],
   tradingRules: DEFAULT_TRADING_RULES,
   monthlyGoalPnl: 0,
