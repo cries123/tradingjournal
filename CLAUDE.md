@@ -136,7 +136,11 @@ was deleted. The rules now, in `server/snaptradeCredentials.ts` (tested against 
 2. **Then** publish `firestore.rules` and `storage.rules` in the Firebase console.
 
 Backwards, the live build gets denied collections it still reads. Neither rules file is
-auto-deployed (there is no `firebase.json`); both are pasted by hand. Jay does this himself.
+auto-deployed. `firestore.rules` can be published from Jay's machine with
+`firebase deploy --only firestore:rules --project trading-69603` — `firebase.json` and `.firebaserc`
+are in the repo and the CLI there is signed in — but only when Jay says to, and only after the push.
+The CLI compiles the rules first and refuses to release a file that does not compile.
+`storage.rules` is not in `firebase.json` and is still pasted by hand.
 
 `storage.rules` grants each user their own `shareCardBackgrounds/{uid}/` folder. A deny-all version
 was sent to him by mistake once — if share-card uploads break, that is why.
