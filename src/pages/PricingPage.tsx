@@ -2,6 +2,7 @@ import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import { PricingContent } from '../components/pricing/PricingContent';
 import type { ExtraNavRoute } from '../hooks/useRoute';
 import { useBackDestination } from '../hooks/useBackDestination';
+import { SiteBackdrop } from '../components/landing/SiteBackdrop';
 
 interface PricingPageProps {
   onHome: () => void;
@@ -25,7 +26,7 @@ export function PricingPage({
   const back = useBackDestination(onHome);
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
-      <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
+      <SiteBackdrop />
       <LandingNav
         onLaunch={onLaunch}
         onHome={onHome}

@@ -2,6 +2,7 @@ import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import { SupportTicketsContent } from '../components/support/SupportTicketsContent';
 import type { ExtraNavRoute } from '../hooks/useRoute';
 import { useBackDestination } from '../hooks/useBackDestination';
+import { SiteBackdrop } from '../components/landing/SiteBackdrop';
 
 interface SupportPageProps {
   onHome: () => void;
@@ -25,7 +26,7 @@ export function SupportPage({
   const back = useBackDestination(onHome);
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
-      <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
+      <SiteBackdrop />
       <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate} />
 
       <main className="relative z-10 flex-1 w-full">

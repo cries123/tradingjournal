@@ -54,7 +54,7 @@ function Note({ children }: { children: React.ReactNode }) {
 
 /* ------------------------------------------------------------------ breakeven */
 
-function BreakevenPanel({ data }: { data: BreakevenStats }) {
+export function BreakevenPanel({ data }: { data: BreakevenStats }) {
   const clears = data.gap >= 0;
 
   return (
@@ -174,7 +174,7 @@ function SizingPanel({ data, currency }: { data: SizingStats; currency: Currency
 
 /* ------------------------------------------------------------------ tilt */
 
-function TiltPanel({ data, currency }: { data: TiltStats; currency: Currency }) {
+export function TiltPanel({ data, currency }: { data: TiltStats; currency: Currency }) {
   const tilts = data.delta < 0;
 
   return (
@@ -216,7 +216,7 @@ function TiltPanel({ data, currency }: { data: TiltStats; currency: Currency }) 
 
 /* ------------------------------------------------------------------ sequence */
 
-function SequencePanel({ rows, currency }: { rows: SequenceRow[]; currency: Currency }) {
+export function SequencePanel({ rows, currency }: { rows: SequenceRow[]; currency: Currency }) {
   const maxAbs = Math.max(...rows.map((r) => Math.abs(r.pnl)), 1);
   const best = rows.reduce((a, b) => (b.perTrade > a.perTrade ? b : a));
   const worst = rows.reduce((a, b) => (b.perTrade < a.perTrade ? b : a));
@@ -251,7 +251,7 @@ function SequencePanel({ rows, currency }: { rows: SequenceRow[]; currency: Curr
 
 /* ------------------------------------------------------------------ daily load */
 
-function LoadPanel({ rows, currency }: { rows: LoadRow[]; currency: Currency }) {
+export function LoadPanel({ rows, currency }: { rows: LoadRow[]; currency: Currency }) {
   const maxAbs = Math.max(...rows.map((r) => Math.abs(r.perDay)), 1);
   const best = rows.reduce((a, b) => (b.perDay > a.perDay ? b : a));
   const worst = rows.reduce((a, b) => (b.perDay < a.perDay ? b : a));

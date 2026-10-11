@@ -12,6 +12,7 @@ import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import { FadeIn } from '../components/motion/FadeIn';
 import { TIER_PLANS } from '../config/tiers';
 import type { ExtraNavRoute } from '../hooks/useRoute';
+import { SiteBackdrop } from '../components/landing/SiteBackdrop';
 
 /**
  * The Trading Assistant's own page.
@@ -78,7 +79,7 @@ export function AiAssistantPage({
 
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
-      <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
+      <SiteBackdrop />
       <LandingNav
         onLaunch={onLaunch}
         onHome={onHome}

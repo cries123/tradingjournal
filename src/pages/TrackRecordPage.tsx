@@ -6,6 +6,7 @@ import { fetchPublishedRecord } from '../services/trackRecord';
 import type { PublishedRecord } from '../utils/trackRecord';
 import { reportErrorSilently } from '../services/errorReporting';
 import { PublishedRecordView } from '../components/trackRecord/PublishedRecordView';
+import { SiteBackdrop } from '../components/landing/SiteBackdrop';
 
 interface TrackRecordPageProps {
   slug: string;
@@ -79,7 +80,7 @@ export function TrackRecordPage({
 
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
-      <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
+      <SiteBackdrop />
       <LandingNav
         onLaunch={onLaunch}
         onHome={onHome}

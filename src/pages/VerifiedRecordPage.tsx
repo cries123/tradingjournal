@@ -5,6 +5,7 @@ import { PublishedRecordView } from '../components/trackRecord/PublishedRecordVi
 import { MIN_TRADES_TO_PUBLISH, type PublishedRecord } from '../utils/trackRecord';
 import { lowestTierWith, TIER_PLANS } from '../config/tiers';
 import type { ExtraNavRoute } from '../hooks/useRoute';
+import { SiteBackdrop } from '../components/landing/SiteBackdrop';
 
 /**
  * The marketing page for published track records.
@@ -98,7 +99,7 @@ export function VerifiedRecordPage({
 
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
-      <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
+      <SiteBackdrop />
       <LandingNav
         onLaunch={onLaunch}
         onHome={onHome}

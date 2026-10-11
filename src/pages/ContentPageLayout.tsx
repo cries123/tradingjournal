@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import type { ExtraNavRoute } from '../hooks/useRoute';
 import { BackLink } from '../components/BackLink';
+import { SiteBackdrop } from '../components/landing/SiteBackdrop';
 
 interface ContentPageLayoutProps {
   title: string;
@@ -30,7 +31,7 @@ export function ContentPageLayout({
 }: ContentPageLayoutProps) {
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
-      <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
+      <SiteBackdrop />
       <LandingNav
         onLaunch={onLaunch}
         onHome={onHome}

@@ -76,6 +76,21 @@ describe('the landing page entry', () => {
     expect([...graph.keys()].map(rel)).not.toContain('src/lib/firebase.ts');
   });
 
+  it('does not carry the landing page demos, which load as the visitor scrolls to them', () => {
+    // The simulator demo and the Performance showcase bring the simulator and the analytics with
+    // them. They are React.lazy behind LazyOnView; one static import would put both in the first
+    // download of every marketing page.
+    const files = [...graph.keys()].map(rel);
+    for (const heavy of [
+      'src/utils/ruleSimulator.ts',
+      'src/utils/brokerAnalytics.ts',
+      'src/components/landing/ProductShowcase.tsx',
+      'src/components/landing/RuleSimulatorDemo.tsx',
+    ]) {
+      expect(files).not.toContain(heavy);
+    }
+  });
+
   it('keeps Firestore in a chunk apart from auth, or the split above buys nothing', () => {
     const config = readFileSync('vite.config.ts', 'utf8');
     expect(config).toContain("return 'firestore'");

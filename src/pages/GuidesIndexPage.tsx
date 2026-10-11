@@ -6,6 +6,7 @@ import { SUPPORTED_BROKER_COUNT } from '../data/brokerCopy';
 import type { ExtraNavRoute } from '../hooks/useRoute';
 import { SupportLinks } from '../components/support/SupportLinks';
 import { BackLink } from '../components/BackLink';
+import { SiteBackdrop } from '../components/landing/SiteBackdrop';
 
 interface GuidesIndexPageProps {
   onHome: () => void;
@@ -62,7 +63,7 @@ export function GuidesIndexPage({
 
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
-      <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
+      <SiteBackdrop />
       <LandingNav
         onLaunch={onLaunch}
         onHome={onHome}

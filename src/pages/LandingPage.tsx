@@ -1,22 +1,17 @@
-import { useEffect, useState } from 'react';
+import { lazy, useEffect, useState, type PointerEvent } from 'react';
 import { lowestPaidPrice } from '../seo/pricingClaims';
-import {
-  BarChart3,
-  Calendar,
-  Check,
-  Cloud,
-  Link2,
-  Lock,
-  Pencil,
-  Share2,
-} from 'lucide-react';
+import { Calendar, Check, Cloud, Lock, Pencil, Share2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { AnnouncementBar } from '../components/landing/AnnouncementBar';
 import { DashboardPreview } from '../components/landing/DashboardPreview';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import { FadeIn } from '../components/motion/FadeIn';
-import { Starfield } from '../components/Starfield';
+import { HeroTrendLine, SiteBackdrop } from '../components/landing/SiteBackdrop';
+import { BrokerMarquee } from '../components/landing/BrokerMarquee';
+import { AssistantDemo } from '../components/landing/AssistantDemo';
+import { LazyOnView } from '../components/landing/LazyOnView';
+import { lowestTierWith, TIER_PLANS, type Feature } from '../config/tiers';
 import { BrokerLogo } from '../components/brokers/BrokerLogo';
 import { brokerIdFromName } from '../utils/brokerIds';
 import { COMING_SOON_BROKERS, SUPPORTED_BROKERS } from '../data/brokers';
@@ -29,6 +24,29 @@ import { LANDING_FAQ } from '../seo/faq';
 import { GUIDE_ARTICLES } from '../seo/guides';
 import { fetchBrokersConfig, type BrokerConfig } from '../services/brokersConfig';
 import type { ExtraNavRoute } from '../hooks/useRoute';
+
+/* Their own downloads, fetched only as the visitor scrolls near them — see LazyOnView. */
+const ProductShowcase = lazy(() => import('../components/landing/ProductShowcase'));
+const RuleSimulatorDemo = lazy(() => import('../components/landing/RuleSimulatorDemo'));
+
+/** "Silver and up" — read from the plans, so the page cannot advertise a feature on the wrong tier. */
+function fromPlan(feature: Feature): string | null {
+  const tier = lowestTierWith(feature);
+  return tier ? `On ${TIER_PLANS[tier].name} and up` : null;
+}
+
+/**
+ * Moves the spotlight glow on whichever landing card is under the cursor. One listener for the page
+ * rather than one per card; touch input is ignored, since there is no hover to light.
+ */
+function trackSpotlight(e: PointerEvent<HTMLDivElement>) {
+  if (e.pointerType !== 'mouse') return;
+  const card = (e.target as HTMLElement).closest<HTMLElement>('.spotlight');
+  if (!card) return;
+  const box = card.getBoundingClientRect();
+  card.style.setProperty('--spot-x', `${e.clientX - box.left}px`);
+  card.style.setProperty('--spot-y', `${e.clientY - box.top}px`);
+}
 
 interface LandingPageProps {
   onLaunch: () => void;
@@ -44,6 +62,13 @@ interface LandingPageProps {
   onNavigate?: (route: ExtraNavRoute) => void;
 }
 
+/*
+ * What the page does not already show.
+ *
+ * This was six icon cards including Broker Sync and Trading Insights, both of which now have whole
+ * sections above them — the real Performance panels and the broker strip — so describing them again
+ * in small grey type was the page repeating itself. The four left are the ones with nothing to show.
+ */
 const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
   {
     icon: Calendar,
@@ -52,24 +77,10 @@ const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
       'See your month at a glance — green days for profit, red for loss. Click any day to import trades or drill into that session.',
   },
   {
-    icon: Link2,
-    title: 'Broker Sync',
-    // Deliberately does not repeat the broker count or the read-only promise — the Brokers section
-    // above makes both, and this page was making each of them eight and seven times respectively.
-    description:
-      'Press Sync and your round-trip trades import from your broker, matched open to close, so you are not copying rows out of a statement every evening.',
-  },
-  {
     icon: Pencil,
     title: 'Manual Trade Entry',
     description:
       'Log a trade in seconds — symbol, P/L, side, setup tags, and notes. Tag your setups so the analytics can tell you which ones actually pay.',
-  },
-  {
-    icon: BarChart3,
-    title: 'Trading Insights',
-    description:
-      'Win rate, profit factor, and expectancy — plus streak tracking, your best and worst days, and which symbols are making or costing you money.',
   },
   {
     icon: Cloud,
@@ -81,7 +92,7 @@ const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
     icon: Share2,
     title: 'Share Cards',
     description:
-      'Export your session, month or year as an image built for a story slot — your stats on a Milky Way background, or a photo of your own. Nothing is published anywhere: you get a file and decide where it goes.',
+      'Export your session, month or year as an image built for a story slot. Nothing is published anywhere: you get a file and decide where it goes.',
   },
 ];
 
@@ -135,16 +146,17 @@ export function LandingPage({
   }, []);
 
   return (
-    <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
-      {/* reactive={false}: the landing page keeps its fixed emerald/blue brand look regardless of
-          which Theme accent a signed-in user has picked in Settings — same reasoning as the logo. */}
-      <Starfield reactive={false} drift />
-      <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
+    <div
+      className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col"
+      onPointerMove={trackSpotlight}
+    >
+      <SiteBackdrop />
       <AnnouncementBar />
       <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate} />
 
       {/* Hero */}
-      <section className="relative z-10 max-w-[1680px] mx-auto px-4 md:px-6 pt-12 md:pt-20 pb-16 md:pb-20">
+      <section className="relative z-10 max-w-[1680px] mx-auto w-full px-4 md:px-6 pt-12 md:pt-20 pb-10 md:pb-14">
+        <HeroTrendLine />
         <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
           <FadeIn>
           <div>
@@ -168,14 +180,15 @@ export function LandingPage({
               Stop guessing what’s{' '}
               <span className="text-gradient-brand">costing you money</span>
             </h1>
-            <p className="mt-5 text-base md:text-lg text-text-secondary leading-relaxed max-w-xl">
-              Trend Chasers is a trading journal for active traders. Track daily P&L on a visual
-              calendar, connect {BROKER_COUNT_PHRASE} — {SHORT_BROKER_EXAMPLES} and more — and import
-              your fills whenever you want them, or log trades manually. Nothing is forced, and you
-              can switch anytime.
+            {/* Two sentences, down from five. "Trading journal" stays in the first one — it is the
+                phrase the h1 gave up, see above. */}
+            <p className="mt-5 text-base md:text-lg text-slate-300/90 leading-relaxed max-w-xl">
+              Trend Chasers is a trading journal that shows where your P&amp;L actually goes. Import
+              your fills from {BROKER_COUNT_PHRASE} — {SHORT_BROKER_EXAMPLES} and more — or log trades
+              by hand.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
-              <button type="button" onClick={onLaunch} className="btn-primary text-base px-7 py-3.5">
+              <button type="button" onClick={onLaunch} className="btn-primary btn-shine text-base px-7 py-3.5">
                 Start journaling free
               </button>
               <button type="button" onClick={onBrokers} className="btn-secondary text-base px-7 py-3.5">
@@ -185,6 +198,12 @@ export function LandingPage({
             <p className="mt-3 text-xs text-text-secondary">
               No signup needed to try it — your journal stays in your browser until you choose to sync.
             </p>
+            {/* On a phone the product was not in the first screen at all — headline, paragraph,
+                buttons, then a scroll. A compact preview goes straight under the buttons there;
+                the full one beside the copy is for wide screens. */}
+            <div className="mt-6 lg:hidden">
+              <DashboardPreview variant="compact" />
+            </div>
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-text-secondary">
               {/* Says what's free and what isn't. "Free — no credit card" sitting next to "broker
                   sync" read as though the sync were free too, which stopped being true the day
@@ -198,12 +217,61 @@ export function LandingPage({
             </div>
           </div>
           </FadeIn>
-          <FadeIn delay={120}>
+          <FadeIn delay={120} className="hidden lg:block">
           <div className="relative">
             <div className="absolute -inset-4 bg-gradient-to-br from-emerald-500/20 via-transparent to-cyan-500/20 rounded-3xl blur-2xl" />
             <DashboardPreview />
           </div>
           </FadeIn>
+        </div>
+      </section>
+
+      {/* Answers "does it work with my broker" in the first screen, rather than a screen down. */}
+      <section className="relative z-10 pb-12 md:pb-16" aria-label="Supported brokers">
+        <div className="max-w-[1680px] mx-auto px-4 md:px-6">
+          <p className="text-center text-xs uppercase tracking-widest text-text-secondary mb-4">
+            Imports from {BROKER_COUNT_PHRASE}
+          </p>
+          <BrokerMarquee names={brokers.supported.map((b) => b.name)} />
+        </div>
+      </section>
+
+      {/* The Performance screen's real panels, on sample data. */}
+      <section id="performance" className={`relative z-10 scroll-mt-24 border-t border-border/50 ${SECTION_MAJOR}`}>
+        <div className="max-w-[1680px] mx-auto px-4 md:px-6">
+          <FadeIn className="max-w-3xl mb-10 md:mb-12">
+            <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Performance</p>
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">See exactly where your P&amp;L goes</h2>
+            <p className="mt-4 text-slate-300/90 leading-relaxed">
+              Worked out from your broker&apos;s fills alone — no tagging, no typing. These are the
+              journal&apos;s own panels, drawn from a sample journal; yours fill in from your trades.
+            </p>
+            {fromPlan('performanceAnalytics') && (
+              <p className="mt-3 text-xs text-text-secondary">{fromPlan('performanceAnalytics')}</p>
+            )}
+          </FadeIn>
+          <LazyOnView minHeight="420px">
+            <ProductShowcase />
+          </LazyOnView>
+        </div>
+      </section>
+
+      <section id="simulator" className={`relative z-10 scroll-mt-24 ${SECTION_MAJOR}`}>
+        <div className="max-w-[1680px] mx-auto px-4 md:px-6">
+          <FadeIn className="max-w-3xl mb-10 md:mb-12">
+            <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">Rule simulator</p>
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">What would a trade cap have saved you?</h2>
+            <p className="mt-4 text-slate-300/90 leading-relaxed">
+              Your own trades, replayed against a limit you did not keep. Try it on a sample journal —
+              drag the cap and watch the month change.
+            </p>
+            {fromPlan('ruleSimulator') && (
+              <p className="mt-3 text-xs text-text-secondary">{fromPlan('ruleSimulator')}</p>
+            )}
+          </FadeIn>
+          <LazyOnView minHeight="380px">
+            <RuleSimulatorDemo onTry={onLaunch} />
+          </LazyOnView>
         </div>
       </section>
 
@@ -371,30 +439,7 @@ export function LandingPage({
             </FadeIn>
 
             <FadeIn delay={100}>
-              <div className="glass-card rounded-2xl p-5 md:p-6 glow-border-brand">
-                <p className="text-xs uppercase tracking-widest text-text-secondary mb-4">
-                  Questions it asks you first
-                </p>
-                <div className="flex flex-wrap gap-2 mb-5">
-                  {[
-                    'Why is FOMO losing?',
-                    'What happens when I trade the open?',
-                    'Am I exiting winners too early?',
-                    'Is my win rate good enough?',
-                  ].map((q) => (
-                    <span
-                      key={q}
-                      className="text-xs px-3 py-1.5 rounded-full border border-border/60 text-text-secondary"
-                    >
-                      {q}
-                    </span>
-                  ))}
-                </div>
-                <p className="text-xs text-text-secondary leading-relaxed border-t border-border/50 pt-4">
-                  Those aren&apos;t examples — they&apos;re built from whatever is actually in your
-                  journal. A trader whose losses cluster at the open gets asked about the open.
-                </p>
-              </div>
+              <AssistantDemo />
             </FadeIn>
           </div>
         </div>
@@ -410,19 +455,19 @@ export function LandingPage({
               Built for active traders who want clarity — not another spreadsheet.
             </p>
           </FadeIn>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
             {FEATURES.map((f, i) => {
               const Icon = f.icon;
               return (
               <FadeIn key={f.title} delay={i * 60}>
               <article
-                className="glass-card rounded-xl p-5 md:p-6 hover:border-emerald-500/30 transition-colors group h-full"
+                className="glass-card spotlight rounded-xl p-5 md:p-6 hover:border-emerald-500/30 transition-colors group h-full"
               >
                 <div className="w-10 h-10 rounded-lg bg-bg-primary/80 border border-border/60 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform text-emerald-400">
                   <Icon size={20} />
                 </div>
                 <h3 className="text-base font-semibold mb-2">{f.title}</h3>
-                <p className="text-sm text-text-secondary leading-relaxed">{f.description}</p>
+                <p className="text-sm text-slate-300/85 leading-relaxed">{f.description}</p>
               </article>
               </FadeIn>
               );
@@ -441,10 +486,10 @@ export function LandingPage({
           <div className="grid md:grid-cols-3 gap-6">
             {STEPS.map((step, i) => (
               <FadeIn key={step.n} delay={i * 80}>
-              <div className="glass-card rounded-xl p-6 md:p-7 h-full">
+              <div className="glass-card spotlight rounded-xl p-6 md:p-7 h-full">
                 <span className="text-4xl font-bold text-gradient-brand opacity-80">{step.n}</span>
                 <h3 className="text-lg font-semibold mt-3 mb-2">{step.title}</h3>
-                <p className="text-sm text-text-secondary leading-relaxed">{step.body}</p>
+                <p className="text-sm text-slate-300/85 leading-relaxed">{step.body}</p>
               </div>
               </FadeIn>
             ))}
@@ -473,10 +518,10 @@ export function LandingPage({
                       onGuide(guide.slug);
                     }
                   }}
-                  className="block glass-card rounded-xl p-5 h-full hover:border-emerald-500/30 transition-colors"
+                  className="block glass-card spotlight rounded-xl p-5 h-full hover:border-emerald-500/30 transition-colors"
                 >
                   <h3 className="font-semibold text-base mb-2">{guide.title}</h3>
-                  <p className="text-sm text-text-secondary leading-relaxed">{guide.description}</p>
+                  <p className="text-sm text-slate-300/85 leading-relaxed">{guide.description}</p>
                 </a>
               </FadeIn>
             ))}
@@ -533,7 +578,7 @@ export function LandingPage({
             Open your journal and log this month&apos;s trades yourself, free and with no credit
             card, or connect a broker and let them import themselves. Just your data, your way.
           </p>
-          <button type="button" onClick={onLaunch} className="btn-primary text-base px-8 py-3.5 mt-8">
+          <button type="button" onClick={onLaunch} className="btn-primary btn-shine text-base px-8 py-3.5 mt-8">
             Open Trend Chasers
           </button>
         </FadeIn>

@@ -2,6 +2,7 @@ import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import { BrokersContent } from '../components/support/BrokersContent';
 import type { ExtraNavRoute } from '../hooks/useRoute';
 import { useBackDestination } from '../hooks/useBackDestination';
+import { SiteBackdrop } from '../components/landing/SiteBackdrop';
 
 interface BrokersPageProps {
   onHome: () => void;
@@ -27,7 +28,7 @@ export function BrokersPage({
   const back = useBackDestination(onHome);
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
-      <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
+      <SiteBackdrop />
       <LandingNav
         onLaunch={onLaunch}
         onHome={onHome}

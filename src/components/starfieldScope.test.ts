@@ -17,13 +17,30 @@ const files = globSync('src/**/*.tsx', { cwd: process.cwd() }).map((f) => ({
   source: readFileSync(join(process.cwd(), f), 'utf-8'),
 }));
 
-describe('starfield drift stays on the landing page', () => {
+/** The one component allowed to drift: the backdrop every public page shares. */
+const BACKDROP = 'src/components/landing/SiteBackdrop.tsx';
+
+describe('starfield drift stays on the public site', () => {
   it('is switched on in exactly one place', () => {
     const withDrift = files
       .filter(({ source }) => /<Starfield[^>]*\bdrift\b/s.test(source))
       .map(({ path }) => path);
 
-    expect(withDrift).toEqual(['src/pages/LandingPage.tsx']);
+    expect(withDrift).toEqual([BACKDROP]);
+  });
+
+  it('never reaches the signed-in app', () => {
+    // The backdrop is for marketing pages. The journal, the admin panel and every in-app component
+    // stay still — see the next test for why.
+    const app = files.filter(
+      ({ path }) =>
+        path === 'src/pages/JournalApp.tsx' ||
+        path === 'src/pages/AdminPage.tsx' ||
+        (path.startsWith('src/components/') && !path.startsWith('src/components/landing/')),
+    );
+    const offenders = app.filter(({ source }) => /<SiteBackdrop\b/.test(source)).map(({ path }) => path);
+    expect(offenders).toEqual([]);
+    expect(readFileSync(join(process.cwd(), 'src/pages/LandingPage.tsx'), 'utf-8')).toContain('<SiteBackdrop');
   });
 
   it('leaves every other surface still', () => {
@@ -33,7 +50,7 @@ describe('starfield drift stays on the landing page', () => {
     expect(users.length).toBeGreaterThan(1);
 
     for (const { path, source } of files) {
-      if (path === 'src/pages/LandingPage.tsx') continue;
+      if (path === BACKDROP) continue;
       expect(/<Starfield[^>]*\bdrift\b/s.test(source), path).toBe(false);
     }
   });

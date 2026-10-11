@@ -116,6 +116,155 @@ body {
   mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black, transparent);
 }
 
+/*
+ * The public site's aurora — two large blurred glows drifting slowly behind everything (SiteBackdrop).
+ * Transform-only animation on two pseudo-elements, so it stays on the compositor and costs no layout
+ * or paint per frame. Low opacity on purpose: atmosphere behind the numbers, never competing with them.
+ */
+.site-aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.site-aurora::before,
+.site-aurora::after {
+  content: '';
+  position: absolute;
+  width: 60vmax;
+  height: 60vmax;
+  border-radius: 9999px;
+  filter: blur(90px);
+  will-change: transform;
+}
+
+.site-aurora::before {
+  top: -25vmax;
+  left: -15vmax;
+  background: radial-gradient(circle, rgba(52, 211, 153, 0.16), transparent 65%);
+  animation: aurora-a 28s ease-in-out infinite alternate;
+}
+
+.site-aurora::after {
+  top: -20vmax;
+  right: -20vmax;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.14), transparent 65%);
+  animation: aurora-b 34s ease-in-out infinite alternate;
+}
+
+@keyframes aurora-a {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(14vw, 10vh, 0) scale(1.15); }
+}
+
+@keyframes aurora-b {
+  from { transform: translate3d(0, 0, 0) scale(1.1); }
+  to { transform: translate3d(-12vw, 14vh, 0) scale(0.95); }
+}
+
+/* The hero's equity line, drawn once on arrival. pathLength=1 on the path makes 1 the whole length. */
+.hero-trend-line path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw-line 2.8s cubic-bezier(0.22, 1, 0.36, 1) 0.4s forwards;
+}
+
+@keyframes draw-line {
+  to { stroke-dashoffset: 0; }
+}
+
+/* A day arriving in the hero preview's sync. */
+.animate-cell-pop {
+  animation: cell-pop 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes cell-pop {
+  0% { opacity: 0; transform: scale(0.8); }
+  60% { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* The broker strip: two copies of the list, slid by half, loop seamlessly. */
+.animate-marquee {
+  animation: marquee 50s linear infinite;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.marquee-mask {
+  mask-image: linear-gradient(90deg, transparent, black 7%, black 93%, transparent);
+}
+
+/* A light sweep across the main call to action every few seconds — enough to be found, not enough to nag. */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.btn-shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, 0.45) 50%, transparent 65%);
+  transform: translateX(-130%);
+  animation: btn-shine 6s ease-in-out 1.6s infinite;
+  pointer-events: none;
+}
+
+@keyframes btn-shine {
+  0%, 72% { transform: translateX(-130%); }
+  100% { transform: translateX(130%); }
+}
+
+/*
+ * A soft glow under the cursor on landing cards. The position comes from --spot-x/--spot-y, set by
+ * one pointermove listener on the page (LandingPage), not one per card. Hover-only, so touch screens
+ * never see it.
+ */
+.spotlight {
+  position: relative;
+}
+
+.spotlight::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  background: radial-gradient(420px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(52, 211, 153, 0.09), transparent 45%);
+}
+
+@media (hover: hover) {
+  .spotlight:hover::before {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-aurora::before,
+  .site-aurora::after,
+  .animate-cell-pop,
+  .animate-marquee,
+  .btn-shine::after {
+    animation: none !important;
+  }
+
+  .hero-trend-line path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
 /* App-facing gradient text — reads the active theme accent (profit-bright -> accent), so it
    recolors when the user switches Theme accent in Settings. Used inside the authenticated app
    and auth/username modals. */

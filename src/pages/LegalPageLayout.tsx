@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import type { ExtraNavRoute } from '../hooks/useRoute';
 import { BackLink } from '../components/BackLink';
+import { SiteBackdrop } from '../components/landing/SiteBackdrop';
 
 interface LegalPageLayoutProps {
   title: string;
@@ -31,7 +32,7 @@ export function LegalPageLayout({
 }: LegalPageLayoutProps) {
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
-      <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
+      <SiteBackdrop />
       <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate} />
       <main className="relative z-10 flex-1 max-w-3xl mx-auto px-4 md:px-6 py-12 md:py-16 w-full">
         <BackLink onHome={onHome} className="mb-8" />
