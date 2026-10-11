@@ -1,4 +1,6 @@
+import type { CSSProperties } from 'react';
 import { pnlClass } from '../../utils/pnlTone';
+import { useReveal } from '../../hooks/useReveal';
 
 /**
  * The card every analysis panel is drawn in.
@@ -18,8 +20,11 @@ export function PanelShell({
   icon: React.ReactNode;
   children: React.ReactNode;
 }) {
+  // The card is its own reveal target rather than wrapped in one, so the grid still stretches the
+  // card itself to the row's height.
+  const { ref, revealProps } = useReveal();
   return (
-    <div className="panel-card p-3 md:p-4 flex flex-col min-h-[160px]">
+    <div ref={ref} {...revealProps} className="reveal panel-card spotlight p-3 md:p-4 flex flex-col min-h-[160px]">
       <div className="mb-2 md:mb-3 shrink-0 flex items-start gap-2">
         <span className="text-accent/80 mt-0.5 shrink-0">{icon}</span>
         <div>
@@ -72,6 +77,7 @@ export function BarRow({
   valueText,
   maxAbs,
   labelWidth = 'w-20 md:w-24',
+  index = 0,
 }: {
   label: string;
   meta?: string;
@@ -79,6 +85,8 @@ export function BarRow({
   valueText: string;
   maxAbs: number;
   labelWidth?: string;
+  /** Position in its list, so the bars grow in one after another rather than as a block. */
+  index?: number;
 }) {
   const width = Math.max((Math.abs(value) / (maxAbs || 1)) * 100, 3);
   return (
@@ -88,8 +96,8 @@ export function BarRow({
       </span>
       <div className="flex-1 h-3 rounded-full overflow-hidden bg-bg-primary relative">
         <div
-          className={`h-full rounded-full chart-bar-h ${value >= 0 ? 'bar-profit-h' : 'bar-loss-h'}`}
-          style={{ width: `${width}%` }}
+          className={`bar-in h-full rounded-full chart-bar-h ${value >= 0 ? 'bar-profit-h' : 'bar-loss-h'}`}
+          style={{ width: `${width}%`, '--i': index } as CSSProperties}
         />
       </div>
       {meta && (

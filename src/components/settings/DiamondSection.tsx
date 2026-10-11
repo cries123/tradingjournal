@@ -125,7 +125,7 @@ export function DiamondSection() {
           <button
             type="button"
             onClick={goToPricing}
-            className="text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors focus-ring rounded"
+            className="text-xs font-medium text-profit-bright hover:text-profit-bright/80 transition-colors focus-ring rounded"
           >
             Upgrade
           </button>

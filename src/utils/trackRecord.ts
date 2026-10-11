@@ -268,3 +268,50 @@ export const MIN_TRADES_TO_PUBLISH = 30;
 export function canPublish(record: TrackRecord): boolean {
   return record.verifiedTrades >= MIN_TRADES_TO_PUBLISH;
 }
+
+/**
+ * The public document for a record — the one function that decides what a published page holds.
+ *
+ * Run by the server when it publishes, and by the Track record screen to draw its preview, so the
+ * preview cannot show a figure the page would not, or leave one out that it would.
+ *
+ * Amounts are dropped from the DOCUMENT, not hidden by the page. A public document with the figures
+ * in it and a flag asking the renderer not to show them is not privacy — anyone can read the
+ * document. If the trader said no amounts, the amounts are not in what this returns.
+ *
+ * Typed as the shape the public page reads, so a field renamed on one side stops the build rather
+ * than rendering as undefined on somebody's published record.
+ */
+export function toPublishedRecord(
+  record: TrackRecord,
+  options: { username: string; showAmounts: boolean; updatedAt: string },
+): PublishedRecord {
+  const money = options.showAmounts
+    ? {
+        netPnl: record.netPnl,
+        avgWin: record.avgWin,
+        avgLoss: record.avgLoss,
+        maxDrawdown: record.maxDrawdown,
+        bestDay: record.bestDay,
+        worstDay: record.worstDay,
+      }
+    : {};
+
+  return {
+    published: true,
+    showAmounts: options.showAmounts,
+    username: options.username,
+    verifiedTrades: record.verifiedTrades,
+    excludedTrades: record.excludedTrades,
+    brokers: record.brokers,
+    firstDate: record.firstDate,
+    lastDate: record.lastDate,
+    tradingDays: record.tradingDays,
+    journalsEligible: record.journalsEligible,
+    journalsIncluded: record.journalsIncluded,
+    winRate: record.winRate,
+    profitFactor: record.profitFactor,
+    ...money,
+    updatedAt: options.updatedAt,
+  };
+}

@@ -6,6 +6,8 @@ import { useSettings } from '../../context/useSettings';
 import { formatCurrency } from '../../utils/format';
 import { rulesAreTestable, simulateRules, type SimulatedDay } from '../../utils/ruleSimulator';
 import { PageFrame, PageSection } from '../layout/PageFrame';
+import { SegmentedControl } from '../ui/SegmentedControl';
+import { CountUp } from '../motion/CountUp';
 
 export interface SimulatorPeriod {
   scope: 'month' | 'year' | 'all';
@@ -45,6 +47,11 @@ function shortDate(key: string): string {
   const [y, m, d] = key.split('-').map(Number);
   if (!y || !m || !d) return key;
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+/** "+$4,806.67" — the difference always carries its sign, gain or cost. */
+function signedCurrency(n: number): string {
+  return `${n >= 0 ? '+' : ''}${formatCurrency(n)}`;
 }
 
 /** Blank clears the rule rather than meaning zero — "" and 0 are different answers here. */
@@ -125,6 +132,7 @@ export function RuleSimulatorContent({ periods, onBack }: RuleSimulatorContentPr
 
   return (
     <PageFrame
+      sidebarDestination
       title="Rule simulator"
       icon={FlaskConical}
       onBack={onBack}
@@ -132,23 +140,12 @@ export function RuleSimulatorContent({ periods, onBack }: RuleSimulatorContentPr
       actions={
         /* Its own period, independent of what the dashboard is showing — asking "what would a stop
            have done to my year" should not mean navigating the calendar first. */
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Period">
-          {periods.map((p) => (
-            <button
-              key={p.scope}
-              type="button"
-              onClick={() => setScope(p.scope)}
-              aria-pressed={p.scope === scope}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus-ring ${
-                p.scope === scope
-                  ? 'bg-accent/15 text-accent'
-                  : 'border border-border text-text-secondary hover:text-text-primary'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Period"
+          value={scope}
+          onChange={setScope}
+          options={periods.map((p) => ({ id: p.scope, label: p.label }))}
+        />
       }
     >
       {trades.length === 0 ? (
@@ -170,10 +167,10 @@ export function RuleSimulatorContent({ periods, onBack }: RuleSimulatorContentPr
                 <p className="text-xs text-text-secondary">Actual</p>
                 <p
                   className={`text-3xl md:text-4xl font-extrabold tabular-nums leading-none mt-1 ${
-                    result.actualPnl >= 0 ? 'text-emerald-400' : 'text-red-400'
+                    result.actualPnl >= 0 ? 'text-profit-bright' : 'text-loss-bright'
                   }`}
                 >
-                  {formatCurrency(result.actualPnl)}
+                  <CountUp value={result.actualPnl} format={formatCurrency} from={0} />
                 </p>
               </div>
 
@@ -183,23 +180,24 @@ export function RuleSimulatorContent({ periods, onBack }: RuleSimulatorContentPr
                     <p className="text-xs text-text-secondary">With these rules</p>
                     <p
                       className={`text-3xl md:text-4xl font-extrabold tabular-nums leading-none mt-1 ${
-                        result.simulatedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'
+                        result.simulatedPnl >= 0 ? 'text-profit-bright' : 'text-loss-bright'
                       }`}
                     >
-                      {formatCurrency(result.simulatedPnl)}
+                      {/* Rolls from the old figure to the new one as a rule is typed, which is the
+                          whole point of the screen: change the cap, watch the number move. */}
+                      <CountUp value={result.simulatedPnl} format={formatCurrency} from={0} />
                     </p>
                   </div>
-                  <div className={`rounded-lg px-4 py-2 ${helped ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
-                    <p className={`text-xs ${helped ? 'text-emerald-300/80' : 'text-red-300/80'}`}>
+                  <div className={`rounded-lg px-4 py-2 ${helped ? 'bg-profit-bright/10' : 'bg-loss-bright/10'}`}>
+                    <p className={`text-xs ${helped ? 'text-profit-bright/80' : 'text-loss-bright/80'}`}>
                       Difference
                     </p>
                     <p
                       className={`text-2xl font-bold tabular-nums leading-none mt-1 ${
-                        helped ? 'text-emerald-400' : 'text-red-400'
+                        helped ? 'text-profit-bright' : 'text-loss-bright'
                       }`}
                     >
-                      {result.difference >= 0 ? '+' : ''}
-                      {formatCurrency(result.difference)}
+                      <CountUp value={result.difference} format={signedCurrency} from={0} />
                     </p>
                   </div>
                 </>
@@ -315,14 +313,14 @@ export function RuleSimulatorContent({ periods, onBack }: RuleSimulatorContentPr
                           </td>
                           <td
                             className={`py-2.5 text-right tabular-nums ${
-                              day.actualPnl >= 0 ? 'text-emerald-400' : 'text-red-400'
+                              day.actualPnl >= 0 ? 'text-profit-bright' : 'text-loss-bright'
                             }`}
                           >
                             {formatCurrency(day.actualPnl)}
                           </td>
                           <td
                             className={`py-2.5 text-right tabular-nums ${
-                              day.simulatedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'
+                              day.simulatedPnl >= 0 ? 'text-profit-bright' : 'text-loss-bright'
                             }`}
                           >
                             {formatCurrency(day.simulatedPnl)}
@@ -358,12 +356,12 @@ export function RuleSimulatorContent({ periods, onBack }: RuleSimulatorContentPr
                     <Stat
                       label="Winners given up"
                       value={`-${formatCurrency(result.winnersGivenUp)}`}
-                      tone="text-red-400"
+                      tone="text-loss-bright"
                     />
                     <Stat
                       label="Losses avoided"
                       value={`+${formatCurrency(result.lossesAvoided)}`}
-                      tone="text-emerald-400"
+                      tone="text-profit-bright"
                     />
                   </div>
                   {/* Both halves, always. A rule that stops a day removes its good trades too, and a
@@ -377,7 +375,7 @@ export function RuleSimulatorContent({ periods, onBack }: RuleSimulatorContentPr
                   </p>
                 </section>
 
-                <section className="panel-card border-emerald-500/25 p-5">
+                <section className="panel-card border-profit-bright/25 p-5">
                   <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
                     Make it real
                   </h2>
@@ -429,7 +427,7 @@ function RuleInput({
 }) {
   const on = numberOrNull(value) != null;
   return (
-    <div className={`panel-card p-4 ${on ? 'border-emerald-500/30' : ''}`}>
+    <div className={`panel-card p-4 ${on ? 'border-profit-bright/30' : ''}`}>
       <p className="text-sm font-medium">{label}</p>
       <p className="text-[11px] text-text-secondary mt-0.5 leading-relaxed">{blurb}</p>
       <div className="mt-3 flex items-center gap-2">

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Trade } from '../types';
-import { directionRows } from './directionRows';
+import { directionRows, directionSplit } from './directionRows';
 
 const trade = (side: 'long' | 'short' | undefined, pnl: number, over: Partial<Trade> = {}): Trade =>
   ({ id: `${side}-${pnl}`, date: '2026-08-03', symbol: 'SPY', side, pnl, ...over }) as Trade;
@@ -55,5 +55,54 @@ describe('directionRows', () => {
   it('does not count a breakeven trade as a win', () => {
     const rows = directionRows([trade('long', 0), trade('long', 100)]);
     expect(rows[0].winRate).toBe(50);
+  });
+});
+
+describe('directionSplit', () => {
+  const option = (optionType: 'call' | 'put' | undefined, pnl: number, side: 'long' | 'short' = 'long') =>
+    trade(side, pnl, { id: `${optionType}-${pnl}-${side}`, assetType: 'option', optionType });
+  const share = (pnl: number) => trade('long', pnl, { id: `stock-${pnl}`, assetType: 'stock' });
+
+  it('splits an options trader who never sells short into calls and puts', () => {
+    // Every one of these is "long", so long vs short would be one full bar and one empty one.
+    const split = directionSplit([option('call', 100), option('call', -40), option('put', -30)]);
+    expect(split.title).toBe('Calls vs Puts');
+    expect(split.groups.map((g) => g.label)).toEqual(['Calls', 'Puts']);
+    expect(split.groups[0]).toMatchObject({ pnl: 60, trades: 2, winRate: 50 });
+    expect(split.groups[1]).toMatchObject({ pnl: -30, trades: 1, winRate: 0 });
+  });
+
+  it('keeps both option groups when only one was traded, as the long/short card does', () => {
+    const split = directionSplit([option('call', 100)]);
+    expect(split.groups.map((g) => g.key)).toEqual(['call', 'put']);
+    expect(split.groups[1]).toMatchObject({ trades: 0, pnl: 0 });
+  });
+
+  it('adds shares as a third group only when shares were traded', () => {
+    const split = directionSplit([option('call', 100), option('put', 20), share(-15)]);
+    expect(split.title).toBe('Calls, puts and shares');
+    expect(split.groups.map((g) => g.label)).toEqual(['Calls', 'Puts', 'Shares']);
+    expect(split.groups[2]).toMatchObject({ pnl: -15, trades: 1 });
+  });
+
+  it('stays long vs short as soon as anything was sold short', () => {
+    // A short call is a bet the other way from a long one. Filing both under "Calls" would hide
+    // the very thing a trader who sells premium wants to see.
+    const split = directionSplit([option('call', 100), option('call', 50, 'short')]);
+    expect(split.title).toBe('Long vs Short');
+    expect(split.groups.map((g) => g.key)).toEqual(['long', 'short']);
+    expect(split.groups[1]).toMatchObject({ pnl: 50, trades: 1 });
+  });
+
+  it('stays long vs short for a journal with no options in it', () => {
+    const split = directionSplit([share(100), share(-20)]);
+    expect(split.title).toBe('Long vs Short');
+    expect(split.groups[0]).toMatchObject({ pnl: 80, trades: 2 });
+  });
+
+  it('leaves out an option with no call or put recorded rather than guessing', () => {
+    const split = directionSplit([option('call', 100), option(undefined, 900)]);
+    expect(split.groups.reduce((n, g) => n + g.trades, 0)).toBe(1);
+    expect(split.groups[0].pnl).toBe(100);
   });
 });

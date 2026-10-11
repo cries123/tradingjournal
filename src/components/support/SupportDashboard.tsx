@@ -142,6 +142,7 @@ export function SupportDashboard({ onBack, onBrokers }: SupportDashboardProps) {
 
   return (
     <PageFrame
+      sidebarDestination
       title="Support"
       icon={LifeBuoy}
       onBack={onBack}
@@ -161,7 +162,7 @@ export function SupportDashboard({ onBack, onBrokers }: SupportDashboardProps) {
                   <button
                     type="button"
                     onClick={goToPricing}
-                    className="text-[11px] font-medium text-emerald-400 hover:text-emerald-300 transition-colors focus-ring rounded"
+                    className="text-[11px] font-medium text-profit-bright hover:text-profit-bright/80 transition-colors focus-ring rounded"
                   >
                     Change plan
                   </button>

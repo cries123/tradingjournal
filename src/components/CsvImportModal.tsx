@@ -11,6 +11,7 @@ import {
   type CsvImportPreview,
 } from '../utils/parseCsvRouter';
 import { useEscapeToClose } from '../hooks/useEscapeToClose';
+import { useAnimatedClose } from '../hooks/useAnimatedClose';
 import { reportErrorSilently } from '../services/errorReporting';
 
 interface CsvImportModalProps {
@@ -31,7 +32,8 @@ function formatTargetDate(date: string): string {
 }
 
 export function CsvImportModal({ onClose, onSave, targetDate }: CsvImportModalProps) {
-  useEscapeToClose(onClose);
+  const { closing, close } = useAnimatedClose(onClose);
+  useEscapeToClose(close);
   const { settings } = useSettings();
   const [step, setStep] = useState<Step>('upload');
   const [fileName, setFileName] = useState('');
@@ -119,7 +121,7 @@ export function CsvImportModal({ onClose, onSave, targetDate }: CsvImportModalPr
     setError(null);
     try {
       await onSave(toSave);
-      onClose();
+      close();
     } catch (err) {
       reportErrorSilently(err, 'promise', 'csv-import-save');
       setError("Those trades didn't save. Nothing was lost from this preview — try Import again.");
@@ -131,9 +133,9 @@ export function CsvImportModal({ onClose, onSave, targetDate }: CsvImportModalPr
   const totalPnl = trades.filter((t) => t.selected).reduce((s, t) => s + t.pnl, 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-backdrop-in motion-safe:animate-backdrop-in p-4" onClick={onClose}>
+    <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm ${closing ? 'animate-backdrop-out' : 'animate-backdrop-in'} p-4`} onClick={close}>
       <div
-        className="bg-bg-secondary border border-border rounded-lg p-6 w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto animate-scale-in motion-safe:animate-scale-in"
+        className={`bg-bg-secondary border border-border rounded-2xl p-6 w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto ${closing ? 'animate-scale-out' : 'animate-scale-in'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-start mb-4">
@@ -145,7 +147,7 @@ export function CsvImportModal({ onClose, onSave, targetDate }: CsvImportModalPr
                 : 'Schwab, Thinkorswim, or Robinhood CSV exports'}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="p-1 text-text-secondary hover:text-text-primary focus-ring rounded" aria-label="Close">
+          <button type="button" onClick={close} className="p-1 text-text-secondary hover:text-text-primary focus-ring rounded" aria-label="Close">
             <X size={20} />
           </button>
         </div>

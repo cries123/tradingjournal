@@ -8,9 +8,12 @@ import {
   canPublish,
   eligibleJournals,
   MIN_TRADES_TO_PUBLISH,
+  toPublishedRecord,
   type PublishedRecord,
 } from '../../utils/trackRecord';
 import { fetchPublishedRecord, publishRecord, unpublishRecord } from '../../services/trackRecord';
+import { CountUp } from '../motion/CountUp';
+import { PublishedRecordView } from './PublishedRecordView';
 import { formatCurrency } from '../../utils/format';
 import { reportErrorSilently } from '../../services/errorReporting';
 import { PageFrame } from '../layout/PageFrame';
@@ -38,7 +41,7 @@ function Toggle({
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500 focus-ring rounded"
+        className="mt-0.5 h-4 w-4 shrink-0 accent-profit-bright focus-ring rounded"
       />
       <span>
         <span className="block text-sm font-medium">{label}</span>
@@ -47,6 +50,9 @@ function Toggle({
     </label>
   );
 }
+
+const wholeNumber = (n: number) => Math.round(n).toLocaleString();
+const percent1 = (n: number) => `${n.toFixed(1)}%`;
 
 /**
  * Publishing a record, and taking it down.
@@ -146,6 +152,20 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
 
   const url = username ? `https://trendchasers.net/r/${username.toLowerCase()}` : '';
 
+  /*
+   * The page itself, drawn from the record on screen through the same toPublishedRecord the server
+   * publishes with — so turning "Show dollar amounts" off removes the amounts here exactly as it
+   * removes them from the document. Dated now, because that is the date a publish would stamp.
+   */
+  const [previewTakenAt] = useState(() => new Date().toISOString());
+  const preview = useMemo(
+    () =>
+      username && record.verifiedTrades > 0
+        ? toPublishedRecord(record, { username, showAmounts, updatedAt: previewTakenAt })
+        : null,
+    [record, username, showAmounts, previewTakenAt],
+  );
+
   const run = async (action: 'publish' | 'unpublish') => {
     setBusy(true);
     setError(null);
@@ -172,6 +192,7 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
 
   return (
     <PageFrame
+      sidebarDestination
       title="Verified track record"
       icon={BadgeCheck}
       onBack={onBack}
@@ -186,20 +207,20 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
           <div>
             <p className="text-xs text-text-secondary">Broker-verified trades</p>
             <p className="text-3xl md:text-4xl font-extrabold tabular-nums leading-none mt-1">
-              {record.verifiedTrades.toLocaleString()}
+              <CountUp value={record.verifiedTrades} format={wholeNumber} from={0} />
             </p>
           </div>
           <div>
             <p className="text-xs text-text-secondary">Hand-entered, excluded</p>
             <p className="text-3xl md:text-4xl font-extrabold tabular-nums leading-none mt-1 text-text-secondary">
-              {record.excludedTrades.toLocaleString()}
+              <CountUp value={record.excludedTrades} format={wholeNumber} from={0} />
             </p>
           </div>
           {record.verifiedTrades > 0 && (
             <div>
               <p className="text-xs text-text-secondary">Win rate</p>
               <p className="text-3xl md:text-4xl font-extrabold tabular-nums leading-none mt-1">
-                {record.winRate.toFixed(1)}%
+                <CountUp value={record.winRate} format={percent1} from={0} />
               </p>
             </div>
           )}
@@ -208,10 +229,10 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
               <p className="text-xs text-text-secondary">Net P&amp;L</p>
               <p
                 className={`text-3xl md:text-4xl font-extrabold tabular-nums leading-none mt-1 ${
-                  record.netPnl >= 0 ? 'text-emerald-400' : 'text-red-400'
+                  record.netPnl >= 0 ? 'text-profit-bright' : 'text-loss-bright'
                 }`}
               >
-                {formatCurrency(record.netPnl)}
+                <CountUp value={record.netPnl} format={formatCurrency} from={0} />
               </p>
             </div>
           )}
@@ -234,15 +255,21 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
       </section>
 
       {error && (
-        <p className="text-sm text-red-400" role="alert">
+        <p className="text-sm text-loss-bright" role="alert">
           {error}
         </p>
       )}
 
-      {/* Three across on a wide screen: what goes on the page, how it is shown, and the button.
-          Stacked down a 768px column the publish button sat three screens below the number it
-          publishes. */}
-      <div className="grid gap-2 md:gap-3 items-start lg:grid-cols-2 xl:grid-cols-3">
+      {/*
+        The controls down the left and the page they produce on the right.
+
+        The screen used to be three cards of settings with half the screen empty under them, and
+        nowhere on it was the thing being published — a trader decided what went on a public page
+        without seeing the page. Now every toggle on the left changes the page on the right as it is
+        clicked. On a narrower screen the controls come first and the page follows.
+      */}
+      <div className="grid gap-2 md:gap-3 items-start xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
+      <div className="grid gap-2 md:gap-3 items-start lg:grid-cols-2 xl:grid-cols-1">
         {journals.length > 0 && (
           <section className="panel-card p-5">
             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -335,7 +362,7 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
           </p>
         </section>
 
-        <section className="panel-card border-emerald-500/25 p-5">
+        <section className="panel-card border-profit-bright/25 p-5">
           {loading ? (
             <p className="text-sm text-text-secondary">Checking whether you have a page…</p>
           ) : !username ? (
@@ -344,7 +371,7 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
             </p>
           ) : live ? (
             <>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-profit-bright/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-profit-bright">
                 <BadgeCheck className="h-3.5 w-3.5" aria-hidden />
                 Published
               </span>
@@ -388,7 +415,7 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
                   type="button"
                   onClick={() => void run('unpublish')}
                   disabled={busy}
-                  className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:text-red-400 hover:border-red-500/40 transition-colors focus-ring disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:text-loss-bright hover:border-loss-bright/40 transition-colors focus-ring disabled:opacity-50"
                 >
                   Take it down
                 </button>
@@ -423,6 +450,25 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
             </>
           )}
         </section>
+      </div>
+
+      <section className="min-w-0" aria-label="Preview of your public page">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 mb-2 px-0.5">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+            Preview · what visitors see
+          </h2>
+          {url && <code className="text-[11px] text-text-secondary break-all">{url}</code>}
+        </div>
+        {preview ? (
+          <PublishedRecordView record={preview} />
+        ) : (
+          <div className="panel-card p-8 text-center text-sm text-text-secondary">
+            {username
+              ? 'Your page appears here once a broker has sent us trades for a journal you include.'
+              : 'Pick a username in Account settings and your page appears here.'}
+          </div>
+        )}
+      </section>
       </div>
     </PageFrame>
   );

@@ -4,6 +4,7 @@ import { useAuth } from '../context/useAuth';
 import { useSettings } from '../context/useSettings';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useEscapeToClose } from '../hooks/useEscapeToClose';
+import { useAnimatedClose } from '../hooks/useAnimatedClose';
 import { MAX_SHARE_CARD_BACKGROUNDS, deleteShareCardBackground, uploadShareCardBackground } from '../services/shareCardBackgrounds';
 import type { TradingStats } from '../utils/stats';
 import { formatCurrency } from '../utils/format';
@@ -50,7 +51,8 @@ interface ShareCardModalProps {
 }
 
 export function ShareCardModal({ period, stats, dateKey = '', year, month = 0, onClose }: ShareCardModalProps) {
-  useEscapeToClose(onClose);
+  const { closing, close } = useAnimatedClose(onClose);
+  useEscapeToClose(close);
   const { settings, updateSettings } = useSettings();
   const { user, username: profileUsername, firebaseEnabled } = useAuth();
   /* Three states, because the clipboard can refuse: 'copied', 'failed', or nothing to say yet. */
@@ -236,11 +238,11 @@ export function ShareCardModal({ period, stats, dateKey = '', year, month = 0, o
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-backdrop-in overflow-y-auto"
-      onClick={onClose}
+      className={`fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 ${closing ? 'animate-backdrop-out' : 'animate-backdrop-in'} overflow-y-auto`}
+      onClick={close}
     >
       <div
-        className={`bg-bg-secondary border border-border rounded-2xl p-5 md:p-6 w-full shadow-xl animate-scale-in my-auto ${
+        className={`bg-bg-secondary border border-border rounded-2xl p-5 md:p-6 w-full shadow-xl ${closing ? 'animate-scale-out' : 'animate-scale-in'} my-auto ${
           orientation === 'portrait' ? 'max-w-sm' : 'max-w-lg'
         }`}
         onClick={(e) => e.stopPropagation()}
@@ -252,7 +254,7 @@ export function ShareCardModal({ period, stats, dateKey = '', year, month = 0, o
               <p className="text-[11px] text-text-secondary mt-0.5">Story format for phone</p>
             )}
           </div>
-          <button type="button" onClick={onClose} className="p-1 text-text-secondary hover:text-text-primary focus-ring rounded" aria-label="Close">
+          <button type="button" onClick={close} className="p-1 text-text-secondary hover:text-text-primary focus-ring rounded" aria-label="Close">
             <X size={20} />
           </button>
         </div>

@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useEscapeToClose } from '../hooks/useEscapeToClose';
+import { useAnimatedClose } from '../hooks/useAnimatedClose';
 
 interface ConfirmDialogProps {
   title: string;
@@ -21,7 +22,10 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  useEscapeToClose(onCancel);
+  // Cancelling plays the dialog out; confirming does not wait, since the parent may be about to
+  // run the action and replace the screen under it.
+  const { closing, close: cancel } = useAnimatedClose(onCancel);
+  useEscapeToClose(cancel);
 
   /*
    * Rendered into document.body rather than where it is written.
@@ -38,16 +42,16 @@ export function ConfirmDialog({
    * matters more than fixing the one caller that exposed it.
    */
   const dialog = (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-backdrop-in" onClick={onCancel}>
+    <div className={`fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 ${closing ? 'animate-backdrop-out' : 'animate-backdrop-in'}`} onClick={cancel}>
       <div
-        className="bg-bg-secondary border border-border rounded-xl p-6 w-full max-w-sm shadow-xl animate-scale-in"
+        className={`bg-bg-secondary border border-border rounded-2xl p-6 w-full max-w-sm shadow-xl ${closing ? 'animate-scale-out' : 'animate-scale-in'}`}
         onClick={(e) => e.stopPropagation()}
         role="alertdialog"
         aria-labelledby="confirm-title"
       >
         <div className="flex justify-between items-start gap-3 mb-3">
           <h3 id="confirm-title" className="text-lg font-semibold">{title}</h3>
-          <button type="button" onClick={onCancel} className="p-1 text-text-secondary hover:text-text-primary focus-ring rounded" aria-label="Close">
+          <button type="button" onClick={cancel} className="p-1 text-text-secondary hover:text-text-primary focus-ring rounded" aria-label="Close">
             <X size={18} />
           </button>
         </div>
@@ -62,7 +66,7 @@ export function ConfirmDialog({
           >
             {confirmLabel}
           </button>
-          <button type="button" onClick={onCancel} className="flex-1 py-2.5 btn-secondary text-sm">
+          <button type="button" onClick={cancel} className="flex-1 py-2.5 btn-secondary text-sm">
             {cancelLabel}
           </button>
         </div>

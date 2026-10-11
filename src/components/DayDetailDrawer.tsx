@@ -96,7 +96,9 @@ export function DayDetailDrawer({
   const [showShare, setShowShare] = useState(false);
 
   // Escape belongs to whatever is on top: the confirmation, the share card, then the drawer.
-  useEscapeToClose(onClose, !pendingDelete && !showShare);
+  // handleClose, not onClose: Escape used to unmount the drawer on the spot while the X and the
+  // backdrop slid it out, so the same action looked different depending on how you asked for it.
+  useEscapeToClose(handleClose, !pendingDelete && !showShare);
   const dayTrades = trades.filter((t) => t.date === date);
   const dayStats = useMemo(() => computeStats(dayTrades), [dayTrades]);
   const totalPnl = dayStats.netPnl;
@@ -112,14 +114,14 @@ export function DayDetailDrawer({
     <>
       <button
         type="button"
-        className={`fixed inset-0 z-50 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
+        className={`fixed inset-0 z-50 bg-black/50 backdrop-blur-sm transition-opacity duration-300 motion-reduce:transition-none ${
           visible ? 'opacity-100' : 'opacity-0'
         }`}
         onClick={handleClose}
         aria-label="Close day details"
       />
       <aside
-        className={`fixed inset-y-0 right-0 z-50 w-full max-w-md bg-bg-secondary border-l border-border/80 shadow-2xl flex flex-col transition-transform duration-300 ease-out ${
+        className={`fixed inset-y-0 right-0 z-50 w-full max-w-md bg-bg-secondary border-l border-border/80 shadow-2xl flex flex-col transition-transform duration-300 ease-out motion-reduce:transition-none ${
           visible ? 'translate-x-0' : 'translate-x-full'
         }`}
         role="dialog"

@@ -10,9 +10,9 @@ const TONE: Record<AnnouncementTone, { wrap: string; icon: string; link: string 
     link: 'text-accent hover:text-accent/80',
   },
   success: {
-    wrap: 'border-emerald-400/30 bg-emerald-400/5',
-    icon: 'bg-emerald-400/15 border-emerald-400/30 text-emerald-400',
-    link: 'text-emerald-400 hover:text-emerald-300',
+    wrap: 'border-profit-bright/30 bg-profit-bright/5',
+    icon: 'bg-profit-bright/15 border-profit-bright/30 text-profit-bright',
+    link: 'text-profit-bright hover:text-profit-bright/80',
   },
   warning: {
     wrap: 'border-amber-400/30 bg-amber-400/5',

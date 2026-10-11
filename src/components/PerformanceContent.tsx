@@ -6,6 +6,7 @@ import { ExecutionPrompts, ExecutionSection } from './analytics/ExecutionSection
 import { BrokerInsightSection } from './analytics/BrokerInsightSection';
 import { hasAnyExecutionData, executionCoverage } from '../utils/executionAnalytics';
 import { PageFrame, PageSection } from './layout/PageFrame';
+import { SegmentedControl } from './ui/SegmentedControl';
 
 type Scope = 'month' | 'year' | 'all';
 
@@ -58,28 +59,13 @@ export function PerformanceContent({ trades, year, month, onBack }: PerformanceC
 
   return (
     <PageFrame
+      sidebarDestination
       title="Performance"
       icon={Gauge}
       onBack={onBack}
       subtitle="How you traded, rather than how much you made. Everything in the first section is worked out from your imported fills alone — nothing to fill in."
       actions={
-        <div className="flex items-center gap-1 rounded-lg bg-bg-tertiary/60 p-0.5">
-          {SCOPES.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setScope(s.id)}
-              aria-pressed={scope === s.id}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors focus-ring ${
-                scope === s.id
-                  ? 'bg-bg-secondary text-text-primary'
-                  : 'text-text-secondary hover:text-text-primary'
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl label="Period" value={scope} onChange={setScope} options={SCOPES} />
       }
     >
       {trades.length === 0 ? (

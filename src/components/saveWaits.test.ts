@@ -27,9 +27,12 @@ describe('the trade modal', () => {
     expect(submit).toContain('await onSave(payload)');
     expect(submit).toContain('await onUpdate(');
     // Close inside the try, after the awaits — never after the catch, where a failure also lands.
+    // `close()` is useAnimatedClose's: it plays the modal out and then calls onClose. Matched as a
+    // word so a stray `onClose()` (which would skip the animation) also counts as closing here.
+    const closes = /\b(?:on)?[cC]lose\(\)/;
     const tryBlock = submit.slice(submit.indexOf('try {'), submit.indexOf('} catch'));
-    expect(tryBlock).toContain('onClose()');
-    expect(submit.slice(submit.indexOf('} catch'))).not.toContain('onClose()');
+    expect(tryBlock).toMatch(closes);
+    expect(submit.slice(submit.indexOf('} catch'))).not.toMatch(closes);
   });
 
   it('says so on failure, and reports it with a scope', () => {
@@ -49,7 +52,8 @@ describe('the CSV import', () => {
   it('awaits the batch and closes only once it has landed', () => {
     expect(save).toContain('await onSave(toSave)');
     const tryBlock = save.slice(save.indexOf('try {'), save.indexOf('} catch'));
-    expect(tryBlock).toContain('onClose()');
+    expect(tryBlock).toMatch(/\b(?:on)?[cC]lose\(\)/);
+    expect(save.slice(save.indexOf('} catch'))).not.toMatch(/\b(?:on)?[cC]lose\(\)/);
   });
 
   it('keeps the preview on failure and reports with a scope', () => {

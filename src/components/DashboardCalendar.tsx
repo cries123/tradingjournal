@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { Trade } from '../types';
 import { aggregateTradesByDay, buildCalendarWeeks, getMonthTotalPnl } from '../utils/calendar';
 import { formatCurrency, formatMonthYear } from '../utils/format';
@@ -6,6 +6,8 @@ import { useSettings } from '../context/useSettings';
 import { DashboardDayCell } from './DashboardDayCell';
 import { DashboardWeekTotalCell } from './DashboardWeekTotalCell';
 import { MonthPicker } from './MonthPicker';
+import { CountUp } from './motion/CountUp';
+import { filledDays, nextDaySeen, type DaySeen } from '../utils/freshDays';
 
 interface DashboardCalendarProps {
   year: number;
@@ -29,6 +31,11 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
  */
 const DAYS_PER_WEEK = 7;
 
+/** "2026-07-04" for a day of a 0-based month — the key trades and summaries are filed under. */
+function dayKey(year: number, month: number, day: number): string {
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
 /** True when one of this week's cells is today — that row stays full height even when empty,
  *  since it's the one the trader is most likely to click into to log a session. */
 function weekHasToday(week: { days: { date: Date | null }[] }, today: Date): boolean {
@@ -48,6 +55,19 @@ export function DashboardCalendar({
   const summaries = useMemo(() => aggregateTradesByDay(trades), [trades]);
   const weeks = useMemo(() => buildCalendarWeeks(year, month, summaries), [year, month, summaries]);
   const monthTotal = useMemo(() => getMonthTotalPnl(summaries, year, month), [summaries, year, month]);
+
+  /*
+   * Days that just gained their first trade while this month is on screen pop into the grid — the
+   * moment a sync lands, which is the moment this product exists for. Derived during render from
+   * the previous record (React's "store information from previous renders" pattern) rather than in
+   * an effect, so the pop starts on the same frame as the day's figure rather than one after it.
+   */
+  const monthKey = `${year}-${month}`;
+  const days = useMemo(() => filledDays(summaries, year, month), [summaries, year, month]);
+  const [seen, setSeen] = useState<DaySeen>(() => nextDaySeen(null, monthKey, days));
+  const nextSeen = nextDaySeen(seen, monthKey, days);
+  if (nextSeen !== seen) setSeen(nextSeen);
+  const fresh = nextSeen.fresh;
 
   const maxDayAbs = useMemo(() => {
     let max = 0;
@@ -69,11 +89,14 @@ export function DashboardCalendar({
       <div className="flex flex-wrap items-center justify-between mb-1.5 md:mb-3 gap-x-2 gap-y-1">
         <div className="min-w-0">
           <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">Calendar</p>
-          <h2 className="text-xs md:text-lg font-semibold">{formatMonthYear(year, month)}</h2>
+          {/* Keyed on the month so it fades in with the grid below, instead of the grid fading
+              in under a heading that had already changed. */}
+          <h2 key={monthKey} className="text-xs md:text-lg font-semibold animate-page-in">{formatMonthYear(year, month)}</h2>
         </div>
         <div className="flex items-center gap-1.5 md:gap-3 shrink-0 ml-auto">
-          <span className={`text-[10px] md:text-sm font-semibold ${monthTotal >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}>
-            {formatCurrency(monthTotal, settings.currency)}
+          {/* Rolls from last month's total to this one's while the grid fades in. */}
+          <span className={`text-[10px] md:text-sm font-semibold tabular-nums ${monthTotal >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}>
+            <CountUp value={monthTotal} format={(n) => formatCurrency(n, settings.currency)} />
           </span>
           <MonthPicker
             year={year}
@@ -119,9 +142,10 @@ export function DashboardCalendar({
                     : 0
                 }
                 isToday={isCurrentMonth && day.date?.getDate() === today.getDate()}
+                fresh={day.date ? fresh.has(dayKey(year, month, day.date.getDate())) : false}
                 onClick={
                   day.date
-                    ? () => onDayClick(`${year}-${String(month + 1).padStart(2, '0')}-${String(day.date!.getDate()).padStart(2, '0')}`)
+                    ? () => onDayClick(dayKey(year, month, day.date!.getDate()))
                     : undefined
                 }
               />

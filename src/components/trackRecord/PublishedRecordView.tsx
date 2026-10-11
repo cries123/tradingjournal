@@ -76,7 +76,9 @@ export function PublishedRecordView({
   onLaunch,
 }: {
   record: PublishedRecord;
-  onLaunch: () => void;
+  /** The "start your own journal" pitch at the foot of the page. Left out by the app's preview,
+   *  where the reader already has a journal. */
+  onLaunch?: () => void;
 }) {
   const amounts = record.showAmounts === true;
 
@@ -248,6 +250,7 @@ export function PublishedRecordView({
         </div>
       </Band>
 
+      {onLaunch && (
       <Band title="Trend Chasers">
         <p className="text-sm text-text-secondary leading-relaxed">
           Trend Chasers is a trading journal that imports your fills from your broker. If you want a
@@ -257,6 +260,7 @@ export function PublishedRecordView({
           Start your own journal
         </button>
       </Band>
+      )}
     </article>
   );
 }

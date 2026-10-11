@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { BarChart3, Calendar, Link2, X } from 'lucide-react';
 import { useEscapeToClose } from '../hooks/useEscapeToClose';
+import { useAnimatedClose } from '../hooks/useAnimatedClose';
 import { markOnboardingDone } from '../utils/onboarding';
 
 const STEPS = [
@@ -30,16 +31,16 @@ export function OnboardingOverlay({ onDone }: OnboardingOverlayProps) {
   const current = STEPS[step];
   const Icon = current.icon;
 
-  const finish = () => {
+  const { closing, close: finish } = useAnimatedClose(() => {
     markOnboardingDone();
     onDone();
-  };
+  });
 
   useEscapeToClose(finish);
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-end md:items-center justify-center bg-black/70 backdrop-blur-sm p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-      <div className="bg-bg-secondary border border-border/80 rounded-2xl p-6 md:p-8 w-full max-w-md shadow-2xl animate-scale-in relative">
+    <div className={`fixed inset-0 z-[90] flex items-end md:items-center justify-center bg-black/70 backdrop-blur-sm p-4 pb-[max(1rem,env(safe-area-inset-bottom))] ${closing ? 'animate-backdrop-out' : 'animate-backdrop-in'}`}>
+      <div className={`bg-bg-secondary border border-border/80 rounded-2xl p-6 md:p-8 w-full max-w-md shadow-2xl ${closing ? 'animate-scale-out' : 'animate-scale-in'} relative`}>
         <button
           type="button"
           onClick={finish}

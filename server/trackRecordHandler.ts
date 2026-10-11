@@ -3,6 +3,7 @@ import {
   buildTrackRecord,
   canPublish,
   MIN_TRADES_TO_PUBLISH,
+  toPublishedRecord,
   type PublishedRecord,
 } from '../src/utils/trackRecord';
 import type { Trade } from '../src/types';
@@ -111,46 +112,15 @@ export async function publishTrackRecord(
     throw new TrackRecordError('A record is already published at that username.', 409);
   }
 
-  /*
-   * Amounts are dropped from the DOCUMENT, not hidden by the page.
-   *
-   * A public document with the figures in it and a flag asking the renderer not to show them is
-   * not privacy — anyone can read the document. If the trader said no amounts, the amounts never
-   * leave this function.
-   */
-  const money = options.showAmounts
-    ? {
-        netPnl: record.netPnl,
-        avgWin: record.avgWin,
-        avgLoss: record.avgLoss,
-        maxDrawdown: record.maxDrawdown,
-        bestDay: record.bestDay,
-        worstDay: record.worstDay,
-      }
-    : {};
-
-  // Typed as the shape the public page reads, so a field renamed on one side stops the build
-  // rather than rendering as undefined on somebody's published record.
-  const published: PublishedRecord = {
-    published: true,
-    showAmounts: options.showAmounts,
-    // The username as they typed it. The slug below is its lowercased form, used only as an id.
+  // The username as they typed it; the slug below is its lowercased form, used only as an id.
+  // What the page dates itself by is now: these figures are a snapshot, not a live feed. The
+  // amounts are dropped from the document itself when the trader said no — see toPublishedRecord,
+  // which the app's preview of the page runs too.
+  const published: PublishedRecord = toPublishedRecord(record, {
     username,
-    verifiedTrades: record.verifiedTrades,
-    excludedTrades: record.excludedTrades,
-    brokers: record.brokers,
-    firstDate: record.firstDate,
-    lastDate: record.lastDate,
-    tradingDays: record.tradingDays,
-    journalsEligible: record.journalsEligible,
-    journalsIncluded: record.journalsIncluded,
-    winRate: record.winRate,
-    profitFactor: record.profitFactor,
-    ...money,
-    // What the page dates itself by. These figures are a snapshot, not a live feed, and saying
-    // when they were taken is the difference between a record and an implied real-time claim.
+    showAmounts: options.showAmounts,
     updatedAt: new Date().toISOString(),
-  };
+  });
 
   const db = getAdminFirestore();
   const batch = db.batch();

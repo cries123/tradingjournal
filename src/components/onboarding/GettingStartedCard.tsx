@@ -39,7 +39,7 @@ export function GettingStartedCard({
     <section className="panel-card p-4 md:p-5 mb-4" aria-labelledby="getting-started-title">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-2">
-          <Sparkles size={15} className="text-emerald-400 shrink-0" aria-hidden />
+          <Sparkles size={15} className="text-profit-bright shrink-0" aria-hidden />
           <h2 id="getting-started-title" className="text-sm font-semibold">
             Getting started
           </h2>
@@ -69,7 +69,7 @@ export function GettingStartedCard({
               }`}
             >
               {step.done ? (
-                <Check size={15} className="mt-0.5 shrink-0 text-emerald-400" aria-hidden />
+                <Check size={15} className="mt-0.5 shrink-0 text-profit-bright" aria-hidden />
               ) : (
                 <Circle size={15} className="mt-0.5 shrink-0 text-text-secondary/60" aria-hidden />
               )}

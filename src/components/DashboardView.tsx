@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Calendar, Grid3X3, RefreshCw, Share2 } from 'lucide-react';
+import { Calendar, Grid3X3, LayoutDashboard, RefreshCw, Share2 } from 'lucide-react';
 import type { Filters, Trade } from '../types';
 import { computeStats, getMonthTrades, getYearTrades } from '../utils/stats';
 import { formatCurrency, formatMonthYear } from '../utils/format';
@@ -20,6 +20,9 @@ import { YearMonths } from './YearMonths';
 import { TradingInsightsSection } from './analytics/TradingInsightsSection';
 import { DirectionPanel } from './analytics/DirectionPanel';
 import { TakeawayBanner } from './analytics/TakeawayBanner';
+import { SegmentedControl } from './ui/SegmentedControl';
+import { Reveal } from './motion/Reveal';
+import { directionSplit } from '../utils/directionRows';
 
 type DashboardMode = 'month' | 'year';
 
@@ -93,6 +96,7 @@ export function DashboardView({
   const hasFilters = Boolean(filters.symbol || filters.setup || filters.side || filters.tag);
   const analyticsTrades = mode === 'month' ? monthTrades : yearTrades;
   const streakDays = useMemo(() => computeJournalingStreak(trades), [trades]);
+  const direction = useMemo(() => directionSplit(analyticsTrades), [analyticsTrades]);
 
   const takeaway = useMemo(() => {
     const insights = computeTradingInsights(analyticsTrades);
@@ -134,29 +138,33 @@ export function DashboardView({
         <AccountSwitcher />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 shrink-0">
-        <div className="flex rounded-lg bg-bg-tertiary/60 p-0.5 border border-border/50">
-          <button
-            type="button"
-            onClick={() => setMode('month')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors focus-ring ${
-              mode === 'month' ? 'bg-accent/15 text-accent' : 'text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            <Calendar size={14} />
-            Month
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('year')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors focus-ring ${
-              mode === 'year' ? 'bg-accent/15 text-accent' : 'text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            <Grid3X3 size={14} />
-            Year
-          </button>
+      {/*
+        The screen's header, in the shape every other screen's has — icon and title, then its
+        controls. The filters live here now: they narrow everything below them, the hero included,
+        and sitting under the calendar they read as a control for the Long vs Short card they
+        happened to be above.
+      */}
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 shrink-0 px-0.5">
+        <div className="hidden md:flex items-center gap-3 mr-2">
+          <span className="p-2 rounded-lg bg-accent/10 text-accent shrink-0">
+            <LayoutDashboard size={20} aria-hidden />
+          </span>
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight">Overview</h1>
         </div>
+
+        <SegmentedControl
+          label="View"
+          value={mode}
+          onChange={setMode}
+          options={[
+            { id: 'month', label: 'Month', icon: Calendar },
+            { id: 'year', label: 'Year', icon: Grid3X3 },
+          ]}
+        />
+
+        {(hasAnyTrades || hasFilters) && (
+          <FiltersBar filters={filters} symbols={filterSymbols} setups={filterSetups} onChange={onFiltersChange} />
+        )}
 
         {/* Syncing is something you do, not something that happens to you: the broker is only ever
             contacted when the trader presses Sync on the Connect Broker screen. So this is a plain
@@ -183,7 +191,7 @@ export function DashboardView({
             {mode === 'month' ? 'Share month' : 'Share year'}
           </button>
         )}
-      </div>
+      </header>
 
       {!hasAnyTrades && (
         <EmptyDashboard
@@ -260,25 +268,22 @@ export function DashboardView({
         </div>
       </div>
 
-      {(hasAnyTrades || hasFilters) && (
-        <FiltersBar filters={filters} symbols={filterSymbols} setups={filterSetups} onChange={onFiltersChange} />
-      )}
-
       {/* Direction on its own row now that Gross Daily P&L, which was the other half of it, has
           gone with the rest of the charts. Full width rather than a half-width card stranded
-          beside an empty column. */}
+          beside an empty column. Calls vs puts for a trader who never sells short — see
+          directionSplit. */}
       {hasAnyTrades && (
-        <div className="panel-card p-3 md:p-4 flex flex-col min-h-[160px]">
+        <Reveal className="panel-card spotlight p-3 md:p-4 flex flex-col min-h-[160px]">
           <div className="mb-1.5 md:mb-3 shrink-0">
             <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
               Direction
             </p>
-            <h3 className="text-[10px] md:text-sm font-semibold text-text-primary">Long vs Short</h3>
+            <h3 className="text-[10px] md:text-sm font-semibold text-text-primary">{direction.title}</h3>
           </div>
           <div className="flex-1 min-h-[80px]">
-            <DirectionPanel trades={analyticsTrades} currency={settings.currency} />
+            <DirectionPanel groups={direction.groups} currency={settings.currency} />
           </div>
-        </div>
+        </Reveal>
       )}
 
       {hasAnyTrades && <TradingInsightsSection trades={analyticsTrades} />}

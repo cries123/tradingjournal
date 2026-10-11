@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import { CandlestickChart, Clock, Crosshair, ListChecks, Ruler, Tags } from 'lucide-react';
 import type { Trade } from '../../types';
 import { useSettings } from '../../context/useSettings';
@@ -42,7 +42,7 @@ function HourPanel({ data, currency }: { data: HourlyBreakdown; currency: Curren
   return (
     <PanelShell eyebrow="Timing" title="P&L by hour entered" icon={<Clock size={14} />}>
       <div className="space-y-1">
-        {data.rows.map((row) => {
+        {data.rows.map((row, i) => {
           const traded = row.trades > 0;
           const widthPct = (Math.abs(row.pnl) / maxAbs) * 100;
           return (
@@ -55,8 +55,8 @@ function HourPanel({ data, currency }: { data: HourlyBreakdown; currency: Curren
               >
                 {row.pnl !== 0 && (
                   <div
-                    className={`h-full rounded-full chart-bar-h ${row.pnl >= 0 ? 'bar-profit-h' : 'bar-loss-h'}`}
-                    style={{ width: `${Math.max(widthPct, 3)}%` }}
+                    className={`bar-in h-full rounded-full chart-bar-h ${row.pnl >= 0 ? 'bar-profit-h' : 'bar-loss-h'}`}
+                    style={{ width: `${Math.max(widthPct, 3)}%`, '--i': i } as CSSProperties}
                   />
                 )}
               </div>
@@ -278,15 +278,15 @@ function TagPanel({
   return (
     <PanelShell eyebrow={eyebrow} title={title} icon={icon ?? <Tags size={14} />}>
       <div className="space-y-1.5">
-        {rows.map((row) => (
+        {rows.map((row, i) => (
           <div key={row.tag} className="flex items-center gap-2">
             <span className="text-[10px] text-text-primary w-20 md:w-24 shrink-0 truncate" title={row.tag}>
               {row.tag}
             </span>
             <div className="flex-1 h-3 rounded-full overflow-hidden bg-bg-primary relative">
               <div
-                className={`h-full rounded-full chart-bar-h ${row.pnl >= 0 ? 'bar-profit-h' : 'bar-loss-h'}`}
-                style={{ width: `${Math.max((Math.abs(row.pnl) / maxAbs) * 100, 3)}%` }}
+                className={`bar-in h-full rounded-full chart-bar-h ${row.pnl >= 0 ? 'bar-profit-h' : 'bar-loss-h'}`}
+                style={{ width: `${Math.max((Math.abs(row.pnl) / maxAbs) * 100, 3)}%`, '--i': i } as CSSProperties}
               />
             </div>
             <span className="text-[9px] text-text-secondary w-14 shrink-0 text-right tabular-nums">
@@ -321,7 +321,7 @@ export function ExecutionSection({ trades }: ExecutionSectionProps) {
   const currency = settings.currency;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 2xl:block 2xl:columns-3 2xl:[&>*]:mb-3 2xl:[&>*]:break-inside-avoid">
+    <div className="panel-grid">
       {/* Symbols first: it needs nothing but a ticker and a P&L, so it is the one panel here that
           draws for every journal from every source. */}
       {coverage.symbols.length > 0 && (
@@ -424,7 +424,7 @@ export function ExecutionPrompts({ trades }: ExecutionSectionProps) {
       <h3 className="text-sm font-semibold mb-3">
         {prompts.length} more panel{prompts.length === 1 ? '' : 's'} the journal can draw
       </h3>
-      <ul className="grid gap-2 md:grid-cols-2 2xl:grid-cols-3">
+      <ul className="panel-grid">
         {prompts.map((prompt) => (
           <li
             key={prompt.id}

@@ -224,8 +224,9 @@ export function SequencePanel({ rows, currency }: { rows: SequenceRow[]; currenc
   return (
     <PanelShell eyebrow="Rhythm" title="How the day unfolds" icon={<ListOrdered size={14} />}>
       <div className="space-y-1.5">
-        {rows.map((row) => (
+        {rows.map((row, i) => (
           <BarRow
+            index={i}
             key={row.label}
             label={row.label}
             meta={`${row.trades}t · ${Math.round(row.winRate)}%`}
@@ -259,8 +260,9 @@ export function LoadPanel({ rows, currency }: { rows: LoadRow[]; currency: Curre
   return (
     <PanelShell eyebrow="Volume" title="Quiet days against busy ones" icon={<Layers size={14} />}>
       <div className="space-y-1.5">
-        {rows.map((row) => (
+        {rows.map((row, i) => (
           <BarRow
+            index={i}
             key={row.label}
             label={row.label}
             meta={`${row.days}d · ${Math.round((row.greenDays / row.days) * 100)}%`}
@@ -296,8 +298,9 @@ function ExpiryPanel({ rows, currency }: { rows: ExpiryRow[]; currency: Currency
   return (
     <PanelShell eyebrow="Expiry" title="Time left when you opened" icon={<CalendarClock size={14} />}>
       <div className="space-y-1.5">
-        {rows.map((row) => (
+        {rows.map((row, i) => (
           <BarRow
+            index={i}
             key={row.label}
             label={row.label}
             meta={`${row.trades}t · ${Math.round(row.winRate)}%`}
@@ -330,8 +333,9 @@ function InstrumentPanel({ rows, currency }: { rows: InstrumentRow[]; currency: 
   return (
     <PanelShell eyebrow="Mix" title="Calls, puts and shares" icon={<Timer size={14} />}>
       <div className="space-y-1.5">
-        {rows.map((row) => (
+        {rows.map((row, i) => (
           <BarRow
+            index={i}
             key={row.label}
             label={row.label}
             meta={`${row.trades}t · ${Math.round(row.winRate)}%`}
@@ -415,7 +419,7 @@ export function BrokerInsightSection({ trades }: { trades: Trade[] }) {
   const currency = settings.currency;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 2xl:block 2xl:columns-3 2xl:[&>*]:mb-3 2xl:[&>*]:break-inside-avoid">
+    <div className="panel-grid">
       {coverage.breakeven && <BreakevenPanel data={coverage.breakeven} />}
       {coverage.sizing && <SizingPanel data={coverage.sizing} currency={currency} />}
       {coverage.tilt && <TiltPanel data={coverage.tilt} currency={currency} />}

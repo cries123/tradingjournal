@@ -396,6 +396,7 @@ export function BrokerConnectContent({
 
   return (
     <PageFrame
+      sidebarDestination
       eyebrow="Connect a broker"
       title="Import trades from your broker"
       icon={Link2}

@@ -52,6 +52,7 @@ export function AssistantContent({ periods, rules, onBack }: AssistantContentPro
 
   return (
     <PageFrame
+      sidebarDestination
       title="Trading assistant"
       icon={Sparkles}
       onBack={onBack}

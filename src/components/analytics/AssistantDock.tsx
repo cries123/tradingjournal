@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { MessageCircle, X } from 'lucide-react';
 import { useEscapeToClose } from '../../hooks/useEscapeToClose';
+import { useAnimatedClose } from '../../hooks/useAnimatedClose';
 import { LockedFeature } from '../plan/LockedFeature';
 import { AssistantPanel, type AssistantPeriod } from './AssistantPanel';
 
@@ -30,7 +31,8 @@ export function AssistantDock({
   rules,
   showLauncher,
 }: AssistantDockProps) {
-  useEscapeToClose(() => onOpenChange(false));
+  const { closing, close } = useAnimatedClose(() => onOpenChange(false));
+  useEscapeToClose(close, open);
 
   // A full-height sheet on a phone would otherwise scroll the journal behind it.
   useEffect(() => {
@@ -63,23 +65,23 @@ export function AssistantDock({
           <button
             type="button"
             aria-label="Close assistant"
-            onClick={() => onOpenChange(false)}
-            className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm animate-backdrop-in"
+            onClick={close}
+            className={`md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm ${closing ? 'animate-backdrop-out' : 'animate-backdrop-in'}`}
           />
 
           <div
             role="dialog"
             aria-label="Trading assistant"
-            className="fixed z-50 flex flex-col animate-scale-in motion-safe:animate-scale-in
+            className={`fixed z-50 flex flex-col ${closing ? 'animate-scale-out' : 'animate-scale-in'}
               inset-x-0 bottom-0 top-16 rounded-t-2xl
               md:inset-auto md:top-auto md:bottom-6 md:right-6 md:w-[400px] md:max-h-[min(620px,calc(100dvh-6rem))] md:rounded-2xl
-              border border-border bg-bg-secondary shadow-2xl shadow-black/50 overflow-hidden"
+              border border-border bg-bg-secondary shadow-2xl shadow-black/50 overflow-hidden`}
           >
             <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border/60 shrink-0">
               <span className="text-xs font-semibold text-text-primary">Trading assistant</span>
               <button
                 type="button"
-                onClick={() => onOpenChange(false)}
+                onClick={close}
                 aria-label="Close"
                 className="p-1.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60 transition-colors focus-ring"
               >

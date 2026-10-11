@@ -1,4 +1,4 @@
-import { lazy, useEffect, useState, type PointerEvent } from 'react';
+import { lazy, useEffect, useState } from 'react';
 import { lowestPaidPrice } from '../seo/pricingClaims';
 import { Calendar, Check, Cloud, Lock, Pencil, Share2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -12,6 +12,7 @@ import { BrokerMarquee } from '../components/landing/BrokerMarquee';
 import { AssistantDemo } from '../components/landing/AssistantDemo';
 import { LazyOnView } from '../components/landing/LazyOnView';
 import { LandingFaq } from '../components/landing/LandingFaq';
+import { trackSpotlight } from '../utils/spotlight';
 import { lowestTierWith, TIER_PLANS, type Feature } from '../config/tiers';
 import { BrokerLogo } from '../components/brokers/BrokerLogo';
 import { brokerIdFromName } from '../utils/brokerIds';
@@ -33,19 +34,6 @@ const RuleSimulatorDemo = lazy(() => import('../components/landing/RuleSimulator
 function fromPlan(feature: Feature): string | null {
   const tier = lowestTierWith(feature);
   return tier ? `On ${TIER_PLANS[tier].name} and up` : null;
-}
-
-/**
- * Moves the spotlight glow on whichever landing card is under the cursor. One listener for the page
- * rather than one per card; touch input is ignored, since there is no hover to light.
- */
-function trackSpotlight(e: PointerEvent<HTMLDivElement>) {
-  if (e.pointerType !== 'mouse') return;
-  const card = (e.target as HTMLElement).closest<HTMLElement>('.spotlight');
-  if (!card) return;
-  const box = card.getBoundingClientRect();
-  card.style.setProperty('--spot-x', `${e.clientX - box.left}px`);
-  card.style.setProperty('--spot-y', `${e.clientY - box.top}px`);
 }
 
 interface LandingPageProps {

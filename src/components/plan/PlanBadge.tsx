@@ -32,12 +32,12 @@ function Meter({ label, used, limit, bonus = 0 }: { label: string; used: number;
         <span className="text-text-secondary">{label}</span>
         <span className={`tabular-nums font-medium ${spent ? 'text-loss-bright' : 'text-text-primary'}`}>
           {remaining} left
-          {bonus > 0 && <span className="text-emerald-400 font-normal"> +{bonus} bonus</span>}
+          {bonus > 0 && <span className="text-profit-bright font-normal"> +{bonus} bonus</span>}
         </span>
       </div>
       <div className="mt-1 h-1 rounded-full bg-bg-tertiary overflow-hidden">
         <div
-          className={`h-full rounded-full transition-[width] ${spent ? 'bg-loss' : 'bg-emerald-400'}`}
+          className={`h-full rounded-full transition-[width] ${spent ? 'bg-loss' : 'bg-profit-bright'}`}
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -99,7 +99,7 @@ export function PlanBadge() {
           <button
             type="button"
             onClick={goToPricing}
-            className="text-[11px] font-medium text-emerald-400 hover:text-emerald-300 transition-colors focus-ring rounded"
+            className="text-[11px] font-medium text-profit-bright hover:text-profit-bright/80 transition-colors focus-ring rounded"
           >
             Upgrade
           </button>

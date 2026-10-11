@@ -308,6 +308,7 @@ export function SettingsPage({
 
   return (
     <PageFrame
+      sidebarDestination
       title="Settings"
       icon={SettingsIcon}
       onBack={onBack}
@@ -330,8 +331,8 @@ export function SettingsPage({
             key={saveState.at}
             className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${
               saveState.status === 'saved'
-                ? 'bg-emerald-500/10 text-emerald-400'
-                : 'bg-red-500/10 text-red-400'
+                ? 'bg-profit-bright/10 text-profit-bright'
+                : 'bg-loss-bright/10 text-loss-bright'
             }`}
           >
             {saveState.status === 'saved' ? <Check size={12} /> : <CloudOff size={12} />}
@@ -593,7 +594,7 @@ export function SettingsPage({
               <button
                 type="button"
                 onClick={goToPricing}
-                className="text-emerald-400 hover:text-emerald-300 transition-colors focus-ring rounded"
+                className="text-profit-bright hover:text-profit-bright/80 transition-colors focus-ring rounded"
               >
                 See plans
               </button>{' '}
@@ -705,7 +706,7 @@ export function SettingsPage({
           </p>
 
           {orphanMoved > 0 && (
-            <p className="text-xs text-emerald-400">
+            <p className="text-xs text-profit-bright">
               Moved {orphanMoved.toLocaleString()}{" "}
               {orphanMoved === 1 ? "trade" : "trades"}.
             </p>

@@ -47,6 +47,7 @@ import { formatMonthYear } from '../utils/format';
 import { currentView, popView, pushView } from '../utils/viewStack';
 import { JournalOfflineBanner } from '../components/JournalOfflineBanner';
 import { InAppProvider } from '../components/layout/PageFrame';
+import { trackSpotlight } from '../utils/spotlight';
 
 interface JournalAppProps {
   onHome?: () => void;
@@ -313,7 +314,9 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
 
   return (
     <div
-      className={`flex w-full bg-bg-primary dashboard-bg ${
+      /* app-spotlight: the cards' hover glow, in the theme accent; one listener for the whole app. */
+      onPointerMove={trackSpotlight}
+      className={`app-spotlight flex w-full bg-bg-primary dashboard-bg ${
         isDesktop ? 'min-h-dvh' : 'h-full min-h-0 flex-1 flex flex-col overflow-hidden'
       }`}
     >
@@ -349,6 +352,13 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
           <div className="max-w-[1680px] mx-auto w-full pb-6 md:pb-10">
            <InAppProvider>
             {syncError && <JournalOfflineBanner message={syncError} />}
+            {/*
+              Keyed on the screen, so moving between screens fades the new one in rather than
+              swapping it in a single frame — the app's screens were the one place nothing moved.
+              The dashboard's loading skeleton has its own key, so the real dashboard fades in over
+              it instead of replacing it with a jump.
+            */}
+            <div key={appView === 'dashboard' && isLoading ? 'dashboard-loading' : appView} className="animate-page-in">
             {appView === 'settings' ? (
               <SettingsPage
                 trades={allTrades}
@@ -515,6 +525,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 />
               </>
             )}
+            </div>
            </InAppProvider>
           </div>
         </main>

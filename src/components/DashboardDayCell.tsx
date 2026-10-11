@@ -12,10 +12,12 @@ interface DashboardDayCellProps {
   /** Shrink to a slim row. Set for whole weeks with no trades, so a month that starts mid-week
    *  doesn't spend two full-height rows of the page saying nothing. */
   compact?: boolean;
+  /** This day just gained its first trade — a sync or an import landed on it. It pops in. */
+  fresh?: boolean;
 }
 
 const cellShell =
-  'rounded-sm md:rounded-lg text-left transition-all duration-200 ease-out flex flex-col bg-bg-card overflow-hidden motion-safe:hover:scale-[1.03] motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.98]';
+  'rounded-sm md:rounded-lg text-left transition-all duration-200 ease-out motion-reduce:transition-none flex flex-col bg-bg-card overflow-hidden motion-safe:hover:scale-[1.03] motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.98]';
 
 const FULL_HEIGHT = 'aspect-square md:aspect-auto md:h-[108px]';
 const COMPACT_HEIGHT = 'h-7 md:h-11';
@@ -27,6 +29,7 @@ export function DashboardDayCell({
   intensity = 0,
   isToday = false,
   compact = false,
+  fresh = false,
 }: DashboardDayCellProps) {
   const { settings } = useSettings();
   const heightClass = compact ? COMPACT_HEIGHT : FULL_HEIGHT;
@@ -42,7 +45,7 @@ export function DashboardDayCell({
   const borderClass = isProfit
     ? 'border-profit-bright/50 ring-1 ring-profit-bright/15 shadow-sm shadow-profit-bright/10'
     : isLoss
-      ? 'border-red-500/50 ring-1 ring-red-500/15 shadow-sm shadow-red-500/10'
+      ? 'border-loss-bright/50 ring-1 ring-loss-bright/15 shadow-sm shadow-loss-bright/10'
       : 'border-border/40';
 
   // Heat-map tint: bigger days glow harder. Reads the live theme accent via the
@@ -62,7 +65,7 @@ export function DashboardDayCell({
       style={heatStyle}
       className={`${cellShell} ${heightClass} p-0.5 md:p-2 border ${borderClass} ${
         isToday ? 'day-today' : ''
-      } hover:bg-bg-tertiary cursor-pointer group focus-ring`}
+      } ${fresh ? 'animate-cell-pop' : ''} hover:bg-bg-tertiary cursor-pointer group focus-ring`}
     >
       <span
         className={`text-[9px] md:text-xs leading-none ${

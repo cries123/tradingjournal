@@ -241,7 +241,8 @@ body {
   z-index: 1;
   opacity: 0;
   transition: opacity 0.3s ease;
-  background: radial-gradient(420px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(52, 211, 153, 0.09), transparent 45%);
+  /* Brand green on the landing page; inside the app --spot-rgb is the theme accent (.app-spotlight). */
+  background: radial-gradient(420px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(var(--spot-rgb, 52, 211, 153), 0.09), transparent 45%);
 }
 
 @media (hover: hover) {
@@ -428,6 +429,153 @@ body {
   animation: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Leaving, the same way in reverse but quicker: a dialog that takes as long to go as it took to
+   arrive feels like it is holding on. useAnimatedClose waits EXIT_MS before unmounting, so these
+   must not run longer than that. */
+@keyframes scale-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@keyframes backdrop-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.animate-scale-out {
+  animation: scale-out 0.18s ease-in forwards;
+  pointer-events: none;
+}
+
+.animate-backdrop-out {
+  animation: backdrop-out 0.18s ease-in forwards;
+  pointer-events: none;
+}
+
+.app-spotlight {
+  --spot-rgb: var(--color-profit-bright-rgb);
+}
+
+/*
+ * Cards that rise into place the first time they scroll into view, and bars that grow out of their
+ * baseline once their card has.
+ *
+ * Driven by data-revealed, which useReveal flips once. Only under no-preference: with reduced motion
+ * nothing here applies and every card and bar is simply where it ends up.
+ *
+ * Revealed means `transform: none`, not translateY(0). Any transform makes an element the containing
+ * block for its position: fixed descendants — the bug that once put a dialog off the top of a phone
+ * screen — so a card must not keep one after it has arrived.
+ *
+ * The bar is scaled, not resized, so its real width stays on the element and a later change in the
+ * data still animates through .chart-bar-h's width transition.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal {
+    transition:
+      opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms),
+      transform 0.6s cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms);
+  }
+
+  .reveal[data-revealed='false'] {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  .bar-in {
+    transform-origin: left;
+    animation: grow-x 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(var(--reveal-delay, 0ms) + 150ms + var(--i, 0) * 60ms);
+  }
+
+  [data-revealed='false'] .bar-in {
+    animation-play-state: paused;
+  }
+}
+
+/*
+ * The analysis panels' grid. Rows stretch to their tallest card, so the cards of a row end on one
+ * line instead of leaving a hole under the short ones.
+ *
+ * A short last row is the other hole. Three across, seven cards leave one card alone on the last
+ * row; stretched across the screen it was a $360 fee figure 1,600px wide. So the grid is six tracks
+ * with every card spanning two, and the tail is re-cut into halves instead: two left over become two
+ * halves, one left over takes the row above with it and becomes two rows of two halves (7 = 3 + 2 +
+ * 2). Panels hide themselves below their sample gates, so the count changes from journal to journal
+ * — these selectors work for any count, not for today's seven.
+ */
+.panel-grid {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 768px) {
+  .panel-grid {
+    gap: 0.75rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Two across, an odd one out has nothing to pair with, so it takes the row. */
+  .panel-grid > :last-child:nth-child(2n + 1) {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 1536px) {
+  .panel-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .panel-grid > *,
+  /* Undoes the two-across rule above, which is as specific as the ones below and would otherwise
+     still stretch an odd last card here — the ninth of nine, say, which has a row of its own. */
+  .panel-grid > :last-child:nth-child(2n + 1) {
+    grid-column: span 2;
+  }
+
+  /* Two left over (count ≡ 2 mod 3): the last two are halves. */
+  .panel-grid > :nth-child(3n + 1):nth-last-child(2),
+  .panel-grid > :nth-child(3n + 2):last-child,
+  /* One left over (count ≡ 1 mod 3): the last four are halves, two rows of two. */
+  .panel-grid > :nth-child(3n + 1):nth-last-child(4),
+  .panel-grid > :nth-child(3n + 2):nth-last-child(3),
+  .panel-grid > :nth-child(3n + 3):nth-last-child(2),
+  .panel-grid > :nth-child(3n + 1):last-child {
+    grid-column: span 3;
+  }
+
+  /* As specific as the tail rules, and after them, so a lone card takes the row rather than half. */
+  .panel-grid > :first-child:only-child {
+    grid-column: 1 / -1;
+  }
+
+  /* A row's cards arrive one after another, left to right, rather than as one block. */
+  .panel-grid > :nth-child(3n + 2) {
+    --reveal-delay: 80ms;
+  }
+
+  .panel-grid > :nth-child(3n + 3) {
+    --reveal-delay: 160ms;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1535.98px) {
+  .panel-grid > :nth-child(2n + 2) {
+    --reveal-delay: 80ms;
+  }
+}
+
 /* Layered, for the reason spelled out above @layer components at the bottom of this file.
  *
  * Unlayered, this `border` shorthand and this `box-shadow` beat every utility on the element. Six
@@ -522,33 +670,39 @@ body {
 /* On a phone these six chips wrapped to three rows, each carrying its own pill border and fill —
    a lot of chrome to deliver six numbers, and it pushed the equity chart below the fold. Below the
    tablet breakpoint they drop the pill entirely and sit as plain figures in a tighter grid; the
-   full chip treatment returns on desktop where there's room for it on one line. */
-.stat-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.125rem 0;
-  border-radius: 0;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  border: none;
-  background: none;
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-}
+   full chip treatment returns on desktop where there's room for it on one line.
 
-@media (min-width: 768px) {
+   Layered, like .panel-card and for the same reason. Unlayered, the `border` shorthand here beat
+   the streak chip's border-amber-500/30, and `.stat-chip .chip-value` beat every text-profit-bright
+   and text-loss-bright put on a value — so a losing average per trade printed in white. */
+@layer components {
   .stat-chip {
-    gap: 0.375rem;
-    padding: 0.25rem 0.625rem;
-    border-radius: 9999px;
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    background: rgba(21, 27, 40, 0.7);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0;
+    border-radius: 0;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    border: none;
+    background: none;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
   }
-}
 
-.stat-chip .chip-value {
-  color: var(--color-text-primary);
+  @media (min-width: 768px) {
+    .stat-chip {
+      gap: 0.375rem;
+      padding: 0.25rem 0.625rem;
+      border-radius: 9999px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      background: rgba(21, 27, 40, 0.7);
+    }
+  }
+
+  .stat-chip .chip-value {
+    color: var(--color-text-primary);
+  }
 }
 
 /* Gradient chart bars */
@@ -699,7 +853,10 @@ details.faq-item[open] summary {
   .animate-scale-in,
   .animate-slide-in,
   .animate-backdrop-in,
-  .animate-fade-up {
+  .animate-fade-up,
+  .animate-scale-out,
+  .animate-backdrop-out,
+  .skeleton-shimmer {
     animation: none !important;
   }
 

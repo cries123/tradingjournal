@@ -3,6 +3,7 @@ import { Search, X } from 'lucide-react';
 import type { Trade } from '../../types';
 import { useAuth } from '../../context/useAuth';
 import { useEscapeToClose } from '../../hooks/useEscapeToClose';
+import { useAnimatedClose } from '../../hooks/useAnimatedClose';
 import { fetchAllDayNotes, type DayNote } from '../../services/dayNotes';
 import { formatCurrency } from '../../utils/format';
 import { countMatches, searchJournal, type SearchHit } from '../../utils/searchJournal';
@@ -31,7 +32,8 @@ export function JournalSearch({ trades, onClose, onOpenDay }: JournalSearchProps
   const [notes, setNotes] = useState<DayNote[] | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEscapeToClose(onClose);
+  const { closing, close } = useAnimatedClose(onClose);
+  useEscapeToClose(close);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -70,14 +72,14 @@ export function JournalSearch({ trades, onClose, onOpenDay }: JournalSearchProps
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[10vh] bg-black/70"
+      className={`fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[10vh] bg-black/70 ${closing ? 'animate-backdrop-out' : 'animate-backdrop-in'}`}
       role="dialog"
       aria-modal="true"
       aria-label="Search your journal"
-      onClick={onClose}
+      onClick={close}
     >
       <div
-        className="w-full max-w-2xl rounded-xl border border-border bg-bg-secondary shadow-2xl overflow-hidden"
+        className={`w-full max-w-2xl rounded-2xl border border-border bg-bg-secondary shadow-2xl overflow-hidden ${closing ? 'animate-scale-out' : 'animate-scale-in'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 border-b border-border/60 px-4 py-3">
@@ -92,7 +94,7 @@ export function JournalSearch({ trades, onClose, onOpenDay }: JournalSearchProps
           />
           <button
             type="button"
-            onClick={onClose}
+            onClick={close}
             aria-label="Close search"
             className="p-1 rounded-lg text-text-secondary hover:text-text-primary focus-ring shrink-0"
           >
@@ -116,7 +118,7 @@ export function JournalSearch({ trades, onClose, onOpenDay }: JournalSearchProps
           )}
 
           {hits.map((hit) => (
-            <Result key={`${hit.kind}-${hit.id ?? hit.date}`} hit={hit} onOpenDay={onOpenDay} onClose={onClose} />
+            <Result key={`${hit.kind}-${hit.id ?? hit.date}`} hit={hit} onOpenDay={onOpenDay} onClose={close} />
           ))}
         </div>
 

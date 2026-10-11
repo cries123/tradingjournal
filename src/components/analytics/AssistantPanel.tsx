@@ -335,18 +335,18 @@ export function AssistantPanel({ periods, rules, bare = false, layout = 'dock' }
                     disabled={busy}
                     className={`w-full text-left rounded-xl border px-3 py-2.5 transition-colors focus-ring disabled:opacity-50 ${
                       f.tone === 'bad'
-                        ? 'border-red-500/25 bg-red-500/[0.04] hover:border-red-500/40'
+                        ? 'border-loss-bright/25 bg-loss-bright/[0.04] hover:border-loss-bright/40'
                         : f.tone === 'good'
-                          ? 'border-emerald-500/25 bg-emerald-500/[0.04] hover:border-emerald-500/40'
+                          ? 'border-profit-bright/25 bg-profit-bright/[0.04] hover:border-profit-bright/40'
                           : 'border-border/50 bg-bg-tertiary/25 hover:border-accent/40'
                     }`}
                   >
                     <span
                       className={`block text-xs font-semibold ${
                         f.tone === 'bad'
-                          ? 'text-red-300'
+                          ? 'text-loss-bright'
                           : f.tone === 'good'
-                            ? 'text-emerald-300'
+                            ? 'text-profit-bright'
                             : 'text-text-primary'
                       }`}
                     >

@@ -17,6 +17,13 @@ interface PageFrameProps {
   badge?: ReactNode;
   onBack?: () => void;
   backLabel?: string;
+  /**
+   * A screen the sidebar links to. Its back link is a phone control only: on a desktop the
+   * sidebar is right there with the same destination in it, and "Back to dashboard" above every
+   * title was a second way to the same place. Sub-screens (order history, account) leave this off —
+   * their way back is to a screen the sidebar does not list.
+   */
+  sidebarDestination?: boolean;
   /** Right-hand side of the header: period tabs, a primary action. */
   actions?: ReactNode;
   /** Column width on the public site only. Inside the app every screen is full width. */
@@ -45,6 +52,7 @@ export function PageFrame({
   badge,
   onBack,
   backLabel = 'Back to dashboard',
+  sidebarDestination = false,
   actions,
   publicWidth = 'max-w-2xl',
   children,
@@ -90,7 +98,7 @@ export function PageFrame({
             <button
               type="button"
               onClick={onBack}
-              className="inline-flex items-center gap-1.5 text-xs text-text-secondary hover:text-accent transition-colors mb-2 focus-ring rounded px-0.5 py-0.5"
+              className={`${sidebarDestination ? 'md:hidden ' : ''}inline-flex items-center gap-1.5 text-xs text-text-secondary hover:text-accent transition-colors mb-2 focus-ring rounded px-0.5 py-0.5`}
             >
               <ArrowLeft size={14} />
               {backLabel}

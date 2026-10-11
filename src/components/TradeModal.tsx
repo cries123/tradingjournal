@@ -3,6 +3,7 @@ import { ChevronDown, X } from 'lucide-react';
 import { useSettings } from '../context/useSettings';
 import type { ChecklistTick, Trade, TradeGrade, TradeSide, AssetClass } from '../types';
 import { useEscapeToClose } from '../hooks/useEscapeToClose';
+import { useAnimatedClose } from '../hooks/useAnimatedClose';
 import { readTradeForm } from '../utils/tradeFormValues';
 import { reportErrorSilently } from '../services/errorReporting';
 import { checklistScoreOf, ticksFor } from '../utils/playbook';
@@ -20,7 +21,8 @@ const GRADES: TradeGrade[] = ['A', 'B', 'C', 'D', 'F'];
 const ASSET_CLASSES: AssetClass[] = ['stock', 'option', 'future', 'forex', 'crypto'];
 
 export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: TradeModalProps) {
-  useEscapeToClose(onClose);
+  const { closing, close } = useAnimatedClose(onClose);
+  useEscapeToClose(close);
   const isEdit = Boolean(trade);
   const { settings } = useSettings();
   const today = new Date().toISOString().slice(0, 10);
@@ -170,7 +172,7 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
       } else {
         await onSave(payload);
       }
-      onClose();
+      close();
     } catch (err) {
       reportErrorSilently(err, 'promise', isEdit ? 'trade-modal-update' : 'trade-modal-save');
       setSaveError(
@@ -182,14 +184,14 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-backdrop-in motion-safe:animate-backdrop-in p-4" onClick={onClose}>
+    <div className={`fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm ${closing ? 'animate-backdrop-out' : 'animate-backdrop-in'} p-4`} onClick={close}>
       <div
-        className="bg-bg-secondary border border-border rounded-lg p-6 w-full max-w-md shadow-xl animate-scale-in motion-safe:animate-scale-in max-h-[90vh] overflow-y-auto"
+        className={`bg-bg-secondary border border-border rounded-2xl p-6 w-full max-w-md shadow-xl ${closing ? 'animate-scale-out' : 'animate-scale-in'} max-h-[90vh] overflow-y-auto`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold">{isEdit ? 'Edit Trade' : 'Add Trade'}</h3>
-          <button type="button" onClick={onClose} className="p-1 text-text-secondary hover:text-text-primary focus-ring rounded" aria-label="Close">
+          <button type="button" onClick={close} className="p-1 text-text-secondary hover:text-text-primary focus-ring rounded" aria-label="Close">
             <X size={20} />
           </button>
         </div>
@@ -385,7 +387,7 @@ export function TradeModal({ trade, defaultDate, onClose, onSave, onUpdate }: Tr
             >
               {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Save Trade'}
             </button>
-            <button type="button" onClick={onClose} className="px-4 py-2.5 btn-secondary text-sm">Cancel</button>
+            <button type="button" onClick={close} className="px-4 py-2.5 btn-secondary text-sm">Cancel</button>
           </div>
         </form>
       </div>

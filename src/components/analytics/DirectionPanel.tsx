@@ -1,38 +1,30 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { Trade } from '../../types';
+import type { CSSProperties } from 'react';
+import type { DirectionGroup } from '../../utils/directionRows';
 import { formatCurrency } from '../../utils/format';
-import { directionRows } from '../../utils/directionRows';
 
 type Currency = Parameters<typeof formatCurrency>[1];
 
 interface DirectionPanelProps {
-  trades: Trade[];
+  groups: DirectionGroup[];
   currency?: Currency;
 }
 
-export function DirectionPanel({ trades, currency }: DirectionPanelProps) {
-  const rows = useMemo(() => directionRows(trades), [trades]);
-  const [animatedFor, setAnimatedFor] = useState<typeof trades | null>(null);
-  const animate = animatedFor === trades;
+const COLUMNS: Record<number, string> = { 2: 'grid-cols-2', 3: 'grid-cols-3' };
 
-  const maxAbs = Math.max(...rows.map((r) => Math.abs(r.pnl)), 1);
-  const sidedTrades = rows.reduce((sum, r) => sum + r.trades, 0);
-
-  /*
-   * Bars grow from zero whenever the data changes.
-   *
-   * Derived rather than toggled: `animate` is false for any data this component has not yet
-   * animated, so a new period resets the bars during render instead of needing a synchronous
-   * setState inside an effect — which is a second render pass, and the pattern React's own docs
-   * point away from. The frame below marks the data as animated, and the bars grow.
-   */
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => setAnimatedFor(trades));
-    return () => cancelAnimationFrame(frame);
-  }, [trades]);
+/**
+ * The direction card's body: long vs short, or calls vs puts — directionSplit decides which.
+ *
+ * The bars grow in with the card (.bar-in, once the card has scrolled into view) and after that
+ * slide to new widths through .chart-bar-h when the period changes. That replaces a frame-timed
+ * "animate whenever the trades array changes" toggle, which regrew every bar from zero on each
+ * filter change and was the only chart on the page doing its own timing.
+ */
+export function DirectionPanel({ groups, currency }: DirectionPanelProps) {
+  const maxAbs = Math.max(...groups.map((g) => Math.abs(g.pnl)), 1);
+  const counted = groups.reduce((sum, g) => sum + g.trades, 0);
 
   // Side is optional on a Trade, and a hand-typed entry can omit it. Saying so beats an empty card.
-  if (sidedTrades === 0) {
+  if (counted === 0) {
     return (
       <div className="flex items-center justify-center h-full px-2 text-center text-xs text-text-secondary">
         No trades this period record a direction yet.
@@ -41,23 +33,23 @@ export function DirectionPanel({ trades, currency }: DirectionPanelProps) {
   }
 
   return (
-    <div className="grid h-full grid-cols-2 content-center gap-x-4 gap-y-2">
-      {rows.map((row, i) => {
+    <div className={`grid h-full ${COLUMNS[groups.length] ?? 'grid-cols-2'} content-center gap-x-4 gap-y-2`}>
+      {groups.map((group, i) => {
         // A direction you never traded and one that broke even are different facts, so an untraded
         // block is dimmed with its rail dropped rather than drawn as a flat bar.
-        const traded = row.trades > 0;
-        const isProfit = row.pnl >= 0;
-        const widthPct = (Math.abs(row.pnl) / maxAbs) * 100;
+        const traded = group.trades > 0;
+        const isProfit = group.pnl >= 0;
+        const widthPct = (Math.abs(group.pnl) / maxAbs) * 100;
 
         return (
-          <div key={row.side} className={traded ? '' : 'opacity-40'}>
-            <p className="text-[10px] md:text-[11px] font-medium text-text-secondary">{row.label}</p>
+          <div key={group.key} className={traded ? '' : 'opacity-40'}>
+            <p className="text-[10px] md:text-[11px] font-medium text-text-secondary">{group.label}</p>
             <p
               className={`mb-1.5 text-base md:text-lg font-semibold leading-tight tabular-nums ${
                 isProfit ? 'text-profit-bright' : 'text-loss-bright'
               }`}
             >
-              {traded ? formatCurrency(row.pnl, currency) : '—'}
+              {traded ? formatCurrency(group.pnl, currency) : '—'}
             </p>
 
             <div
@@ -65,20 +57,17 @@ export function DirectionPanel({ trades, currency }: DirectionPanelProps) {
                 traded ? 'bg-bg-primary' : 'border border-dashed border-border/40'
               }`}
             >
-              {traded && row.pnl !== 0 && (
+              {traded && group.pnl !== 0 && (
                 <div
-                  className={`chart-bar-h h-full rounded-full ${isProfit ? 'bar-profit-h' : 'bar-loss-h'}`}
-                  style={{
-                    width: animate ? `${Math.max(widthPct, 3)}%` : '0%',
-                    transitionDelay: `${i * 60}ms`,
-                  }}
+                  className={`bar-in chart-bar-h h-full rounded-full ${isProfit ? 'bar-profit-h' : 'bar-loss-h'}`}
+                  style={{ width: `${Math.max(widthPct, 3)}%`, '--i': i } as CSSProperties}
                 />
               )}
             </div>
 
             <p className="mt-1 text-[9px] md:text-[10px] text-text-secondary tabular-nums">
               {traded
-                ? `${row.trades} ${row.trades === 1 ? 'trade' : 'trades'} · ${Math.round(row.winRate)}% win`
+                ? `${group.trades} ${group.trades === 1 ? 'trade' : 'trades'} · ${Math.round(group.winRate)}% win`
                 : 'No trades'}
             </p>
           </div>

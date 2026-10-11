@@ -19,11 +19,14 @@ export function tweenValue(from: number, to: number, progress: number): number {
  * and a figure that began at $0 would flash from the real number to nothing and back on every load.
  * Movement only happens on a change, and a change mid-flight continues from the number on screen
  * rather than jumping. Under reduced motion it goes straight there.
+ *
+ * `from` is for screens nothing prerenders — the app behind sign-in — where counting up from zero
+ * the first time a figure appears is the arrival, not a flash.
  */
-export function useCountUp(target: number, durationMs = 900): number {
+export function useCountUp(target: number, durationMs = 900, from?: number): number {
   const reduceMotion = usePrefersReducedMotion();
-  const [value, setValue] = useState(target);
-  const shown = useRef(target);
+  const [value, setValue] = useState(() => (reduceMotion ? target : (from ?? target)));
+  const shown = useRef(reduceMotion ? target : (from ?? target));
 
   useEffect(() => {
     const start = shown.current;
