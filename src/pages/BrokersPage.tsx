@@ -9,7 +9,6 @@ interface BrokersPageProps {
   onPrivacy: () => void;
   onTerms: () => void;
   onBrokers: () => void;
-  onRequestBroker?: () => void;
   onGuides?: () => void;
   onHelp?: () => void;
   onNavigate?: (route: ExtraNavRoute) => void;
@@ -21,7 +20,6 @@ export function BrokersPage({
   onPrivacy,
   onTerms,
   onBrokers,
-  onRequestBroker,
   onGuides,
   onHelp,
   onNavigate,
@@ -43,7 +41,6 @@ export function BrokersPage({
         <BrokersContent
           onBack={back.goBack}
           backLabel={back.label}
-          onRequestBroker={onRequestBroker}
           wide
           onGuides={onGuides}
           onHelp={onHelp}

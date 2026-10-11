@@ -46,7 +46,6 @@ const ROUTES = [
   '/privacy',
   '/terms',
   '/refunds',
-  '/request-broker',
   '/report-bug',
   // Indexable product pages. Without a prerendered snapshot Google sees an empty SPA shell, so a
   // page can be linked from every footer on the site and still never be crawled properly.

@@ -31,6 +31,15 @@
   to = "/.netlify/functions/record-preview"
   status = 200
 
+# The broker-request form was removed (it was being spammed). A permanent redirect, so search
+# engines drop the old address rather than indexing a page that now shows the broker list.
+# Above the SPA catch-all for the same first-match reason as /r/*.
+[[redirects]]
+  from = "/request-broker"
+  to = "/brokers"
+  status = 301
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

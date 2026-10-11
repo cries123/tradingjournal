@@ -227,8 +227,8 @@ describe('Sidebar', () => {
   });
 
   it('keeps Support lit while one of the screens it absorbed is open', () => {
-    // Landing on "Request broker" with nothing highlighted is how a nav loses the reader.
-    const html = renderToString(sidebar('request-broker'));
+    // Landing on "Report a bug" with nothing highlighted is how a nav loses the reader.
+    const html = renderToString(sidebar('report-bug'));
     expect(html).toContain('aria-current="page"');
   });
 
@@ -242,14 +242,15 @@ describe('Sidebar', () => {
 describe('SupportDashboard', () => {
   it('paints the account facts a support thread would otherwise have to ask for', () => {
     const html = paint(
-      createElement(SupportDashboard, { onBack: noop, onBrokers: noop, onRequestBroker: noop }),
+      createElement(SupportDashboard, { onBack: noop, onBrokers: noop }),
     );
 
     expect(html).toContain('Your account');
     expect(html).toContain('Syncs left today');
     expect(html).toContain('AI left today');
     expect(html).toContain('Report a bug');
-    expect(html).toContain('Request a broker');
+    // The broker-request form was removed for spam; nothing here should still offer it.
+    expect(html).not.toContain('Request a broker');
   });
 });
 

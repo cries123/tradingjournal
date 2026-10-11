@@ -3,11 +3,12 @@ import { currentView, popView, pushView } from './viewStack';
 
 describe('viewStack', () => {
   it('goes back to the screen you came from, not to a fixed one', () => {
-    // The reported case: brokers -> request-broker -> back should be brokers.
+    // The reported case was brokers -> request a broker -> back landing on the dashboard. That
+    // screen is gone; the rule is the same for any drill-down, such as support -> brokers.
     let stack = ['dashboard'];
+    stack = pushView(stack, 'support');
     stack = pushView(stack, 'brokers');
-    stack = pushView(stack, 'request-broker');
-    expect(currentView(popView(stack, 'dashboard'), 'dashboard')).toBe('brokers');
+    expect(currentView(popView(stack, 'dashboard'), 'dashboard')).toBe('support');
   });
 
   it('lands on the dashboard when there is nothing behind the current screen', () => {

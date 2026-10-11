@@ -23,12 +23,12 @@ export const LANDING_FAQ: FaqItem[] = [
   {
     question: 'Which brokers are supported today?',
     answer:
-      `${SUPPORTED_BROKER_COUNT} brokers support one-tap import, including ${SUPPORTED_BROKER_NAMES.slice(0, 6).join(', ')}, and more — see the full list on the Brokers page. Manual entry works for any broker. Use Request broker support in the footer to ask for another connection.`,
+      `${SUPPORTED_BROKER_COUNT} brokers support one-tap import, including ${SUPPORTED_BROKER_NAMES.slice(0, 6).join(', ')}, and more — see the full list on the Brokers page. Manual entry works for any broker.`,
   },
   {
     question: 'I use a different broker. Can you add support?',
     answer:
-      'Use Request broker support in the footer — tell us your broker and we will look at adding a connection or a manual-entry template for your workflow.',
+      'Manual entry works with any broker today. One-tap import arrives as SnapTrade adds brokerages; if you have an account, open a support ticket in the app and tell us which one you use.',
   },
   {
     question: 'Can I use Trend Chasers on my phone?',

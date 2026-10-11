@@ -31,21 +31,6 @@ service cloud.firestore {
         );
     }
 
-    function validBrokerSupportCreate() {
-      return request.resource.data.brokerName is string
-        && request.resource.data.brokerName.size() >= 2
-        && request.resource.data.exportMethod is string
-        && request.resource.data.exportMethod.size() >= 3
-        && request.resource.data.email is string
-        && request.resource.data.email.size() > 0
-        && request.resource.data.status == 'open'
-        && request.resource.data.createdAt is string
-        && (
-          (request.auth != null && request.resource.data.uid == request.auth.uid)
-          || (request.auth == null && request.resource.data.uid == null)
-        );
-    }
-
     match /config/brokers {
       allow read: if true;
       allow write: if false;
@@ -272,11 +257,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    match /brokerSupportRequests/{requestId} {
-      allow create: if validBrokerSupportCreate();
-      allow read, update: if isAdmin();
-      allow delete: if false;
-    }
+    /*
+     * brokerSupportRequests is closed. The form that wrote it took submissions from anyone, signed
+     * in or not, and was spammed; removing the form alone would leave the collection open to
+     * anything posting to Firestore directly. No rule matches it now, so every read and write is
+     * denied. Existing documents stay until deleted from the console.
+     */
 
     match /users/{userId} {
       allow write: if request.auth != null && request.auth.uid == userId;

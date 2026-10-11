@@ -1,6 +1,5 @@
 import type { AdminUserSummary } from './admin';
 import type { AdminUserNote } from './adminUserNotes';
-import type { BrokerSupportRequest } from './brokerSupportRequests';
 import type { BugReport } from './bugReports';
 
 function escapeCsv(value: string): string {
@@ -75,33 +74,6 @@ export function exportBugReportsCsv(reports: BugReport[]): void {
       r.steps,
       r.adminNote ?? '',
       r.pageUrl,
-    ]),
-  ]);
-}
-
-export function exportBrokerRequestsCsv(requests: BrokerSupportRequest[]): void {
-  downloadCsv('trend-chasers-broker-requests.csv', [
-    [
-      'created_at',
-      'status',
-      'priority',
-      'broker',
-      'email',
-      'username',
-      'export_method',
-      'details',
-      'admin_note',
-    ],
-    ...requests.map((r) => [
-      r.createdAt,
-      r.status,
-      r.priority ?? 'medium',
-      r.brokerName,
-      r.email,
-      r.username ?? '',
-      r.exportMethod,
-      r.details,
-      r.adminNote ?? '',
     ]),
   ]);
 }

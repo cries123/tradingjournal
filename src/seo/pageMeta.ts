@@ -70,12 +70,6 @@ export const PAGE_SEO: Record<
     path: '/support',
     noindex: true,
   },
-  'request-broker': {
-    title: 'Request Broker Support — Trend Chasers',
-    description:
-      'Trade with a broker we do not support yet? Request CSV or screenshot import — we will configure it for your workflow.',
-    path: '/request-broker',
-  },
   app: {
     title: 'Journal — Trend Chasers',
     description: 'Your Trend Chasers trading journal dashboard.',
@@ -227,7 +221,6 @@ export const PRERENDER_ROUTES = [
   '/privacy',
   '/terms',
   '/refunds',
-  '/request-broker',
   '/report-bug',
   '/pricing',
   '/help-center',

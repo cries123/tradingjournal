@@ -31,7 +31,6 @@ import { AccountSettingsContent } from '../components/account/AccountSettingsCon
 import { SubscriptionContent } from '../components/account/SubscriptionContent';
 import { OrderHistoryContent } from '../components/account/OrderHistoryContent';
 import { PerformanceContent } from '../components/PerformanceContent';
-import { RequestBrokerContent } from '../components/support/RequestBrokerContent';
 import { CsvImportModal } from '../components/CsvImportModal';
 import { TradeModal } from '../components/TradeModal';
 import { UsernameSetupModal } from '../components/UsernameSetupModal';
@@ -364,10 +363,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 onAccount={() => openView('account')}
               />
             ) : appView === 'brokers' ? (
-              <BrokersContent
-                onBack={goBackView}
-                onRequestBroker={() => openView('request-broker')}
-              />
+              <BrokersContent onBack={goBackView} />
             ) : appView === 'connect-broker' ? (
               <LockedFeature
                 feature="brokerSync"
@@ -447,12 +443,9 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
               <SupportDashboard
                 onBack={goBackView}
                 onBrokers={() => openView('brokers')}
-                onRequestBroker={() => openView('request-broker')}
               />
             ) : appView === 'report-bug' ? (
               <ReportBugContent onBack={goBackView} />
-            ) : appView === 'request-broker' ? (
-              <RequestBrokerContent onBack={goBackView} />
             ) : isLoading ? (
               <DashboardSkeleton />
             ) : (

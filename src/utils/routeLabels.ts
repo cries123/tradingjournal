@@ -13,7 +13,6 @@ const NAMED_PATHS: Record<string, string> = {
   '/help-center': 'the help center',
   '/support': 'support',
   '/report-bug': 'report a bug',
-  '/request-broker': 'broker requests',
   '/whats-new': "what's new",
   '/market-simulator': 'the market simulator',
   '/ai-assistant': 'the AI assistant',

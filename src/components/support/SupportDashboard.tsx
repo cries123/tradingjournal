@@ -5,7 +5,6 @@ import {
   CreditCard,
   LifeBuoy,
   Link2,
-  MessageSquarePlus,
   Plug,
   Sparkles,
 } from 'lucide-react';
@@ -21,8 +20,6 @@ interface SupportDashboardProps {
   onBack: () => void;
   /** Opens the supported-brokers list, which is still its own screen. */
   onBrokers: () => void;
-  /** Opens the "my broker isn't here" form. */
-  onRequestBroker: () => void;
 }
 
 function shortDate(iso: string | null | undefined): string | null {
@@ -97,7 +94,7 @@ function QuickAction({
  * context above them and the four ways in, each of which opens a ticket already filed under the
  * right category rather than making somebody choose from a dropdown they have not read.
  */
-export function SupportDashboard({ onBack, onBrokers, onRequestBroker }: SupportDashboardProps) {
+export function SupportDashboard({ onBack, onBrokers }: SupportDashboardProps) {
   const { user, username } = useAuth();
   const {
     tier,
@@ -196,7 +193,7 @@ export function SupportDashboard({ onBack, onBrokers, onRequestBroker }: Support
             </section>
           )}
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-2">
             <QuickAction
               icon={<CreditCard size={16} />}
               label="Billing"
@@ -214,12 +211,6 @@ export function SupportDashboard({ onBack, onBrokers, onRequestBroker }: Support
               label="Report a bug"
               blurb="Something in the app is broken"
               onClick={() => startTicket('bug')}
-            />
-            <QuickAction
-              icon={<MessageSquarePlus size={16} />}
-              label="Request a broker"
-              blurb="Yours isn't on the list yet"
-              onClick={onRequestBroker}
             />
           </div>
         </div>

@@ -151,8 +151,8 @@ export function HelpCenterPage({
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Help Center</h1>
         </div>
         <p className="text-base text-text-secondary mb-8 leading-relaxed max-w-xl">
-          Answers and how-tos, organized by area. Can&apos;t find what you need? Reach us through
-          Report a bug or Request broker support in the footer.
+          Answers and how-tos, organized by area. Can&apos;t find what you need? Open a support ticket
+          from the app, or use Report a bug in the footer.
         </p>
 
         {/* Controls that cannot do anything are worse than no controls: a search box over an

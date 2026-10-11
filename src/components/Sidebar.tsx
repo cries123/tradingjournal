@@ -30,7 +30,6 @@ export type SidebarAppView =
   | 'track-record'
   | 'assistant'
   | 'report-bug'
-  | 'request-broker'
   | 'support'
   | 'coach'
   | 'account'
@@ -275,7 +274,7 @@ export function Sidebar({
               label="Settings"
             />
             <NavItem
-              active={appView === 'support' || appView === 'brokers' || appView === 'report-bug' || appView === 'request-broker'}
+              active={appView === 'support' || appView === 'brokers' || appView === 'report-bug'}
               onClick={wrap(onSupport)}
               icon={<LifeBuoy size={16} />}
               label="Support"

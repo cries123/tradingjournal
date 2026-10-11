@@ -11,7 +11,6 @@ const ROUTE_PATHS: Partial<Record<AppRoute, string>> = {
   privacy: '/privacy',
   terms: '/terms',
   'report-bug': '/report-bug',
-  'request-broker': '/request-broker',
 };
 
 /** Track anonymous site visits for admin conversion metrics. */

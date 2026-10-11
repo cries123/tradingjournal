@@ -288,15 +288,6 @@ export function LandingFooter({
                   Report a bug
                 </a>
               </li>
-              <li>
-                <a
-                  href="/request-broker"
-                  onClick={navHandler(onNavigate && (() => onNavigate('request-broker')))}
-                  className="hover:text-emerald-400 transition-colors"
-                >
-                  Request broker support
-                </a>
-              </li>
             </ul>
           </div>
         </div>

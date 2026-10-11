@@ -23,7 +23,6 @@ const RefundPolicyPage = lazy(() => import('./pages/RefundPolicyPage').then((m) 
 const PricingPage = lazy(() => import('./pages/PricingPage').then((m) => ({ default: m.PricingPage })));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage').then((m) => ({ default: m.PrivacyPolicyPage })));
 const ReportBugPage = lazy(() => import('./pages/ReportBugPage').then((m) => ({ default: m.ReportBugPage })));
-const RequestBrokerPage = lazy(() => import('./pages/RequestBrokerPage').then((m) => ({ default: m.RequestBrokerPage })));
 const SupportPage = lazy(() => import('./pages/SupportPage').then((m) => ({ default: m.SupportPage })));
 const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage').then((m) => ({ default: m.TermsOfServicePage })));
 const TrackRecordPage = lazy(() => import('./pages/TrackRecordPage').then((m) => ({ default: m.TrackRecordPage })));
@@ -56,7 +55,6 @@ export default function App() {
   const goBrokers = () => navigate('brokers');
   const goPrivacy = () => navigate('privacy');
   const goTerms = () => navigate('terms');
-  const goRequestBroker = () => navigate('request-broker');
   const goAdmin = () => navigate('admin');
   const goGuides = () => navigate('guides');
   const goReportBug = () => navigate('report-bug');
@@ -72,7 +70,6 @@ export default function App() {
     onPrivacy: goPrivacy,
     onTerms: goTerms,
     onBrokers: goBrokers,
-    onRequestBroker: goRequestBroker,
     onGuides: goGuides,
     onGuide: navigateGuide,
     onHelp: () => navigate('help-center'),
@@ -113,8 +110,6 @@ export default function App() {
     content = <TermsOfServicePage {...publicPageProps} />;
   } else if (route === 'report-bug') {
     content = <ReportBugPage {...publicPageProps} />;
-  } else if (route === 'request-broker') {
-    content = <RequestBrokerPage {...publicPageProps} />;
   } else if (route === 'support') {
     content = <SupportPage {...publicPageProps} />;
   } else if (route === 'admin') {

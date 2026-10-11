@@ -10,7 +10,6 @@ export type AppRoute =
   | 'terms'
   | 'refunds'
   | 'report-bug'
-  | 'request-broker'
   | 'admin'
   | 'guides'
   | 'guide'
@@ -38,8 +37,7 @@ export type ExtraNavRoute =
   | 'whats-new'
   | 'verified-records'
   | 'report-bug'
-  | 'support'
-  | 'request-broker';
+  | 'support';
 
 /** Slug-less routes only: 'guide', 'broker-guide' and 'track-record' each need one, so they
  *  navigate through their own function rather than through this table. */
@@ -50,7 +48,6 @@ const ROUTE_PATHS: Record<NavRoute, string> = {
   privacy: '/privacy',
   terms: '/terms',
   'report-bug': '/report-bug',
-  'request-broker': '/request-broker',
   admin: '/admin',
   guides: '/guides',
   'market-simulator': '/market-simulator',
@@ -102,7 +99,12 @@ export function parseRoutePath(path: string): RouteState {
   if (path.startsWith('/terms')) return { route: 'terms' };
   if (path.startsWith('/refunds')) return { route: 'refunds' };
   if (path.startsWith('/report-bug')) return { route: 'report-bug' };
-  if (path.startsWith('/request-broker')) return { route: 'request-broker' };
+  /*
+   * The broker-request form was removed — it took submissions from anyone, signed in or not, and
+   * was being spammed. Old links and search results land on the broker list instead of a blank
+   * page, which is the question somebody following one was asking anyway.
+   */
+  if (path.startsWith('/request-broker')) return { route: 'brokers' };
   if (path.startsWith('/admin')) return { route: 'admin' };
   if (path.startsWith('/market-simulator')) return { route: 'market-simulator' };
   if (path.startsWith('/ai-assistant')) return { route: 'ai-assistant' };

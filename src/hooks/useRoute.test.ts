@@ -30,7 +30,8 @@ describe('parseRoutePath', () => {
     // /r/ is a prefix of nothing else only because the check requires the second slash — this is
     // the test that keeps it that way.
     expect(parseRoutePath('/report-bug').route).toBe('report-bug');
-    expect(parseRoutePath('/request-broker').route).toBe('request-broker');
+    // The form is gone; an old link lands on the broker list rather than nowhere.
+    expect(parseRoutePath('/request-broker').route).toBe('brokers');
     expect(parseRoutePath('/refunds').route).toBe('refunds');
   });
 

@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   Ban,
   BarChart3,
-  Building2,
   Download,
   Eye,
   Flag,
@@ -39,7 +38,6 @@ import {
   claimOrVerifyAdmin,
   computePlatformStats,
   computeSignupStats,
-  computeTopBrokers,
   fetchSignedUpUsers,
   type AdminAccessResult,
   type AdminActivityItem,
@@ -47,7 +45,7 @@ import {
 } from '../services/admin';
 import { formatCurrency } from '../utils/format';
 import { adminActionFailureMessage, describeAdminActionError, withTimeout } from '../utils/adminActionError';
-import { exportBrokerRequestsCsv, exportBugReportsCsv, exportUsersCsv } from '../services/adminExport';
+import { exportBugReportsCsv, exportUsersCsv } from '../services/adminExport';
 import {
   fetchAdminHealth,
   fetchAdminHealthHistory,
@@ -94,14 +92,6 @@ import {
 } from '../services/adminHelpArticles';
 import type { AdminPriority } from '../services/adminShared';
 import { useBackDestination } from '../hooks/useBackDestination';
-import {
-  fetchBrokerSupportRequests,
-  updateBrokerSupportAdminNote,
-  updateBrokerSupportPriority,
-  updateBrokerSupportStatus,
-  type BrokerSupportRequest,
-  type BrokerSupportStatus,
-} from '../services/brokerSupportRequests';
 import {
   fetchBugReports,
   updateBugReportAdminNote,
@@ -150,8 +140,7 @@ interface AdminPageProps {
   onNavigate?: (route: ExtraNavRoute) => void;
 }
 
-type RequestStatus = BugReportStatus | BrokerSupportStatus;
-type StatusFilter = 'all' | RequestStatus;
+type StatusFilter = 'all' | BugReportStatus;
 
 type UserSortKey = 'activity' | 'login' | 'trades' | 'newest' | 'name';
 
@@ -217,7 +206,6 @@ type AdminState =
       funnel: 'loading' | 'ready';
       isNewClaim: boolean;
       reports: BugReport[];
-      brokerRequests: BrokerSupportRequest[];
       tickets: SupportTicket[];
       errorEvents: ErrorEvent[];
       errorsDropped: number;
@@ -237,13 +225,13 @@ type AdminState =
       healthHistory: AdminHealthSnapshot[];
     };
 
-const STATUS_LABELS: Record<RequestStatus, string> = {
+const STATUS_LABELS: Record<BugReportStatus, string> = {
   open: 'Open',
   resolved: 'Resolved',
   closed: 'Closed',
 };
 
-function statusBadgeClass(status: RequestStatus): string {
+function statusBadgeClass(status: BugReportStatus): string {
   switch (status) {
     case 'open':
       return 'bg-amber-500/15 text-amber-400';
@@ -439,23 +427,11 @@ function ActivityFeedItem({ item }: { item: AdminActivityItem }) {
     );
   }
 
-  if (item.type === 'bug') {
-    return (
-      <li className="flex gap-3 text-xs">
-        <span className="shrink-0 w-16 text-text-secondary">{time.split(',')[0]}</span>
-        <span className="text-amber-400 font-medium">Bug</span>
-        <span className="text-text-secondary truncate">{item.preview}</span>
-      </li>
-    );
-  }
-
   return (
     <li className="flex gap-3 text-xs">
       <span className="shrink-0 w-16 text-text-secondary">{time.split(',')[0]}</span>
-      <span className="text-cyan-400 font-medium">Broker</span>
-      <span className="text-text-secondary truncate">
-        {item.brokerName} · {item.email}
-      </span>
+      <span className="text-amber-400 font-medium">Bug</span>
+      <span className="text-text-secondary truncate">{item.preview}</span>
     </li>
   );
 }
@@ -530,7 +506,6 @@ function StatusFilterBar({
  */
 function NeedsAttention({
   openBugs,
-  openBrokers,
   ticketsWaiting,
   openErrors,
   health,
@@ -539,7 +514,6 @@ function NeedsAttention({
   onGoToErrors,
 }: {
   openBugs: number;
-  openBrokers: number;
   ticketsWaiting: number;
   openErrors: number;
   health: AdminHealthStatus | null;
@@ -564,9 +538,6 @@ function NeedsAttention({
   }
   if (openErrors > 0) waiting.push(`${openErrors} production error${openErrors === 1 ? '' : 's'}`);
   if (openBugs > 0) waiting.push(`${openBugs} open bug report${openBugs === 1 ? '' : 's'}`);
-  if (openBrokers > 0) {
-    waiting.push(`${openBrokers} broker request${openBrokers === 1 ? '' : 's'}`);
-  }
 
   if (waiting.length === 0 && down.length === 0) return null;
 
@@ -615,11 +586,9 @@ function NeedsAttention({
 function ExportMenu({
   onUsers,
   onBugs,
-  onBrokers,
 }: {
   onUsers: () => void;
   onBugs: () => void;
-  onBrokers: () => void;
 }) {
   const [open, setOpen] = useState(false);
   useEscapeToClose(() => setOpen(false));
@@ -627,7 +596,6 @@ function ExportMenu({
   const items = [
     { label: 'Users CSV', run: onUsers },
     { label: 'Bug reports CSV', run: onBugs },
-    { label: 'Broker requests CSV', run: onBrokers },
   ];
 
   return (
@@ -684,7 +652,6 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
   /** The last admin mutation that failed, named. Cleared when the next one starts. */
   const [actionError, setActionError] = useState<string | null>(null);
   const [bugFilter, setBugFilter] = useState<StatusFilter>('all');
-  const [brokerFilter, setBrokerFilter] = useState<StatusFilter>('all');
   const [selectedUser, setSelectedUser] = useState<AdminUserSummary | null>(null);
   const [userSearch, setUserSearch] = useState('');
   /** Narrows the list to people who actually have a brokerage linked. */
@@ -754,7 +721,6 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
       // wakes a Netlify function.
       const [
         reportsResult,
-        brokerResult,
         usersResult,
         notesResult,
         auditResult,
@@ -762,7 +728,6 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         errorsResult,
       ] = await Promise.allSettled([
         fetchBugReports(),
-        fetchBrokerSupportRequests(),
         fetchSignedUpUsers(),
         fetchAllAdminUserNotes(),
         fetchRecentAuditLog(),
@@ -781,7 +746,6 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         funnel: 'loading',
         isNewClaim: access.isNewClaim,
         reports: reportsResult.status === 'fulfilled' ? reportsResult.value : [],
-        brokerRequests: brokerResult.status === 'fulfilled' ? brokerResult.value : [],
         tickets: ticketsResult.status === 'fulfilled' ? ticketsResult.value : [],
         errorEvents: errorsResult.status === 'fulfilled' ? errorsResult.value : [],
         errorsDropped: 0,
@@ -880,7 +844,6 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         funnel: 'ready',
         isNewClaim: access.isNewClaim,
         reports: [],
-        brokerRequests: [],
         tickets: [],
         errorEvents: [],
         errorsDropped: 0,
@@ -1046,50 +1009,6 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
       });
     });
 
-  const handleBrokerStatusChange = (requestId: string, status: BrokerSupportStatus, label: string) =>
-    runAdminAction(`broker:${requestId}`, 'Updating the broker request', async () => {
-      await updateBrokerSupportStatus(requestId, status);
-      setState((prev) => {
-        if (prev.phase !== 'ready') return prev;
-        return {
-          ...prev,
-          brokerRequests: prev.brokerRequests.map((r) =>
-            r.id === requestId ? { ...r, status } : r,
-          ),
-        };
-      });
-      void logAdminAction({
-        ...adminIdentity,
-        action: 'broker-request.status-changed',
-        targetType: 'broker-request',
-        targetId: requestId,
-        targetLabel: label,
-        detail: `Status → ${STATUS_LABELS[status]}`,
-      });
-    });
-
-  const handleBrokerPriorityChange = (requestId: string, priority: AdminPriority, label: string) =>
-    runAdminAction(`broker-priority:${requestId}`, 'Changing the broker priority', async () => {
-      await updateBrokerSupportPriority(requestId, priority);
-      setState((prev) => {
-        if (prev.phase !== 'ready') return prev;
-        return {
-          ...prev,
-          brokerRequests: prev.brokerRequests.map((r) =>
-            r.id === requestId ? { ...r, priority } : r,
-          ),
-        };
-      });
-      void logAdminAction({
-        ...adminIdentity,
-        action: 'broker-request.priority-changed',
-        targetType: 'broker-request',
-        targetId: requestId,
-        targetLabel: label,
-        detail: `Priority → ${PRIORITY_LABELS[priority]}`,
-      });
-    });
-
   const handleBugNoteSave = (reportId: string, adminNote: string, label: string) =>
     runAdminAction(`bug-note:${reportId}`, 'Saving the note', async () => {
       await updateBugReportAdminNote(reportId, adminNote);
@@ -1105,28 +1024,6 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         action: 'bug.note-saved',
         targetType: 'bug-report',
         targetId: reportId,
-        targetLabel: label,
-        detail: 'Admin note updated',
-      });
-    });
-
-  const handleBrokerNoteSave = (requestId: string, adminNote: string, label: string) =>
-    runAdminAction(`broker-note:${requestId}`, 'Saving the note', async () => {
-      await updateBrokerSupportAdminNote(requestId, adminNote);
-      setState((prev) => {
-        if (prev.phase !== 'ready') return prev;
-        return {
-          ...prev,
-          brokerRequests: prev.brokerRequests.map((r) =>
-            r.id === requestId ? { ...r, adminNote } : r,
-          ),
-        };
-      });
-      void logAdminAction({
-        ...adminIdentity,
-        action: 'broker-request.note-saved',
-        targetType: 'broker-request',
-        targetId: requestId,
         targetLabel: label,
         detail: 'Admin note updated',
       });
@@ -1300,13 +1197,8 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
     [ready?.users, brokerByUid],
   );
 
-  const topBrokers = useMemo(
-    () => (ready ? computeTopBrokers(ready.brokerRequests) : []),
-    [ready],
-  );
-
   const activityFeed = useMemo(
-    () => (ready ? buildActivityFeed(ready.users, ready.reports, ready.brokerRequests) : []),
+    () => (ready ? buildActivityFeed(ready.users, ready.reports) : []),
     [ready],
   );
 
@@ -1321,17 +1213,6 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
     return sorted.filter((r) => r.status === bugFilter);
   }, [ready, bugFilter]);
 
-  const filteredBrokers = useMemo(() => {
-    if (!ready) return [];
-    const sorted = [...ready.brokerRequests].sort((a, b) => {
-      const priorityDiff = PRIORITY_RANK[a.priority ?? 'medium'] - PRIORITY_RANK[b.priority ?? 'medium'];
-      if (priorityDiff !== 0) return priorityDiff;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-    if (brokerFilter === 'all') return sorted;
-    return sorted.filter((r) => r.status === brokerFilter);
-  }, [ready, brokerFilter]);
-
   const bugFilterCounts = useMemo(() => {
     if (!ready) return { all: 0, open: 0, resolved: 0, closed: 0 };
     return {
@@ -1342,19 +1223,8 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
     };
   }, [ready]);
 
-  const brokerFilterCounts = useMemo(() => {
-    if (!ready) return { all: 0, open: 0, resolved: 0, closed: 0 };
-    return {
-      all: ready.brokerRequests.length,
-      open: ready.brokerRequests.filter((r) => r.status === 'open').length,
-      resolved: ready.brokerRequests.filter((r) => r.status === 'resolved').length,
-      closed: ready.brokerRequests.filter((r) => r.status === 'closed').length,
-    };
-  }, [ready]);
-
   const openBugCount = bugFilterCounts.open;
-  const openBrokerCount = brokerFilterCounts.open;
-  const openCount = openBugCount + openBrokerCount;
+  const openCount = openBugCount;
   /* The funnel measures a rolling year, so signups have to be counted over the same window —
      an all-time signup count beside a 12-month visitor count is two different periods stacked in
      one chart, and it reads as a conversion rate that cannot be true. */
@@ -1545,7 +1415,6 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                 <ExportMenu
                   onUsers={() => exportUsersCsv(ready.users, ready.userNotes)}
                   onBugs={() => exportBugReportsCsv(ready.reports)}
-                  onBrokers={() => exportBrokerRequestsCsv(ready.brokerRequests)}
                 />
                 <button
                   type="button"
@@ -1566,7 +1435,6 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
 
             <NeedsAttention
               openBugs={openBugCount}
-              openBrokers={openBrokerCount}
               ticketsWaiting={ticketsWaiting}
               openErrors={openErrorCount}
               health={ready.health}
@@ -1845,7 +1713,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                 />
               </div>
 
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                 <div className="panel-card rounded-xl p-5 md:p-6">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
@@ -1926,33 +1794,6 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                   </p>
                 </div>
 
-                <div className="panel-card rounded-xl p-5 md:p-6 sm:col-span-2 lg:col-span-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
-                      <Building2 size={18} />
-                    </div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-                      Broker requests
-                    </p>
-                  </div>
-                  <p className="text-3xl font-bold tracking-tight">
-                    {ready.brokerRequests.length.toLocaleString()}
-                  </p>
-                  <p className="text-xs text-text-secondary mt-2">
-                    {openBrokerCount > 0 ? `${openBrokerCount} open · ` : ''}
-                    {ready.brokerRequests.filter((r) => r.status === 'resolved').length} resolved
-                  </p>
-                  {topBrokers.length > 0 && (
-                    <ul className="mt-4 space-y-1">
-                      {topBrokers.map((b) => (
-                        <li key={b.name} className="flex justify-between text-xs text-text-secondary">
-                          <span>{b.name}</span>
-                          <span className="font-medium text-text-primary">{b.count}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
               </div>
 
               {platformStats && (
@@ -2286,85 +2127,6 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
 
             {tab === 'requests' && (
               <>
-              <h2 className="text-base font-semibold mb-2">Broker support requests</h2>
-              <StatusFilterBar value={brokerFilter} onChange={setBrokerFilter} counts={brokerFilterCounts} />
-
-              {filteredBrokers.length === 0 ? (
-                <div className="panel-card rounded-xl p-8 text-center text-text-secondary text-sm mb-10">
-                  {ready.brokerRequests.length === 0
-                    ? 'No broker support requests yet.'
-                    : 'No requests match this filter.'}
-                </div>
-              ) : (
-                <div className="space-y-4 mb-10">
-                  {filteredBrokers.map((request) => (
-                    <article key={request.id} className="panel-card rounded-xl p-5 md:p-6">
-                      <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${statusBadgeClass(request.status)}`}
-                            >
-                              {STATUS_LABELS[request.status]}
-                            </span>
-                            <PrioritySelect
-                              value={request.priority ?? 'medium'}
-                              disabled={updatingKey === `broker-priority:${request.id}`}
-                              onChange={(priority) =>
-                                void handleBrokerPriorityChange(request.id, priority, request.brokerName)
-                              }
-                            />
-                          </div>
-                          <p className="text-sm font-semibold mt-2">{request.brokerName}</p>
-                          <p className="text-xs text-text-secondary mt-1">
-                            {new Date(request.createdAt).toLocaleString()}
-                            {' · '}
-                            {request.email}
-                            {request.username ? ` (@${request.username})` : ''}
-                          </p>
-                        </div>
-                        <select
-                          value={request.status}
-                          disabled={updatingKey === `broker:${request.id}`}
-                          onChange={(e) =>
-                            void handleBrokerStatusChange(
-                              request.id,
-                              e.target.value as BrokerSupportStatus,
-                              request.brokerName,
-                            )
-                          }
-                          className="input-field text-sm py-1.5 px-2 min-w-[120px]"
-                          aria-label="Update broker request status"
-                        >
-                          <option value="open">Open</option>
-                          <option value="resolved">Resolved</option>
-                          <option value="closed">Closed</option>
-                        </select>
-                      </div>
-
-                      <p className="text-sm whitespace-pre-wrap leading-relaxed">{request.exportMethod}</p>
-
-                      {request.details && (
-                        <div className="mt-4 pt-4 border-t border-border/50">
-                          <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-2">
-                            Additional details
-                          </p>
-                          <p className="text-sm text-text-secondary whitespace-pre-wrap">{request.details}</p>
-                        </div>
-                      )}
-
-                      <AdminNoteField
-                        value={request.adminNote ?? ''}
-                        disabled={updatingKey === `broker-note:${request.id}`}
-                        onSave={(note) => handleBrokerNoteSave(request.id, note, request.brokerName)}
-                        label="Broker request admin note"
-                      />
-                    </article>
-                  ))}
-                </div>
-              )}
-
-
               {/*
                 This list is signed-OUT visitors only, and said so nowhere.
 

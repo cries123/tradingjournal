@@ -1,9 +1,9 @@
 /**
  * A back stack for the screens inside the journal, which are view state rather than URL routes.
  *
- * Every one of those screens had `onBack={() => setAppView('dashboard')}` hardcoded, so Brokers →
- * "Request a broker" → back put you on the dashboard rather than back in the broker list you were
- * looking at. Back has to mean the screen before this one, not one particular screen.
+ * Every one of those screens had `onBack={() => setAppView('dashboard')}` hardcoded, so going
+ * Support → Brokers → back put you on the dashboard rather than back on the screen you came from.
+ * Back has to mean the screen before this one, not one particular screen.
  */
 const MAX_DEPTH = 10;
 

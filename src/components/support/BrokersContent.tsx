@@ -41,7 +41,6 @@ const UNIVERSAL_FACTS = [
 interface BrokersContentProps {
   onBack: () => void;
   backLabel?: string;
-  onRequestBroker?: () => void;
   /** Wider grid for the public page. Inside the app it is always wide — see PageFrame. */
   wide?: boolean;
   onGuides?: () => void;
@@ -60,7 +59,6 @@ interface BrokersContentProps {
 export function BrokersContent({
   onBack,
   backLabel = 'Back to dashboard',
-  onRequestBroker,
   wide = false,
   onGuides,
   onHelp,
@@ -190,23 +188,11 @@ export function BrokersContent({
       )}
 
       {nothingFound && (
-        // A search that finds nothing is the moment someone is most likely to tell us what they
-        // use, so the request lands here rather than only at the bottom of the page.
         <div className="rounded-xl border border-dashed border-accent/25 p-8 text-center mb-10">
           <h2 className="text-lg font-semibold mb-2">No match for “{query.trim()}”</h2>
-          <p className="text-sm text-text-secondary leading-relaxed mb-5 max-w-md mx-auto">
-            It isn&apos;t supported yet — but manual entry works today, and telling us moves it up
-            the list.
+          <p className="text-sm text-text-secondary leading-relaxed max-w-md mx-auto">
+            It isn&apos;t supported yet — but manual entry works with any broker, today.
           </p>
-          {onRequestBroker ? (
-            <button type="button" onClick={onRequestBroker} className="btn-primary text-sm px-5 py-2.5">
-              Request {query.trim()}
-            </button>
-          ) : (
-            <a href="/request-broker" className="btn-primary text-sm px-5 py-2.5 inline-block">
-              Request this broker
-            </a>
-          )}
         </div>
       )}
 
@@ -216,24 +202,6 @@ export function BrokersContent({
         </div>
       )}
 
-      {!nothingFound && (
-        <div className="rounded-xl border-2 border-dashed border-accent/25 p-6 md:p-8 text-center">
-          <h2 className="text-xl font-semibold mb-2">Your broker not listed?</h2>
-          <p className="text-sm text-text-secondary leading-relaxed mb-6 max-w-lg mx-auto">
-            Tell us your broker plus how you export trades. We&apos;ll configure import support for
-            your workflow.
-          </p>
-          {onRequestBroker ? (
-            <button type="button" onClick={onRequestBroker} className="btn-primary text-sm px-6 py-2.5">
-              Request your broker
-            </button>
-          ) : (
-            <a href="/request-broker" className="btn-primary text-sm px-6 py-2.5 inline-block">
-              Request your broker
-            </a>
-          )}
-        </div>
-      )}
     </>
   );
 

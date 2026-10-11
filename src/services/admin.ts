@@ -13,7 +13,6 @@ import {
   sum,
   where,
 } from 'firebase/firestore';
-import type { BrokerSupportRequest } from './brokerSupportRequests';
 import type { BugReport } from './bugReports';
 import { getFirebaseDb, isFirebaseConfigured } from '../lib/firebase';
 import { normalizeTradeDate, maxDateKey, maxIsoTimestamp, toDateKey } from '../utils/format';
@@ -139,20 +138,7 @@ export type AdminActivityItem =
       email: string;
       preview: string;
       status: string;
-    }
-  | {
-      type: 'broker';
-      at: string;
-      id: string;
-      brokerName: string;
-      email: string;
-      status: string;
     };
-
-export interface BrokerRequestSummary {
-  name: string;
-  count: number;
-}
 
 function firestoreTimestampToIso(value: unknown): string | null {
   if (!value) return null;
@@ -529,27 +515,9 @@ export function computeSignupStats(users: AdminUserSummary[]): AdminSignupStats 
   return { last7Days, thisMonth, dailyLast7 };
 }
 
-export function computeTopBrokers(
-  requests: BrokerSupportRequest[],
-  limit = 5,
-): BrokerRequestSummary[] {
-  const counts = new Map<string, number>();
-  for (const request of requests) {
-    const name = request.brokerName.trim();
-    if (!name) continue;
-    counts.set(name, (counts.get(name) ?? 0) + 1);
-  }
-
-  return [...counts.entries()]
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-    .slice(0, limit);
-}
-
 export function buildActivityFeed(
   users: AdminUserSummary[],
   reports: BugReport[],
-  brokerRequests: BrokerSupportRequest[],
   limit = 20,
 ): AdminActivityItem[] {
   const items: AdminActivityItem[] = [];
@@ -573,17 +541,6 @@ export function buildActivityFeed(
       email: report.email,
       preview: report.description.slice(0, 80),
       status: report.status,
-    });
-  }
-
-  for (const request of brokerRequests) {
-    items.push({
-      type: 'broker',
-      at: request.createdAt,
-      id: request.id,
-      brokerName: request.brokerName,
-      email: request.email,
-      status: request.status,
     });
   }
 
