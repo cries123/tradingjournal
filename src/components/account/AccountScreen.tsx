@@ -1,39 +1,31 @@
 import type { ReactNode } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { PageFrame } from '../layout/PageFrame';
 
 interface AccountScreenProps {
   title: string;
   subtitle: string;
+  icon?: LucideIcon;
   onBack: () => void;
+  /** 2 lays the panels out side by side on a wide screen; 1 keeps one full-width panel (a ledger). */
+  columns?: 1 | 2;
   children: ReactNode;
 }
 
 /**
- * The shell the three account screens share — back link, heading, one column.
+ * The shell the three account screens share.
  *
- * One column rather than the Settings page's masonry: everything on these screens is a form or a
- * ledger, and both are read top to bottom. A two-column flow would put "change your password"
- * beside "change your email" and invite filling in the wrong one.
+ * These were one 672px column, on the reasoning that a form is read top to bottom and that
+ * "change your password" beside "change your email" invites filling in the wrong one. Beside the
+ * Overview it read as a different, emptier product — two thirds of a wide screen was blank — so the
+ * panels now sit two across. Each is its own titled card with its own button, which is what keeps
+ * the two forms apart; a single long form split down the middle would not be.
  */
-export function AccountScreen({ title, subtitle, onBack, children }: AccountScreenProps) {
+export function AccountScreen({ title, subtitle, icon, onBack, columns = 2, children }: AccountScreenProps) {
   return (
-    <div className="space-y-6 max-w-2xl">
-      <button
-        type="button"
-        onClick={onBack}
-        className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors focus-ring rounded-lg px-1 py-1"
-      >
-        <ArrowLeft size={16} />
-        Back to dashboard
-      </button>
-
-      <div>
-        <h1 className="text-2xl font-bold">{title}</h1>
-        <p className="text-sm text-text-secondary mt-1">{subtitle}</p>
-      </div>
-
-      {children}
-    </div>
+    <PageFrame title={title} subtitle={subtitle} icon={icon} onBack={onBack}>
+      <div className={`grid gap-2 md:gap-3 items-start ${columns === 2 ? 'lg:grid-cols-2' : ''}`}>{children}</div>
+    </PageFrame>
   );
 }
 

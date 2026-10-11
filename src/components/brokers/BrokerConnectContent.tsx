@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { syncStartDate } from '../../utils/syncWindow';
-import { ArrowLeft, CheckCircle2, ExternalLink, Link2, Loader2, RefreshCw, Unlink } from 'lucide-react';
+import { CheckCircle2, ExternalLink, Link2, Loader2, RefreshCw, Unlink } from 'lucide-react';
+import { PageFrame } from '../layout/PageFrame';
 import { BrokerLogo } from './BrokerLogo';
 import { useEntitlement } from '../../context/useEntitlement';
 import { StartTrialButton } from '../plan/StartTrialButton';
@@ -394,40 +395,31 @@ export function BrokerConnectContent({
     (status?.accounts ?? []).filter((a) => matchesBrokerEntry(a.institutionName, entry));
 
   return (
-    <div className="pb-6">
-      <div className="max-w-3xl mx-auto p-4 md:p-6">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors mb-8 focus-ring rounded-lg px-1 py-1"
-        >
-          <ArrowLeft size={16} />
-          Back to dashboard
-        </button>
-
-        <p className="text-xs uppercase tracking-widest text-accent font-medium mb-3">Connect a broker</p>
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-          Import trades from your broker
-        </h1>
-        <p className="text-text-secondary text-base leading-relaxed max-w-2xl mb-8">
+    <PageFrame
+      eyebrow="Connect a broker"
+      title="Import trades from your broker"
+      icon={Link2}
+      onBack={onBack}
+      subtitle={
+        <>
           Connect any of the brokers below through SnapTrade, a broker-data connection provider, and
           pull your trade history in with one tap — no typing it out. Your broker credentials go
           directly to your broker or to SnapTrade&apos;s secure portal — never to Trend Chasers. You
           can disconnect anytime. Prefer not to connect? You can still log trades manually.
-        </p>
-        <p className="text-sm text-text-secondary leading-relaxed max-w-2xl mb-8 rounded-xl border border-border/60 bg-bg-tertiary/40 px-4 py-3">
-          <span className="font-semibold text-text-primary">Syncing is on your say-so.</span>{' '}
-          Trend Chasers never pulls from your broker on its own — press{' '}
-          <span className="font-medium text-text-primary">Sync</span> on an account below whenever
-          you want the latest fills. Re-syncing is safe: trades you already have are recognised and
-          skipped, never added twice.
-        </p>
-
+        </>
+      }
+    >
+      <p className="text-sm text-text-secondary leading-relaxed rounded-xl border border-border/60 bg-bg-tertiary/40 px-4 py-3">
+        <span className="font-semibold text-text-primary">Syncing is on your say-so.</span>{' '}
+        Trend Chasers never pulls from your broker on its own — press{' '}
+        <span className="font-medium text-text-primary">Sync</span> on an account below whenever
+        you want the latest fills. Re-syncing is safe: trades you already have are recognised and
+        skipped, never added twice.
         {/* Shown from the plan, not from a count of what's on screen: someone who has downgraded
             still sees the connections they made, and the honest number is what their plan allows
             now — otherwise a refused Connect looks like a bug. */}
         {limits.brokers > 0 && (
-          <p className="text-sm text-text-secondary max-w-2xl mb-8 -mt-4">
+          <span className="block mt-1.5">
             {TIER_PLANS[tier].name} includes{' '}
             <span className="text-text-primary font-medium">{brokersLabel(limits).toLowerCase()}</span>{' '}
             and{' '}
@@ -439,221 +431,223 @@ export function BrokerConnectContent({
               </>
             )}
             .
+          </span>
+        )}
+      </p>
+
+      {/*
+        * Offered before they press anything.
+        *
+        * A free account can connect nothing, so the old path was: press Connect, wait, read a
+        * 402 telling you to go and buy something. The offer belongs in front of that, at the
+        * moment they are already looking at the button.
+        */}
+      {canConnect && limits.brokers === 0 && (
+        <div className="panel-card p-5">
+          <p className="text-sm font-medium text-text-primary mb-1">
+            Broker sync isn&apos;t on your plan yet
           </p>
-        )}
+          {/* The free week is only promised to somebody who can actually have one. The server's
+              "you have already had a trial" rule fires for the first time now that the Creem
+              webhook records one, and this card gated on the FEATURE being locked, not on
+              eligibility — so an ex-triallist was offered a free week and then sent to a pricing
+              page that does not offer it. */}
+          <p className="text-sm text-text-secondary leading-relaxed mb-4">
+            Connect your brokerage and your fills import themselves, matched into round trips with
+            fees worked out.{' '}
+            {trialAvailable
+              ? `Try it free for ${TRIAL_DAYS} days and see your own calendar fill in.`
+              : 'It is on every paid plan.'}
+          </p>
+          <StartTrialButton
+            viaPricing
+            className="max-w-sm"
+            fallback={
+              <button
+                type="button"
+                onClick={goToPricing}
+                className="btn-primary w-full max-w-sm py-2.5 text-sm font-semibold"
+              >
+                See the plans
+              </button>
+            }
+          />
+        </div>
+      )}
 
-        {/*
-          * Offered before they press anything.
-          *
-          * A free account can connect nothing, so the old path was: press Connect, wait, read a
-          * 402 telling you to go and buy something. The offer belongs in front of that, at the
-          * moment they are already looking at the button.
-          */}
-        {canConnect && limits.brokers === 0 && (
-          <div className="panel-card p-5 mb-6">
-            <p className="text-sm font-medium text-text-primary mb-1">
-              Broker sync isn&apos;t on your plan yet
+      {!firebaseEnabled ? (
+        <div className="panel-card p-6 text-sm text-text-secondary">
+          Broker connect requires cloud sync to be configured for this deployment. Ask the site owner to
+          set up Firebase.
+        </div>
+      ) : !canConnect ? (
+        <div className="panel-card p-6 text-sm text-text-secondary">
+          Sign in to connect a broker — your connection is tied securely to your account.
+        </div>
+      ) : available === false ? (
+        <div className="panel-card p-6 text-sm text-text-secondary">
+          Broker connect isn&apos;t set up on this deployment yet. The site owner needs to add
+          SnapTrade API keys (SNAPTRADE_CLIENT_ID / SNAPTRADE_CONSUMER_KEY).
+        </div>
+      ) : null}
+
+      {error && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-300">
+          {error}
+          {errorDetail && (
+            // Admin-only, decided server-side. Monospace because this is upstream error text
+            // meant to be copied into a support thread, not read as prose.
+            <p className="mt-2 pt-2 border-t border-red-500/20 font-mono text-[11px] leading-relaxed text-red-300/70 break-words">
+              {errorDetail}
             </p>
-            {/* The free week is only promised to somebody who can actually have one. The server's
-                "you have already had a trial" rule fires for the first time now that the Creem
-                webhook records one, and this card gated on the FEATURE being locked, not on
-                eligibility — so an ex-triallist was offered a free week and then sent to a pricing
-                page that does not offer it. */}
-            <p className="text-sm text-text-secondary leading-relaxed mb-4">
-              Connect your brokerage and your fills import themselves, matched into round trips with
-              fees worked out.{' '}
-              {trialAvailable
-                ? `Try it free for ${TRIAL_DAYS} days and see your own calendar fill in.`
-                : 'It is on every paid plan.'}
-            </p>
-            <StartTrialButton
-              viaPricing
-              className="max-w-sm"
-              fallback={
-                <button
-                  type="button"
-                  onClick={goToPricing}
-                  className="btn-primary w-full max-w-sm py-2.5 text-sm font-semibold"
-                >
-                  See the plans
-                </button>
-              }
-            />
-          </div>
-        )}
+          )}
+        </div>
+      )}
 
-        {!firebaseEnabled ? (
-          <div className="panel-card p-6 text-sm text-text-secondary mb-6">
-            Broker connect requires cloud sync to be configured for this deployment. Ask the site owner to
-            set up Firebase.
-          </div>
-        ) : !canConnect ? (
-          <div className="panel-card p-6 text-sm text-text-secondary mb-6">
-            Sign in to connect a broker — your connection is tied securely to your account.
-          </div>
-        ) : available === false ? (
-          <div className="panel-card p-6 text-sm text-text-secondary mb-6">
-            Broker connect isn&apos;t set up on this deployment yet. The site owner needs to add
-            SnapTrade API keys (SNAPTRADE_CLIENT_ID / SNAPTRADE_CONSUMER_KEY).
-          </div>
-        ) : null}
-
-        {error && (
-          <div className="rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-300 mb-6">
-            {error}
-            {errorDetail && (
-              // Admin-only, decided server-side. Monospace because this is upstream error text
-              // meant to be copied into a support thread, not read as prose.
-              <p className="mt-2 pt-2 border-t border-red-500/20 font-mono text-[11px] leading-relaxed text-red-300/70 break-words">
-                {errorDetail}
-              </p>
+      {syncMessage && (
+        <div className="rounded-lg border border-accent/30 bg-accent/5 px-4 py-3 text-sm text-accent flex items-start gap-2">
+          <CheckCircle2 size={16} className="shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p>{syncMessage}</p>
+            {/* Amber, not the success green: these are things the import could not do, and a
+                trader who never notices them is a trader whose totals silently disagree with
+                their broker. */}
+            {syncNotes.length > 0 && (
+              <ul className="mt-2 space-y-1.5 border-t border-accent/20 pt-2">
+                {syncNotes.map((note) => (
+                  <li key={note} className="text-xs text-amber-200/90 leading-relaxed">
+                    {note}
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
-        )}
-
-        {syncMessage && (
-          <div className="rounded-lg border border-accent/30 bg-accent/5 px-4 py-3 text-sm text-accent mb-6 flex items-start gap-2">
-            <CheckCircle2 size={16} className="shrink-0 mt-0.5" />
-            <div className="min-w-0">
-              <p>{syncMessage}</p>
-              {/* Amber, not the success green: these are things the import could not do, and a
-                  trader who never notices them is a trader whose totals silently disagree with
-                  their broker. */}
-              {syncNotes.length > 0 && (
-                <ul className="mt-2 space-y-1.5 border-t border-accent/20 pt-2">
-                  {syncNotes.map((note) => (
-                    <li key={note} className="text-xs text-amber-200/90 leading-relaxed">
-                      {note}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        )}
-
-        <div className="space-y-5">
-          {brokerCopy.map((broker) => {
-            const accounts = accountsForInstitution(broker.entry);
-            const isConnected = accounts.length > 0;
-
-            return (
-              <article key={broker.key} className="panel-card p-5 md:p-6">
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <BrokerLogo broker={broker.brokerId} />
-                  <span className="inline-flex px-2 py-0.5 rounded-full bg-bg-tertiary/60 text-text-secondary text-[10px] font-semibold uppercase tracking-wide border border-border/50">
-                    {broker.access}
-                  </span>
-                </div>
-
-                {isConnected ? (
-                  <div className="space-y-2 mb-4">
-                    {accounts.map((a) => (
-                      <div
-                        key={a.id}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-accent/25 bg-accent/5 px-3 py-2"
-                      >
-                        <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle2 size={14} className="text-accent shrink-0" />
-                          <span className="font-medium">{a.name ?? a.institutionName}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void handleSync(a)}
-                            disabled={syncingAccountId === a.id}
-                            className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-border/60 hover:border-accent/40 hover:text-accent transition-colors disabled:opacity-50 focus-ring"
-                          >
-                            {syncingAccountId === a.id ? (
-                              <Loader2 size={13} className="animate-spin" />
-                            ) : (
-                              <RefreshCw size={13} />
-                            )}
-                            Sync trades
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleDisconnect(a)}
-                            className="inline-flex items-center gap-1.5 text-xs text-text-secondary hover:text-red-400 transition-colors focus-ring rounded px-1"
-                          >
-                            <Unlink size={13} />
-                            Disconnect
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <>
-                  {broker.entry.status && (
-                    /* Above the button, not below it: a greyed-out control with the reason
-                       underneath is a puzzle, and the reason is the only useful thing here. */
-                    <div
-                      className={`mb-3 rounded-lg border px-3 py-2.5 text-xs leading-relaxed ${
-                        broker.entry.status.kind === 'down'
-                          ? 'border-amber-500/30 bg-amber-500/[0.07] text-amber-200/90'
-                          : 'border-border bg-bg-tertiary/40 text-text-secondary'
-                      }`}
-                    >
-                      <span className="font-semibold">
-                        {broker.entry.status.kind === 'down' ? 'Temporarily unavailable' : 'Degraded'}
-                      </span>
-                      <span className="mx-1.5 opacity-40">·</span>
-                      {broker.entry.status.message}
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => void handleConnect(broker.key)}
-                    disabled={
-                      !canConnect ||
-                      available !== true ||
-                      connectingBroker === broker.key ||
-                      isBrokerDown(broker.entry)
-                    }
-                    className="inline-flex items-center gap-2 btn-primary text-sm px-4 py-2 mb-4 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {connectingBroker === broker.key ? (
-                      <Loader2 size={15} className="animate-spin" />
-                    ) : (
-                      <Link2 size={15} />
-                    )}
-                    Connect {broker.shortName ?? broker.name}
-                  </button>
-                  </>
-                )}
-
-                <details className="text-sm">
-                  <summary className="cursor-pointer text-text-secondary hover:text-text-primary transition-colors select-none">
-                    How the connection works
-                  </summary>
-                  <ol className="mt-3 space-y-2 list-decimal list-inside text-text-secondary">
-                    {broker.steps.map((step, i) => (
-                      <li key={i}>{step}</li>
-                    ))}
-                  </ol>
-                  <p className="mt-3 text-xs text-text-secondary/80 flex items-start gap-1.5">
-                    <ExternalLink size={12} className="mt-0.5 shrink-0" />
-                    {broker.note}
-                  </p>
-                </details>
-              </article>
-            );
-          })}
         </div>
+      )}
 
-        {canConnect && available && (
-          <button
-            type="button"
-            onClick={() => void refreshStatus()}
-            disabled={statusLoading}
-            className="mt-6 inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors focus-ring rounded px-1"
-          >
-            {statusLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            Refresh connections
-          </button>
-        )}
+      {/* Twenty brokers down one 768px column was five screens of scrolling to find yours. A grid
+          puts every one of them within a glance on a desktop. */}
+      <div className="grid gap-2 md:gap-3 items-start md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        {brokerCopy.map((broker) => {
+          const accounts = accountsForInstitution(broker.entry);
+          const isConnected = accounts.length > 0;
+
+          return (
+            <article key={broker.key} className="panel-card p-5">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <BrokerLogo broker={broker.brokerId} />
+                <span className="inline-flex px-2 py-0.5 rounded-full bg-bg-tertiary/60 text-text-secondary text-[10px] font-semibold uppercase tracking-wide border border-border/50">
+                  {broker.access}
+                </span>
+              </div>
+
+              {isConnected ? (
+                <div className="space-y-2 mb-4">
+                  {accounts.map((a) => (
+                    <div
+                      key={a.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-accent/25 bg-accent/5 px-3 py-2"
+                    >
+                      <div className="flex items-center gap-2 text-sm">
+                        <CheckCircle2 size={14} className="text-accent shrink-0" />
+                        <span className="font-medium">{a.name ?? a.institutionName}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void handleSync(a)}
+                          disabled={syncingAccountId === a.id}
+                          className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-border/60 hover:border-accent/40 hover:text-accent transition-colors disabled:opacity-50 focus-ring"
+                        >
+                          {syncingAccountId === a.id ? (
+                            <Loader2 size={13} className="animate-spin" />
+                          ) : (
+                            <RefreshCw size={13} />
+                          )}
+                          Sync trades
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDisconnect(a)}
+                          className="inline-flex items-center gap-1.5 text-xs text-text-secondary hover:text-red-400 transition-colors focus-ring rounded px-1"
+                        >
+                          <Unlink size={13} />
+                          Disconnect
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <>
+                {broker.entry.status && (
+                  /* Above the button, not below it: a greyed-out control with the reason
+                     underneath is a puzzle, and the reason is the only useful thing here. */
+                  <div
+                    className={`mb-3 rounded-lg border px-3 py-2.5 text-xs leading-relaxed ${
+                      broker.entry.status.kind === 'down'
+                        ? 'border-amber-500/30 bg-amber-500/[0.07] text-amber-200/90'
+                        : 'border-border bg-bg-tertiary/40 text-text-secondary'
+                    }`}
+                  >
+                    <span className="font-semibold">
+                      {broker.entry.status.kind === 'down' ? 'Temporarily unavailable' : 'Degraded'}
+                    </span>
+                    <span className="mx-1.5 opacity-40">·</span>
+                    {broker.entry.status.message}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void handleConnect(broker.key)}
+                  disabled={
+                    !canConnect ||
+                    available !== true ||
+                    connectingBroker === broker.key ||
+                    isBrokerDown(broker.entry)
+                  }
+                  className="inline-flex items-center gap-2 btn-primary text-sm px-4 py-2 mb-4 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {connectingBroker === broker.key ? (
+                    <Loader2 size={15} className="animate-spin" />
+                  ) : (
+                    <Link2 size={15} />
+                  )}
+                  Connect {broker.shortName ?? broker.name}
+                </button>
+                </>
+              )}
+
+              <details className="text-sm">
+                <summary className="cursor-pointer text-text-secondary hover:text-text-primary transition-colors select-none">
+                  How the connection works
+                </summary>
+                <ol className="mt-3 space-y-2 list-decimal list-inside text-text-secondary">
+                  {broker.steps.map((step, i) => (
+                    <li key={i}>{step}</li>
+                  ))}
+                </ol>
+                <p className="mt-3 text-xs text-text-secondary/80 flex items-start gap-1.5">
+                  <ExternalLink size={12} className="mt-0.5 shrink-0" />
+                  {broker.note}
+                </p>
+              </details>
+            </article>
+          );
+        })}
       </div>
-    </div>
+
+      {canConnect && available && (
+        <button
+          type="button"
+          onClick={() => void refreshStatus()}
+          disabled={statusLoading}
+          className="self-start inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors focus-ring rounded px-1"
+        >
+          {statusLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          Refresh connections
+        </button>
+      )}
+    </PageFrame>
   );
 }

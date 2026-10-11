@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { UserRound } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
 import { authErrorCode, authErrorMessage } from '../../utils/authErrors';
 import { RENAME_COOLDOWN_DAYS } from '../../config/accountRules';
@@ -43,6 +44,7 @@ export function AccountSettingsContent({ onBack }: AccountSettingsContentProps) 
     <AccountScreen
       title="Account settings"
       subtitle="Your sign-in details. Everything else lives in Settings."
+      icon={UserRound}
       onBack={onBack}
     >
       <UsernamePanel current={username} onRename={renameUsername} />

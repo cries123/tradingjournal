@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ArrowLeft, Bug, CheckCircle2 } from 'lucide-react';
+import { Bug, CheckCircle2 } from 'lucide-react';
+import { PageFrame } from '../layout/PageFrame';
 import { useAuth } from '../../context/useAuth';
 import { submitBugReport } from '../../services/bugReports';
 import { SupportTicketsContent } from './SupportTicketsContent';
@@ -83,118 +84,103 @@ function AnonymousBugReportForm({ onBack, backLabel = 'Back to dashboard' }: Rep
   };
 
   return (
-    <div className="pb-6">
-      <div className="max-w-2xl mx-auto p-4 md:p-6">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors mb-8 focus-ring rounded-lg px-1 py-1"
-        >
-          <ArrowLeft size={16} />
-          {backLabel}
-        </button>
-
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-accent/10 text-accent">
-            <Bug size={22} />
-          </div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Report a bug</h1>
+    <PageFrame
+      title="Report a bug"
+      icon={Bug}
+      onBack={onBack}
+      backLabel={backLabel}
+      subtitle="Found something broken or confusing? Tell us what happened and we will look into it."
+    >
+      {!firebaseEnabled ? (
+        <div className="panel-card p-6 text-sm text-text-secondary">
+          Bug reporting requires the app to be connected to our backend. Please email{' '}
+          <a href="mailto:support@trendchasers.net" className="text-accent hover:underline">
+            support@trendchasers.net
+          </a>{' '}
+          or use{' '}
+          <a href="https://github.com/cries123/tradingjournal/issues/new" className="text-accent hover:underline">
+            GitHub Issues
+          </a>{' '}
+          instead.
         </div>
-        <p className="text-text-secondary mb-8 leading-relaxed">
-          Found something broken or confusing? Tell us what happened and we will look into it.
-        </p>
+      ) : submitted ? (
+        <div className="panel-card p-8 text-center">
+          <CheckCircle2 size={40} className="mx-auto text-accent mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Thanks — we got your report</h2>
+          <p className="text-text-secondary text-sm mb-6">
+            We will review it and reach out at {contactEmail.trim()} if we need more details.
+          </p>
+          <button type="button" onClick={onBack} className="btn-primary text-sm px-5 py-2.5">
+            {backLabel}
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="panel-card p-6 md:p-8 space-y-5">
+          <div>
+            <label htmlFor="bug-description" className="block text-sm font-medium mb-2">
+              What went wrong? <span className="text-red-400">*</span>
+            </label>
+            <textarea
+              id="bug-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={4}
+              required
+              minLength={10}
+              placeholder="Describe the bug — what you expected vs what actually happened."
+              className="input-field w-full resize-y min-h-[120px]"
+            />
+          </div>
 
-        {!firebaseEnabled ? (
-          <div className="panel-card p-6 text-sm text-text-secondary">
-            Bug reporting requires the app to be connected to our backend. Please email{' '}
-            <a href="mailto:support@trendchasers.net" className="text-accent hover:underline">
-              support@trendchasers.net
-            </a>{' '}
-            or use{' '}
-            <a href="https://github.com/cries123/tradingjournal/issues/new" className="text-accent hover:underline">
-              GitHub Issues
-            </a>{' '}
-            instead.
+          <div>
+            <label htmlFor="bug-steps" className="block text-sm font-medium mb-2">
+              Steps to reproduce <span className="text-text-secondary font-normal">(optional)</span>
+            </label>
+            <textarea
+              id="bug-steps"
+              value={steps}
+              onChange={(e) => setSteps(e.target.value)}
+              rows={3}
+              placeholder="1. Go to…&#10;2. Click…&#10;3. See error…"
+              className="input-field w-full resize-y min-h-[96px]"
+            />
           </div>
-        ) : submitted ? (
-          <div className="panel-card p-8 text-center">
-            <CheckCircle2 size={40} className="mx-auto text-accent mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Thanks — we got your report</h2>
-            <p className="text-text-secondary text-sm mb-6">
-              We will review it and reach out at {contactEmail.trim()} if we need more details.
-            </p>
-            <button type="button" onClick={onBack} className="btn-primary text-sm px-5 py-2.5">
-              {backLabel}
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="panel-card p-6 md:p-8 space-y-5">
+
+          {!user && (
             <div>
-              <label htmlFor="bug-description" className="block text-sm font-medium mb-2">
-                What went wrong? <span className="text-red-400">*</span>
+              <label htmlFor="bug-email" className="block text-sm font-medium mb-2">
+                Your email <span className="text-red-400">*</span>
               </label>
-              <textarea
-                id="bug-description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={4}
+              <input
+                id="bug-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
-                minLength={10}
-                placeholder="Describe the bug — what you expected vs what actually happened."
-                className="input-field w-full resize-y min-h-[120px]"
+                placeholder="you@example.com"
+                className="input-field w-full"
               />
             </div>
+          )}
 
-            <div>
-              <label htmlFor="bug-steps" className="block text-sm font-medium mb-2">
-                Steps to reproduce <span className="text-text-secondary font-normal">(optional)</span>
-              </label>
-              <textarea
-                id="bug-steps"
-                value={steps}
-                onChange={(e) => setSteps(e.target.value)}
-                rows={3}
-                placeholder="1. Go to…&#10;2. Click…&#10;3. See error…"
-                className="input-field w-full resize-y min-h-[96px]"
-              />
-            </div>
+          {user && (
+            <p className="text-xs text-text-secondary">
+              Signed in as {user.email}
+              {username ? ` (@${username})` : ''}. We will use this account to follow up.
+            </p>
+          )}
 
-            {!user && (
-              <div>
-                <label htmlFor="bug-email" className="block text-sm font-medium mb-2">
-                  Your email <span className="text-red-400">*</span>
-                </label>
-                <input
-                  id="bug-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  placeholder="you@example.com"
-                  className="input-field w-full"
-                />
-              </div>
-            )}
+          {error && (
+            <p className="text-sm text-red-400" role="alert">
+              {error}
+            </p>
+          )}
 
-            {user && (
-              <p className="text-xs text-text-secondary">
-                Signed in as {user.email}
-                {username ? ` (@${username})` : ''}. We will use this account to follow up.
-              </p>
-            )}
-
-            {error && (
-              <p className="text-sm text-red-400" role="alert">
-                {error}
-              </p>
-            )}
-
-            <button type="submit" disabled={busy} className="btn-primary w-full sm:w-auto px-6 py-2.5">
-              {busy ? 'Sending…' : 'Submit report'}
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
+          <button type="submit" disabled={busy} className="btn-primary w-full sm:w-auto px-6 py-2.5">
+            {busy ? 'Sending…' : 'Submit report'}
+          </button>
+        </form>
+      )}
+    </PageFrame>
   );
 }

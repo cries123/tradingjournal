@@ -47,6 +47,7 @@ import { AssistantDock } from '../components/analytics/AssistantDock';
 import { formatMonthYear } from '../utils/format';
 import { currentView, popView, pushView } from '../utils/viewStack';
 import { JournalOfflineBanner } from '../components/JournalOfflineBanner';
+import { InAppProvider } from '../components/layout/PageFrame';
 
 interface JournalAppProps {
   onHome?: () => void;
@@ -347,6 +348,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
               the sidebar — and forced everything into one tall column. Same cap the Brokers,
               Tutorials and Help Center pages already use, so the app and the site line up. */}
           <div className="max-w-[1680px] mx-auto w-full pb-6 md:pb-10">
+           <InAppProvider>
             {syncError && <JournalOfflineBanner message={syncError} />}
             {appView === 'settings' ? (
               <SettingsPage
@@ -520,6 +522,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 />
               </>
             )}
+           </InAppProvider>
           </div>
         </main>
 

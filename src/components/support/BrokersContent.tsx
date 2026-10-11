@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, Search, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Building2, Check, Search, ShieldCheck } from 'lucide-react';
+import { PageFrame } from '../layout/PageFrame';
+import { useInApp } from '../layout/inApp';
 import { BrokerLogo } from '../brokers/BrokerLogo';
 import { brokerIdFromName } from '../../utils/brokerIds';
 import { fetchBrokersConfig, type BrokerConfig } from '../../services/brokersConfig';
@@ -40,7 +42,7 @@ interface BrokersContentProps {
   onBack: () => void;
   backLabel?: string;
   onRequestBroker?: () => void;
-  /** Wider grid for the public page; the in-app view stays inside the dashboard's column. */
+  /** Wider grid for the public page. Inside the app it is always wide — see PageFrame. */
   wide?: boolean;
   onGuides?: () => void;
   onHelp?: () => void;
@@ -85,10 +87,170 @@ export function BrokersContent({
   );
   const nothingFound = term.length > 0 && liveMatches.length === 0 && soonMatches.length === 0;
 
-  const container = wide ? 'max-w-[1680px] px-4 md:px-8' : 'max-w-4xl px-4 md:px-6';
-  const grid = wide
+  const inApp = useInApp();
+  const isWide = wide || inApp;
+  const container = isWide ? 'max-w-[1680px] px-4 md:px-8' : 'max-w-4xl px-4 md:px-6';
+  const grid = isWide
     ? 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
     : 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3';
+  const intro = (
+    <>
+      Connect any of the {supported.length || 20} brokers below for read-only trade import — or skip
+      connecting entirely and log trades yourself. Either way, you&apos;re in control.
+    </>
+  );
+
+  const body = (
+    <>
+
+      {/* Said once, up front, instead of on every card. */}
+      <div className="rounded-xl border border-border/50 bg-bg-secondary/40 p-4 md:p-5 mb-8">
+        <div className="flex items-center gap-2 mb-3">
+          <ShieldCheck size={15} className="text-accent shrink-0" />
+          <p className="text-sm font-semibold text-text-primary">True of every connection</p>
+        </div>
+        <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          {UNIVERSAL_FACTS.map((fact) => (
+            <li key={fact} className="flex items-start gap-2 text-[13px] text-text-secondary">
+              <Check size={13} className="text-accent mt-0.5 shrink-0" />
+              {fact}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="relative mb-5 max-w-md">
+        <Search
+          size={15}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none"
+          aria-hidden
+        />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search for your broker…"
+          aria-label="Search brokers"
+          className="input-field w-full py-2.5 pl-9"
+        />
+      </div>
+
+      {liveMatches.length > 0 && (
+        <>
+          <div className="flex items-baseline gap-2 mb-3">
+            <h2 className="text-sm font-semibold text-text-primary">Available now</h2>
+            <span className="text-xs text-text-secondary tabular-nums">{liveMatches.length}</span>
+          </div>
+          <div className={`${grid} mb-8`}>
+            {liveMatches.map((b) => {
+              const guide = brokerGuidePath(b.name);
+              return (
+                <article
+                  key={b.name}
+                  className="group flex flex-col rounded-xl border border-border/50 bg-bg-secondary/40 p-4 transition-colors hover:border-accent/30"
+                >
+                  <BrokerLogo broker={brokerIdFromName(b.name)} />
+                  <p className="text-xs text-text-secondary mt-3 flex-1">{b.detail}</p>
+                  {guide && (
+                    <a
+                      href={guide}
+                      className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-accent hover:text-accent/80 transition-colors"
+                    >
+                      Setup guide
+                      <ArrowRight size={12} />
+                    </a>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {soonMatches.length > 0 && (
+        <>
+          <div className="flex items-baseline gap-2 mb-3">
+            <h2 className="text-sm font-semibold text-text-primary">On the roadmap</h2>
+            <span className="text-xs text-text-secondary tabular-nums">{soonMatches.length}</span>
+          </div>
+          <p className="text-xs text-text-secondary mb-3">
+            Not connectable yet — manual entry and CSV import work for these today.
+          </p>
+          <div className="flex flex-wrap gap-2 mb-10">
+            {soonMatches.map((name) => (
+              <span
+                key={name}
+                className="px-3 py-1.5 rounded-full text-xs border border-border/50 text-text-secondary/80 bg-bg-primary/40"
+              >
+                {name}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+
+      {nothingFound && (
+        // A search that finds nothing is the moment someone is most likely to tell us what they
+        // use, so the request lands here rather than only at the bottom of the page.
+        <div className="rounded-xl border border-dashed border-accent/25 p-8 text-center mb-10">
+          <h2 className="text-lg font-semibold mb-2">No match for “{query.trim()}”</h2>
+          <p className="text-sm text-text-secondary leading-relaxed mb-5 max-w-md mx-auto">
+            It isn&apos;t supported yet — but manual entry works today, and telling us moves it up
+            the list.
+          </p>
+          {onRequestBroker ? (
+            <button type="button" onClick={onRequestBroker} className="btn-primary text-sm px-5 py-2.5">
+              Request {query.trim()}
+            </button>
+          ) : (
+            <a href="/request-broker" className="btn-primary text-sm px-5 py-2.5 inline-block">
+              Request this broker
+            </a>
+          )}
+        </div>
+      )}
+
+      {(onGuides || onHelp) && (
+        <div className="mb-10">
+          <SupportLinks current="brokers" onGuides={onGuides} onHelp={onHelp} />
+        </div>
+      )}
+
+      {!nothingFound && (
+        <div className="rounded-xl border-2 border-dashed border-accent/25 p-6 md:p-8 text-center">
+          <h2 className="text-xl font-semibold mb-2">Your broker not listed?</h2>
+          <p className="text-sm text-text-secondary leading-relaxed mb-6 max-w-lg mx-auto">
+            Tell us your broker plus how you export trades. We&apos;ll configure import support for
+            your workflow.
+          </p>
+          {onRequestBroker ? (
+            <button type="button" onClick={onRequestBroker} className="btn-primary text-sm px-6 py-2.5">
+              Request your broker
+            </button>
+          ) : (
+            <a href="/request-broker" className="btn-primary text-sm px-6 py-2.5 inline-block">
+              Request your broker
+            </a>
+          )}
+        </div>
+      )}
+    </>
+  );
+
+  if (inApp) {
+    return (
+      <PageFrame
+        eyebrow="Brokers"
+        title="Supported brokers & import methods"
+        icon={Building2}
+        onBack={onBack}
+        backLabel={backLabel}
+        subtitle={intro}
+      >
+        <div>{body}</div>
+      </PageFrame>
+    );
+  }
 
   return (
     <div className="pb-6">
@@ -106,142 +268,9 @@ export function BrokersContent({
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
           Supported brokers &amp; import methods
         </h1>
-        <p className="text-text-secondary text-base leading-relaxed max-w-2xl mb-8">
-          Connect any of the {supported.length || 20} brokers below for read-only trade import — or
-          skip connecting entirely and log trades yourself. Either way, you&apos;re in control.
-        </p>
+        <p className="text-text-secondary text-base leading-relaxed max-w-2xl mb-8">{intro}</p>
 
-        {/* Said once, up front, instead of on every card. */}
-        <div className="rounded-xl border border-border/50 bg-bg-secondary/40 p-4 md:p-5 mb-8">
-          <div className="flex items-center gap-2 mb-3">
-            <ShieldCheck size={15} className="text-accent shrink-0" />
-            <p className="text-sm font-semibold text-text-primary">True of every connection</p>
-          </div>
-          <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            {UNIVERSAL_FACTS.map((fact) => (
-              <li key={fact} className="flex items-start gap-2 text-[13px] text-text-secondary">
-                <Check size={13} className="text-accent mt-0.5 shrink-0" />
-                {fact}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="relative mb-5 max-w-md">
-          <Search
-            size={15}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none"
-            aria-hidden
-          />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search for your broker…"
-            aria-label="Search brokers"
-            className="input-field w-full py-2.5 pl-9"
-          />
-        </div>
-
-        {liveMatches.length > 0 && (
-          <>
-            <div className="flex items-baseline gap-2 mb-3">
-              <h2 className="text-sm font-semibold text-text-primary">Available now</h2>
-              <span className="text-xs text-text-secondary tabular-nums">{liveMatches.length}</span>
-            </div>
-            <div className={`${grid} mb-8`}>
-              {liveMatches.map((b) => {
-                const guide = brokerGuidePath(b.name);
-                return (
-                  <article
-                    key={b.name}
-                    className="group flex flex-col rounded-xl border border-border/50 bg-bg-secondary/40 p-4 transition-colors hover:border-accent/30"
-                  >
-                    <BrokerLogo broker={brokerIdFromName(b.name)} />
-                    <p className="text-xs text-text-secondary mt-3 flex-1">{b.detail}</p>
-                    {guide && (
-                      <a
-                        href={guide}
-                        className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-accent hover:text-accent/80 transition-colors"
-                      >
-                        Setup guide
-                        <ArrowRight size={12} />
-                      </a>
-                    )}
-                  </article>
-                );
-              })}
-            </div>
-          </>
-        )}
-
-        {soonMatches.length > 0 && (
-          <>
-            <div className="flex items-baseline gap-2 mb-3">
-              <h2 className="text-sm font-semibold text-text-primary">On the roadmap</h2>
-              <span className="text-xs text-text-secondary tabular-nums">{soonMatches.length}</span>
-            </div>
-            <p className="text-xs text-text-secondary mb-3">
-              Not connectable yet — manual entry and CSV import work for these today.
-            </p>
-            <div className="flex flex-wrap gap-2 mb-10">
-              {soonMatches.map((name) => (
-                <span
-                  key={name}
-                  className="px-3 py-1.5 rounded-full text-xs border border-border/50 text-text-secondary/80 bg-bg-primary/40"
-                >
-                  {name}
-                </span>
-              ))}
-            </div>
-          </>
-        )}
-
-        {nothingFound && (
-          // A search that finds nothing is the moment someone is most likely to tell us what they
-          // use, so the request lands here rather than only at the bottom of the page.
-          <div className="rounded-xl border border-dashed border-accent/25 p-8 text-center mb-10">
-            <h2 className="text-lg font-semibold mb-2">No match for “{query.trim()}”</h2>
-            <p className="text-sm text-text-secondary leading-relaxed mb-5 max-w-md mx-auto">
-              It isn&apos;t supported yet — but manual entry works today, and telling us moves it up
-              the list.
-            </p>
-            {onRequestBroker ? (
-              <button type="button" onClick={onRequestBroker} className="btn-primary text-sm px-5 py-2.5">
-                Request {query.trim()}
-              </button>
-            ) : (
-              <a href="/request-broker" className="btn-primary text-sm px-5 py-2.5 inline-block">
-                Request this broker
-              </a>
-            )}
-          </div>
-        )}
-
-        {(onGuides || onHelp) && (
-          <div className="mb-10">
-            <SupportLinks current="brokers" onGuides={onGuides} onHelp={onHelp} />
-          </div>
-        )}
-
-        {!nothingFound && (
-          <div className="rounded-xl border-2 border-dashed border-accent/25 p-6 md:p-8 text-center">
-            <h2 className="text-xl font-semibold mb-2">Your broker not listed?</h2>
-            <p className="text-sm text-text-secondary leading-relaxed mb-6 max-w-lg mx-auto">
-              Tell us your broker plus how you export trades. We&apos;ll configure import support for
-              your workflow.
-            </p>
-            {onRequestBroker ? (
-              <button type="button" onClick={onRequestBroker} className="btn-primary text-sm px-6 py-2.5">
-                Request your broker
-              </button>
-            ) : (
-              <a href="/request-broker" className="btn-primary text-sm px-6 py-2.5 inline-block">
-                Request your broker
-              </a>
-            )}
-          </div>
-        )}
+        {body}
       </div>
     </div>
   );

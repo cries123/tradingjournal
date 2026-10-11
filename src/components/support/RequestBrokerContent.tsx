@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { ArrowLeft, Building2, CheckCircle2 } from 'lucide-react';
+import { Building2, CheckCircle2 } from 'lucide-react';
+import { PageFrame } from '../layout/PageFrame';
+import { useInApp } from '../layout/inApp';
 import { useAuth } from '../../context/useAuth';
 import { submitBrokerSupportRequest } from '../../services/brokerSupportRequests';
 
@@ -10,6 +12,7 @@ interface RequestBrokerContentProps {
 
 export function RequestBrokerContent({ onBack, backLabel = 'Back to dashboard' }: RequestBrokerContentProps) {
   const { user, username, firebaseEnabled } = useAuth();
+  const inApp = useInApp();
   const [brokerName, setBrokerName] = useState('');
   const [exportMethod, setExportMethod] = useState('');
   const [details, setDetails] = useState('');
@@ -58,136 +61,124 @@ export function RequestBrokerContent({ onBack, backLabel = 'Back to dashboard' }
   };
 
   return (
-    <div className="pb-6">
-      <div className="max-w-2xl mx-auto p-4 md:p-6">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors mb-8 focus-ring rounded-lg px-1 py-1"
-        >
-          <ArrowLeft size={16} />
-          {backLabel}
-        </button>
-
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-accent/10 text-accent">
-            <Building2 size={22} />
-          </div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Request broker support</h1>
+    <PageFrame
+      title="Request broker support"
+      icon={Building2}
+      onBack={onBack}
+      backLabel={backLabel}
+      subtitle="Tell us your broker and how you export trades. We will review your request and prioritize new import support."
+    >
+      {!firebaseEnabled ? (
+        <div className="panel-card p-6 text-sm text-text-secondary">
+          Broker support requests require the app to be connected to our backend. Please email{' '}
+          <a href="mailto:support@trendchasers.net" className="text-accent hover:underline">
+            support@trendchasers.net
+          </a>{' '}
+          or use{' '}
+          <a href="https://github.com/cries123/tradingjournal/issues/new" className="text-accent hover:underline">
+            GitHub Issues
+          </a>{' '}
+          instead.
         </div>
-        <p className="text-text-secondary mb-8 leading-relaxed">
-          Tell us your broker and how you export trades. We will review your request and prioritize new
-          import support.
-        </p>
+      ) : submitted ? (
+        <div className="panel-card p-8 text-center">
+          <CheckCircle2 size={40} className="mx-auto text-accent mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Thanks — we got your request</h2>
+          <p className="text-text-secondary text-sm mb-6">
+            We will review support for {brokerName.trim()} and reach out at {contactEmail.trim()} if we
+            need more details.
+          </p>
+          <button type="button" onClick={onBack} className="btn-primary text-sm px-5 py-2.5">
+            {backLabel}
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="panel-card p-6 md:p-8 space-y-5">
+          <div>
+            <label htmlFor="broker-name" className="block text-sm font-medium mb-2">
+              Broker name <span className="text-red-400">*</span>
+            </label>
+            <input
+              id="broker-name"
+              type="text"
+              value={brokerName}
+              onChange={(e) => setBrokerName(e.target.value)}
+              required
+              minLength={2}
+              placeholder="e.g. Interactive Brokers, Webull, Fidelity"
+              className="input-field w-full"
+            />
+          </div>
 
-        {!firebaseEnabled ? (
-          <div className="panel-card p-6 text-sm text-text-secondary">
-            Broker support requests require the app to be connected to our backend. Please email{' '}
-            <a href="mailto:support@trendchasers.net" className="text-accent hover:underline">
-              support@trendchasers.net
-            </a>{' '}
-            or use{' '}
-            <a href="https://github.com/cries123/tradingjournal/issues/new" className="text-accent hover:underline">
-              GitHub Issues
-            </a>{' '}
-            instead.
+          {/* Side by side inside the app, where the form has the width for it; the public page
+              keeps its single column. */}
+          <div className={inApp ? 'grid gap-5 lg:grid-cols-2' : 'space-y-5'}>
+          <div>
+            <label htmlFor="export-method" className="block text-sm font-medium mb-2">
+              How do you export trades? <span className="text-red-400">*</span>
+            </label>
+            <textarea
+              id="export-method"
+              value={exportMethod}
+              onChange={(e) => setExportMethod(e.target.value)}
+              rows={3}
+              required
+              minLength={3}
+              placeholder="CSV from account statements, mobile app screenshots, manual copy-paste, etc."
+              className="input-field w-full resize-y min-h-[96px]"
+            />
           </div>
-        ) : submitted ? (
-          <div className="panel-card p-8 text-center">
-            <CheckCircle2 size={40} className="mx-auto text-accent mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Thanks — we got your request</h2>
-            <p className="text-text-secondary text-sm mb-6">
-              We will review support for {brokerName.trim()} and reach out at {contactEmail.trim()} if we
-              need more details.
-            </p>
-            <button type="button" onClick={onBack} className="btn-primary text-sm px-5 py-2.5">
-              {backLabel}
-            </button>
+
+          <div>
+            <label htmlFor="broker-details" className="block text-sm font-medium mb-2">
+              Anything else? <span className="text-text-secondary font-normal">(optional)</span>
+            </label>
+            <textarea
+              id="broker-details"
+              value={details}
+              onChange={(e) => setDetails(e.target.value)}
+              rows={3}
+              placeholder="Sample file format, platform (mobile vs desktop), links to export docs…"
+              className="input-field w-full resize-y min-h-[96px]"
+            />
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="panel-card p-6 md:p-8 space-y-5">
+          </div>
+
+          {!user && (
             <div>
-              <label htmlFor="broker-name" className="block text-sm font-medium mb-2">
-                Broker name <span className="text-red-400">*</span>
+              <label htmlFor="broker-email" className="block text-sm font-medium mb-2">
+                Your email <span className="text-red-400">*</span>
               </label>
               <input
-                id="broker-name"
-                type="text"
-                value={brokerName}
-                onChange={(e) => setBrokerName(e.target.value)}
+                id="broker-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
-                minLength={2}
-                placeholder="e.g. Interactive Brokers, Webull, Fidelity"
+                placeholder="you@example.com"
                 className="input-field w-full"
               />
             </div>
+          )}
 
-            <div>
-              <label htmlFor="export-method" className="block text-sm font-medium mb-2">
-                How do you export trades? <span className="text-red-400">*</span>
-              </label>
-              <textarea
-                id="export-method"
-                value={exportMethod}
-                onChange={(e) => setExportMethod(e.target.value)}
-                rows={3}
-                required
-                minLength={3}
-                placeholder="CSV from account statements, mobile app screenshots, manual copy-paste, etc."
-                className="input-field w-full resize-y min-h-[96px]"
-              />
-            </div>
+          {user && (
+            <p className="text-xs text-text-secondary">
+              Signed in as {user.email}
+              {username ? ` (@${username})` : ''}. We will use this account to follow up.
+            </p>
+          )}
 
-            <div>
-              <label htmlFor="broker-details" className="block text-sm font-medium mb-2">
-                Anything else? <span className="text-text-secondary font-normal">(optional)</span>
-              </label>
-              <textarea
-                id="broker-details"
-                value={details}
-                onChange={(e) => setDetails(e.target.value)}
-                rows={3}
-                placeholder="Sample file format, platform (mobile vs desktop), links to export docs…"
-                className="input-field w-full resize-y min-h-[96px]"
-              />
-            </div>
+          {error && (
+            <p className="text-sm text-red-400" role="alert">
+              {error}
+            </p>
+          )}
 
-            {!user && (
-              <div>
-                <label htmlFor="broker-email" className="block text-sm font-medium mb-2">
-                  Your email <span className="text-red-400">*</span>
-                </label>
-                <input
-                  id="broker-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  placeholder="you@example.com"
-                  className="input-field w-full"
-                />
-              </div>
-            )}
-
-            {user && (
-              <p className="text-xs text-text-secondary">
-                Signed in as {user.email}
-                {username ? ` (@${username})` : ''}. We will use this account to follow up.
-              </p>
-            )}
-
-            {error && (
-              <p className="text-sm text-red-400" role="alert">
-                {error}
-              </p>
-            )}
-
-            <button type="submit" disabled={busy} className="btn-primary w-full sm:w-auto px-6 py-2.5">
-              {busy ? 'Sending…' : 'Submit request'}
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
+          <button type="submit" disabled={busy} className="btn-primary w-full sm:w-auto px-6 py-2.5">
+            {busy ? 'Sending…' : 'Submit request'}
+          </button>
+        </form>
+      )}
+    </PageFrame>
   );
 }

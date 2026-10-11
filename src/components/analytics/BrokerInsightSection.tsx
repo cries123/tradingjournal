@@ -415,7 +415,7 @@ export function BrokerInsightSection({ trades }: { trades: Trade[] }) {
   const currency = settings.currency;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 2xl:block 2xl:columns-3 2xl:[&>*]:mb-3 2xl:[&>*]:break-inside-avoid">
       {coverage.breakeven && <BreakevenPanel data={coverage.breakeven} />}
       {coverage.sizing && <SizingPanel data={coverage.sizing} currency={currency} />}
       {coverage.tilt && <TiltPanel data={coverage.tilt} currency={currency} />}

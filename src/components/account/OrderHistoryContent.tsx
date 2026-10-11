@@ -47,6 +47,8 @@ export function OrderHistoryContent({ onBack }: OrderHistoryContentProps) {
     <AccountScreen
       title="Order history"
       subtitle="Every payment we have taken, newest first."
+      icon={Receipt}
+      columns={1}
       onBack={onBack}
     >
       <AccountPanel title="Payments">

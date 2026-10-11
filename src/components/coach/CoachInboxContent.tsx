@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Loader2, Send, UserRoundCheck } from 'lucide-react';
+import { Loader2, Send, UserRoundCheck } from 'lucide-react';
+import { PageFrame } from '../layout/PageFrame';
 import type { Trade } from '../../types';
 import { formatCurrency } from '../../utils/format';
 import { pnlClass } from '../../utils/pnlTone';
@@ -205,98 +206,87 @@ export function CoachInboxContent({ onBack }: { onBack: () => void }) {
   const days = useMemo(() => (view ? groupDays(view) : []), [view]);
   const open = journals?.find((j) => j.ownerUid === openUid) ?? null;
 
+  const backToList = Boolean(openUid) && (journals?.length ?? 0) > 1;
+
   return (
-    <div className="pb-6">
-      <div className="max-w-3xl mx-auto p-4 md:p-6">
-        <button
-          type="button"
-          onClick={openUid && (journals?.length ?? 0) > 1 ? () => setOpenUid(null) : onBack}
-          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors mb-6 focus-ring rounded-lg px-1 py-1"
-        >
-          <ArrowLeft size={16} />
-          {openUid && (journals?.length ?? 0) > 1 ? 'All journals' : 'Back to dashboard'}
-        </button>
+    <PageFrame
+      title={open ? (open.username ? `@${open.username}` : (open.email ?? 'Journal')) : 'Coaching'}
+      icon={UserRoundCheck}
+      onBack={backToList ? () => setOpenUid(null) : onBack}
+      backLabel={backToList ? 'All journals' : 'Back to dashboard'}
+      subtitle={
+        open
+          ? 'The last 90 days of their trading. Anything you write here shows up in their journal.'
+          : 'Traders who invited you to read their journal and leave notes on it.'
+      }
+    >
 
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-accent/10 text-accent">
-            <UserRoundCheck size={22} />
-          </div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-            {open ? (open.username ? `@${open.username}` : (open.email ?? 'Journal')) : 'Coaching'}
-          </h1>
-        </div>
-        <p className="text-text-secondary mb-6 leading-relaxed max-w-2xl">
-          {open
-            ? 'The last 90 days of their trading. Anything you write here shows up in their journal.'
-            : 'Traders who invited you to read their journal and leave notes on it.'}
+      {error && (
+        <p className="panel-card p-4 text-sm text-red-400" role="alert">
+          {error}
         </p>
+      )}
 
-        {error && (
-          <p className="panel-card p-4 text-sm text-red-400" role="alert">
-            {error}
-          </p>
-        )}
+      {!error && journals === null && (
+        <p className="panel-card p-8 text-center text-sm text-text-secondary">Loading…</p>
+      )}
 
-        {!error && journals === null && (
-          <p className="panel-card p-8 text-center text-sm text-text-secondary">Loading…</p>
-        )}
+      {!error && journals?.length === 0 && (
+        <p className="panel-card p-8 text-center text-sm text-text-secondary">
+          Nobody has invited you yet. A trader adds you from their Settings, using the address you
+          signed in with.
+        </p>
+      )}
 
-        {!error && journals?.length === 0 && (
-          <p className="panel-card p-8 text-center text-sm text-text-secondary">
-            Nobody has invited you yet. A trader adds you from their Settings, using the address you
-            signed in with.
-          </p>
-        )}
+      {!openUid && (journals?.length ?? 0) > 1 && (
+        <div className="grid gap-2 md:gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {journals?.map((journal) => (
+            <button
+              key={journal.ownerUid}
+              type="button"
+              onClick={() => setOpenUid(journal.ownerUid)}
+              className="w-full text-left panel-card p-4 hover:border-accent/40 transition-colors focus-ring"
+            >
+              <p className="text-sm font-semibold">
+                {journal.username ? `@${journal.username}` : (journal.email ?? 'A trader')}
+              </p>
+              <p className="text-xs text-text-secondary mt-0.5">
+                Invited {new Date(journal.invitedAt).toLocaleDateString()}
+              </p>
+            </button>
+          ))}
+        </div>
+      )}
 
-        {!openUid && (journals?.length ?? 0) > 1 && (
-          <div className="space-y-2">
-            {journals?.map((journal) => (
-              <button
-                key={journal.ownerUid}
-                type="button"
-                onClick={() => setOpenUid(journal.ownerUid)}
-                className="w-full text-left panel-card p-4 hover:border-accent/40 transition-colors focus-ring"
-              >
-                <p className="text-sm font-semibold">
-                  {journal.username ? `@${journal.username}` : (journal.email ?? 'A trader')}
-                </p>
-                <p className="text-xs text-text-secondary mt-0.5">
-                  Invited {new Date(journal.invitedAt).toLocaleDateString()}
-                </p>
-              </button>
-            ))}
-          </div>
-        )}
+      {openUid && view === null && !error && (
+        <p className="panel-card p-8 text-center text-sm text-text-secondary">Loading the journal…</p>
+      )}
 
-        {openUid && view === null && !error && (
-          <p className="panel-card p-8 text-center text-sm text-text-secondary">Loading the journal…</p>
-        )}
+      {openUid && view && days.length === 0 && (
+        <p className="panel-card p-8 text-center text-sm text-text-secondary">
+          No trades in the last 90 days.
+        </p>
+      )}
 
-        {openUid && view && days.length === 0 && (
-          <p className="panel-card p-8 text-center text-sm text-text-secondary">
-            No trades in the last 90 days.
-          </p>
-        )}
-
-        {openUid && days.length > 0 && (
-          <div className="space-y-3">
-            {days.map((day) => (
-              <DayCard
-                key={day.date}
-                day={day}
-                ownerUid={openUid}
-                onNoteAdded={(note) =>
-                  setLoaded((prev) =>
-                    prev && prev.uid === openUid
-                      ? { ...prev, view: { ...prev.view, notes: [note, ...prev.view.notes] } }
-                      : prev,
-                  )
-                }
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+      {/* Two days across on a wide screen, newest first reading left to right. */}
+      {openUid && days.length > 0 && (
+        <div className="grid gap-2 md:gap-3 items-start xl:grid-cols-2">
+          {days.map((day) => (
+            <DayCard
+              key={day.date}
+              day={day}
+              ownerUid={openUid}
+              onNoteAdded={(note) =>
+                setLoaded((prev) =>
+                  prev && prev.uid === openUid
+                    ? { ...prev, view: { ...prev.view, notes: [note, ...prev.view.notes] } }
+                    : prev,
+                )
+              }
+            />
+          ))}
+        </div>
+      )}
+    </PageFrame>
   );
 }

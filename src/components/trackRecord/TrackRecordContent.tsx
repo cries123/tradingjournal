@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, BadgeCheck, Check, Copy, ExternalLink } from 'lucide-react';
+import { BadgeCheck, Check, Copy, ExternalLink } from 'lucide-react';
 import type { Trade } from '../../types';
 import { useAuth } from '../../context/useAuth';
 import { useSettings } from '../../context/useSettings';
@@ -13,6 +13,7 @@ import {
 import { fetchPublishedRecord, publishRecord, unpublishRecord } from '../../services/trackRecord';
 import { formatCurrency } from '../../utils/format';
 import { reportErrorSilently } from '../../services/errorReporting';
+import { PageFrame } from '../layout/PageFrame';
 
 interface TrackRecordContentProps {
   /** Every trade on the account, across journals — a record spans the trader, not one journal. */
@@ -170,24 +171,12 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
   };
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <button
-        type="button"
-        onClick={onBack}
-        className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors focus-ring rounded-lg px-1 py-1"
-      >
-        <ArrowLeft size={16} />
-        Back to dashboard
-      </button>
-
-      <div>
-        <h1 className="text-2xl font-bold">Verified track record</h1>
-        <p className="text-sm text-text-secondary mt-1 leading-relaxed">
-          A public page built only from trades your broker sent us. Anything you typed in by hand is
-          left out of it — and the page says how many.
-        </p>
-      </div>
-
+    <PageFrame
+      title="Verified track record"
+      icon={BadgeCheck}
+      onBack={onBack}
+      subtitle="A public page built only from trades your broker sent us. Anything you typed in by hand is left out of it — and the page says how many."
+    >
       <section className="hero-card p-5">
         <p className="text-[11px] uppercase tracking-[0.2em] text-text-secondary font-semibold">
           What your page would say
@@ -244,192 +233,197 @@ export function TrackRecordContent({ trades, onBack }: TrackRecordContentProps) 
         )}
       </section>
 
-      {journals.length > 0 && (
-        <section className="panel-card p-5">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
-              Journals to include
-            </h2>
-            {journals.length > 1 && (
-              <button
-                type="button"
-                onClick={() => updateSettings({ trackRecordJournals: null })}
-                disabled={selected.length === journals.length}
-                className="text-xs text-text-secondary hover:text-accent transition-colors focus-ring rounded-lg px-2 py-1 disabled:opacity-40 disabled:hover:text-text-secondary"
-              >
-                Select all
-              </button>
-            )}
-          </div>
-
-          <div className="space-y-3 mt-4">
-            {journals.map((id) => (
-              <Toggle
-                key={id}
-                checked={selected.includes(id)}
-                onChange={(on) => toggleJournal(id, on)}
-                label={journalName(id)}
-                blurb={`${(verifiedIn.get(id) ?? 0).toLocaleString()} broker-imported ${
-                  verifiedIn.get(id) === 1 ? 'trade' : 'trades'
-                }`}
-              />
-            ))}
-          </div>
-
-          {selected.length === 0 && (
-            <p className="text-xs text-amber-300/90 mt-4">
-              Pick at least one journal — a record of nothing is not a record.
-            </p>
-          )}
-
-          {selected.length > 0 && selected.length < journals.length && (
-            /* The honesty clause. Choosing which accounts to show is reasonable; doing it
-               invisibly is how a "verified" page becomes a highlight reel, so the page itself
-               reports the ratio and the trader is told that here, before they publish. */
-            <p className="text-xs text-amber-300/90 mt-4 leading-relaxed">
-              Your page will say it covers {selected.length} of your {journals.length}{' '}
-              broker-connected journals. Leaving one out is allowed; hiding that you did is not.
-            </p>
-          )}
-
-          {unavailable.length > 0 && (
-            <p className="text-[11px] text-text-secondary mt-4 leading-relaxed">
-              Not available: {unavailable.map((a) => a.name).join(', ')} — no broker-imported
-              trades, so nothing in there can be verified. Trades you typed into
-              {unavailable.length === 1 ? ' it ' : ' them '}
-              are not counted anywhere on this screen.
-            </p>
-          )}
-        </section>
-      )}
-
-      <section className="panel-card p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
-          What to show
-        </h2>
-
-        <div className="space-y-4 mt-4">
-          <Toggle
-            checked={showAmounts}
-            onChange={setShowAmounts}
-            label="Show dollar amounts"
-            blurb="Off, the page shows win rate and profit factor only. The amounts are not hidden by the page — they are never written to it, so nobody can read them out of it."
-          />
-          {/* Says WHICH name, because the two are not the same thing and the difference is the
-              point: the handle they chose goes on the page, the name their bank knows does not,
-              and nothing in the product can put the latter there. */}
-          <p className="text-xs text-text-secondary leading-relaxed">
-            The page is headed with your username{username ? ` — @${username}` : ""}, the same
-            name already in the link. Your real name is never printed on it and is never sent
-            to it.
-          </p>
-        </div>
-
-        {/*
-          Said here rather than discovered later. There is no percentage return on the page and
-          there never will be, and somebody about to publish is exactly who wants to know why.
-        */}
-        <p className="text-xs text-text-secondary mt-5 leading-relaxed">
-          There is no percentage return on the page. A broker connection is read-only and never
-          shows us your balance, so a percentage would be a real profit divided by a number you
-          typed — which looks audited and is not.
-        </p>
-      </section>
-
       {error && (
         <p className="text-sm text-red-400" role="alert">
           {error}
         </p>
       )}
 
-      <section className="panel-card border-emerald-500/25 p-5">
-        {loading ? (
-          <p className="text-sm text-text-secondary">Checking whether you have a page…</p>
-        ) : !username ? (
-          <p className="text-sm text-text-secondary leading-relaxed">
-            Pick a username in Account settings first — it becomes the address of your page.
-          </p>
-        ) : live ? (
-          <>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
-              <BadgeCheck className="h-3.5 w-3.5" aria-hidden />
-              Published
-            </span>
-
-            <div className="flex flex-wrap items-center gap-2 mt-3">
-              <code className="text-sm text-text-primary break-all">{url}</code>
-              <button
-                type="button"
-                onClick={copy}
-                className="inline-flex items-center gap-1.5 text-xs text-text-secondary hover:text-accent transition-colors focus-ring rounded-lg px-2 py-1"
-              >
-                {copied ? <Check size={13} /> : <Copy size={13} />}
-                {copied ? 'Copied' : 'Copy'}
-              </button>
-              <a
-                href={url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs text-text-secondary hover:text-accent transition-colors focus-ring rounded-lg px-2 py-1"
-              >
-                <ExternalLink size={13} />
-                Open
-              </a>
+      {/* Three across on a wide screen: what goes on the page, how it is shown, and the button.
+          Stacked down a 768px column the publish button sat three screens below the number it
+          publishes. */}
+      <div className="grid gap-2 md:gap-3 items-start lg:grid-cols-2 xl:grid-cols-3">
+        {journals.length > 0 && (
+          <section className="panel-card p-5">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+                Journals to include
+              </h2>
+              {journals.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => updateSettings({ trackRecordJournals: null })}
+                  disabled={selected.length === journals.length}
+                  className="text-xs text-text-secondary hover:text-accent transition-colors focus-ring rounded-lg px-2 py-1 disabled:opacity-40 disabled:hover:text-text-secondary"
+                >
+                  Select all
+                </button>
+              )}
             </div>
 
-            <p className="text-xs text-text-secondary mt-3 leading-relaxed">
-              These figures were taken {new Date(live.updatedAt).toLocaleString()} and do not update
-              on their own. Republish after syncing to bring the page up to date.
-            </p>
+            <div className="space-y-3 mt-4">
+              {journals.map((id) => (
+                <Toggle
+                  key={id}
+                  checked={selected.includes(id)}
+                  onChange={(on) => toggleJournal(id, on)}
+                  label={journalName(id)}
+                  blurb={`${(verifiedIn.get(id) ?? 0).toLocaleString()} broker-imported ${
+                    verifiedIn.get(id) === 1 ? 'trade' : 'trades'
+                  }`}
+                />
+              ))}
+            </div>
 
-            <div className="flex flex-wrap gap-2 mt-4">
+            {selected.length === 0 && (
+              <p className="text-xs text-amber-300/90 mt-4">
+                Pick at least one journal — a record of nothing is not a record.
+              </p>
+            )}
+
+            {selected.length > 0 && selected.length < journals.length && (
+              /* The honesty clause. Choosing which accounts to show is reasonable; doing it
+                 invisibly is how a "verified" page becomes a highlight reel, so the page itself
+                 reports the ratio and the trader is told that here, before they publish. */
+              <p className="text-xs text-amber-300/90 mt-4 leading-relaxed">
+                Your page will say it covers {selected.length} of your {journals.length}{' '}
+                broker-connected journals. Leaving one out is allowed; hiding that you did is not.
+              </p>
+            )}
+
+            {unavailable.length > 0 && (
+              <p className="text-[11px] text-text-secondary mt-4 leading-relaxed">
+                Not available: {unavailable.map((a) => a.name).join(', ')} — no broker-imported
+                trades, so nothing in there can be verified. Trades you typed into
+                {unavailable.length === 1 ? ' it ' : ' them '}
+                are not counted anywhere on this screen.
+              </p>
+            )}
+          </section>
+        )}
+
+        <section className="panel-card p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+            What to show
+          </h2>
+
+          <div className="space-y-4 mt-4">
+            <Toggle
+              checked={showAmounts}
+              onChange={setShowAmounts}
+              label="Show dollar amounts"
+              blurb="Off, the page shows win rate and profit factor only. The amounts are not hidden by the page — they are never written to it, so nobody can read them out of it."
+            />
+            {/* Says WHICH name, because the two are not the same thing and the difference is the
+                point: the handle they chose goes on the page, the name their bank knows does not,
+                and nothing in the product can put the latter there. */}
+            <p className="text-xs text-text-secondary leading-relaxed">
+              The page is headed with your username{username ? ` — @${username}` : ""}, the same
+              name already in the link. Your real name is never printed on it and is never sent
+              to it.
+            </p>
+          </div>
+
+          {/*
+            Said here rather than discovered later. There is no percentage return on the page and
+            there never will be, and somebody about to publish is exactly who wants to know why.
+          */}
+          <p className="text-xs text-text-secondary mt-5 leading-relaxed">
+            There is no percentage return on the page. A broker connection is read-only and never
+            shows us your balance, so a percentage would be a real profit divided by a number you
+            typed — which looks audited and is not.
+          </p>
+        </section>
+
+        <section className="panel-card border-emerald-500/25 p-5">
+          {loading ? (
+            <p className="text-sm text-text-secondary">Checking whether you have a page…</p>
+          ) : !username ? (
+            <p className="text-sm text-text-secondary leading-relaxed">
+              Pick a username in Account settings first — it becomes the address of your page.
+            </p>
+          ) : live ? (
+            <>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
+                <BadgeCheck className="h-3.5 w-3.5" aria-hidden />
+                Published
+              </span>
+
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                <code className="text-sm text-text-primary break-all">{url}</code>
+                <button
+                  type="button"
+                  onClick={copy}
+                  className="inline-flex items-center gap-1.5 text-xs text-text-secondary hover:text-accent transition-colors focus-ring rounded-lg px-2 py-1"
+                >
+                  {copied ? <Check size={13} /> : <Copy size={13} />}
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-text-secondary hover:text-accent transition-colors focus-ring rounded-lg px-2 py-1"
+                >
+                  <ExternalLink size={13} />
+                  Open
+                </a>
+              </div>
+
+              <p className="text-xs text-text-secondary mt-3 leading-relaxed">
+                These figures were taken {new Date(live.updatedAt).toLocaleString()} and do not update
+                on their own. Republish after syncing to bring the page up to date.
+              </p>
+
+              <div className="flex flex-wrap gap-2 mt-4">
+                <button
+                  type="button"
+                  onClick={() => void run('publish')}
+                  disabled={busy || !canPost}
+                  className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                >
+                  {busy ? 'Working…' : 'Republish with these settings'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void run('unpublish')}
+                  disabled={busy}
+                  className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:text-red-400 hover:border-red-500/40 transition-colors focus-ring disabled:opacity-50"
+                >
+                  Take it down
+                </button>
+              </div>
+
+              {/* What "take it down" actually does, because the usual meaning of unpublish — a flag
+                  flipped on a document anyone can still read — is not what happens here. */}
+              <p className="text-[11px] text-text-secondary mt-3">
+                Taking it down deletes the page and its figures outright. The address stops working
+                for everyone, including anyone who saved the link.
+              </p>
+            </>
+          ) : (
+            <>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+                Publish
+              </h2>
+              <p className="text-sm text-text-secondary mt-1.5 leading-relaxed">
+                Your page will live at{' '}
+                <code className="text-text-primary break-all">{url}</code>. You can take it down at any
+                time.
+              </p>
               <button
                 type="button"
                 onClick={() => void run('publish')}
                 disabled={busy || !canPost}
-                className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold mt-4 disabled:opacity-50"
               >
-                {busy ? 'Working…' : 'Republish with these settings'}
+                <BadgeCheck size={15} />
+                {busy ? 'Publishing…' : 'Publish my record'}
               </button>
-              <button
-                type="button"
-                onClick={() => void run('unpublish')}
-                disabled={busy}
-                className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:text-red-400 hover:border-red-500/40 transition-colors focus-ring disabled:opacity-50"
-              >
-                Take it down
-              </button>
-            </div>
-
-            {/* What "take it down" actually does, because the usual meaning of unpublish — a flag
-                flipped on a document anyone can still read — is not what happens here. */}
-            <p className="text-[11px] text-text-secondary mt-3">
-              Taking it down deletes the page and its figures outright. The address stops working
-              for everyone, including anyone who saved the link.
-            </p>
-          </>
-        ) : (
-          <>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
-              Publish
-            </h2>
-            <p className="text-sm text-text-secondary mt-1.5 leading-relaxed">
-              Your page will live at{' '}
-              <code className="text-text-primary break-all">{url}</code>. You can take it down at any
-              time.
-            </p>
-            <button
-              type="button"
-              onClick={() => void run('publish')}
-              disabled={busy || !canPost}
-              className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold mt-4 disabled:opacity-50"
-            >
-              <BadgeCheck size={15} />
-              {busy ? 'Publishing…' : 'Publish my record'}
-            </button>
-          </>
-        )}
-      </section>
-    </div>
+            </>
+          )}
+        </section>
+      </div>
+    </PageFrame>
   );
 }

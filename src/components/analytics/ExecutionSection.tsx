@@ -321,7 +321,7 @@ export function ExecutionSection({ trades }: ExecutionSectionProps) {
   const currency = settings.currency;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 2xl:block 2xl:columns-3 2xl:[&>*]:mb-3 2xl:[&>*]:break-inside-avoid">
       {/* Symbols first: it needs nothing but a ticker and a P&L, so it is the one panel here that
           draws for every journal from every source. */}
       {coverage.symbols.length > 0 && (
@@ -424,7 +424,7 @@ export function ExecutionPrompts({ trades }: ExecutionSectionProps) {
       <h3 className="text-sm font-semibold mb-3">
         {prompts.length} more panel{prompts.length === 1 ? '' : 's'} the journal can draw
       </h3>
-      <ul className="grid gap-2 md:grid-cols-2">
+      <ul className="grid gap-2 md:grid-cols-2 2xl:grid-cols-3">
         {prompts.map((prompt) => (
           <li
             key={prompt.id}

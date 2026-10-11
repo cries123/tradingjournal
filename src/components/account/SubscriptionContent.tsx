@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ExternalLink } from 'lucide-react';
+import { CreditCard, ExternalLink } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
 import { useEntitlement } from '../../context/useEntitlement';
 import { openBillingPortal } from '../../services/entitlement';
@@ -93,6 +93,7 @@ export function SubscriptionContent({ onBack, onOrderHistory }: SubscriptionCont
     <AccountScreen
       title="Subscription"
       subtitle="What you are on, what it renews at, and how to stop it."
+      icon={CreditCard}
       onBack={onBack}
     >
       <AccountPanel title="Current plan">

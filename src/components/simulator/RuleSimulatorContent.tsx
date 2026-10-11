@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { ArrowLeft, Check } from 'lucide-react';
+import { Check, FlaskConical } from 'lucide-react';
 import type { Trade } from '../../types';
 import type { TradingRules } from '../../types/strategy';
 import { useSettings } from '../../context/useSettings';
 import { formatCurrency } from '../../utils/format';
 import { rulesAreTestable, simulateRules, type SimulatedDay } from '../../utils/ruleSimulator';
+import { PageFrame, PageSection } from '../layout/PageFrame';
 
 export interface SimulatorPeriod {
   scope: 'month' | 'year' | 'all';
@@ -123,43 +124,33 @@ export function RuleSimulatorContent({ periods, onBack }: RuleSimulatorContentPr
   };
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      <button
-        type="button"
-        onClick={onBack}
-        className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors focus-ring rounded-lg px-1 py-1"
-      >
-        <ArrowLeft size={16} />
-        Back to dashboard
-      </button>
-
-      <div>
-        <h1 className="text-2xl font-bold">Rule simulator</h1>
-        <p className="text-sm text-text-secondary mt-1">
-          Your own trades, replayed against rules you set. Nothing here changes your journal.
-        </p>
-      </div>
-
-      {/* Its own period, independent of what the dashboard is showing — asking "what would a stop
-          have done to my year" should not mean navigating the calendar first. */}
-      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Period">
-        {periods.map((p) => (
-          <button
-            key={p.scope}
-            type="button"
-            onClick={() => setScope(p.scope)}
-            aria-pressed={p.scope === scope}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus-ring ${
-              p.scope === scope
-                ? 'bg-accent/15 text-accent'
-                : 'border border-border text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-
+    <PageFrame
+      title="Rule simulator"
+      icon={FlaskConical}
+      onBack={onBack}
+      subtitle="Your own trades, replayed against rules you set. Nothing here changes your journal."
+      actions={
+        /* Its own period, independent of what the dashboard is showing — asking "what would a stop
+           have done to my year" should not mean navigating the calendar first. */
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Period">
+          {periods.map((p) => (
+            <button
+              key={p.scope}
+              type="button"
+              onClick={() => setScope(p.scope)}
+              aria-pressed={p.scope === scope}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus-ring ${
+                p.scope === scope
+                  ? 'bg-accent/15 text-accent'
+                  : 'border border-border text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      }
+    >
       {trades.length === 0 ? (
         <section className="panel-card p-5">
           <p className="text-sm text-text-secondary">
@@ -232,12 +223,20 @@ export function RuleSimulatorContent({ periods, onBack }: RuleSimulatorContentPr
             )}
           </section>
 
-          <div className="grid lg:grid-cols-[300px_1fr] gap-6 items-start">
-            <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-                Rules to test
-              </p>
+          {/*
+            The four rules side by side rather than stacked down a 300px rail: on a wide screen that
+            rail left the result table squeezed into what was left, and the rules are the controls —
+            they belong at the top, next to the number they change.
 
+            Time-of-day rules are said to be absent rather than left to be discovered. Schwab's feed
+            carries a date with no fill time, so a time-of-day rule would silently simulate nothing for
+            most journals here.
+          */}
+          <PageSection
+            title="Rules to test"
+            blurb="Time-of-day rules are not here: most brokers send the date without the fill time, so there is nothing to test them against."
+          >
+            <div className="grid gap-2 md:gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <RuleInput
                 label="Max trades per day"
                 blurb="Stop once you have taken this many, whatever happened."
@@ -266,25 +265,94 @@ export function RuleSimulatorContent({ periods, onBack }: RuleSimulatorContentPr
                 value={maxGain}
                 onChange={setMaxGain}
               />
-
-              {/*
-                Said plainly rather than left to be discovered. Schwab's feed carries a date with no
-                fill time, so a time-of-day rule would silently simulate nothing for most journals
-                here — better to explain its absence than to ship one that quietly does nothing.
-              */}
-              <p className="text-[11px] text-text-secondary leading-relaxed px-1">
-                Time-of-day rules are not here: most brokers send the date without the fill time, so
-                there is nothing to test them against.
-              </p>
             </div>
+          </PageSection>
 
-            <div className="space-y-6">
-              {testable && (
+          <div
+            className={`grid gap-2 md:gap-3 items-start ${
+              result.changedDays.length > 0 && testable ? 'xl:grid-cols-[minmax(0,1fr)_400px]' : ''
+            }`}
+          >
+            {/* Second on a narrow screen, where the summary of what the rules did reads first. */}
+            {result.changedDays.length > 0 && (
+              <section className="panel-card p-5 order-2 xl:order-1">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+                    Days it would have changed
+                  </h2>
+                  <span className="text-[11px] text-text-secondary">
+                    {result.daysChanged} of {result.tradingDays}
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto mt-3">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-[11px] uppercase tracking-wide text-text-secondary">
+                        <th className="pb-2 font-medium">Date</th>
+                        <th className="pb-2 font-medium text-right">Trades</th>
+                        <th className="pb-2 font-medium text-right">Actual</th>
+                        <th className="pb-2 font-medium text-right">Simulated</th>
+                        {/* Five columns in 366px gave every row three wrapped lines and a 61px
+                            height. On a phone this moves under the date instead, where it reads
+                            as a sentence rather than a squeezed column. */}
+                        <th className="hidden sm:table-cell pb-2 pl-4 font-medium">Stopped by</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {result.changedDays.slice(0, 25).map((day) => (
+                        <tr key={day.date} className="border-t border-border/50">
+                          <td className="py-2.5 whitespace-nowrap">
+                            {shortDate(day.date)}
+                            {day.stoppedBy && (
+                              <span className="block sm:hidden text-[10px] text-text-secondary font-normal">
+                                {STOP_LABEL[day.stoppedBy.rule]}, trade {day.stoppedBy.atTrade}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 text-right tabular-nums text-text-secondary">
+                            {day.actualTrades} → {day.keptTrades}
+                          </td>
+                          <td
+                            className={`py-2.5 text-right tabular-nums ${
+                              day.actualPnl >= 0 ? 'text-emerald-400' : 'text-red-400'
+                            }`}
+                          >
+                            {formatCurrency(day.actualPnl)}
+                          </td>
+                          <td
+                            className={`py-2.5 text-right tabular-nums ${
+                              day.simulatedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'
+                            }`}
+                          >
+                            {formatCurrency(day.simulatedPnl)}
+                          </td>
+                          <td className="hidden sm:table-cell py-2.5 pl-4 text-[11px] text-text-secondary">
+                            {day.stoppedBy
+                              ? `${STOP_LABEL[day.stoppedBy.rule]}, trade ${day.stoppedBy.atTrade}`
+                              : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {result.changedDays.length > 25 && (
+                  <p className="mt-3 text-[11px] text-text-secondary">
+                    Showing the 25 worst of {result.changedDays.length}.
+                  </p>
+                )}
+              </section>
+            )}
+
+            {testable && (
+              <div className="flex flex-col gap-2 md:gap-3 order-1 xl:order-2">
                 <section className="panel-card p-5">
                   <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
                     What the rules did
                   </h2>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-2 gap-4 mt-4">
                     <Stat label="Days cut short" value={String(result.daysChanged)} />
                     <Stat label="Trades removed" value={String(result.tradesRemoved)} />
                     <Stat
@@ -308,81 +376,7 @@ export function RuleSimulatorContent({ periods, onBack }: RuleSimulatorContentPr
                     bigger of the two.
                   </p>
                 </section>
-              )}
 
-              {result.changedDays.length > 0 && (
-                <section className="panel-card p-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
-                      Days it would have changed
-                    </h2>
-                    <span className="text-[11px] text-text-secondary">
-                      {result.daysChanged} of {result.tradingDays}
-                    </span>
-                  </div>
-
-                  <div className="overflow-x-auto mt-3">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-[11px] uppercase tracking-wide text-text-secondary">
-                          <th className="pb-2 font-medium">Date</th>
-                          <th className="pb-2 font-medium text-right">Trades</th>
-                          <th className="pb-2 font-medium text-right">Actual</th>
-                          <th className="pb-2 font-medium text-right">Simulated</th>
-                          {/* Five columns in 366px gave every row three wrapped lines and a 61px
-                              height. On a phone this moves under the date instead, where it reads
-                              as a sentence rather than a squeezed column. */}
-                          <th className="hidden sm:table-cell pb-2 pl-4 font-medium">Stopped by</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {result.changedDays.slice(0, 25).map((day) => (
-                          <tr key={day.date} className="border-t border-border/50">
-                            <td className="py-2.5 whitespace-nowrap">
-                              {shortDate(day.date)}
-                              {day.stoppedBy && (
-                                <span className="block sm:hidden text-[10px] text-text-secondary font-normal">
-                                  {STOP_LABEL[day.stoppedBy.rule]}, trade {day.stoppedBy.atTrade}
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-2.5 text-right tabular-nums text-text-secondary">
-                              {day.actualTrades} → {day.keptTrades}
-                            </td>
-                            <td
-                              className={`py-2.5 text-right tabular-nums ${
-                                day.actualPnl >= 0 ? 'text-emerald-400' : 'text-red-400'
-                              }`}
-                            >
-                              {formatCurrency(day.actualPnl)}
-                            </td>
-                            <td
-                              className={`py-2.5 text-right tabular-nums ${
-                                day.simulatedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'
-                              }`}
-                            >
-                              {formatCurrency(day.simulatedPnl)}
-                            </td>
-                            <td className="hidden sm:table-cell py-2.5 pl-4 text-[11px] text-text-secondary">
-                              {day.stoppedBy
-                                ? `${STOP_LABEL[day.stoppedBy.rule]}, trade ${day.stoppedBy.atTrade}`
-                                : '—'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {result.changedDays.length > 25 && (
-                    <p className="mt-3 text-[11px] text-text-secondary">
-                      Showing the 25 worst of {result.changedDays.length}.
-                    </p>
-                  )}
-                </section>
-              )}
-
-              {testable && (
                 <section className="panel-card border-emerald-500/25 p-5">
                   <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
                     Make it real
@@ -402,12 +396,12 @@ export function RuleSimulatorContent({ periods, onBack }: RuleSimulatorContentPr
                     {saved ? 'Saved as your trading rules' : 'Save as my trading rules'}
                   </button>
                 </section>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </>
       )}
-    </div>
+    </PageFrame>
   );
 }
 

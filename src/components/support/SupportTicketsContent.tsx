@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, CheckCircle2, LifeBuoy, MessageSquare, Plus, Send } from 'lucide-react';
+import { PageFrame } from '../layout/PageFrame';
 import { useAuth } from '../../context/useAuth';
 import { useEntitlement } from '../../context/useEntitlement';
 import { reportErrorSilently } from '../../services/errorReporting';
@@ -406,139 +407,133 @@ export function SupportTicketsContent({
 
   const unansweredCount = tickets.filter((t) => t.unreadForUser).length;
 
-  return (
-    <div className={embedded ? '' : 'pb-6'}>
-      <div className={embedded ? '' : 'max-w-2xl mx-auto p-4 md:p-6'}>
-        {!embedded && (
-          <>
-            <button
-              type="button"
-              onClick={onBack}
-              className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors mb-8 focus-ring rounded-lg px-1 py-1"
-            >
-              <ArrowLeft size={16} />
-              {backLabel}
+  const body = (
+    <>
+      {!firebaseEnabled ? (
+        <div className="panel-card p-6 text-sm text-text-secondary">
+          Tickets need the app to be connected to our backend. Email{' '}
+          <a href="mailto:support@trendchasers.net" className="text-accent hover:underline">
+            support@trendchasers.net
+          </a>{' '}
+          and we will pick it up there.
+        </div>
+      ) : loading ? (
+        <div className="panel-card p-8 text-center text-sm text-text-secondary">Checking your account…</div>
+      ) : !user ? (
+        <div className="panel-card p-8 text-center">
+          <MessageSquare size={36} className="mx-auto text-accent mb-4" />
+          <h2 className="text-lg font-semibold mb-2">Sign in to open a ticket</h2>
+          <p className="text-sm text-text-secondary mb-6 max-w-sm mx-auto leading-relaxed">
+            A ticket is a conversation tied to your account, so we can see your plan and your
+            broker connections without asking you to describe them.
+          </p>
+          {onSignIn && (
+            <button type="button" onClick={onSignIn} className="btn-primary text-sm px-5 py-2.5">
+              Sign in
             </button>
-
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 rounded-lg bg-accent/10 text-accent">
-                <LifeBuoy size={22} />
-              </div>
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{heading}</h1>
-              {unansweredCount > 0 && (
-                <span className="text-[11px] font-semibold rounded-full px-2 py-0.5 bg-accent/15 text-accent">
-                  {unansweredCount} new {unansweredCount === 1 ? 'reply' : 'replies'}
-                </span>
-              )}
-            </div>
-            <p className="text-text-secondary mb-8 leading-relaxed">{intro}</p>
-          </>
-        )}
-
-        {!firebaseEnabled ? (
-          <div className="panel-card p-6 text-sm text-text-secondary">
-            Tickets need the app to be connected to our backend. Email{' '}
+          )}
+          <p className="text-xs text-text-secondary mt-5">
+            No account? Email{' '}
             <a href="mailto:support@trendchasers.net" className="text-accent hover:underline">
               support@trendchasers.net
-            </a>{' '}
-            and we will pick it up there.
-          </div>
-        ) : loading ? (
-          <div className="panel-card p-8 text-center text-sm text-text-secondary">Checking your account…</div>
-        ) : !user ? (
-          <div className="panel-card p-8 text-center">
-            <MessageSquare size={36} className="mx-auto text-accent mb-4" />
-            <h2 className="text-lg font-semibold mb-2">Sign in to open a ticket</h2>
-            <p className="text-sm text-text-secondary mb-6 max-w-sm mx-auto leading-relaxed">
-              A ticket is a conversation tied to your account, so we can see your plan and your
-              broker connections without asking you to describe them.
+            </a>
+            .
+          </p>
+        </div>
+      ) : selected ? (
+        <TicketThread ticket={selected} onBack={() => setSelectedId(null)} onCloseTicket={closeTicket} />
+      ) : composing || (ticketsLoaded && tickets.length === 0) ? (
+        <NewTicketForm
+          initialCategory={initialCategory}
+          hasExisting={tickets.length > 0}
+          onCancel={() => setComposing(false)}
+          onCreated={(id) => {
+            setComposing(false);
+            setSelectedId(id);
+          }}
+        />
+      ) : (
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => setComposing(true)}
+            className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm mb-2"
+          >
+            <Plus size={16} /> New ticket
+          </button>
+
+          {!ticketsLoaded && (
+            <div className="panel-card p-8 text-center text-sm text-text-secondary">
+              Loading your tickets…
+            </div>
+          )}
+
+          {listError && (
+            <p className="text-sm text-red-400" role="alert">
+              {listError}
             </p>
-            {onSignIn && (
-              <button type="button" onClick={onSignIn} className="btn-primary text-sm px-5 py-2.5">
-                Sign in
-              </button>
-            )}
-            <p className="text-xs text-text-secondary mt-5">
-              No account? Email{' '}
-              <a href="mailto:support@trendchasers.net" className="text-accent hover:underline">
-                support@trendchasers.net
-              </a>
-              .
-            </p>
-          </div>
-        ) : selected ? (
-          <TicketThread ticket={selected} onBack={() => setSelectedId(null)} onCloseTicket={closeTicket} />
-        ) : composing || (ticketsLoaded && tickets.length === 0) ? (
-          <NewTicketForm
-            initialCategory={initialCategory}
-            hasExisting={tickets.length > 0}
-            onCancel={() => setComposing(false)}
-            onCreated={(id) => {
-              setComposing(false);
-              setSelectedId(id);
-            }}
-          />
-        ) : (
-          <div className="space-y-3">
+          )}
+
+          {tickets.map((t) => (
             <button
+              key={t.id}
               type="button"
-              onClick={() => setComposing(true)}
-              className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm mb-2"
+              onClick={() => setSelectedId(t.id)}
+              className="w-full text-left panel-card p-4 hover:border-accent/40 transition-colors focus-ring"
             >
-              <Plus size={16} /> New ticket
-            </button>
-
-            {!ticketsLoaded && (
-              <div className="panel-card p-8 text-center text-sm text-text-secondary">
-                Loading your tickets…
-              </div>
-            )}
-
-            {listError && (
-              <p className="text-sm text-red-400" role="alert">
-                {listError}
-              </p>
-            )}
-
-            {tickets.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setSelectedId(t.id)}
-                className="w-full text-left panel-card p-4 hover:border-accent/40 transition-colors focus-ring"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-semibold truncate">{t.subject}</p>
-                      {t.unreadForUser && (
-                        <span className="text-[10px] font-semibold rounded-full px-1.5 py-0.5 bg-accent/15 text-accent shrink-0">
-                          New reply
-                        </span>
-                      )}
-                      {t.status === 'resolved' && (
-                        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 shrink-0">
-                          <CheckCircle2 size={11} /> Resolved
-                        </span>
-                      )}
-                      {t.status === 'closed' && (
-                        <span className="text-[10px] text-text-secondary shrink-0">Closed</span>
-                      )}
-                    </div>
-                    <p className="text-xs text-text-secondary mt-1 line-clamp-1">
-                      {t.lastMessageFrom === 'support' ? 'Support: ' : 'You: '}
-                      {t.lastMessagePreview}
-                    </p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold truncate">{t.subject}</p>
+                    {t.unreadForUser && (
+                      <span className="text-[10px] font-semibold rounded-full px-1.5 py-0.5 bg-accent/15 text-accent shrink-0">
+                        New reply
+                      </span>
+                    )}
+                    {t.status === 'resolved' && (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 shrink-0">
+                        <CheckCircle2 size={11} /> Resolved
+                      </span>
+                    )}
+                    {t.status === 'closed' && (
+                      <span className="text-[10px] text-text-secondary shrink-0">Closed</span>
+                    )}
                   </div>
-                  <span className="text-[11px] text-text-secondary shrink-0">
-                    {formatWhen(t.lastMessageAt)}
-                  </span>
+                  <p className="text-xs text-text-secondary mt-1 line-clamp-1">
+                    {t.lastMessageFrom === 'support' ? 'Support: ' : 'You: '}
+                    {t.lastMessagePreview}
+                  </p>
                 </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+                <span className="text-[11px] text-text-secondary shrink-0">
+                  {formatWhen(t.lastMessageAt)}
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+
+  // Embedded in the Support screen, which draws its own header around it.
+  if (embedded) return body;
+
+  return (
+    <PageFrame
+      title={heading}
+      icon={LifeBuoy}
+      onBack={onBack}
+      backLabel={backLabel}
+      subtitle={intro}
+      badge={
+        unansweredCount > 0 ? (
+          <span className="text-[11px] font-semibold rounded-full px-2 py-0.5 bg-accent/15 text-accent">
+            {unansweredCount} new {unansweredCount === 1 ? 'reply' : 'replies'}
+          </span>
+        ) : null
+      }
+    >
+      {body}
+    </PageFrame>
   );
 }
