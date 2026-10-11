@@ -56,7 +56,10 @@ export function AssistantContent({ periods, rules, onBack }: AssistantContentPro
           streams in (no page jump under the cursor on every token), and on a tall screen the
           conversation fills it rather than leaving the bottom third empty. */}
       <div className="grid gap-2 md:gap-3 lg:grid-cols-[272px_minmax(0,1fr)] lg:h-[calc(100dvh-11rem)] lg:min-h-[540px]">
-        <aside className="panel-card p-3 flex flex-col min-h-0">
+        {/* Conversation first on a phone, history under it. Stacked the other way round, the
+            history list and the allowance meter filled the whole first screen and the chat began
+            below the fold. */}
+        <aside className="panel-card p-3 flex flex-col min-h-0 order-2 lg:order-1">
           <button
             type="button"
             onClick={startNew}
@@ -152,7 +155,7 @@ export function AssistantContent({ periods, rules, onBack }: AssistantContentPro
           </div>
         </aside>
 
-        <div className="panel-card p-3 md:p-4 flex flex-col h-[calc(100dvh-11rem)] min-h-[540px] lg:h-auto lg:min-h-0">
+        <div className="panel-card p-3 md:p-4 flex flex-col h-[calc(100dvh-11rem)] min-h-[540px] lg:h-auto lg:min-h-0 order-1 lg:order-2">
           <AssistantPanel periods={periods} rules={rules} bare layout="page" />
         </div>
       </div>

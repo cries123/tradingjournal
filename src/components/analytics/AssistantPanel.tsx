@@ -65,7 +65,18 @@ function readNotesOptIn(): boolean {
 export function AssistantPanel({ periods, rules, bare = false, layout = 'dock' }: AssistantPanelProps) {
   const { messages, append, rollbackTo, startNew } = useAssistantThreads();
   const { limits, noteUsage } = useEntitlement();
-  const [scope, setScope] = useState<AssistantScope>(periods[0]?.scope ?? 'month');
+  /*
+   * The period opens on the narrowest one that has trades in it, not always on the first.
+   *
+   * It always opened on this month, and on the first days of a month — or any month not traded
+   * yet — that is an empty period: the screen said "no trades in this period" over a journal with
+   * hundreds in it, and showed none of the findings that are the point of opening it. Derived
+   * rather than chosen once at mount, because the trades can still be loading when the screen
+   * opens; once somebody picks a period themselves, their choice stands.
+   */
+  const [chosenScope, setScope] = useState<AssistantScope | null>(null);
+  const scope: AssistantScope =
+    chosenScope ?? periods.find((p) => p.trades.length > 0)?.scope ?? periods[0]?.scope ?? 'month';
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -209,7 +220,7 @@ export function AssistantPanel({ periods, rules, bare = false, layout = 'dock' }
         </div>
         <p className="text-xs text-text-secondary leading-relaxed">
           {periods.length > 1
-            ? 'No trades in this period yet. Log a few, or switch period above, and the assistant can review them with you.'
+            ? `No trades in ${active?.label ?? 'this period'} yet. Pick a longer period below, or log a few, and the assistant can review them with you.`
             : 'Log a few trades and the assistant can review them with you.'}
         </p>
         {periods.length > 1 && (
@@ -334,11 +345,11 @@ export function AssistantPanel({ periods, rules, bare = false, layout = 'dock' }
             at 1,300px a line of answer ran past 200 characters, and nobody reads a line that long. */}
         <div className={page ? 'mx-auto w-full max-w-3xl' : ''}>
           {messages.length === 0 ? (
-            <div className={page ? 'pt-8 pb-6' : 'py-1'}>
+            <div className={page ? 'pt-4 pb-6 md:pt-8' : 'py-1'}>
               {page ? (
-                <div className="text-center mb-7 animate-msg-in">
+                <div className="text-center mb-5 md:mb-7 animate-msg-in">
                   <AssistantAvatar size="lg" />
-                  <h2 className="mt-4 text-xl md:text-2xl font-semibold tracking-tight text-text-primary">
+                  <h2 className="mt-3 md:mt-4 text-lg md:text-2xl font-semibold tracking-tight text-text-primary">
                     What do you want to know about {active?.label}?
                   </h2>
                   <p className="mt-1.5 text-sm text-text-secondary">

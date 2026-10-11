@@ -311,6 +311,27 @@ describe('the assistant page', () => {
     expect(meter).toBeGreaterThan(history);
   });
 
+  it('opens on a period that has trades when this month has none yet', () => {
+    // October 11th, nothing traded yet in October: the page said "no trades in this period" over a
+    // journal with hundreds in it and showed none of its findings.
+    const quietMonth = [
+      { scope: 'month' as const, label: 'October 2026', trades: [] },
+      { scope: 'year' as const, label: '2026', trades: [trade({ pnl: 120 }), trade({ pnl: -60 })] },
+      { scope: 'all' as const, label: 'All time', trades: [trade({ pnl: 120 })] },
+    ];
+    const page = paint(createElement(InAppProvider, null, createElement(AssistantContent, { periods: quietMonth, onBack: noop })));
+    expect(page).toContain('What do you want to know about 2026?');
+    expect(page).not.toContain('No trades in');
+    expect(page).toMatch(/aria-pressed="true"[^>]*>2026</);
+  });
+
+  it('puts the conversation above the history on a phone', () => {
+    const chat = html.indexOf('order-1 lg:order-2');
+    const rail = html.indexOf('order-2 lg:order-1');
+    expect(chat).toBeGreaterThan(-1);
+    expect(rail).toBeGreaterThan(-1);
+  });
+
   it('picks the period with the app’s one toggle', () => {
     expect(html).toContain('role="group" aria-label="Period"');
   });
