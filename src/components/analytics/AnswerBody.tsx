@@ -32,23 +32,34 @@ function Segments({ segments }: { segments: AnswerSegment[] }) {
   );
 }
 
+/**
+ * Body text per surface. The dock is a 400px panel, where 13px grey is right; the Assistant page
+ * is a reading column, where a long answer in 13px slate-400 was the hardest text in the app to
+ * read. There it is a size up and nearer white.
+ */
+const TEXT = {
+  sm: 'text-[13px] leading-relaxed text-text-secondary',
+  md: 'text-[14.5px] leading-7 text-text-primary/85',
+} as const;
+
 /** Renders an assistant answer as real paragraphs, lists and highlighted figures. */
-export function AnswerBody({ answer }: { answer: string }) {
+export function AnswerBody({ answer, size = 'sm' }: { answer: string; size?: keyof typeof TEXT }) {
   const blocks = parseAnswer(answer);
+  const text = TEXT[size];
 
   return (
-    <div className="space-y-2">
+    <div className={size === 'md' ? 'space-y-3' : 'space-y-2'}>
       {blocks.map((block, i) =>
         block.kind === 'paragraph' ? (
-          <p key={i} className="text-[13px] leading-relaxed text-text-secondary">
+          <p key={i} className={text}>
             <Segments segments={block.segments} />
           </p>
         ) : (
-          <ul key={i} className="space-y-1.5">
+          <ul key={i} className={size === 'md' ? 'space-y-2' : 'space-y-1.5'}>
             {block.items.map((item, j) => (
-              <li key={j} className="flex gap-2 text-[13px] leading-relaxed text-text-secondary">
+              <li key={j} className={`flex gap-2.5 ${text}`}>
                 <span
-                  className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-accent/70"
+                  className={`shrink-0 rounded-full bg-accent/70 ${size === 'md' ? 'mt-[11px] h-1.5 w-1.5' : 'mt-[7px] h-1 w-1'}`}
                   aria-hidden
                 />
                 <span className="min-w-0">

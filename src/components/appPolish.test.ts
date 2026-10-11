@@ -71,6 +71,7 @@ import { PageFrame, InAppProvider } from './layout/PageFrame';
 import { PanelShell, BarRow } from './analytics/PanelShell';
 import { CountUp } from './motion/CountUp';
 import { TrackRecordContent } from './trackRecord/TrackRecordContent';
+import { AssistantContent } from './analytics/AssistantContent';
 import { computeStats } from '../utils/stats';
 import { buildTrackRecord, toPublishedRecord } from '../utils/trackRecord';
 
@@ -216,6 +217,7 @@ describe('SegmentedControl', () => {
       'src/components/DashboardView.tsx',
       'src/components/PerformanceContent.tsx',
       'src/components/simulator/RuleSimulatorContent.tsx',
+      'src/components/analytics/AssistantPanel.tsx',
     ]) {
       const source = readFileSync(file, 'utf8');
       expect(source).toContain('<SegmentedControl');
@@ -288,6 +290,37 @@ describe('the track record preview', () => {
   });
 });
 
+describe('the assistant page', () => {
+  const periods = [
+    { scope: 'month' as const, label: 'July 2026', trades: [trade({ pnl: 120 }), trade({ pnl: -60, date: '2026-07-15' })] },
+    { scope: 'year' as const, label: '2026', trades: [trade({ pnl: 120 })] },
+  ];
+  const html = paint(createElement(InAppProvider, null, createElement(AssistantContent, { periods, onBack: noop })));
+
+  it('opens on the conversation, not on a row of stat tiles', () => {
+    expect(html).toContain('What do you want to know about July 2026?');
+    for (const tile of ['Saved conversations', 'Questions asked', 'Switch period in the chat']) {
+      expect(html).not.toContain(tile);
+    }
+  });
+
+  it('keeps the allowance, as a meter under the history', () => {
+    const history = html.indexOf('>History');
+    const meter = html.indexOf('Questions left today');
+    expect(history).toBeGreaterThan(-1);
+    expect(meter).toBeGreaterThan(history);
+  });
+
+  it('picks the period with the app’s one toggle', () => {
+    expect(html).toContain('role="group" aria-label="Period"');
+  });
+
+  it('reads the conversation in a column, not across the whole panel', () => {
+    // The scrolling conversation itself, not just the composer under it, which is capped too.
+    expect(html).toMatch(/overflow-y-auto[^"]*"><div class="mx-auto w-full max-w-3xl">/);
+  });
+});
+
 describe('dialogs play out instead of vanishing', () => {
   const DIALOGS = [
     'src/components/TradeModal.tsx',
@@ -323,7 +356,7 @@ describe('the stylesheet', () => {
   })();
 
   it('switches the new animations off under reduced motion', () => {
-    for (const name of ['.animate-scale-out', '.animate-backdrop-out', '.skeleton-shimmer']) {
+    for (const name of ['.animate-scale-out', '.animate-backdrop-out', '.skeleton-shimmer', '.animate-msg-in', '.typing-dot']) {
       expect(reduce).toContain(name);
     }
   });

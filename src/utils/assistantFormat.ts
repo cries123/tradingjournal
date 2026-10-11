@@ -50,14 +50,29 @@ function splitFigures(text: string): AnswerSegment[] {
   return out;
 }
 
-/** Splits on **bold**, then finds figures inside whatever is left. */
+/** A bold run that is nothing but one figure — "**-$553.27**". */
+const WHOLE_FIGURE = new RegExp(`^${FIGURE.source}$`);
+
+/**
+ * Splits on **bold**, then finds figures inside whatever is left.
+ *
+ * A bold run that is exactly one figure is read as that figure. The model bolds most of the numbers
+ * it quotes, so "**-$553.27**" was coming out as plain bold white while the same loss written
+ * without asterisks was red — the colouring missed the figures the answer leaned on hardest. The
+ * figure style is already semibold, so nothing is lost by it.
+ */
 export function parseInline(line: string): AnswerSegment[] {
   const out: AnswerSegment[] = [];
   let last = 0;
   for (const match of line.matchAll(/\*\*(.+?)\*\*/g)) {
     const at = match.index ?? 0;
     if (at > last) out.push(...splitFigures(line.slice(last, at)));
-    out.push({ kind: 'bold', text: match[1] });
+    const inner = match[1].trim();
+    out.push(
+      WHOLE_FIGURE.test(inner)
+        ? { kind: 'figure', text: inner, positive: figureTone(inner) }
+        : { kind: 'bold', text: match[1] },
+    );
     last = at + match[0].length;
   }
   if (last < line.length) out.push(...splitFigures(line.slice(last)));

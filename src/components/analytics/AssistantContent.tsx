@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { MessageSquare, Sparkles, SquarePen, Trash2 } from 'lucide-react';
+import { useState, type CSSProperties } from 'react';
+import { Lock, MessageSquare, Sparkles, SquarePen, Trash2 } from 'lucide-react';
 import { useEntitlement } from '../../context/useEntitlement';
 import { useAssistantThreads } from '../../hooks/useAssistantThreads';
 import { relativeAge } from '../../utils/assistantThreads';
@@ -11,16 +11,6 @@ interface AssistantContentProps {
   periods: AssistantPeriod[];
   rules?: { enabled: boolean; maxDailyLoss?: number; maxTradesPerDay?: number; maxDailyGain?: number };
   onBack: () => void;
-}
-
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="rounded-lg bg-bg-primary/50 border border-border/40 px-3 py-2">
-      <p className="text-[10px] uppercase tracking-wider text-text-secondary">{label}</p>
-      <p className="text-base font-semibold tabular-nums mt-0.5">{value}</p>
-      {hint && <p className="text-[10px] text-text-secondary leading-snug">{hint}</p>}
-    </div>
-  );
 }
 
 /**
@@ -35,6 +25,12 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
  * two things it was missing: room to read a long answer, and a list of everything you have already
  * asked. The dock stays for asking a quick question without leaving the calendar; both read the
  * same saved conversations, so it is one assistant with two doors.
+ *
+ * Laid out like the chat tools people already know: conversations down the left, one reading column
+ * in the middle with the box to type in at its foot. It used to open on a row of four stat tiles —
+ * questions left, conversations saved, questions asked, the period — which made the first thing on
+ * a chat screen a dashboard. The allowance now sits under the history where it is a meter, the
+ * counts are in the history header, and the period is the chat's own control.
  */
 export function AssistantContent({ periods, rules, onBack }: AssistantContentProps) {
   const { tier, limits, usage } = useEntitlement();
@@ -44,11 +40,9 @@ export function AssistantContent({ periods, rules, onBack }: AssistantContentPro
      Date.now() while rendering is an impure read the linter is right to refuse. */
   const [now] = useState(() => Date.now());
 
-  const left = Math.max(0, limits.aiMessagesPerDay - usage.aiMessagesUsed) + (usage.aiCredits ?? 0);
-  const questionsAsked = threads.reduce(
-    (sum, t) => sum + t.messages.filter((m) => m.role === 'user').length,
-    0,
-  );
+  const perDay = limits.aiMessagesPerDay;
+  const left = Math.max(0, perDay - usage.aiMessagesUsed) + (usage.aiCredits ?? 0);
+  const leftPct = perDay > 0 ? Math.min(100, (left / perDay) * 100) : 0;
 
   return (
     <PageFrame
@@ -56,73 +50,69 @@ export function AssistantContent({ periods, rules, onBack }: AssistantContentPro
       title="Trading assistant"
       icon={Sparkles}
       onBack={onBack}
-      subtitle="Every figure it quotes is one your journal already computed, so it can never disagree with the screen you came from. It reviews the trades you took — it won't tell you what to trade next."
+      subtitle="Ask about the trades you took. Every figure it quotes is one your journal already computed, so it can't disagree with your dashboard — and it reviews, it never tells you what to trade next."
     >
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
-        <Stat
-          label="Questions left today"
-          value={limits.aiMessagesPerDay > 0 ? String(left) : '—'}
-          hint={
-            limits.aiMessagesPerDay > 0
-              ? `of ${limits.aiMessagesPerDay} on ${TIER_PLANS[tier].name}`
-              : 'Not on this plan'
-          }
-        />
-        <Stat label="Saved conversations" value={String(threads.length)} hint="On this device" />
-        <Stat label="Questions asked" value={String(questionsAsked)} hint="Across your history" />
-        <Stat
-          label="Reviewing"
-          value={periods[0]?.label ?? '—'}
-          hint="Switch period in the chat"
-        />
-      </div>
-
-      <div className="grid gap-2 md:gap-3 lg:grid-cols-[260px_minmax(0,1fr)] items-start">
-        <aside className="panel-card p-2.5 lg:sticky lg:top-4">
+      {/* One height for both columns, from the window: the composer stays put while a long reply
+          streams in (no page jump under the cursor on every token), and on a tall screen the
+          conversation fills it rather than leaving the bottom third empty. */}
+      <div className="grid gap-2 md:gap-3 lg:grid-cols-[272px_minmax(0,1fr)] lg:h-[calc(100dvh-11rem)] lg:min-h-[540px]">
+        <aside className="panel-card p-3 flex flex-col min-h-0">
           <button
             type="button"
             onClick={startNew}
-            className="w-full flex items-center justify-center gap-2 rounded-lg border border-accent/30 bg-accent/10 text-accent px-3 py-2 text-[13px] font-medium hover:bg-accent/15 transition-colors focus-ring"
+            className="btn-primary w-full gap-2 px-3 py-2 text-[13px] focus-ring"
           >
-            <SquarePen size={14} />
+            <SquarePen size={14} aria-hidden />
             New chat
           </button>
 
-          <p className="px-1 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-text-secondary/45">
+          <p className="flex items-center justify-between px-1 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-text-secondary/60">
             History
+            {threads.length > 0 && <span className="tabular-nums tracking-normal">{threads.length}</span>}
           </p>
 
           {threads.length === 0 ? (
-            <p className="px-1 pb-1 text-[11px] text-text-secondary leading-relaxed">
-              Conversations you have are saved here, so you can come back to an answer instead of
-              spending another question on it.
-            </p>
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 px-3 py-6 text-center">
+              <MessageSquare size={18} className="text-text-secondary/40" aria-hidden />
+              <p className="text-[11px] text-text-secondary leading-relaxed">
+                Conversations you have are saved here, so you can come back to an answer instead of
+                spending another question on it.
+              </p>
+            </div>
           ) : (
-            <ul className="space-y-0.5 max-h-[420px] overflow-y-auto no-scrollbar">
+            <ul className="flex-1 min-h-0 max-h-56 lg:max-h-none space-y-0.5 overflow-y-auto no-scrollbar -mx-1 px-1">
               {threads.map((t) => {
                 const open = t.id === activeId;
+                const asked = t.messages.filter((m) => m.role === 'user').length;
                 return (
                   <li key={t.id} className="group relative">
                     <button
                       type="button"
                       onClick={() => selectThread(t.id)}
-                      className={`w-full rounded-lg pl-2.5 pr-7 py-1.5 text-left transition-colors focus-ring ${
-                        open
-                          ? 'bg-accent/10 text-accent'
-                          : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60'
+                      aria-current={open ? 'true' : undefined}
+                      className={`relative w-full rounded-lg pl-3 pr-8 py-2 text-left transition-colors focus-ring ${
+                        open ? 'bg-accent/10' : 'hover:bg-bg-tertiary/60'
                       }`}
                     >
-                      <span className="block text-[12px] leading-snug line-clamp-2">{t.title}</span>
-                      <span className="block text-[10px] text-text-secondary/70 mt-0.5">
-                        {relativeAge(t.updatedAt, now)} ·{' '}
-                        {t.messages.filter((m) => m.role === 'user').length} asked
+                      {open && (
+                        <span className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-accent" aria-hidden />
+                      )}
+                      <span
+                        className={`block text-[13px] leading-snug line-clamp-2 ${
+                          open ? 'text-text-primary font-medium' : 'text-text-secondary'
+                        }`}
+                      >
+                        {t.title}
+                      </span>
+                      <span className="block text-[11px] text-text-secondary/60 mt-0.5">
+                        {relativeAge(t.updatedAt, now)} · {asked} asked
                       </span>
                     </button>
                     <button
                       type="button"
                       onClick={() => deleteThread(t.id)}
                       aria-label={`Delete conversation: ${t.title}`}
-                      className="absolute right-1 top-1.5 p-1 rounded-md text-text-secondary/50 hover:text-loss-bright hover:bg-loss/10 transition-colors focus-ring md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
+                      className="absolute right-1.5 top-2 p-1 rounded-md text-text-secondary/50 hover:text-loss-bright hover:bg-loss/10 transition-colors focus-ring md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
                     >
                       <Trash2 size={12} />
                     </button>
@@ -131,22 +121,41 @@ export function AssistantContent({ periods, rules, onBack }: AssistantContentPro
               })}
             </ul>
           )}
+
+          <div className="mt-3 pt-3 border-t border-border/40 shrink-0">
+            <div className="flex items-baseline justify-between gap-2 text-[11px]">
+              <span className="text-text-secondary">Questions left today</span>
+              {perDay > 0 ? (
+                <span className="font-semibold tabular-nums text-text-primary">
+                  {left}
+                  <span className="font-normal text-text-secondary"> / {perDay}</span>
+                </span>
+              ) : (
+                <span className="text-text-secondary">Not on this plan</span>
+              )}
+            </div>
+            {perDay > 0 && (
+              <>
+                <div className="mt-1.5 h-1 rounded-full bg-bg-primary overflow-hidden">
+                  <div
+                    className="bar-in h-full rounded-full bg-gradient-to-r from-profit-bright to-accent"
+                    style={{ width: `${leftPct}%` } as CSSProperties}
+                  />
+                </div>
+                <p className="mt-1 text-[10px] text-text-secondary/60">Resets daily on {TIER_PLANS[tier].name}</p>
+              </>
+            )}
+            <p className="mt-3 flex items-start gap-1.5 text-[10px] text-text-secondary/60 leading-relaxed">
+              <Lock size={10} className="mt-0.5 shrink-0" aria-hidden />
+              Kept in this browser, not on our servers — your questions and notes stay on this device.
+            </p>
+          </div>
         </aside>
 
-        {/* A fixed height rather than growing with the answer: the composer stays put while a long
-            reply streams in, which is what stops the page jumping under the cursor on every token.
-            Sized from the window rather than capped at 680px, so on a tall screen the conversation
-            fills it instead of leaving the bottom third empty. */}
-        <div className="panel-card p-3 md:p-4 flex flex-col h-[calc(100dvh-15rem)] min-h-[440px]">
+        <div className="panel-card p-3 md:p-4 flex flex-col h-[calc(100dvh-11rem)] min-h-[540px] lg:h-auto lg:min-h-0">
           <AssistantPanel periods={periods} rules={rules} bare layout="page" />
         </div>
       </div>
-
-      <p className="flex items-start gap-2 px-0.5 text-[11px] text-text-secondary leading-relaxed">
-        <MessageSquare size={13} className="mt-0.5 shrink-0 text-text-secondary/60" />
-        Conversations are kept in this browser, not on our servers — your questions and your notes
-        stay on the device you asked them from.
-      </p>
     </PageFrame>
   );
 }
