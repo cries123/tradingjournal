@@ -4,6 +4,7 @@ import {
   isClientRejected,
   isRejectedCredential,
   isUpstreamOutage,
+  maskKeys,
   readableUpstreamError,
   redactUrl,
   upstreamSummary,
@@ -380,5 +381,34 @@ describe('readableUpstreamError', () => {
   it('returns anything without a status untouched', () => {
     const err = new TypeError('x is undefined');
     expect(readableUpstreamError(err)).toBe(err);
+  });
+});
+
+/*
+ * SnapTrade echoes back the client id it was sent. With the consumer key pasted into
+ * SNAPTRADE_CLIENT_ID by mistake, the panel printed the consumer key — a secret — on screen and into
+ * the stored error row. It happened, on 10 October.
+ */
+describe('maskKeys', () => {
+  const KEY = '8ot3Gyhwc4ynPKFHLr33GKWr1izz2393ZCNBIVlORSPpC91Dk1';
+
+  it('hides a key-length string, keeping enough to tell which one it was', () => {
+    const line = upstreamSummary(
+      Object.assign(new Error('Request failed with status code 401'), {
+        name: 'SnaptradeError',
+        status: 401,
+        responseBody: { detail: `Invalid clientId provided - ${KEY}`, code: '1083' },
+        method: 'POST',
+        url: 'https://api.snaptrade.com/api/v1/snapTrade/registerUser',
+      }),
+    )!;
+    expect(line).not.toContain(KEY);
+    expect(line).toContain('8ot3…[50 chars hidden]');
+  });
+
+  it('leaves a real client id, and ordinary words and codes, readable', () => {
+    expect(maskKeys('Invalid clientId provided - TREND-CHASERS-TNNCU (code 1083)')).toBe(
+      'Invalid clientId provided - TREND-CHASERS-TNNCU (code 1083)',
+    );
   });
 });

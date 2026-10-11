@@ -135,6 +135,20 @@ export function isClientRejected(err: unknown): boolean {
   return /client ?id|consumer ?key/i.test(`${body} ${firstLine}`);
 }
 
+/**
+ * Long key-shaped strings, cut to their first four characters.
+ *
+ * SnapTrade echoes back whatever it was sent as the client id ("Invalid clientId provided - …").
+ * A real client id is short and readable (TREND-CHASERS-TNNCU), but when the consumer key was
+ * pasted into SNAPTRADE_CLIENT_ID by mistake, this line printed the consumer key — a secret — on
+ * the admin's screen and into the stored error row. Twenty-four unbroken letters and digits is
+ * longer than any id worth reading and shorter than any key; four characters are enough to tell
+ * which key it was.
+ */
+export function maskKeys(text: string): string {
+  return text.replace(/[A-Za-z0-9]{24,}/g, (key) => `${key.slice(0, 4)}…[${key.length} chars hidden]`);
+}
+
 /** The reason in a JSON error body, with its code — or the body itself, squeezed onto one line. */
 function bodyReason(body: string): string {
   if (!body) return '';
@@ -178,7 +192,7 @@ export function upstreamSummary(err: unknown): string | null {
   return [
     `${isSnaptrade ? 'SnapTrade' : 'HTTP'} ${status}`,
     path ? [method?.toUpperCase(), path].filter(Boolean).join(' ') : '',
-    bodyReason(body),
+    maskKeys(bodyReason(body)),
   ]
     .filter(Boolean)
     .join(' · ')
