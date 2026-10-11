@@ -255,7 +255,8 @@ body {
   .site-aurora::after,
   .animate-cell-pop,
   .animate-marquee,
-  .btn-shine::after {
+  .btn-shine::after,
+  details.glass-card > p {
     animation: none !important;
   }
 
@@ -638,6 +639,23 @@ details.glass-card[open] summary {
 
 details.glass-card > p {
   animation: fade-up 0.3s ease-out;
+}
+
+/* The landing FAQ. A row you are about to read should not jump 2px as the pointer reaches it, so
+   it doesn't lift; the spotlight answers the hover instead. The open one is tinted so that, with two
+   columns of them, the answer you opened is the one your eye finds. Its answer is indented under the
+   question, so the rule under the question is dropped. */
+details.faq-item:hover {
+  transform: none;
+}
+
+details.faq-item[open] {
+  border-color: rgba(52, 211, 153, 0.26);
+  background: linear-gradient(145deg, rgba(14, 30, 28, 0.95), rgba(13, 17, 26, 0.88));
+}
+
+details.faq-item[open] summary {
+  border-bottom-color: transparent;
 }
 
 /**

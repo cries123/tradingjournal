@@ -11,6 +11,7 @@ import { HeroTrendLine, SiteBackdrop } from '../components/landing/SiteBackdrop'
 import { BrokerMarquee } from '../components/landing/BrokerMarquee';
 import { AssistantDemo } from '../components/landing/AssistantDemo';
 import { LazyOnView } from '../components/landing/LazyOnView';
+import { LandingFaq } from '../components/landing/LandingFaq';
 import { lowestTierWith, TIER_PLANS, type Feature } from '../config/tiers';
 import { BrokerLogo } from '../components/brokers/BrokerLogo';
 import { brokerIdFromName } from '../utils/brokerIds';
@@ -20,7 +21,6 @@ import {
   BROKER_EXAMPLES,
   SHORT_BROKER_EXAMPLES,
 } from '../data/brokerCopy';
-import { LANDING_FAQ } from '../seo/faq';
 import { GUIDE_ARTICLES } from '../seo/guides';
 import { fetchBrokersConfig, type BrokerConfig } from '../services/brokersConfig';
 import type { ExtraNavRoute } from '../hooks/useRoute';
@@ -95,8 +95,6 @@ const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
       'Export your session, month or year as an image built for a story slot. Nothing is published anywhere: you get a file and decide where it goes.',
   },
 ];
-
-const FAQ = LANDING_FAQ.map((item) => ({ q: item.question, a: item.answer }));
 
 const STEPS = [
   { n: '01', title: 'Connect or log', body: 'Sync from your broker automatically, or enter trades manually — get your data into the journal in seconds.' },
@@ -538,25 +536,7 @@ export function LandingPage({
 
       {/* FAQ */}
       <section id="faq" className={`relative z-10 scroll-mt-24 ${SECTION_CLOSING}`}>
-        <div className="max-w-3xl mx-auto px-4 md:px-6">
-          <FadeIn className="text-center mb-12">
-            <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">FAQ</p>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Common questions</h2>
-          </FadeIn>
-          <div className="space-y-4">
-            {FAQ.map((item, i) => (
-              <FadeIn key={item.q} delay={i * 50}>
-              <details className="glass-card rounded-xl group">
-                <summary className="px-5 py-4 cursor-pointer font-medium text-sm md:text-base list-none flex items-center justify-between gap-4">
-                  {item.q}
-                  <span className="text-text-secondary group-open:rotate-45 transition-transform text-lg">+</span>
-                </summary>
-                <p className="px-5 pb-4 text-sm text-text-secondary leading-relaxed">{item.a}</p>
-              </details>
-              </FadeIn>
-            ))}
-          </div>
-        </div>
+        <LandingFaq />
       </section>
 
       {/* CTA */}

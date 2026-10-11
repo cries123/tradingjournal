@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { DashboardPreview } from './DashboardPreview';
 import { AssistantDemo } from './AssistantDemo';
 import { BrokerMarquee } from './BrokerMarquee';
+import { LandingFaq } from './LandingFaq';
+import { LANDING_FAQ } from '../../seo/faq';
 import { demoInsights, demoJournal } from './landingDemo';
 
 /*
@@ -61,6 +63,35 @@ describe('the broker strip', () => {
 
   it('renders nothing with no brokers', () => {
     expect(renderToString(createElement(BrokerMarquee, { names: [] }))).toBe('');
+  });
+});
+
+describe('the FAQ', () => {
+  const html = renderToString(createElement(LandingFaq));
+  const words = text(html).replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+
+  it('shows every question and answer once, in the order the FAQPage markup lists them', () => {
+    // Split into two columns on a wide screen — a slice that drops or repeats one would put a
+    // question in Google's results that the page does not show.
+    let from = 0;
+    for (const { question, answer } of LANDING_FAQ) {
+      expect(words.split(question).length - 1).toBe(1);
+      expect(words.split(answer).length - 1).toBe(1);
+      const at = words.indexOf(question);
+      expect(at).toBeGreaterThan(from);
+      from = at;
+    }
+  });
+
+  it('numbers them in reading order, down the first column and then the second', () => {
+    const numbers = [...html.matchAll(/<summary[^>]*><span[^>]*>(\d+)<\/span>/g)].map((m) => m[1]);
+    expect(numbers).toEqual(LANDING_FAQ.map((_, i) => String(i + 1).padStart(2, '0')));
+  });
+
+  it('opens the first answer and only that one', () => {
+    const details = html.match(/<details[^>]*>/g) ?? [];
+    expect(details).toHaveLength(LANDING_FAQ.length);
+    expect(details.map((d) => /\sopen=""/.test(d))).toEqual(LANDING_FAQ.map((_, i) => i === 0));
   });
 });
 
