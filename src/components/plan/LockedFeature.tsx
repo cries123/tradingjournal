@@ -16,6 +16,13 @@ interface LockedFeatureProps {
   comingSoon?: boolean;
   /** Layout classes for the wrapper, for callers that live inside a flex or fixed-height panel. */
   className?: string;
+  /**
+   * A cut-down version for a plan that has `previewFeature` but not `feature` — shown instead of
+   * the lock card. The assistant's opening findings on Silver: real, computed locally, with the
+   * chat itself still behind the plan that includes it.
+   */
+  preview?: ReactNode;
+  previewFeature?: Feature;
 }
 
 /**
@@ -36,6 +43,8 @@ export function LockedFeature({
   children,
   comingSoon,
   className = '',
+  preview,
+  previewFeature,
 }: LockedFeatureProps) {
   const { has, loaded, marketReplayLive } = useEntitlement();
 
@@ -45,6 +54,7 @@ export function LockedFeature({
   // Until the plan is known, show the feature as-is. Flashing a paywall at a paying customer on
   // every page load is worse than a half-second of optimism.
   if (!loaded || (unlocked && !soon)) return <>{children}</>;
+  if (preview && previewFeature && has(previewFeature)) return <>{preview}</>;
 
   const needed = lowestTierWith(feature);
   const neededName = needed ? TIER_PLANS[needed].name : 'a paid plan';
@@ -82,8 +92,10 @@ export function LockedFeature({
       <div
         className="[grid-area:1/1] pointer-events-none select-none overflow-hidden blur-[2px] opacity-35 max-h-[min(70vh,620px)] [mask-image:linear-gradient(to_bottom,black_55%,transparent)]"
         aria-hidden="true"
-        // @ts-expect-error -- `inert` is a valid HTML attribute; React 19 types lag behind it.
-        inert=""
+        /* A boolean, not "". React 19 types and renders inert as a boolean attribute and reads an
+           empty string as false — the old inert="" (from when the types lacked it) rendered nothing
+           at all, so every control behind the padlock was still reachable with Tab. */
+        inert
       >
         {children}
       </div>

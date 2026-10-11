@@ -437,6 +437,13 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 feature="aiAssistant"
                 title="The trading assistant is a paid feature"
                 description="Ask your journal why a setup keeps losing, whether you cut winners early, or what changed since last month. It reads the stats your dashboard already computed."
+                /* With the Performance screen (Silver) the opening findings are shown for real —
+                   they are computed in the browser and cost nothing — and only the chat is locked.
+                   Free keeps the lock: the findings are the Performance screen's analysis. */
+                previewFeature="performanceAnalytics"
+                preview={
+                  <AssistantContent periods={assistantPeriods} rules={assistantRules} onBack={goBackView} chatLocked />
+                }
               >
                 <AssistantContent
                   periods={assistantPeriods}

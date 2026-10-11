@@ -9,6 +9,8 @@ import { useAssistantThreads } from '../../hooks/useAssistantThreads';
 import { useEntitlement } from '../../context/useEntitlement';
 import { AnswerBody } from './AnswerBody';
 import { SegmentedControl } from '../ui/SegmentedControl';
+import { lowestTierWith, TIER_PLANS } from '../../config/tiers';
+import { goToPricing } from '../../utils/navigateToPath';
 
 export type AssistantScope = 'month' | 'year' | 'all';
 
@@ -36,6 +38,13 @@ interface AssistantPanelProps {
    * dock and the tab are the same assistant reading the same conversations.
    */
   layout?: 'dock' | 'page';
+  /**
+   * The opening screen without the chat: a plan that has the Performance screen but not the
+   * assistant (Silver). The findings and suggested questions are computed here in the browser —
+   * no model call, no cost — so they are shown for real, and asking anything opens the upgrade
+   * instead of sending. Saved conversations are not shown; continuing one is the paid part.
+   */
+  chatLocked?: boolean;
 }
 
 /** Max height for the textarea before it starts scrolling instead of growing. */
@@ -62,8 +71,11 @@ function readNotesOptIn(): boolean {
  * Every number it sees is computed by the app first (see utils/journalFacts.ts), so its answers
  * cannot disagree with the dashboard sitting above it.
  */
-export function AssistantPanel({ periods, rules, bare = false, layout = 'dock' }: AssistantPanelProps) {
-  const { messages, append, rollbackTo, startNew } = useAssistantThreads();
+export function AssistantPanel({ periods, rules, bare = false, layout = 'dock', chatLocked = false }: AssistantPanelProps) {
+  const { messages: savedMessages, append, rollbackTo, startNew } = useAssistantThreads();
+  const messages = useMemo(() => (chatLocked ? [] : savedMessages), [chatLocked, savedMessages]);
+  /** What a locked-chat reader tried to ask, so the upgrade prompt can name it. */
+  const [wanted, setWanted] = useState<string | null>(null);
   const { limits, noteUsage } = useEntitlement();
   /*
    * The period opens on the narrowest one that has trades in it, not always on the first.
@@ -193,6 +205,12 @@ export function AssistantPanel({ periods, rules, bare = false, layout = 'dock' }
     }
   };
 
+  /** A finding or a suggested question was clicked: ask it, or — with the chat locked — say where it can be asked. */
+  const ask = (question: string, label: string) => {
+    if (chatLocked) setWanted(label);
+    else void send(question);
+  };
+
   const retryLast = () => {
     const lastUser = [...messages].reverse().find((m) => m.role === 'user');
     if (lastUser) void send(lastUser.content);
@@ -281,7 +299,8 @@ export function AssistantPanel({ periods, rules, bare = false, layout = 'dock' }
             <SegmentedControl label="Period" value={scope} onChange={setScope} options={periodOptions} />
           )}
 
-          {periods.length > 1 && (
+          {/* Compare and notes change what the model is sent, so they only appear with the chat. */}
+          {!chatLocked && periods.length > 1 && (
             <label
               className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
                 compareScope
@@ -311,6 +330,7 @@ export function AssistantPanel({ periods, rules, bare = false, layout = 'dock' }
 
           {/* Notes are the trader's own words, so sharing them with the model is their decision to
               make rather than a default the app picks for them. */}
+          {!chatLocked && (
           <label
             className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs cursor-pointer transition-colors ${
               shareNotes
@@ -334,6 +354,7 @@ export function AssistantPanel({ periods, rules, bare = false, layout = 'dock' }
             <Lock size={12} className="shrink-0" aria-hidden />
             {shareNotes ? 'Reading your trade notes' : 'Let it read my trade notes'}
           </label>
+          )}
         </div>
       </div>
 
@@ -381,14 +402,15 @@ export function AssistantPanel({ periods, rules, bare = false, layout = 'dock' }
                         large={page}
                         index={i}
                         disabled={busy}
-                        onAsk={() => void send(f.question)}
+                        askLabel={chatLocked ? `Ask on ${CHAT_PLAN_NAME}` : undefined}
+                        onAsk={() => ask(f.question, f.headline)}
                       />
                     ))}
                   </div>
                 </>
               )}
 
-              {unreadNotes > 0 && (
+              {!chatLocked && unreadNotes > 0 && (
                 /* Surfaced where somebody is actually looking, and only when it would change the
                    answer. The toggle in the control row is easy to miss. */
                 <button
@@ -410,7 +432,7 @@ export function AssistantPanel({ periods, rules, bare = false, layout = 'dock' }
                     <button
                       key={s.id}
                       type="button"
-                      onClick={() => void send(s.question)}
+                      onClick={() => ask(s.question, s.label)}
                       disabled={busy}
                       className="rounded-full border border-border/60 bg-bg-tertiary/40 px-3.5 py-2 text-[13px] text-text-secondary transition-colors hover:border-accent/50 hover:bg-accent/10 hover:text-text-primary focus-ring disabled:opacity-50"
                     >
@@ -420,7 +442,7 @@ export function AssistantPanel({ periods, rules, bare = false, layout = 'dock' }
                     <button
                       key={s.id}
                       type="button"
-                      onClick={() => void send(s.question)}
+                      onClick={() => ask(s.question, s.label)}
                       disabled={busy}
                       className="group flex items-center justify-between gap-2 rounded-xl border border-border/50 bg-bg-tertiary/25 px-3 py-2.5 text-left transition-colors hover:border-accent/40 hover:bg-bg-tertiary/50 focus-ring disabled:opacity-50"
                     >
@@ -509,6 +531,9 @@ export function AssistantPanel({ periods, rules, bare = false, layout = 'dock' }
           </div>
         )}
 
+        {chatLocked ? (
+          <ChatUpgrade wanted={wanted} page={page} />
+        ) : (
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -566,6 +591,51 @@ export function AssistantPanel({ periods, rules, bare = false, layout = 'dock' }
             </div>
           )}
         </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** The plan the chat comes with, read from the plans so the prompt cannot name the wrong one. */
+const CHAT_PLAN = lowestTierWith('aiAssistant');
+const CHAT_PLAN_NAME = CHAT_PLAN ? TIER_PLANS[CHAT_PLAN].name : 'a higher plan';
+
+/**
+ * Where the message box goes when the chat is not on this plan.
+ *
+ * Says what the box would do and what it costs, and — once somebody has clicked a finding or a
+ * question — names the thing they just tried to ask. "Ask about 'Your bigger positions are the
+ * losing ones' on Gold" is an offer about their own trading; a padlock is a wall.
+ */
+function ChatUpgrade({ wanted, page }: { wanted: string | null; page: boolean }) {
+  const plan = CHAT_PLAN ? TIER_PLANS[CHAT_PLAN] : null;
+  return (
+    <div className={`shrink-0 ${page ? 'pt-3' : 'mt-2 px-1'}`}>
+      <div
+        key={wanted ?? 'idle'}
+        className={`flex flex-wrap items-center gap-3 rounded-2xl border border-accent/30 bg-accent/[0.06] p-3 ${
+          page ? 'md:p-4' : ''
+        } ${wanted ? 'animate-msg-in' : ''}`}
+      >
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent/15 text-accent" aria-hidden>
+          <Lock size={15} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-text-primary leading-snug">
+            {wanted ? <>Ask about &ldquo;{wanted}&rdquo; on {CHAT_PLAN_NAME}</> : <>Ask follow-up questions on {CHAT_PLAN_NAME}</>}
+          </p>
+          {plan && (
+            <p className="mt-0.5 text-xs text-text-secondary">
+              {plan.limits.aiMessagesPerDay} questions a day about your own trades · from ${plan.price}/month
+            </p>
+          )}
+        </div>
+        {/* Its own row on a phone (and in the 400px dock): beside the text it squeezed the offer
+            into four lines of two words each. */}
+        <button type="button" onClick={goToPricing} className="btn-primary w-full sm:w-auto px-4 py-2 text-sm shrink-0 focus-ring">
+          Upgrade to {CHAT_PLAN_NAME}
+        </button>
       </div>
     </div>
   );
@@ -632,12 +702,15 @@ function FindingCard({
   index,
   disabled,
   onAsk,
+  askLabel = 'Ask about this',
 }: {
   finding: Finding;
   large: boolean;
   index: number;
   disabled: boolean;
   onAsk: () => void;
+  /** The card's call to action — the plan that answers it, when the chat is locked. */
+  askLabel?: string;
 }) {
   const tone = TONE[finding.tone];
 
@@ -672,7 +745,7 @@ function FindingCard({
       <span className="mt-2 block text-sm font-semibold leading-snug text-text-primary">{finding.headline}</span>
       <span className="mt-1.5 block text-xs leading-relaxed text-text-secondary">{finding.detail}</span>
       <span className="mt-auto pt-3 inline-flex items-center gap-1 text-xs font-medium text-accent">
-        Ask about this
+        {askLabel}
         <ArrowRight size={12} className="transition-transform motion-safe:group-hover:translate-x-0.5" aria-hidden />
       </span>
     </button>

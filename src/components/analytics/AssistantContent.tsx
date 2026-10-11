@@ -1,9 +1,10 @@
 import { useState, type CSSProperties } from 'react';
-import { Lock, MessageSquare, Sparkles, SquarePen, Trash2 } from 'lucide-react';
+import { Check, Lock, MessageSquare, Sparkles, SquarePen, Trash2 } from 'lucide-react';
 import { useEntitlement } from '../../context/useEntitlement';
 import { useAssistantThreads } from '../../hooks/useAssistantThreads';
 import { relativeAge } from '../../utils/assistantThreads';
-import { TIER_PLANS } from '../../config/tiers';
+import { lowestTierWith, TIER_PLANS } from '../../config/tiers';
+import { goToPricing } from '../../utils/navigateToPath';
 import { AssistantPanel, type AssistantPeriod } from './AssistantPanel';
 import { PageFrame } from '../layout/PageFrame';
 
@@ -11,6 +12,8 @@ interface AssistantContentProps {
   periods: AssistantPeriod[];
   rules?: { enabled: boolean; maxDailyLoss?: number; maxTradesPerDay?: number; maxDailyGain?: number };
   onBack: () => void;
+  /** The opening findings without the chat, for a plan without the assistant — see AssistantPanel. */
+  chatLocked?: boolean;
 }
 
 /**
@@ -32,7 +35,7 @@ interface AssistantContentProps {
  * a chat screen a dashboard. The allowance now sits under the history where it is a meter, the
  * counts are in the history header, and the period is the chat's own control.
  */
-export function AssistantContent({ periods, rules, onBack }: AssistantContentProps) {
+export function AssistantContent({ periods, rules, onBack, chatLocked = false }: AssistantContentProps) {
   const { tier, limits, usage } = useEntitlement();
   const { threads, activeId, selectThread, startNew, deleteThread } = useAssistantThreads();
 
@@ -59,6 +62,9 @@ export function AssistantContent({ periods, rules, onBack }: AssistantContentPro
         {/* Conversation first on a phone, history under it. Stacked the other way round, the
             history list and the allowance meter filled the whole first screen and the chat began
             below the fold. */}
+        {chatLocked ? (
+          <ChatPlanCard />
+        ) : (
         <aside className="panel-card p-3 flex flex-col min-h-0 order-2 lg:order-1">
           <button
             type="button"
@@ -154,11 +160,57 @@ export function AssistantContent({ periods, rules, onBack }: AssistantContentPro
             </p>
           </div>
         </aside>
+        )}
 
         <div className="panel-card p-3 md:p-4 flex flex-col h-[calc(100dvh-11rem)] min-h-[540px] lg:h-auto lg:min-h-0 order-1 lg:order-2">
-          <AssistantPanel periods={periods} rules={rules} bare layout="page" />
+          <AssistantPanel periods={periods} rules={rules} bare layout="page" chatLocked={chatLocked} />
         </div>
       </div>
     </PageFrame>
+  );
+}
+
+/**
+ * The side rail with the chat locked: what the plan that has it adds, where the history and the
+ * allowance meter would be. There is no history to show — conversations are the paid part — and a
+ * rail of empty history would read as a broken feature rather than a locked one.
+ */
+function ChatPlanCard() {
+  const plan = lowestTierWith('aiAssistant');
+  const p = plan ? TIER_PLANS[plan] : null;
+  if (!p) return null;
+  return (
+    <aside className="panel-card p-4 flex flex-col order-2 lg:order-1">
+      <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent/15 text-accent" aria-hidden>
+        <Sparkles size={16} />
+      </span>
+      <p className="mt-3 text-sm font-semibold text-text-primary">Ask it anything on {p.name}</p>
+      <p className="mt-1 text-xs text-text-secondary leading-relaxed">
+        The findings here are yours already. {p.name} lets you ask about them — and about anything
+        else in your journal.
+      </p>
+      <ul className="mt-3 space-y-2 text-xs text-text-secondary">
+        {[
+          `${p.limits.aiMessagesPerDay} questions a day about your own trades`,
+          'Follow up on any finding, compare two periods',
+          'Conversations saved, so an answer is there next time',
+          'The rule simulator — what a daily stop would have done',
+        ].map((line) => (
+          <li key={line} className="flex items-start gap-2">
+            <Check size={13} className="mt-0.5 shrink-0 text-profit-bright" aria-hidden />
+            {line}
+          </li>
+        ))}
+      </ul>
+      <button type="button" onClick={goToPricing} className="btn-primary mt-4 w-full px-3 py-2 text-[13px] focus-ring">
+        Upgrade to {p.name}
+      </button>
+      <p className="mt-2 text-center text-[11px] text-text-secondary">From ${p.price}/month · cancel anytime</p>
+      <p className="mt-auto pt-4 flex items-start gap-1.5 text-[10px] text-text-secondary/60 leading-relaxed">
+        <Lock size={10} className="mt-0.5 shrink-0" aria-hidden />
+        These findings are worked out on your device from your journal. Nothing was sent anywhere to
+        make them.
+      </p>
+    </aside>
   );
 }

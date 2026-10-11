@@ -97,6 +97,8 @@ export function AssistantDock({
                 title="Ask your journal anything"
                 description="The assistant reads the stats your dashboard already computed and tells you what they mean — why a setup keeps losing, whether you cut winners early, what changed last month."
                 className="flex-1 min-h-0"
+                previewFeature="performanceAnalytics"
+                preview={<AssistantPanel periods={periods} rules={rules} bare chatLocked />}
               >
                 <AssistantPanel periods={periods} rules={rules} bare />
               </LockedFeature>
