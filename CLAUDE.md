@@ -30,7 +30,7 @@ scripts/    prerender
 ## Commands
 
 ```bash
-npm test                       # vitest, ~1,500 tests, node environment
+npm test                       # vitest, ~1,650 tests, node environment
 npm run lint                   # eslint
 npx tsc -p tsconfig.app.json --noEmit      # and .node / .server / .test — all four must pass
 npm run build
@@ -90,6 +90,8 @@ the change would have broken `"Script error."` filtering in production.
 | Syncs/day | 0 | 5 | 10 | 24 |
 | AI messages/day | 0 | 0 | 15 | 40 |
 | Performance screen | — | yes | yes | yes |
+| Track record, All journals, monthly PDF report | — | yes | yes | yes |
+| Rule simulator | — | — | yes | yes |
 | Auto-import, coach seat, rule alerts, AI review | — | — | — | yes |
 
 ### What things actually cost (checked against Jay's SnapTrade invoice, not their public page)
@@ -129,6 +131,76 @@ was deleted. The rules now, in `server/snaptradeCredentials.ts` (tested against 
   this user", and recovery never starts for the former; users get a 503 saying it is our side;
 - `upstreamSummary` is what the admin Errors list records ("SnapTrade 401 · POST /… · reason (code)"),
   never the SDK's message, which is a status line plus a header dump.
+
+## The screens, and the pieces they share
+
+Sidebar destinations: Overview, Performance, Rule simulator, Assistant, Track record, plus Connect
+broker, Settings, Support. `report` (the monthly report) is reached from the Overview, not the
+sidebar. Every screen is wrapped in `PageFrame` (`src/components/layout/PageFrame.tsx`) — full
+width in the app, a centred column on the public site. `sidebarDestination` hides its back link on
+desktop, where the sidebar already goes there.
+
+Shared pieces, so none of these get rebuilt:
+
+- **`SegmentedControl`** (`components/ui/`) is the one period/mode toggle. There were three.
+- **`CountUp`** and **`Reveal`** (`components/motion/`), `useReveal`, `useAnimatedClose`
+  (`hooks/`). Figures count up and roll on change; cards rise in when first scrolled into view;
+  every dialog plays out before it unmounts, via `useAnimatedClose` — a close wired straight to the
+  prop skips the animation, which is the bug Escape had on the day drawer.
+- **`.panel-grid`** in `index.css` lays the Performance panels out so rows end level and a short
+  last row splits into halves rather than leaving one card 1,600px wide. It works for any card
+  count; `dist/pv-gridcheck.mjs` checks 1–10 at three widths.
+- **`.spotlight`** + `trackSpotlight` (`utils/spotlight.ts`): one pointer listener on the shell
+  lights whichever card is under the cursor. `--spot-rgb` is brand green on the landing page and the
+  theme accent in the app.
+- **Reduced motion turns all of it off**, and `appPolish.test.ts` asserts that for each new
+  animation. `.reveal` must end at `transform: none`, never `translateY(0)` — any transform makes
+  the card a containing block for `position: fixed` children, which once put a dialog off the top
+  of a phone screen.
+
+**In-app colour comes from the theme tokens** (`text-profit-bright` / `text-loss-bright` /
+`accent`), never a hard-coded `emerald`/`red` — the user picks the accent in Settings and about
+fifteen places used to ignore it. `.panel-card` and `.stat-chip` are `@layer components` so a
+utility class on the element still wins; unlayered, their `border` shorthand silently beat every
+`border-*` utility, which is why the streak chip's amber border did nothing for months.
+
+### All journals
+
+Silver and up. A **view**, not a journal: `activeAccountId` stays a real journal so new trades,
+CSV imports and "clear this journal" still have one to act on. Everything reads
+`viewingAllJournals` from `SettingsContext` — the stored flag AND the plan AND a second journal
+(`allJournalsView` in `utils/journalScope.ts`) — never `settings.viewAllJournals` directly, or a
+stale flag after a downgrade strands somebody in a view they cannot leave.
+
+**Rule limits stay per account.** The rule banner reads `activeJournalTrades`; in this view the
+breach list stands aside with a note, the assistant is handed no rules, and the monthly report
+omits its rules section. Adding a paper journal's trades to a live account's daily cap reports
+breaches neither account had.
+
+### The monthly report
+
+`buildMonthlyReport` (`utils/monthlyReport.ts`) computes from the same functions the dashboard
+uses, so the PDF cannot disagree with the screen. **No PDF library and no server**: "Download PDF"
+calls `window.print()`, and a second copy of the document is portalled into `<body>` while
+`@media print` hides everything else. That is what stops the PDF trailing blank pages the height
+of the app.
+
+### The assistant
+
+`AssistantPanel` is one component on two surfaces — the Assistant page (`layout="page"`) and the
+dock on the Overview. Both read the same saved conversations from `useAssistantThreads`
+(localStorage, not Firestore).
+
+- The period opens on the narrowest one that **has trades**, not always this month — on the 1st of
+  a month the old default showed "no trades in this period" over a full journal.
+- `chatLocked` is the Silver view: the opening findings are computed in the browser by
+  `openingFindings`, cost nothing, and are shown for real; only the chat is behind Gold. Free keeps
+  the padlock, because those findings are the Performance screen's analysis.
+- Server guardrails are in `server/aiAssistantHandler.ts`: **the model never computes** (the client
+  sends facts already derived by `journalFacts.ts`) and **it never advises on what to trade next**.
+  That second line is what keeps this a journaling feature rather than unlicensed financial advice.
+  There is no rule in the prompt covering general knowledge, so "what does SPY track" is currently
+  undefined behaviour.
 
 ## Deploy sequencing — this order, always
 
@@ -219,3 +291,25 @@ with the junction still in place can delete through it into the real `node_modul
 - Trial emails key on `trialEndsAt`, written by the webhook on a "trialing" signal. The daily
   trial-nudges run also asks Creem once per paying account whether it is a trial the webhook missed
   (`server/trialBackfill.ts`).
+- Rule-by-rule playbook results are still not in the assistant's facts.
+- The assistant prompt says nothing about general knowledge, so a plain "what does assignment mean"
+  is undefined — it may answer from memory or deflect. Company research is deliberately NOT wanted:
+  there is no data source behind it, the model's knowledge goes stale, and "is X a good company" is
+  the edge of investment advice.
+
+## Packaging it as a mobile app — what is already true
+
+Asked for, not yet started. The facts that decide the approach:
+
+- It is **already an installable PWA** — `public/manifest.webmanifest` is `display: standalone`,
+  and the landing FAQ tells people to use Add to Home Screen.
+- **The backend is Firebase**, so a wrapped build shares auth and Firestore with the web app and a
+  journal carries over with no migration. That is the whole "same journal on both" problem, solved
+  by not having it.
+- The layout is already mobile-first: `useIsDesktop` (768px) switches between the sidebar and
+  `MobileNav` + `MobileBottomNav`.
+- **The hard part is billing, not the shell.** Creem subscriptions are a web checkout; Apple
+  requires in-app purchase for digital subscriptions sold inside an iOS app, at their cut. Decide
+  that before writing any wrapper code — it shapes whether the app sells at all or only signs in.
+- Second hard part: the SnapTrade connect flow is a redirect to their portal, which needs checking
+  inside a webview, and `/api/*` is Netlify Functions on a different origin.
