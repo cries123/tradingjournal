@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { syncStartDate } from '../../utils/syncWindow';
+import { manualSyncTradeId } from '../../utils/brokerTradeIds';
+import { describeSyncResult } from '../../utils/syncOutcomeCopy';
+import { describeEvent, type JournalEvent } from '../../utils/journalEvents';
+import { SyncHistory } from './SyncHistory';
 import { CheckCircle2, ExternalLink, Link2, Loader2, RefreshCw, Unlink } from 'lucide-react';
 import { PageFrame } from '../layout/PageFrame';
 import { BrokerLogo } from './BrokerLogo';
@@ -15,6 +19,7 @@ import {
   checkBrokerConnectAvailable,
   disconnectBroker,
   fetchBrokerStatus,
+  fetchSyncHistory,
   startBrokerConnect,
   syncBrokerAccount,
   type BrokerAccountSummary,
@@ -170,6 +175,14 @@ export function BrokerConnectContent({
   /** The underlying reason, when the server judged this caller to be the site admin. */
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  /** The trader's own sync history, loaded with the status and again after each sync. */
+  const [history, setHistory] = useState<JournalEvent[] | null>(null);
+
+  const loadHistory = () => {
+    fetchSyncHistory()
+      .then(setHistory)
+      .catch((err: unknown) => reportErrorSilently(err, 'promise', 'broker-sync-history'));
+  };
 
   const canConnect = firebaseEnabled && !loading && Boolean(user);
 
@@ -206,6 +219,7 @@ export function BrokerConnectContent({
 
   const refreshStatus = async (): Promise<BrokerStatus | null> => {
     if (!canConnect) return null;
+    loadHistory();
     setStatusLoading(true);
     setError(null);
     try {
@@ -254,10 +268,13 @@ export function BrokerConnectContent({
     setSyncMessage(null);
     setSyncNotes([]);
     setSyncingAccountId(account.id);
+    // One clock read for the window and for the ids of what it brings back.
+    const startedAt = new Date();
     try {
       const {
-        trades, truncated, syncsRemaining, syncsPerDay, syncCredits,
+        trades, truncated, syncsRemaining, syncsPerDay, syncCredits, activityCount,
         unmatchedCloses, assumedShorts, inferredOrderDays, ignored, negativeFees,
+        openPositions, orientationAssumed, windowReason, syncRefundNotice,
         /*
          * A window, not the whole account.
          *
@@ -270,7 +287,7 @@ export function BrokerConnectContent({
          */
       } = await syncBrokerAccount(
         account.id,
-        syncStartDate(existingTrades, account.id, new Date()),
+        syncStartDate(existingTrades, account.id, startedAt),
       );
       // The server has already spent one of today's syncs by the time this returns, so the meter
       // is updated from its answer rather than guessed at. Bonus syncs ride inside the remaining
@@ -292,12 +309,26 @@ export function BrokerConnectContent({
 
       const label = account.name ?? account.institutionName;
 
+      /*
+       * The notes first, on every path. They used to be set only after a successful import, so the
+       * outcome that needed them most — activity came back and none of it paired — got "No trade
+       * activity found" and nothing else, while the server had already worked out exactly why.
+       */
+      setSyncNotes(describeSyncGaps({
+        unmatchedCloses, assumedShorts, inferredOrderDays, ignored, negativeFees, openPositions, orientationAssumed,
+      }));
+      const outcome = {
+        label,
+        activityCount: activityCount ?? trades.length * 2,
+        tradesReturned: trades.length,
+        truncated,
+        refundNotice: syncRefundNotice ?? null,
+        windowReason,
+      };
+
       if (freshTrades.length === 0) {
-        setSyncMessage(
-          trades.length === 0
-            ? `No trade activity found for ${label}.`
-            : `You're up to date — all ${trades.length} trade${trades.length === 1 ? '' : 's'} from ${label} ${trades.length === 1 ? 'was' : 'were'} already imported.`,
-        );
+        setSyncMessage(describeSyncResult({ ...outcome, fresh: 0 }));
+        loadHistory();
         return;
       }
 
@@ -308,15 +339,10 @@ export function BrokerConnectContent({
         );
       }
 
+      // One id scheme for both importers — see brokerTradeIds for the bug that two copies of it hid.
+      const stamp = startedAt.getTime();
       const withIds: Trade[] = freshTrades.map(
-        (t, i) =>
-          ({
-            ...t,
-            // Zero-padded for the same reason autoSyncTradeId pads: this id IS the import sequence,
-            // and unpadded it collates `_10` before `_2`, scrambling exactly the busy days the rule
-            // simulator and the tilt panels draw their conclusions from.
-            id: `snaptrade_${account.id}_${Date.now()}_${String(i).padStart(4, '0')}`,
-          }) as Trade,
+        (t, i) => ({ ...t, id: manualSyncTradeId(account.id, stamp, i) }) as Trade,
       );
       // Awaited: the message below is a claim that these trades are in the journal, so it must
       // not be made until they are. A rejection here lands in the catch, where the sync is
@@ -340,16 +366,8 @@ export function BrokerConnectContent({
         setErrorDetail(null);
         return;
       }
-      const skipped = trades.length - freshTrades.length;
-      setSyncMessage(
-        `Imported ${freshTrades.length} trade${freshTrades.length === 1 ? '' : 's'} from ${label}` +
-          (skipped > 0 ? ` (${skipped} already up to date).` : '.') +
-          (truncated
-            ? ' This account has more activity than one sync can pull in — the oldest history was left out.'
-            : ''),
-      );
-      // Said out loud rather than left for the trader to discover by disagreeing with their broker.
-      setSyncNotes(describeSyncGaps({ unmatchedCloses, assumedShorts, inferredOrderDays, ignored, negativeFees }));
+      setSyncMessage(describeSyncResult({ ...outcome, fresh: freshTrades.length }));
+      loadHistory();
     } catch (err) {
       // A failed sync usually still costs one. The server now says how many are left even when it
       // fails — and says so after refunding, when the failure was an outage rather than a rejected
@@ -525,6 +543,8 @@ export function BrokerConnectContent({
           </div>
         </div>
       )}
+
+      {history && history.length > 0 && <SyncHistory events={history} describe={describeEvent} />}
 
       {/* Twenty brokers down one 768px column was five screens of scrolling to find yours. A grid
           puts every one of them within a glance on a desktop. */}

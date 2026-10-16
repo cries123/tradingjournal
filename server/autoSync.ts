@@ -121,6 +121,27 @@ export function journalForImports(existing: Trade[], activeAccountId: string): s
 }
 
 /**
+ * Which journal ONE brokerage account's trades belong in: wherever that account last imported.
+ *
+ * journalForImports answers for the trader as a whole, and the morning import used that one answer
+ * for every account it pulled. A trader with Schwab in one journal and Robinhood in another woke up
+ * to both brokers' trades in whichever journal had imported most recently — and then a manual sync
+ * of the other broker found its trades already present (in the wrong journal) and said "you're up
+ * to date". The account is read off the trade id, which is the only place it survives.
+ *
+ * An account that has never imported anywhere falls back to the trader-wide answer, which is also
+ * what the first manual sync of a new connection would do.
+ */
+export function journalForAccount(existing: Trade[], snaptradeAccountId: string, fallback: string): string {
+  let best: Trade | null = null;
+  for (const trade of existing) {
+    if (!trade.accountId || !isBrokerTradeIdFor(trade.id, snaptradeAccountId)) continue;
+    if (!best || trade.date > best.date) best = trade;
+  }
+  return best?.accountId ?? fallback;
+}
+
+/**
  * Firestore's WriteBatch limit is 500 operations; the same 400 the trade writers use.
  *
  * The automatic import wrote every fresh trade in ONE batch. Ten days of an active 0DTE account is
@@ -156,21 +177,8 @@ export function chunkForWrite<T>(items: readonly T[], size = TRADE_WRITE_CHUNK):
  * `auto` is kept in the middle so the provenance is still legible in the id. It sits after the
  * prefix the check needs, so both facts fit.
  */
-export function autoSyncTradeId(snaptradeAccountId: string, stamp: number, index: number): string {
-  /*
-   * The index is ZERO-PADDED, because this id is also the import sequence.
-   *
-   * Firestore returns a collection with no orderBy in document-id order, which is lexicographic, and
-   * the trade list is then sorted by date alone — a stable sort, so within a day the id order is what
-   * survives. Unpadded, `_10` sorts before `_2`, so on any day with eleven or more trades the replay
-   * order was wrong even relative to the importer's own sequence.
-   *
-   * Which is exactly the kind of day the rule simulator is about: maxTradesPerDay only acts on days
-   * with more trades than the cap, so the days that decide its headline figure were precisely the days
-   * whose order was scrambled. Four digits covers a day no 0DTE trader will reach.
-   */
-  return `snaptrade_${snaptradeAccountId}_auto${stamp}_${String(index).padStart(4, '0')}`;
-}
+export { autoSyncTradeId } from '../src/utils/brokerTradeIds';
+import { isBrokerTradeIdFor } from '../src/utils/brokerTradeIds';
 
 export interface AutoSyncOutcome {
   uid: string;

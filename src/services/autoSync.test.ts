@@ -6,12 +6,14 @@ import {
   autoSyncTradeId,
   chunkForWrite,
   decideAutoSync,
+  journalForAccount,
   journalForImports,
   lookbackStart,
   runAutoSync,
   TRADE_WRITE_CHUNK,
   type AutoSyncDeps,
 } from '../../server/autoSync';
+import { manualSyncTradeId } from '../utils/brokerTradeIds';
 import { syncStartDate } from '../utils/syncWindow';
 
 const trade = (over: Partial<Trade>): Trade =>
@@ -119,6 +121,34 @@ describe('journalForImports', () => {
     expect(journalForImports([trade({ date: '2026-08-01', accountId: 'paper' })], 'default')).toBe(
       'default',
     );
+  });
+});
+
+describe('journalForAccount', () => {
+  const manual = (accountId: string, journal: string, date: string): Trade =>
+    ({ id: manualSyncTradeId(accountId, 1, 0), accountId: journal, date, symbol: 'SPY', pnl: 1, sourceId: 's' }) as Trade;
+  const auto = (accountId: string, journal: string, date: string): Trade =>
+    ({ id: autoSyncTradeId(accountId, 1, 0), accountId: journal, date, symbol: 'SPY', pnl: 1, sourceId: 's' }) as Trade;
+
+  it('files each brokerage account where that account last imported', () => {
+    // Schwab in "live", Robinhood in "paper". The run used to pick one journal for both.
+    const existing = [manual('schwab', 'live', '2026-10-01'), manual('robinhood', 'paper', '2026-10-03')];
+    expect(journalForAccount(existing, 'schwab', 'default')).toBe('live');
+    expect(journalForAccount(existing, 'robinhood', 'default')).toBe('paper');
+  });
+
+  it('reads the account off the id, whichever importer wrote it', () => {
+    expect(journalForAccount([auto('schwab', 'live', '2026-10-01')], 'schwab', 'default')).toBe('live');
+  });
+
+  it('follows the most recent import when an account has moved journals', () => {
+    const existing = [manual('schwab', 'old', '2026-08-01'), manual('schwab', 'new', '2026-10-01')];
+    expect(journalForAccount(existing, 'schwab', 'default')).toBe('new');
+  });
+
+  it('falls back for an account that has never imported', () => {
+    expect(journalForAccount([manual('schwab', 'live', '2026-10-01')], 'robinhood', 'default')).toBe('default');
+    expect(journalForAccount([], 'schwab', 'default')).toBe('default');
   });
 });
 

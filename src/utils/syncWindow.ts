@@ -1,5 +1,6 @@
 import type { Trade } from '../types';
 import { isBrokerVerified } from './trackRecord';
+import { isBrokerTradeIdFor } from './brokerTradeIds';
 
 /**
  * How far back a sync needs to ask the broker to look.
@@ -50,7 +51,7 @@ function toKey(date: Date): string {
  * account inherits a busy one’s window and silently stops fetching its own history.
  */
 function belongsToAccount(trade: Trade, snaptradeAccountId: string): boolean {
-  return typeof trade.id === 'string' && trade.id.startsWith(`snaptrade_${snaptradeAccountId}_`);
+  return isBrokerTradeIdFor(trade.id, snaptradeAccountId);
 }
 
 /**

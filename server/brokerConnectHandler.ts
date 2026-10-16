@@ -20,7 +20,8 @@ import {
   shouldRefundSync,
   type SyncOutcome,
 } from '../src/utils/syncRefund';
-import { recordJournalEvent } from './journalEvents';
+import { readJournalEvents, recordJournalEvent } from './journalEvents';
+import { nextSyncState, planSyncStart, type AccountSyncState, type SyncStartReason } from '../src/utils/syncPlan';
 import { isClientRejected, isUpstreamOutage, upstreamSummary } from './upstreamErrors';
 import {
   getOrRegisterCreds as getOrRegisterCredsWith,
@@ -32,7 +33,7 @@ import { brokersUnlimited, lowestTierWith, TIER_PLANS, type Tier } from '../src/
 
 export type SupportedBroker = string;
 
-export type BrokerConnectAction = 'connect' | 'status' | 'sync' | 'disconnect';
+export type BrokerConnectAction = 'connect' | 'status' | 'sync' | 'disconnect' | 'history';
 
 export interface BrokerConnectRequestBody {
   action: BrokerConnectAction;
@@ -53,6 +54,51 @@ export interface BrokerConnectResult {
 // server code) can reach `users/{uid}/private/*`, since no client-facing rule matches that path.
 function privateSnaptradeDoc(uid: string) {
   return getAdminFirestore().doc(`users/${uid}/private/snaptrade`);
+}
+
+/**
+ * What the last pull of each brokerage account left open, and which way its feed runs — the two
+ * facts the next sync window is planned from. The rule is in src/utils/syncPlan.ts; this is only
+ * where it is kept. Under private/ like the credential, so no client rule reaches it and no rules
+ * deploy is needed.
+ *
+ * Unreadable reads as "nothing known", which plans a full pull: the safe direction. A failed write
+ * is logged and the next sync simply pulls everything again.
+ */
+function brokerSyncStateDoc(uid: string) {
+  return getAdminFirestore().doc(`users/${uid}/private/brokerSync`);
+}
+
+async function readSyncState(uid: string, accountId: string): Promise<AccountSyncState | null> {
+  try {
+    const snap = await brokerSyncStateDoc(uid).get();
+    const accounts = (snap.data()?.accounts ?? {}) as Record<string, AccountSyncState>;
+    return accounts[accountId] ?? null;
+  } catch (err) {
+    console.warn(`[broker-connect] could not read sync state for ${uid}; pulling everything:`, err);
+    return null;
+  }
+}
+
+async function writeSyncState(uid: string, accountId: string, state: AccountSyncState): Promise<void> {
+  try {
+    await brokerSyncStateDoc(uid).set({ accounts: { [accountId]: state } }, { merge: true });
+  } catch (err) {
+    console.error(`[broker-connect] could not write sync state for ${uid}:`, err);
+  }
+}
+
+/** The window one pull will use, with everything needed to judge the state it leaves behind. */
+interface SyncWindow {
+  startDate: string | undefined;
+  reason: SyncStartReason;
+  previous: AccountSyncState | null;
+}
+
+async function planWindow(uid: string, accountId: string, requested: string | undefined): Promise<SyncWindow> {
+  const previous = await readSyncState(uid, accountId);
+  const plan = planSyncStart(requested, previous);
+  return { startDate: plan.startDate, reason: plan.reason, previous };
 }
 
 /**
@@ -468,8 +514,16 @@ async function handleSync(uid: string, accountId?: string, startDate?: string, e
     );
   }
 
+  /*
+   * The client's start date is a request, not an instruction. It walks back from the newest trade
+   * the journal holds, which is right for "what could be new" and blind to positions still open —
+   * see syncPlan.ts for the trades that cost. The server knows what the last pull left open and
+   * starts no later than that; on an account it knows nothing about, it pulls everything.
+   */
+  const window = await planWindow(uid, accountId, startDate || undefined);
+
   try {
-    return await pullActivities(uid, creds, accountId, startDate, endDate, spend.remaining, limits.syncsPerDay, tier, spend.credits, syncedInstitution, spend.source);
+    return await pullActivities(uid, creds, accountId, window, endDate, spend.remaining, limits.syncsPerDay, tier, spend.credits, syncedInstitution, spend.source);
   } catch (err) {
     // Two failures that are nobody's fault on the user's side: no answer at all, and SnapTrade
     // refusing the app. The listing above usually catches the second before anything is spent;
@@ -511,7 +565,7 @@ async function pullActivities(
   uid: string,
   creds: SnaptradeCreds,
   accountId: string,
-  startDate: string | undefined,
+  window: SyncWindow,
   endDate: string | undefined,
   syncsRemaining: number,
   syncsPerDay: number,
@@ -541,10 +595,9 @@ async function pullActivities(
         userId: c.userId,
         userSecret: c.userSecret,
         accountId,
-        // Leaving startDate/endDate unset pulls SnapTrade's full known history for the account (its
-        // own default) instead of an arbitrary recent window — syncing exists to backfill the
-        // calendar with everything, not just what happened lately.
-        startDate: startDate || undefined,
+        // Unset, SnapTrade returns the account's full known history — what a first sync and a
+        // repair both need. Otherwise the planned window, which reaches every open position.
+        startDate: window.startDate,
         endDate: endDate || undefined,
         offset: page * PAGE_SIZE,
         limit: PAGE_SIZE,
@@ -565,7 +618,22 @@ async function pullActivities(
     );
   }
 
-  const { trades, diagnostics } = mapSnapTradeActivities(activities);
+  const mapped = mapSnapTradeActivities(activities, { feedDirection: window.previous?.feedDirection });
+  const { trades, diagnostics } = mapped;
+
+  // What this pull leaves behind for the next one: the oldest open lot, and the feed's direction.
+  await writeSyncState(
+    uid,
+    accountId,
+    nextSyncState({
+      previous: window.previous,
+      startDate: window.startDate,
+      truncated,
+      oldestOpenDate: mapped.oldestOpenDate,
+      observedDirection: mapped.observedDirection,
+      now: new Date().toISOString(),
+    }),
+  );
 
   /*
    * A sync that brought back nothing does not cost a sync.
@@ -609,9 +677,13 @@ async function pullActivities(
       activityCount: activities.length,
       tradesReturned: trades.length,
       unmatchedCloses: diagnostics.unmatchedOptionCloses.length,
+      assumedShorts: diagnostics.assumedShorts.length,
+      openPositions: diagnostics.openPositions,
       ignored: Object.values(diagnostics.ignored).reduce((a, b) => a + b, 0),
       ignoredByType: diagnostics.ignored,
       truncated,
+      windowReason: window.reason,
+      windowStart: window.startDate ?? null,
       syncsRemaining: remainingAfterSync(syncsRemaining, refunded),
     },
   });
@@ -628,6 +700,12 @@ async function pullActivities(
       inferredOrderDays: diagnostics.inferredOrderDays.length,
       ignored: diagnostics.ignored,
       negativeFees: diagnostics.negativeFees,
+      // Lots the feed left open: not trades yet, and the reason "Tuesday's position" is not here.
+      openPositions: diagnostics.openPositions,
+      orientationAssumed: diagnostics.orientationAssumed,
+      // Why the window was what it was, so the screen can say why a sync took as long as it did.
+      windowReason: window.reason,
+      windowStart: window.startDate ?? null,
       activityCount: activities.length,
       totalActivityCount: total ?? activities.length,
       truncated,
@@ -747,6 +825,22 @@ async function isSiteAdmin(uid: string): Promise<boolean> {
 /** A pulled trade, carrying the brokerage account id that only the pull loop knows. */
 export type PulledTrade = ParsedTradeInput & { snaptradeAccountId: string };
 
+/** What one account's automatic pull found — the morning import's journal event is written from it. */
+export interface PulledAccount {
+  accountId: string;
+  institution: string | null;
+  activityCount: number;
+  tradesReturned: number;
+  unmatchedCloses: number;
+  assumedShorts: number;
+  openPositions: number;
+  ignored: number;
+  ignoredByType: Record<string, number>;
+  truncated: boolean;
+  windowReason: SyncStartReason;
+  windowStart: string | null;
+}
+
 export async function pullRecentActivityForUser(
   uid: string,
   startDate: string,
@@ -766,9 +860,17 @@ export async function pullRecentActivityForUser(
   /** An account hit the page cap, so the oldest of the window was left out. */
   truncated: boolean;
   skippedAccounts: number;
+  perAccount: PulledAccount[];
+  /**
+   * The earliest start date any account's window used, or undefined when one pulled everything.
+   * The caller's dedupe read has to reach at least this far back.
+   */
+  earliestStart: string | undefined;
 }> {
   const creds = await getCredsIfRegistered(uid);
-  if (!creds) return { accounts: 0, trades: [], pulls: 0, truncated: false, skippedAccounts: 0 };
+  if (!creds) {
+    return { accounts: 0, trades: [], pulls: 0, truncated: false, skippedAccounts: 0, perAccount: [], earliestStart: startDate };
+  }
 
   const snaptrade = getSnaptrade();
   let active = creds;
@@ -779,13 +881,22 @@ export async function pullRecentActivityForUser(
   });
 
   const trades: PulledTrade[] = [];
+  const perAccount: PulledAccount[] = [];
   let pulls = 0;
   /** True when an account hit the page cap, so the caller can say the window was not fully covered. */
   let truncated = false;
+  let earliestStart: string | undefined = startDate;
+  let anyFullPull = false;
 
   for (const account of listed.data) {
     if (!account.id) continue;
     if (pulls >= maxAccounts) break;
+
+    // The same planning as a manual sync. The ten-day lookback is the request; a position still
+    // open from before it widens the window, and an account with no trusted state pulls everything.
+    const window = await planWindow(uid, account.id, startDate);
+    if (window.startDate === undefined) anyFullPull = true;
+    else if (earliestStart === undefined || window.startDate < earliestStart) earliestStart = window.startDate;
 
     /*
      * Paged, like the manual sync beside it.
@@ -804,6 +915,7 @@ export async function pullRecentActivityForUser(
     const PAGE_SIZE = 1000;
     const MAX_PAGES = 3;
     const activities: SnapTradeActivityLike[] = [];
+    let accountTruncated = false;
 
     for (let page = 0; page < MAX_PAGES; page++) {
       const res = await withCredentialRecovery(uid, active, (c) => {
@@ -812,9 +924,10 @@ export async function pullRecentActivityForUser(
           userId: c.userId,
           userSecret: c.userSecret,
           accountId: account.id,
-          // A window, not the whole history: this is topping up a journal that a manual sync already
-          // backfilled, and a full pull every morning would be slower and no more complete.
-          startDate,
+          // Usually a window, topping up a journal a manual sync backfilled. Unset for an account
+          // whose open positions are not yet known: three pages is most accounts' whole history,
+          // and one that is longer is left incomplete for a manual sync to repair, and says so.
+          startDate: window.startDate,
           offset: page * PAGE_SIZE,
           limit: PAGE_SIZE,
         });
@@ -825,6 +938,7 @@ export async function pullRecentActivityForUser(
 
       if (batch.length < PAGE_SIZE) break;
       if (page === MAX_PAGES - 1) {
+        accountTruncated = true;
         truncated = true;
         console.warn(
           `[broker-pull] ${uid}: account ${account.id} hit ${MAX_PAGES * PAGE_SIZE} activities; the oldest of the window was left for a manual sync.`,
@@ -841,6 +955,38 @@ export async function pullRecentActivityForUser(
      * with a P&L that never happened to anybody.
      */
     const accountId = account.id;
+    const mapped = mapSnapTradeActivities(activities, { feedDirection: window.previous?.feedDirection });
+
+    await writeSyncState(
+      uid,
+      accountId,
+      nextSyncState({
+        previous: window.previous,
+        startDate: window.startDate,
+        truncated: accountTruncated,
+        oldestOpenDate: mapped.oldestOpenDate,
+        observedDirection: mapped.observedDirection,
+        now: new Date().toISOString(),
+      }),
+    );
+
+    // Kept, not dropped: the morning import used to throw these away, so a Diamond trader whose
+    // swing trades vanished had nothing to look at. The caller writes them to the sync history.
+    perAccount.push({
+      accountId,
+      institution: account.institution_name ?? null,
+      activityCount: activities.length,
+      tradesReturned: mapped.trades.length,
+      unmatchedCloses: mapped.diagnostics.unmatchedOptionCloses.length,
+      assumedShorts: mapped.diagnostics.assumedShorts.length,
+      openPositions: mapped.diagnostics.openPositions,
+      ignored: Object.values(mapped.diagnostics.ignored).reduce((a, b) => a + b, 0),
+      ignoredByType: mapped.diagnostics.ignored,
+      truncated: accountTruncated,
+      windowReason: window.reason,
+      windowStart: window.startDate ?? null,
+    });
+
     /*
      * Tagged with the account it came from, because the caller needs it and this loop is the last
      * place that knows.
@@ -849,12 +995,7 @@ export async function pullRecentActivityForUser(
      * id from and invented its own scheme — one that syncWindow cannot read, which left every
      * manual sync for an auto-syncing trader pulling the whole history again.
      */
-    trades.push(
-      ...mapSnapTradeActivities(activities).trades.map((trade) => ({
-        ...trade,
-        snaptradeAccountId: accountId,
-      })),
-    );
+    trades.push(...mapped.trades.map((trade) => ({ ...trade, snaptradeAccountId: accountId })));
   }
 
   return {
@@ -863,6 +1004,8 @@ export async function pullRecentActivityForUser(
     pulls,
     truncated,
     skippedAccounts: Math.max(0, listed.data.length - pulls),
+    perAccount,
+    earliestStart: anyFullPull ? undefined : earliestStart,
   };
 }
 
@@ -892,6 +1035,16 @@ export async function handleBrokerConnectRequest(
         return await handleSync(uid, body.accountId, body.startDate, body.endDate);
       case 'disconnect':
         return await handleDisconnect(uid, body.authorizationId);
+      case 'history': {
+        /*
+         * What each sync did, for the person it happened to. This history existed for a year and was
+         * readable only from the admin panel: a trader whose morning import had been importing nothing
+         * could not see that it had, and wrote in instead. Served here rather than read from the
+         * browser so the journalEvents collection stays server-only, as its comment requires.
+         */
+        const events = (await readJournalEvents(uid, 40)).filter((e) => e.type === 'sync').slice(0, 20);
+        return { statusCode: 200, body: { events } };
+      }
       default:
         throw new BrokerRequestError('Unknown action', 400);
     }

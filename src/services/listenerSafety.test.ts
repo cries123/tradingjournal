@@ -86,7 +86,9 @@ describe('broker sync', () => {
     expect(sync).toContain('await onImportTrades(');
 
     const importAt = sync.indexOf('await onImportTrades(');
-    const claimAt = sync.indexOf('`Imported ${freshTrades.length}');
+    // The claim is the sentence built from the fresh count — "Imported N trades" lives in
+    // describeSyncResult now, and this is the one call that passes it a non-zero fresh.
+    const claimAt = sync.indexOf('describeSyncResult({ ...outcome, fresh: freshTrades.length })');
     expect(importAt).toBeGreaterThan(-1);
     expect(claimAt).toBeGreaterThan(importAt);
   });

@@ -1,15 +1,19 @@
 import { schedule, type Handler } from '@netlify/functions';
+import { FieldPath } from 'firebase-admin/firestore';
 import type { Trade } from '../../src/types';
 import { getAdminFirestore } from '../../server/firebaseAdmin';
 import { effectiveTier, readEntitlement } from '../../server/entitlements';
 import { logServerError } from '../../server/errorReports';
 import { pullRecentActivityForUser } from '../../server/brokerConnectHandler';
+import { recordJournalEvent } from '../../server/journalEvents';
+import { brokerTradeIdPrefix } from '../../src/utils/brokerTradeIds';
 import { recordAutomatic, usageDay } from '../../server/usage';
 import { dedupeIncomingTrades } from '../../src/utils/duplicateTrades';
 import {
   accountsPerRun,
   autoSyncTradeId,
   chunkForWrite,
+  journalForAccount,
   journalForImports,
   lookbackStart,
   runAutoSync,
@@ -35,14 +39,35 @@ function isDryRun(): boolean {
   return process.env.AUTO_SYNC_DRY_RUN === 'true';
 }
 
-/** Everything already in the journal that a new import could duplicate. */
-async function recentTrades(uid: string, since: string): Promise<Trade[]> {
+/**
+ * Everything already in the journal that a new import could duplicate.
+ *
+ * Only as far back as the pull reached — reading a whole journal to dedupe ten days of fills would
+ * be the most expensive part of this job. The exception is a pull that read everything (an account
+ * with no trusted sync state yet), which can return trades from any date; then the whole journal is
+ * the only honest comparison, once.
+ */
+async function recentTrades(uid: string, since: string | undefined): Promise<Trade[]> {
+  const trades = getAdminFirestore().collection(`users/${uid}/trades`);
+  const snap = await (since === undefined ? trades : trades.where('date', '>=', since)).get();
+  return snap.docs.map((doc) => ({ ...(doc.data() as Trade), id: doc.id }));
+}
+
+/**
+ * The trades ONE brokerage account has imported, to learn which journal it belongs in.
+ *
+ * By document id, which is where the account survives: every importer writes
+ * `snaptrade_<account>_…`, so a range over that prefix is that account's trades and nothing else.
+ * A single-field order on the document id needs no composite index.
+ */
+async function journalCandidatesFor(uid: string, snaptradeAccountId: string): Promise<Trade[]> {
+  const prefix = brokerTradeIdPrefix(snaptradeAccountId);
   const snap = await getAdminFirestore()
     .collection(`users/${uid}/trades`)
-    /* Only the window the pull covers, plus the margin lookbackStart already builds in. Reading a
-       whole journal to dedupe ten days of fills would be the most expensive part of this job, and
-       for a five-year journal it would be most of a Firestore quota. */
-    .where('date', '>=', since)
+    .orderBy(FieldPath.documentId())
+    .startAt(prefix)
+    .endAt(`${prefix}\uf8ff`)
+    .limit(JOURNAL_LOOKUP_LIMIT)
     .get();
 
   return snap.docs.map((doc) => ({ ...(doc.data() as Trade), id: doc.id }));
@@ -75,11 +100,8 @@ async function journalCandidates(uid: string): Promise<Trade[]> {
 
 async function importFor(uid: string, activeAccountId: string, today: string) {
   const since = lookbackStart(today);
-  const { accounts, trades, pulls, skippedAccounts, truncated } = await pullRecentActivityForUser(
-    uid,
-    since,
-    accountsPerRun(),
-  );
+  const { accounts, trades, pulls, skippedAccounts, truncated, perAccount, earliestStart } =
+    await pullRecentActivityForUser(uid, since, accountsPerRun());
   if (skippedAccounts > 0) {
     console.info(
       `[auto-sync] ${uid}: refreshed ${pulls} of ${accounts} accounts; ${skippedAccounts} left for a manual sync.`,
@@ -98,14 +120,43 @@ async function importFor(uid: string, activeAccountId: string, today: string) {
   // behalf rather than a bill. Worth keeping either way: "the morning import ran and found
   // nothing" and "the morning import never ran" are different problems.
   await recordAutomatic('sync', uid, pulls);
-  if (trades.length === 0) return { imported: 0, accounts };
 
-  const existing = await recentTrades(uid, since);
+  const existing = trades.length > 0 ? await recentTrades(uid, earliestStart) : [];
   const { fresh } = dedupeIncomingTrades(trades, existing);
+
+  /*
+   * One history row per account, written whatever came back — including nothing.
+   *
+   * The morning import wrote no history at all, so the one person it ran for could not tell "it
+   * found nothing" from "it never ran", and Diamond's headline feature was a black box with a
+   * switch on it. The same rows the manual sync writes, marked automatic, with how many were new.
+   */
+  const at = new Date().toISOString();
+  const freshByAccount = new Map<string, number>();
+  for (const t of fresh) freshByAccount.set(t.snaptradeAccountId, (freshByAccount.get(t.snaptradeAccountId) ?? 0) + 1);
+  for (const a of perAccount) {
+    await recordJournalEvent(uid, {
+      type: 'sync',
+      at,
+      sync: { ...a, automatic: true, fresh: freshByAccount.get(a.accountId) ?? 0 },
+    });
+  }
+
   if (fresh.length === 0) return { imported: 0, accounts };
 
-  // Asked of the newest trades rather than of the dedupe window, which only reaches back ten days.
-  const journal = journalForImports(await journalCandidates(uid), activeAccountId);
+  /*
+   * A journal per brokerage account, not one for the run.
+   *
+   * Each account goes where it last imported. An account that has never imported falls back to the
+   * trader-wide answer — the journal the last broker import of any kind went to, else the active
+   * one — asked of the newest trades rather than of the dedupe window, which may be only days wide.
+   */
+  const fallback = journalForImports(await journalCandidates(uid), activeAccountId);
+  const journalByAccount = new Map<string, string>();
+  for (const accountId of new Set(fresh.map((t) => t.snaptradeAccountId))) {
+    journalByAccount.set(accountId, journalForAccount(await journalCandidatesFor(uid, accountId), accountId, fallback));
+  }
+
   const db = getAdminFirestore();
   const stamp = Date.now();
   const savedAt = new Date().toISOString();
@@ -138,7 +189,7 @@ async function importFor(uid: string, activeAccountId: string, today: string) {
       batch.set(db.doc(`users/${uid}/trades/${id}`), {
         ...fields,
         id,
-        accountId: fields.accountId ?? journal,
+        accountId: fields.accountId ?? journalByAccount.get(snaptradeAccountId) ?? fallback,
         savedAt,
       });
     });

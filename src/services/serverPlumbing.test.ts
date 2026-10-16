@@ -174,7 +174,7 @@ describe('the automatic pull covers its window', () => {
      */
     const job = codeOnly(readFileSync('netlify/functions/auto-sync.ts', 'utf8'));
 
-    expect(job).toMatch(/const \{[^}]*truncated[^}]*\} = await pullRecentActivityForUser/);
+    expect(job).toMatch(/const \{[^}]*truncated[^}]*\} =\s*await pullRecentActivityForUser/);
     expect(job).toMatch(/if \(truncated\) \{\s*console\.warn\(/);
   });
 });
@@ -303,5 +303,66 @@ describe('the SPY comparison', () => {
 
   it('no longer reaches back into the previous month for a fallback', () => {
     expect(source).not.toContain('valid[valid.length - 2].c');
+  });
+});
+
+describe('the sync window is planned on the server', () => {
+  /*
+   * The client's start date walks back from the newest trade in the journal and knows nothing about
+   * positions still open. A pull that starts after an open lot arrives as closes with no opens — an
+   * option close dropped, a stock sale recorded as a short — and pairs the same sell differently from
+   * the last sync, so it comes back under a new sourceId as a duplicate. The handler must plan the
+   * window from what the previous pull left open, and the automatic pull must do the same per account.
+   */
+  const source = codeOnly(readFileSync('server/brokerConnectHandler.ts', 'utf8'));
+  const manual = source.slice(source.indexOf('async function pullActivities'), source.indexOf('export async function pullRecentActivityForUser'));
+  const automatic = source.slice(source.indexOf('export async function pullRecentActivityForUser'));
+
+  it('has the manual sync ask SnapTrade for the planned window, not the client\'s', () => {
+    expect(source).toMatch(/const window = await planWindow\(uid, accountId, startDate \|\| undefined\);/);
+    expect(manual).toContain('startDate: window.startDate,');
+    expect(manual).not.toMatch(/startDate: startDate/);
+  });
+
+  it('has the automatic pull plan every account the same way', () => {
+    expect(automatic).toMatch(/const window = await planWindow\(uid, account\.id, startDate\);/);
+    expect(automatic).toContain('startDate: window.startDate,');
+  });
+
+  it('records what each pull left open, for the next one, on both paths', () => {
+    expect(manual).toMatch(/await writeSyncState\(\s*uid,\s*accountId,\s*nextSyncState\(/);
+    expect(automatic).toMatch(/await writeSyncState\(\s*uid,\s*accountId,\s*nextSyncState\(/);
+  });
+
+  it('hands the matcher the direction an earlier pull saw, on both paths', () => {
+    expect(manual).toContain('mapSnapTradeActivities(activities, { feedDirection: window.previous?.feedDirection })');
+    expect(automatic).toContain('mapSnapTradeActivities(activities, { feedDirection: window.previous?.feedDirection })');
+  });
+});
+
+describe('the morning import files each brokerage account in its own journal', () => {
+  /*
+   * importFor chose ONE journal for the whole run — the journal the last broker import of any kind
+   * landed in — and wrote every account's trades there. A Diamond trader with Schwab in "live" and
+   * Robinhood in "paper" woke to both brokers in one journal, and the manual sync then reported "up
+   * to date" because the trades were, just in the wrong place.
+   */
+  const job = codeOnly(readFileSync('netlify/functions/auto-sync.ts', 'utf8'));
+
+  it('asks per account, by the id prefix that account writes', () => {
+    expect(job).toMatch(/journalForAccount\(await journalCandidatesFor\(uid, accountId\), accountId, fallback\)/);
+    expect(job).toContain('.startAt(prefix)');
+  });
+
+  it('writes each trade to its own account\'s journal', () => {
+    expect(job).toContain('accountId: fields.accountId ?? journalByAccount.get(snaptradeAccountId) ?? fallback,');
+  });
+
+  it('writes a history row per account, marked automatic, whatever came back', () => {
+    const event = job.indexOf("type: 'sync',");
+    const earlyReturn = job.indexOf('if (fresh.length === 0) return');
+    expect(event).toBeGreaterThan(-1);
+    expect(event).toBeLessThan(earlyReturn);
+    expect(job).toContain('automatic: true, fresh: freshByAccount.get(a.accountId) ?? 0');
   });
 });

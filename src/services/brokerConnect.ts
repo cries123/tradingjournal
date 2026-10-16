@@ -1,6 +1,8 @@
 import type { ParsedTradeInput } from '../types';
 import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebase';
 import type { BrokerRegistryKey } from '../data/brokerRegistry';
+import type { JournalEvent } from '../utils/journalEvents';
+import type { SyncStartReason } from '../utils/syncPlan';
 
 export type SupportedBroker = BrokerRegistryKey;
 
@@ -238,8 +240,24 @@ export async function syncBrokerAccount(
   syncsPerDay?: number;
   /** The bonus part of syncsRemaining, if any. */
   syncCredits?: number;
+  /** Lots the broker's feed left open — positions that are not trades yet. */
+  openPositions?: number;
+  /** A one-day feed with no known direction, so that day's fill order was a guess. */
+  orientationAssumed?: boolean;
+  /** Why the server asked for the window it did. */
+  windowReason?: SyncStartReason;
+  windowStart?: string | null;
+  /** True when this sync cost nothing, with the sentence to say so. */
+  syncRefunded?: boolean;
+  syncRefundNotice?: string | null;
 }> {
   return brokerApiPost({ action: 'sync', accountId, startDate, endDate });
+}
+
+/** The caller's own recent syncs, newest first — manual and automatic alike. */
+export async function fetchSyncHistory(): Promise<JournalEvent[]> {
+  const { events } = await brokerApiPost<{ events: JournalEvent[] }>({ action: 'history' });
+  return events;
 }
 
 /** Disconnects a broker connection. */

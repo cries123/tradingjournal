@@ -36,8 +36,20 @@ export interface SyncOutcome {
   ignoredByType: Record<string, number>;
   /** True when the pull hit its page cap, so older history was not fetched. */
   truncated: boolean;
-  /** Syncs left after this one, so a support thread can see the allowance running down. */
-  syncsRemaining: number;
+  /** Syncs left after this one, so a support thread can see the allowance running down. Absent on an automatic run, which spends none. */
+  syncsRemaining?: number;
+  /** Sales recorded as shorts for want of a prior buy in the window. */
+  assumedShorts?: number;
+  /** Lots the feed left open — the positions that are not trades yet. */
+  openPositions?: number;
+  /** Why the server asked for the window it did: 'first-sync', 'repairing', 'window', 'widened-for-open-position'. */
+  windowReason?: string;
+  /** The first day the pull asked for, or null for the whole history. */
+  windowStart?: string | null;
+  /** The morning import rather than the Sync button. */
+  automatic?: boolean;
+  /** Of tradesReturned, the ones that were not already in the journal — known only after dedupe. */
+  fresh?: number;
 }
 
 export interface ClearOutcome {
@@ -82,9 +94,19 @@ export function describeEvent(event: JournalEvent): string {
   if (!s) return 'Synced.';
 
   const where = s.institution ?? 'a broker';
+  const verb = s.automatic ? `Morning import from ${where}` : `Synced ${where}`;
+  // An automatic run spends nothing, so "spent for nothing" is only true of the Sync button.
+  const wasted = s.automatic ? '' : ' A sync was spent for nothing.';
+  const open = s.openPositions ? ` ${s.openPositions} ${s.openPositions === 1 ? 'position is' : 'positions are'} still open.` : '';
+  const scope =
+    s.windowReason === 'first-sync' || s.windowReason === 'repairing'
+      ? ' Read the full history.'
+      : s.windowReason === 'widened-for-open-position'
+        ? ' Reached back to an open position.'
+        : '';
 
   if (s.activityCount === 0) {
-    return `Synced ${where} — the broker returned no activity at all. A sync was spent for nothing.`;
+    return `${verb} — the broker returned no activity at all.${open}${scope}${wasted}`;
   }
 
   if (s.tradesReturned === 0) {
@@ -94,7 +116,7 @@ export function describeEvent(event: JournalEvent): string {
         : s.ignored > 0
           ? ` All ${s.ignored} were ${describeIgnored(s.ignoredByType)} the matcher could not use.`
           : '';
-    return `Synced ${where} — ${s.activityCount} activities came back but nothing paired into a trade.${why} A sync was spent for nothing.`;
+    return `${verb} — ${s.activityCount} activities came back but nothing paired into a trade.${why}${open}${scope}${wasted}`;
   }
 
   const lost = s.activityCount - s.tradesReturned * 2;
@@ -105,9 +127,10 @@ export function describeEvent(event: JournalEvent): string {
         ? ` ${s.ignored} activities were unusable.`
         : '';
 
-  return `Synced ${where} — ${s.activityCount} activities in, ${s.tradesReturned} ${
+  const fresh = s.fresh != null ? ` ${s.fresh} new.` : '';
+  return `${verb} — ${s.activityCount} activities in, ${s.tradesReturned} ${
     s.tradesReturned === 1 ? 'trade' : 'trades'
-  } out.${tail}${s.truncated ? ' Hit the page cap, so older history was not fetched.' : ''}`;
+  } out.${fresh}${tail}${open}${scope}${s.truncated ? ' Hit the page cap, so older history was not fetched.' : ''}`;
 }
 
 /** True when this sync gave the trader nothing, which is the row a support thread looks for. */

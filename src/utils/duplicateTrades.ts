@@ -240,6 +240,14 @@ export function dedupeIncomingTrades<T extends Partial<Trade>>(
      * exists for one job only — recognising rows ALREADY in the journal whose sourceIds carry the
      * old Math.random() component and will never match again — and that job is done by the seed
      * above, from existingTrades.
+     *
+     * The seed is deliberately NOT narrowed to those old rows. SnapTrade's own types say an
+     * activity id "can change if SnapTrade re-fetches and reprocesses the data from the brokerage";
+     * when that happens every trade in the journal has an id that will never match again, and the
+     * fingerprint is the only thing between that day and a duplicated history. The price is narrow:
+     * a second, genuinely identical round trip on a Schwab contract is dropped if it arrives in a
+     * LATER sync than the first — which takes the broker's day-late feed splitting one day across
+     * two syncs. One trade left out beats every trade in twice.
      */
     seen.add(idKey);
     fresh.push(trade);

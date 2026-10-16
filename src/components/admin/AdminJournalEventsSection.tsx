@@ -140,7 +140,8 @@ export function AdminJournalEventsSection({ uid }: { uid: string }) {
                       <div className="min-w-0">
                         <p className="text-[11px] text-text-secondary">{formatWhen(event.at)}</p>
                         <p className="text-xs mt-0.5 leading-relaxed">{describeEvent(event)}</p>
-                        {event.sync && (
+                        {/* An automatic run spends no sync, so it carries no count. */}
+                        {event.sync?.syncsRemaining != null && (
                           <p className="text-[10px] text-text-secondary mt-1">
                             {event.sync.syncsRemaining} syncs left after this one
                           </p>

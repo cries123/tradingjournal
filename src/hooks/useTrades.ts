@@ -260,11 +260,21 @@ export function useTrades() {
   );
 
   const addTrades = useCallback(
-    async (newTrades: Omit<Trade, 'id'>[]) => {
+    async (newTrades: (Omit<Trade, 'id'> & { id?: string })[]) => {
       setSampleTrades([]);
+      /*
+       * A trade that arrives with an id keeps it.
+       *
+       * This minted a fresh UUID for every row, which threw away the one the broker importer had
+       * just built — the `snaptrade_<account>_…` id that is the only place the brokerage account
+       * survives onto a trade, and the one syncWindow reads to decide how far back the next sync
+       * asks for. With it gone every manual sync looked like a first sync and pulled the whole
+       * history, which is the slow request that times out on a phone and still costs a sync.
+       * CSV and screenshot imports carry no id and get one here, as before.
+       */
       const withIds = newTrades.map((trade) => ({
         ...withAccount(trade),
-        id: crypto.randomUUID(),
+        id: trade.id ?? crypto.randomUUID(),
       }));
       if (user && firebaseEnabled) {
         await runCloudWrite(() => saveTradesBatch(user.uid, withIds));
