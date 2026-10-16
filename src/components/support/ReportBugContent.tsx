@@ -31,8 +31,8 @@ export function ReportBugContent({ onBack, backLabel = 'Back to dashboard' }: Re
         onBack={onBack}
         backLabel={backLabel}
         initialCategory="bug"
-        heading="Report a bug"
-        intro="Tell us what broke. It opens a ticket, so we can ask a follow-up and you can see the answer without leaving the app."
+        heading="Support ticket"
+        intro="Tell us what's not working. It opens a ticket, so we can ask a follow-up and you can see the answer without leaving the app."
       />
     );
   }
@@ -85,11 +85,11 @@ function AnonymousBugReportForm({ onBack, backLabel = 'Back to dashboard' }: Rep
 
   return (
     <PageFrame
-      title="Report a bug"
+      title="Support ticket"
       icon={Bug}
       onBack={onBack}
       backLabel={backLabel}
-      subtitle="Found something broken or confusing? Tell us what happened and we will look into it."
+      subtitle="Something broken or confusing? Tell us what happened and we will look into it."
     >
       {!firebaseEnabled ? (
         <div className="panel-card p-6 text-sm text-text-secondary">

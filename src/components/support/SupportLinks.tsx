@@ -24,8 +24,10 @@ const COPY: Record<SupportDestination, { title: string; blurb: string }> = {
   tutorials: { title: 'Tutorials', blurb: 'Step-by-step walkthroughs for setting up and using your journal.' },
   brokers: { title: 'Supported brokers', blurb: 'Check whether yours connects, and how its import works.' },
   help: { title: 'Help Center', blurb: 'Short answers to specific questions, organised by area.' },
-  report: { title: 'Report a bug', blurb: "Something broken or behaving oddly? Tell us and we'll look." },
-  ticket: { title: 'Open a ticket', blurb: 'Billing, memberships or anything that needs a real reply.' },
+  // Two doors into the same ticket queue, filed under different categories — named by what they
+  // are for, so they do not read as the same card twice.
+  report: { title: 'Support ticket', blurb: "Something broken or behaving oddly? Tell us and we'll look." },
+  ticket: { title: 'Account & billing', blurb: 'Charges, memberships or anything that needs a real reply.' },
 };
 
 /**

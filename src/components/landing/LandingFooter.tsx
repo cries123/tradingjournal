@@ -285,7 +285,7 @@ export function LandingFooter({
                   onClick={navHandler(onNavigate && (() => onNavigate('report-bug')))}
                   className="hover:text-emerald-400 transition-colors"
                 >
-                  Report a bug
+                  Support ticket
                 </a>
               </li>
             </ul>

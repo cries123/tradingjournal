@@ -24,7 +24,7 @@ interface SupportTicketsContentProps {
   onBack: () => void;
   backLabel?: string;
   onSignIn?: () => void;
-  /** Preselects a category — used by the "Report a bug" entry point. */
+  /** Preselects a category — used by the "Support ticket" entry point. */
   initialCategory?: TicketCategory;
   heading?: string;
   intro?: string;
@@ -36,7 +36,7 @@ interface SupportTicketsContentProps {
    * bolted on rather than designed in.
    */
   embedded?: boolean;
-  /** Open straight into the new-ticket form, for an entry point that is already "report a bug". */
+  /** Open straight into the new-ticket form, for an entry point that is already "support ticket". */
   autoCompose?: boolean;
 }
 

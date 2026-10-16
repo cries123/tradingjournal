@@ -1907,7 +1907,10 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                     <Users size={16} className="text-emerald-400" />
                     <h2 className="text-sm font-semibold text-text-primary">
                       Users ({ready.users.length})
-                      {brokerDataLoaded && connectedCount > 0 && (
+                      {/* Shown at zero too: a count that disappears when it is 0 reads as "not
+                          counted", and the question this tab is asked most is how many people
+                          have a broker linked. Hidden only while the answer is not yet known. */}
+                      {brokerDataLoaded && (
                         <span className="ml-2 font-normal text-text-secondary">
                           · {connectedCount} with a broker
                         </span>

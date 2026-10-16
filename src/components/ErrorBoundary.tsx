@@ -67,7 +67,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
           <h1 className="text-lg font-semibold mb-2">Something went wrong</h1>
           <p className="text-sm text-text-secondary mb-6">
             Your trades are safe. Reload the page to keep journaling — if this keeps happening,
-            report it from the Report a bug page.
+            open a support ticket and tell us what you were doing.
           </p>
           <button
             type="button"

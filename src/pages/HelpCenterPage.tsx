@@ -153,7 +153,7 @@ export function HelpCenterPage({
         </div>
         <p className="text-base text-text-secondary mb-8 leading-relaxed max-w-xl">
           Answers and how-tos, organized by area. Can&apos;t find what you need? Open a support ticket
-          from the app, or use Report a bug in the footer.
+          from the app, or from the link in the footer.
         </p>
 
         {/* Controls that cannot do anything are worse than no controls: a search box over an

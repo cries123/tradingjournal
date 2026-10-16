@@ -109,7 +109,7 @@ export function SupportDashboard({ onBack, onBrokers }: SupportDashboardProps) {
     loaded,
   } = useEntitlement();
 
-  /* A counter, not just a category: choosing "Report a bug" twice in a row has to reopen the form
+  /* A counter, not just a category: choosing "Support ticket" twice in a row has to reopen the form
      the second time, and a bare category would be the same value and remount nothing. */
   const [compose, setCompose] = useState<{ category: TicketCategory; n: number } | null>(null);
   const startTicket = (category: TicketCategory) =>
@@ -209,8 +209,8 @@ export function SupportDashboard({ onBack, onBrokers }: SupportDashboardProps) {
             />
             <QuickAction
               icon={<Bug size={16} />}
-              label="Report a bug"
-              blurb="Something in the app is broken"
+              label="Support ticket"
+              blurb="Something in the app isn't working"
               onClick={() => startTicket('bug')}
             />
           </div>

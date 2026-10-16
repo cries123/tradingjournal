@@ -59,8 +59,8 @@ export const PAGE_SEO: Record<
     path: '/terms',
   },
   'report-bug': {
-    title: 'Report a Bug — Trend Chasers',
-    description: 'Found something broken? Tell us and we will fix it.',
+    title: 'Support Ticket — Trend Chasers',
+    description: 'Something not working? Open a support ticket and we will look into it.',
     path: '/report-bug',
     noindex: true,
   },

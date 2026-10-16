@@ -135,7 +135,7 @@ export function PrivacyPolicyPage({ onHome, onLaunch, onPrivacy, onTerms, onBrok
           <a href="mailto:support@trendchasers.net" className="text-emerald-400 hover:underline">
             support@trendchasers.net
           </a>
-          , or use Report a bug in the site footer.
+          , or open a support ticket from the site footer.
         </p>
       </section>
     </LegalPageLayout>

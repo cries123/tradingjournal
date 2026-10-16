@@ -198,7 +198,7 @@ describe('Sidebar', () => {
        which was removed outright. Share month is still a feature — it lives in the dashboard
        toolbar, which is why it must not also be a nav row. */
     for (const gone of [
-      'Supported brokers', 'Report a bug', 'Request broker', 'Share month', 'Clear journal',
+      'Supported brokers', 'Support ticket', 'Report a bug', 'Request broker', 'Share month', 'Clear journal',
       'Leaderboard',
     ]) {
       expect(html).not.toContain(gone);
@@ -248,7 +248,9 @@ describe('SupportDashboard', () => {
     expect(html).toContain('Your account');
     expect(html).toContain('Syncs left today');
     expect(html).toContain('AI left today');
-    expect(html).toContain('Report a bug');
+    expect(html).toContain('Support ticket');
+    // Renamed: "bug" put people off filing anything that was not a crash.
+    expect(html).not.toContain('Report a bug');
     // The broker-request form was removed for spam; nothing here should still offer it.
     expect(html).not.toContain('Request a broker');
   });
