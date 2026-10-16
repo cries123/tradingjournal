@@ -1,4 +1,5 @@
 import type { ParsedTradeInput, TradeSide } from '../src/types';
+import type { FeedDirection } from '../src/utils/syncPlan';
 
 /**
  * Maps a SnapTrade UniversalActivity feed into round-trip trades (opens paired with closes,
@@ -127,19 +128,43 @@ export function hasTimeOfDay(isoOrDate: string): boolean {
  * last, the feed is newest-first and is reversed; then a stable sort on the date alone keeps
  * feed order within each timestamp.
  */
-function orientOldestFirst(activities: SnapTradeActivityLike[]): SnapTradeActivityLike[] {
-  const dated = activities.filter((a) => a.trade_date);
-  if (dated.length < 2) return activities;
-  const first = dated[0].trade_date as string;
-  const last = dated[dated.length - 1].trade_date as string;
-  return first.localeCompare(last) > 0 ? [...activities].reverse() : activities;
+function orientOldestFirst(
+  activities: SnapTradeActivityLike[],
+  hint: FeedDirection | undefined,
+): { ordered: SnapTradeActivityLike[]; observed: FeedDirection | null; assumed: boolean } {
+  const dates = activities.map((a) => a.trade_date).filter((d): d is string => Boolean(d));
+  const first = dates[0];
+  // The last date that differs from the first. Two rows on different days are enough to read the
+  // direction; a feed where every row shares one day has nothing to read it from.
+  const other = first === undefined ? undefined : [...dates].reverse().find((d) => d !== first);
+
+  if (first !== undefined && other !== undefined) {
+    const observed: FeedDirection = first.localeCompare(other) > 0 ? 'newest-first' : 'oldest-first';
+    return { ordered: observed === 'newest-first' ? [...activities].reverse() : activities, observed, assumed: false };
+  }
+
+  /*
+   * A single day's fills, or none. The direction is a property of SnapTrade's API rather than of the
+   * day, so the handler passes in what an earlier, multi-day pull saw. Without that — the very first
+   * pull of an account that has only ever traded one day — input order is kept and the fact that it
+   * was a guess is reported, because a newest-first feed processed forward turns a day of long trades
+   * into shorts that were never placed.
+   */
+  if (hint === 'newest-first') return { ordered: [...activities].reverse(), observed: null, assumed: false };
+  return { ordered: activities, observed: null, assumed: hint === undefined && dates.length > 1 };
 }
 
-function normalize(activities: SnapTradeActivityLike[], diagnostics: SyncDiagnostics): RawActivity[] {
+function normalize(
+  activities: SnapTradeActivityLike[],
+  diagnostics: SyncDiagnostics,
+  hint: FeedDirection | undefined,
+): { rows: RawActivity[]; observed: FeedDirection | null } {
   const out: RawActivity[] = [];
   const seen = new Map<string, number>();
+  const { ordered, observed, assumed } = orientOldestFirst(activities, hint);
+  diagnostics.orientationAssumed = assumed;
 
-  for (const [feedIndex, a] of orientOldestFirst(activities).entries()) {
+  for (const [feedIndex, a] of ordered.entries()) {
     const type = (a.type || '').toUpperCase();
     const isOption = Boolean(a.option_symbol);
     const settlement = isOption ? optionSettlementKind(type) : null;
@@ -153,6 +178,14 @@ function normalize(activities: SnapTradeActivityLike[], diagnostics: SyncDiagnos
     }
     if (!a.trade_date) continue;
     if (!settlement && (typeof a.price !== 'number' || typeof a.units !== 'number')) continue;
+
+    // A BUY or SELL of nothing is a row the matcher cannot use, and one it must not divide by: the
+    // fee share of a close is `fee * matched / units`. Counted with the other unusable rows.
+    const units = Math.abs(typeof a.units === 'number' ? a.units : 0);
+    if (!settlement && !(units > 0)) {
+      diagnostics.ignored.ZERO_UNITS = (diagnostics.ignored.ZERO_UNITS ?? 0) + 1;
+      continue;
+    }
 
     const optionAction = (a.option_type || '').toUpperCase();
 
@@ -170,13 +203,14 @@ function normalize(activities: SnapTradeActivityLike[], diagnostics: SyncDiagnos
     out.push({
       id: a.id || fallbackActivityId(a, seen),
       tradeDate: a.trade_date,
-      units: Math.abs(typeof a.units === 'number' ? a.units : 0),
+      units,
       // An expiring option is worth nothing, which is the whole point of recording it: the premium
       // is the P&L. Brokers report these with no price, or with zero.
       price: settlement ? 0 : (a.price as number),
       // A fee is a cost. A brokerage that reports costs as negative numbers would otherwise have
       // every fee ADDED to P&L, doubling the error; the count above says whether that happened.
-      fee: typeof a.fee === 'number' ? Math.abs(a.fee) : 0,
+      // Finite only: Math.abs(NaN) is NaN, and a NaN fee made every P&L on that lot NaN.
+      fee: typeof a.fee === 'number' && Number.isFinite(a.fee) ? Math.abs(a.fee) : 0,
       // A settlement is economically a sale of whatever is held — a long position closing at zero
       // is a loss of the premium, a short one closing at zero is a gain of it. Which of the two it
       // is comes from the lot being closed, not from here.
@@ -209,7 +243,7 @@ function normalize(activities: SnapTradeActivityLike[], diagnostics: SyncDiagnos
       || tieRank(x) - tieRank(y)
       || x.feedIndex - y.feedIndex,
   );
-  return out;
+  return { rows: out, observed };
 }
 
 /**
@@ -291,6 +325,17 @@ export interface SyncDiagnostics {
   ignored: Record<string, number>;
   /** Fills whose fee arrived as a negative number. Treated as a cost; the count says it happened. */
   negativeFees: number;
+  /**
+   * Lots still open when the feed ended — bought and not yet sold, or the reverse. Not trades yet,
+   * so not in the journal; they appear once closed. Said, so "my position from Tuesday is missing"
+   * has an answer, and so the server can start the next window early enough to pair them.
+   */
+  openPositions: number;
+  /**
+   * The feed held a single day and no direction was known for it, so input order was kept. Totals
+   * are unaffected; if that order was newest-first, the sides and entries of that day are not.
+   */
+  orientationAssumed: boolean;
 }
 
 interface OpenLot {
@@ -433,10 +478,16 @@ function lotSideFor(exec: RawActivity): LotSide {
   return exec.side === 'SELL' ? 'long' : 'short';
 }
 
+/** What a matcher produced, and what it was still holding when the feed ended. */
+interface Matched {
+  trades: ParsedTradeInput[];
+  open: OpenLot[];
+}
+
 function matchOptions(
   activities: RawActivity[],
   diagnostics: SyncDiagnostics,
-): ParsedTradeInput[] {
+): Matched {
   const openLots = new Map<string, OpenLot[]>();
   const trades: ParsedTradeInput[] = [];
   const queueFor = (exec: RawActivity, side: LotSide): OpenLot[] => {
@@ -475,7 +526,7 @@ function matchOptions(
       // A close with nothing to close. The opening fill predates the history we were given.
       diagnostics.unmatchedOptionCloses.push({
         symbol: exec.optionTicker || exec.underlyingSymbol,
-        date: exec.tradeDate.slice(0, 10),
+        date: journalDate(exec.tradeDate),
         units: exec.units,
       });
       continue;
@@ -521,13 +572,13 @@ function matchOptions(
     if (remaining > 0.0001 && !exec.settlement) {
       diagnostics.unmatchedOptionCloses.push({
         symbol: exec.optionTicker || exec.underlyingSymbol,
-        date: exec.tradeDate.slice(0, 10),
+        date: journalDate(exec.tradeDate),
         units: remaining,
       });
     }
   }
 
-  return trades;
+  return { trades, open: [...openLots.values()].flat() };
 }
 
 /**
@@ -541,7 +592,7 @@ function matchByInventory(
   activities: RawActivity[],
   diagnostics: SyncDiagnostics,
   instrument: { key: (a: RawActivity) => string; label: (a: RawActivity) => string; mult: number },
-): ParsedTradeInput[] {
+): Matched {
   const queues = new Map<string, OpenLot[]>();
   const trades: ParsedTradeInput[] = [];
 
@@ -583,7 +634,7 @@ function matchByInventory(
       if (execSign < 0) {
         diagnostics.assumedShorts.push({
           symbol: instrument.label(exec),
-          date: exec.tradeDate.slice(0, 10),
+          date: journalDate(exec.tradeDate),
           units: remaining,
         });
       }
@@ -591,12 +642,31 @@ function matchByInventory(
     }
   }
 
-  return trades;
+  return { trades, open: [...queues.values()].flat() };
+}
+
+/** A lot the feed left open, as the server and the screen see it. */
+export interface OpenPosition {
+  symbol: string;
+  /** Journal date of the opening fill. */
+  openDate: string;
+  units: number;
+  side: TradeSide;
 }
 
 export interface MappedSync {
   trades: ParsedTradeInput[];
   diagnostics: SyncDiagnostics;
+  openPositions: OpenPosition[];
+  /** The earliest openDate above, or null with nothing open. What the next sync window must reach. */
+  oldestOpenDate: string | null;
+  /** Which way the feed ran, when it spanned two dates. The handler remembers it for single-day pulls. */
+  observedDirection: FeedDirection | null;
+}
+
+export interface MapOptions {
+  /** The feed direction an earlier pull observed, for a feed with only one day to read it from. */
+  feedDirection?: FeedDirection;
 }
 
 /**
@@ -608,7 +678,7 @@ function noteInferredOrderDays(activities: RawActivity[], diagnostics: SyncDiagn
   for (const a of activities) {
     if (a.hasTimeOfDay || a.settlement) continue;
     const symbol = a.optionTicker ?? a.underlyingSymbol;
-    const date = a.tradeDate.slice(0, 10);
+    const date = journalDate(a.tradeDate);
     const key = `${a.accountId}|${symbol}|${date}`;
     const g = groups.get(key) ?? { buys: 0, sells: 0, symbol, date };
     if (a.side === 'BUY') g.buys += 1;
@@ -634,28 +704,53 @@ const FLAGLESS_OPTION = {
   mult: 100,
 };
 
-export function mapSnapTradeActivities(activities: SnapTradeActivityLike[]): MappedSync {
+export function mapSnapTradeActivities(activities: SnapTradeActivityLike[], options: MapOptions = {}): MappedSync {
   const diagnostics: SyncDiagnostics = {
     unmatchedOptionCloses: [],
     assumedShorts: [],
     inferredOrderDays: [],
     ignored: {},
     negativeFees: 0,
+    openPositions: 0,
+    orientationAssumed: false,
   };
-  const normalized = normalize(activities, diagnostics);
+  const { rows: normalized, observed } = normalize(activities, diagnostics, options.feedDirection);
   const flaggedOptions = normalized.filter((a) => a.isOption && a.positionEffect !== undefined);
   const flaglessOptions = normalized.filter((a) => a.isOption && a.positionEffect === undefined);
   const stocks = normalized.filter((a) => !a.isOption);
 
   noteInferredOrderDays(normalized, diagnostics);
 
-  const trades = [
-    ...matchOptions(flaggedOptions, diagnostics),
-    ...matchByInventory(flaglessOptions, diagnostics, FLAGLESS_OPTION),
-    ...matchByInventory(stocks, diagnostics, STOCK),
-  ].sort((a, b) => a.date.localeCompare(b.date));
+  const matched = [
+    matchOptions(flaggedOptions, diagnostics),
+    matchByInventory(flaglessOptions, diagnostics, FLAGLESS_OPTION),
+    matchByInventory(stocks, diagnostics, STOCK),
+  ];
 
-  return { trades, diagnostics };
+  const trades = matched.flatMap((m) => m.trades).sort((a, b) => a.date.localeCompare(b.date));
+
+  // Both matchers shift a lot off its queue once it is scaled down to nothing (to the same
+  // tolerance they match with), so every lot still queued has size and is a real open position.
+  const openPositions: OpenPosition[] = matched
+    .flatMap((m) => m.open)
+    .map((lot): OpenPosition => ({
+      symbol: lot.open.optionTicker ?? lot.open.underlyingSymbol,
+      openDate: journalDate(lot.open.tradeDate),
+      units: Math.abs(lot.qty),
+      // The opening fill's side says which way the lot points, for both matchers: a flagged
+      // option lot is BUY_TO_OPEN or SELL_TO_OPEN, and an inventory lot was opened by its first fill.
+      side: lot.open.side === 'BUY' ? 'long' : 'short',
+    }))
+    .sort((a, b) => a.openDate.localeCompare(b.openDate));
+  diagnostics.openPositions = openPositions.length;
+
+  return {
+    trades,
+    diagnostics,
+    openPositions,
+    oldestOpenDate: openPositions[0]?.openDate ?? null,
+    observedDirection: observed,
+  };
 }
 
 /** Trades only, for callers that do not surface the diagnostics. */

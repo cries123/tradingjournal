@@ -13,19 +13,31 @@ export interface SyncGapCounts {
   inferredOrderDays?: number;
   ignored?: Record<string, number>;
   negativeFees?: number;
+  /** Lots the feed left open — bought and not yet sold. Not trades yet, and worth saying so. */
+  openPositions?: number;
+  /** A one-day feed with no known direction, so the order of that day's fills was a guess. */
+  orientationAssumed?: boolean;
 }
 
 /** "3 dividends, 1 transfer, 1 split" — the rows the sync read past, named. */
 export function describeIgnored(ignored: Record<string, number>): string {
+  // SnapTrade's type names, as its SDK documents them. An unlisted one prints lowercased.
   const NAMES: Record<string, [string, string]> = {
     DIVIDEND: ['dividend', 'dividends'],
+    SUBSTITUTE_DIVIDEND: ['payment in lieu of a dividend', 'payments in lieu of dividends'],
+    STOCK_DIVIDEND: ['stock dividend', 'stock dividends'],
     TRANSFER: ['transfer', 'transfers'],
+    EXTERNAL_ASSET_TRANSFER_IN: ['transfer in', 'transfers in'],
+    EXTERNAL_ASSET_TRANSFER_OUT: ['transfer out', 'transfers out'],
     SPLIT: ['stock split', 'stock splits'],
+    ADJUSTMENT: ['adjustment', 'adjustments'],
     FEE: ['account fee', 'account fees'],
+    TAX: ['tax charge', 'tax charges'],
     INTEREST: ['interest payment', 'interest payments'],
     CONTRIBUTION: ['deposit', 'deposits'],
     WITHDRAWAL: ['withdrawal', 'withdrawals'],
     REI: ['dividend reinvestment', 'dividend reinvestments'],
+    ZERO_UNITS: ['fill of zero shares', 'fills of zero shares'],
   };
   return Object.entries(ignored)
     .filter(([, n]) => n > 0)
@@ -49,10 +61,28 @@ export function describeSyncGaps(
   const notes: string[] = [];
 
   if (unmatchedCloses > 0) {
+    // "Older than the history your broker shares" is true now that the window reaches every open
+    // position; before, it was usually the window that had not asked, and the note blamed the broker.
     notes.push(
       `${unmatchedCloses} closing ${unmatchedCloses === 1 ? 'fill was' : 'fills were'} left out, `
       + 'because the trade that opened the position is older than the history your broker shares. '
       + 'Add those trades by hand if you want them counted.',
+    );
+  }
+
+  if ((counts.openPositions ?? 0) > 0) {
+    const n = counts.openPositions as number;
+    notes.push(
+      `${n} ${n === 1 ? 'position is' : 'positions are'} still open at your broker. `
+      + `${n === 1 ? 'It appears' : 'They appear'} in the journal once closed.`,
+    );
+  }
+
+  if (counts.orientationAssumed) {
+    notes.push(
+      'This sync covered a single day, so the order of that day’s fills was taken as the broker '
+      + 'sent them. The total is right; if entries and exits on that day look swapped, sync again '
+      + 'once another day’s trades are in.',
     );
   }
 
