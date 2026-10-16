@@ -118,6 +118,37 @@ hides rather than concluding anything from four trades. Setups, R multiples, MAE
 still need hand entry — a coverage panel names what the broker did not send instead of drawing a
 blank chart.
 
+### How a sync decides what to ask for (October 2026 rebuild, after the duplicate/missing-trade complaints)
+
+- **Every imported trade's id is `snaptrade_<accountId>_…`**, built only by `src/utils/brokerTradeIds.ts`
+  (`manualSyncTradeId` / `autoSyncTradeId`). It is the only place the brokerage account survives onto a
+  trade, and `syncWindow`, `journalForAccount` and the auto-sync journal lookup all read it. `addTrades`
+  keeps an incoming id — it minted a UUID for every row for three months, so every manual sync looked
+  like a first sync and pulled the whole history.
+- **The window is anchored on open positions, not on the newest closed trade.** The client still sends
+  `syncStartDate` (14 days back from the newest import) but it is a request; `server/brokerConnectHandler`
+  plans the real start with `planSyncStart` (`src/utils/syncPlan.ts`) from `users/{uid}/private/brokerSync`
+  (`accounts.{accountId}`: `oldestOpenDate`, `complete`, `feedDirection`). A position opened before the
+  window and closed inside it used to arrive as a close with no open — an option close was dropped, a stock
+  sale became an invented short, and the FIFO pairing differed from the last sync's so the same sell came
+  back under a different `sourceId` with a different P&L. Now the pull starts no later than the day before
+  the oldest open lot; with no trusted state (never synced, or the last pull was truncated) it pulls
+  everything. Auto-sync plans the same way per account.
+- **Feed direction is a hint carried between pulls.** `orientOldestFirst` reads it from a multi-day feed and
+  stores it; a one-day feed with no hint keeps input order and reports `orientationAssumed`, which the screen
+  says out loud. Whether SnapTrade is newest-first has still never been observed on a real account.
+- **`dedupeIncomingTrades` keeps the execution fingerprint deliberately wide.** SnapTrade says activity ids
+  "can change if we re-fetch and reprocess", so the fingerprint is the only thing that stops a re-issued id
+  arriving as a duplicate. The cost — two genuinely identical fills on one day across two syncs collapse to
+  one — was weighed and accepted; narrowing it is the wrong fix.
+- **Sync history is the trader's, not just the admin's.** `action: 'history'` on `/api/broker-connect`
+  returns the caller's `journalEvents` (collection stays server-only, no rules change). Auto-sync writes one
+  event per account, `automatic: true`, with `fresh` after dedupe. The connect screen's copy comes from
+  `describeSyncResult` (`utils/syncOutcomeCopy.ts`) and `describeSyncGaps` on every path, including
+  "nothing paired", which used to be reported as "no activity found" with no notes.
+- The matcher guards: zero-unit fills counted as `ZERO_UNITS` (they divided the fee by zero), non-finite fees
+  read as 0, and every diagnostic date is the Eastern trading day, like the trades.
+
 ### SnapTrade credentials — never delete a stored secret to "recover"
 
 `resetSnapTradeUserSecret` needs the user's CURRENT secret. Once a `users/{uid}/private/snaptrade`
