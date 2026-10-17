@@ -14,7 +14,6 @@ import {
   Share2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { BrandLogo } from '../components/BrandLogo';
 import { AnnouncementBar } from '../components/landing/AnnouncementBar';
 import { DashboardPreview } from '../components/landing/DashboardPreview';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
@@ -489,8 +488,14 @@ export function LandingPage({
       <section className="relative z-10 py-24 md:py-36 overflow-hidden">
         <div className="giant-glow opacity-60" aria-hidden />
         <FadeIn className="relative max-w-3xl mx-auto px-4 md:px-6 text-center">
-          <div className="flex justify-center mb-10">
-            <BrandLogo size="md" variant="mark" />
+          {/* Sized to the headline under it: at 40px the mark was a speck over 60px type. */}
+          <div className="flex justify-center mb-8 md:mb-10">
+            <img
+              src="/logo-mark.svg"
+              alt=""
+              aria-hidden
+              className="h-24 w-24 md:h-32 md:w-32 object-contain drop-shadow-[0_12px_40px_rgba(var(--color-accent-rgb),0.35)]"
+            />
           </div>
           <h2 className="public-display text-4xl sm:text-5xl md:text-6xl">Start journaling confidently</h2>
           <p className="mt-6 text-lg text-text-secondary leading-relaxed">
