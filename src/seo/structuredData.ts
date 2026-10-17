@@ -4,6 +4,7 @@ import { LANDING_FAQ } from './faq';
 import { GUIDE_ARTICLES, getGuideBySlug } from './guides';
 import { SITE_ORIGIN } from './pageMeta';
 import { BROKER_COUNT_PHRASE } from '../data/brokerCopy';
+import { SOCIAL_LINKS } from '../data/social';
 
 const ORGANIZATION = {
   '@type': 'Organization',
@@ -11,6 +12,8 @@ const ORGANIZATION = {
   name: 'Trend Chasers',
   url: SITE_ORIGIN,
   logo: `${SITE_ORIGIN}/logo-mark.svg`,
+  // The same profiles the footer links, so search engines tie them to this organisation.
+  sameAs: SOCIAL_LINKS.map((s) => s.url),
   description:
     `Free trading journal with a visual P&L calendar, performance analytics, and one-tap trade import from ${BROKER_COUNT_PHRASE}.`,
   contactPoint: {

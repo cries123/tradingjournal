@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import { LifeBuoy, Mail, Menu, X } from 'lucide-react';
 import { BrandLogo } from '../BrandLogo';
 import { useAuth } from '../../context/useAuth';
 import { NavAccountMenu } from './NavAccountMenu';
@@ -8,6 +8,8 @@ import { MobileNavPanel } from './MobileNavPanel';
 import { BROKER_GUIDES } from '../../seo/brokerGuides';
 import { GUIDE_ARTICLES } from '../../seo/guides';
 import type { ExtraNavRoute } from '../../hooks/useRoute';
+import { SOCIAL_LINKS, X_HANDLE } from '../../data/social';
+import { DiscordIcon, XIcon } from './SocialIcons';
 
 interface LandingFooterProps {
   onPrivacy: () => void;
@@ -265,29 +267,41 @@ export function LandingFooter({
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-text-primary mb-3">Contact</p>
             <ul className="space-y-2 text-sm text-text-secondary">
-              <li>
-                <a href="mailto:support@trendchasers.net" className="hover:text-accent transition-colors">
-                  support@trendchasers.net
-                </a>
-              </li>
+              {/* One row per way to reach us, each with its mark: the email, the ticket form, and
+                  the two places the community is. "Open a support ticket" and "Support ticket" were
+                  two rows to the same queue. */}
               <li>
                 <a
-                  href="/support"
-                  onClick={navHandler(onNavigate && (() => onNavigate('support')))}
-                  className="hover:text-accent transition-colors"
+                  href="mailto:support@trendchasers.net"
+                  className="inline-flex items-center gap-1.5 hover:text-accent transition-colors"
                 >
-                  Open a support ticket
+                  <Mail size={13} aria-hidden />
+                  support@trendchasers.net
                 </a>
               </li>
               <li>
                 <a
                   href="/report-bug"
                   onClick={navHandler(onNavigate && (() => onNavigate('report-bug')))}
-                  className="hover:text-accent transition-colors"
+                  className="inline-flex items-center gap-1.5 hover:text-accent transition-colors"
                 >
-                  Support ticket
+                  <LifeBuoy size={13} aria-hidden />
+                  Support
                 </a>
               </li>
+              {SOCIAL_LINKS.map((s) => (
+                <li key={s.id}>
+                  <a
+                    href={s.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 hover:text-accent transition-colors"
+                  >
+                    {s.id === 'x' ? <XIcon size={13} /> : <DiscordIcon size={14} />}
+                    {s.id === 'x' ? X_HANDLE : 'Discord'}
+                  </a>
+                </li>
+              ))}
             </ul>
           </div>
         </div>

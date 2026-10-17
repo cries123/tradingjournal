@@ -24,6 +24,8 @@ import { HeroBars } from '../components/landing/HeroBars';
 import { StickyCta } from '../components/landing/StickyCta';
 import { ProofStrip } from '../components/landing/ProofStrip';
 import { PhoneShowcase } from '../components/landing/PhoneShowcase';
+import { DiscordIcon, XIcon } from '../components/landing/SocialIcons';
+import { SOCIAL_LINKS, X_HANDLE } from '../data/social';
 import { AssistantDemo } from '../components/landing/AssistantDemo';
 import { LazyOnView } from '../components/landing/LazyOnView';
 import { LandingFaq } from '../components/landing/LandingFaq';
@@ -437,6 +439,44 @@ export function LandingPage({
               </button>
             </div>
           )}
+        </div>
+      </section>
+
+      {/* Where the people are. Two doors, one line each, nothing else. */}
+      <section id="community" className="relative z-10 pb-20 md:pb-28 scroll-mt-24">
+        <div className="max-w-[1000px] mx-auto px-4 md:px-6">
+          <FadeIn className="text-center max-w-2xl mx-auto mb-10 md:mb-14">
+            <h2 className="public-display text-4xl md:text-5xl">Join the community</h2>
+            <p className="mt-4 text-text-secondary text-lg">
+              Other traders keeping a journal, and the person who builds this one.
+            </p>
+          </FadeIn>
+          <div className="grid gap-4 md:gap-5 sm:grid-cols-2">
+            {SOCIAL_LINKS.map((s, i) => (
+              <FadeIn key={s.id} delay={i * 60}>
+                <a
+                  href={s.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="public-card spotlight group flex h-full items-start gap-4 p-6 md:p-7 hover:border-white/20 transition-colors focus-ring"
+                >
+                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white text-black">
+                    {s.id === 'x' ? <XIcon size={20} /> : <DiscordIcon size={22} />}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-xl font-semibold leading-snug">
+                      {s.id === 'x' ? `${s.name} · ${X_HANDLE}` : s.name}
+                    </span>
+                    <span className="mt-2 block text-sm leading-relaxed text-text-secondary">{s.blurb}</span>
+                    <span className="public-link mt-4 text-sm">
+                      Open {s.name}
+                      <ChevronRight size={16} aria-hidden />
+                    </span>
+                  </span>
+                </a>
+              </FadeIn>
+            ))}
+          </div>
         </div>
       </section>
 

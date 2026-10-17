@@ -1,5 +1,6 @@
 import { useLayoutEffect } from 'react';
 import { DEFAULT_OG_IMAGE, SITE_ORIGIN, type PageSeo } from '../seo/pageMeta';
+import { X_HANDLE } from '../data/social';
 
 function upsertMeta(attr: 'name' | 'property', key: string, content: string) {
   let el = document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`);
@@ -39,6 +40,7 @@ export function usePageMeta(seo: PageSeo) {
     upsertMeta('property', 'og:image', DEFAULT_OG_IMAGE);
 
     upsertMeta('name', 'twitter:card', 'summary_large_image');
+    upsertMeta('name', 'twitter:site', X_HANDLE);
     upsertMeta('name', 'twitter:title', seo.title);
     upsertMeta('name', 'twitter:description', seo.description);
     upsertMeta('name', 'twitter:image', DEFAULT_OG_IMAGE);
