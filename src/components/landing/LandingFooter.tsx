@@ -53,7 +53,7 @@ export function LandingFooter({
   };
 
   return (
-    <footer className="relative z-10 mt-auto border-t border-border/50 bg-bg-secondary/40 shrink-0">
+    <footer className="relative z-10 mt-auto border-t border-white/10 bg-bg-primary shrink-0">
       <div className="max-w-[1680px] mx-auto px-4 md:px-6 py-10 md:py-14">
         <div className="grid sm:grid-cols-2 lg:grid-cols-6 gap-8 mb-10">
           <div className="sm:col-span-2 lg:col-span-1">
@@ -82,7 +82,7 @@ export function LandingFooter({
             <p className="text-xs font-semibold uppercase tracking-wider text-text-primary mb-3">Product</p>
             <ul className="space-y-2 text-sm text-text-secondary">
               <li>
-                <a href="/#features" onClick={goHomeSection('#features')} className="hover:text-emerald-400 transition-colors">
+                <a href="/#features" onClick={goHomeSection('#features')} className="hover:text-accent transition-colors">
                   Features
                 </a>
               </li>
@@ -95,7 +95,7 @@ export function LandingFooter({
                       onBrokers();
                     }
                   }}
-                  className="hover:text-emerald-400 transition-colors"
+                  className="hover:text-accent transition-colors"
                 >
                   Supported brokers
                 </a>
@@ -104,7 +104,7 @@ export function LandingFooter({
                 <a
                   href="/app"
                   onClick={navHandler(onLaunch)}
-                  className="hover:text-emerald-400 transition-colors"
+                  className="hover:text-accent transition-colors"
                 >
                   Open journal
                 </a>
@@ -113,13 +113,13 @@ export function LandingFooter({
                 <a
                   href="/guides"
                   onClick={navHandler(onGuides)}
-                  className="hover:text-emerald-400 transition-colors"
+                  className="hover:text-accent transition-colors"
                 >
                   Guides
                 </a>
               </li>
               <li>
-                <a href="/#faq" onClick={goHomeSection('#faq')} className="hover:text-emerald-400 transition-colors">
+                <a href="/#faq" onClick={goHomeSection('#faq')} className="hover:text-accent transition-colors">
                   FAQ
                 </a>
               </li>
@@ -133,7 +133,7 @@ export function LandingFooter({
                 <a
                   href="/help-center"
                   onClick={navHandler(onNavigate && (() => onNavigate('help-center')))}
-                  className="hover:text-emerald-400 transition-colors"
+                  className="hover:text-accent transition-colors"
                 >
                   Help Center
                 </a>
@@ -142,7 +142,7 @@ export function LandingFooter({
                 <a
                   href="/whats-new"
                   onClick={navHandler(onNavigate && (() => onNavigate('whats-new')))}
-                  className="hover:text-emerald-400 transition-colors"
+                  className="hover:text-accent transition-colors"
                 >
                   What&apos;s New
                 </a>
@@ -151,7 +151,7 @@ export function LandingFooter({
                 <a
                   href="/pricing"
                   onClick={navHandler(onNavigate && (() => onNavigate('pricing')))}
-                  className="hover:text-emerald-400 transition-colors"
+                  className="hover:text-accent transition-colors"
                 >
                   Pricing
                 </a>
@@ -160,7 +160,7 @@ export function LandingFooter({
                 <a
                   href="/#security"
                   onClick={goHomeSection('#security')}
-                  className="hover:text-emerald-400 transition-colors"
+                  className="hover:text-accent transition-colors"
                 >
                   Security
                 </a>
@@ -181,7 +181,7 @@ export function LandingFooter({
                         onGuide(guide.slug);
                       }
                     }}
-                    className="hover:text-emerald-400 transition-colors"
+                    className="hover:text-accent transition-colors"
                   >
                     {guide.title.replace(' — Trend Chasers', '').slice(0, 42)}
                   </a>
@@ -195,7 +195,7 @@ export function LandingFooter({
                     href={guide.path}
                     /* Left as a plain link on purpose: these are crawlable SEO landing pages and
                        no page above the footer carries a broker-guide nav handler to pass down. */
-                    className="hover:text-emerald-400 transition-colors"
+                    className="hover:text-accent transition-colors"
                   >
                     {guide.brokerName} journal guide
                   </a>
@@ -210,7 +210,7 @@ export function LandingFooter({
                       onGuides();
                     }
                   }}
-                  className="hover:text-emerald-400 transition-colors"
+                  className="hover:text-accent transition-colors"
                 >
                   All {BROKER_GUIDES.length} broker guides →
                 </a>
@@ -228,7 +228,7 @@ export function LandingFooter({
                     e.preventDefault();
                     onPrivacy();
                   }}
-                  className="hover:text-emerald-400 transition-colors"
+                  className="hover:text-accent transition-colors"
                 >
                   Privacy Policy
                 </a>
@@ -240,7 +240,7 @@ export function LandingFooter({
                     e.preventDefault();
                     onTerms();
                   }}
-                  className="hover:text-emerald-400 transition-colors"
+                  className="hover:text-accent transition-colors"
                 >
                   Terms of Service
                 </a>
@@ -254,7 +254,7 @@ export function LandingFooter({
                     e.preventDefault();
                     onNavigate?.('refunds');
                   }}
-                  className="hover:text-emerald-400 transition-colors"
+                  className="hover:text-accent transition-colors"
                 >
                   Refund Policy
                 </a>
@@ -266,7 +266,7 @@ export function LandingFooter({
             <p className="text-xs font-semibold uppercase tracking-wider text-text-primary mb-3">Contact</p>
             <ul className="space-y-2 text-sm text-text-secondary">
               <li>
-                <a href="mailto:support@trendchasers.net" className="hover:text-emerald-400 transition-colors">
+                <a href="mailto:support@trendchasers.net" className="hover:text-accent transition-colors">
                   support@trendchasers.net
                 </a>
               </li>
@@ -274,7 +274,7 @@ export function LandingFooter({
                 <a
                   href="/support"
                   onClick={navHandler(onNavigate && (() => onNavigate('support')))}
-                  className="hover:text-emerald-400 transition-colors"
+                  className="hover:text-accent transition-colors"
                 >
                   Open a support ticket
                 </a>
@@ -283,7 +283,7 @@ export function LandingFooter({
                 <a
                   href="/report-bug"
                   onClick={navHandler(onNavigate && (() => onNavigate('report-bug')))}
-                  className="hover:text-emerald-400 transition-colors"
+                  className="hover:text-accent transition-colors"
                 >
                   Support ticket
                 </a>
@@ -364,7 +364,7 @@ export function LandingNav({
   const signedIn = !authLoading && Boolean(user);
 
   return (
-    <header className="relative z-30 border-b border-border/50 backdrop-blur-md bg-bg-primary/70 sticky top-0">
+    <header className="relative z-30 border-b border-white/5 backdrop-blur-md bg-bg-primary/70 sticky top-0">
       <div className="max-w-[1680px] mx-auto px-4 md:px-8 h-16 sm:h-[72px] flex items-center gap-3 sm:gap-6 md:gap-9">
         <NavBrand onHome={onHome} />
         <nav className="hidden sm:flex items-center gap-6 sm:gap-7" aria-label="Main">
@@ -442,8 +442,8 @@ export function LandingNav({
                 {/* Shorter on narrow phones so it doesn't crowd the logo + menu button off the
                     edge — the auth modal it opens lets you switch between signing up and signing
                     in either way. */}
-                <span className="sm:hidden">Sign in</span>
-                <span className="hidden sm:inline">Sign up / Sign in</span>
+                <span className="sm:hidden">Start free</span>
+                <span className="hidden sm:inline">Start for free</span>
               </>
             )}
           </a>

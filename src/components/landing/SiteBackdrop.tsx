@@ -16,7 +16,8 @@ export function SiteBackdrop() {
     <>
       {/* reactive={false}: public pages keep the fixed emerald/blue brand look whatever Theme accent a
           signed-in user picked in Settings — same reasoning as the logo. */}
-      <Starfield reactive={false} drift />
+      {/* subtle: on a pure-black site the full field reads as noise behind 56px headlines. */}
+      <Starfield reactive={false} drift subtle />
       <div className="site-aurora" aria-hidden />
       <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
     </>

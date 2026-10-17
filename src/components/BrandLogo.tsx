@@ -82,7 +82,7 @@ export function BrandLogo({ size = 'md', variant = 'compact' }: BrandLogoProps) 
         <span
           className={`${row.title} font-black tracking-[0.14em] leading-none whitespace-nowrap`}
         >
-          <span className="text-[#6cd59f]">TREND</span>{' '}
+          <span className="brand-word text-[#6cd59f]">TREND</span>{' '}
           <span className="text-text-primary">CHASERS</span>
         </span>
       </span>
@@ -99,7 +99,7 @@ export function BrandLogo({ size = 'md', variant = 'compact' }: BrandLogoProps) 
         className={`${markHeights[size]} shrink-0 object-contain object-left`}
       />
       <div className="min-w-0 leading-none">
-        <p className={`${text.title} font-black tracking-[0.14em] text-[#6cd59f]`}>TREND</p>
+        <p className={`${text.title} font-black tracking-[0.14em] brand-word text-[#6cd59f]`}>TREND</p>
         <p className={`${text.title} font-black tracking-[0.14em] text-text-primary mt-0.5`}>CHASERS</p>
         <p className={`${text.sub} text-[#8e939d] mt-1`}>Track · Analyze · Improve</p>
       </div>

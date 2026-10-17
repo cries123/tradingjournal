@@ -1,14 +1,27 @@
-import { lazy, useEffect, useState } from 'react';
+import { lazy, useEffect, useRef, useState } from 'react';
 import { lowestPaidPrice } from '../seo/pricingClaims';
-import { Calendar, Check, Cloud, Lock, Pencil, Share2 } from 'lucide-react';
+import {
+  Bot,
+  Calendar,
+  ChevronRight,
+  Cloud,
+  FileText,
+  Gauge,
+  Link2,
+  Lock,
+  Pencil,
+  Share2,
+  Smartphone,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { AnnouncementBar } from '../components/landing/AnnouncementBar';
 import { DashboardPreview } from '../components/landing/DashboardPreview';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import { FadeIn } from '../components/motion/FadeIn';
-import { HeroTrendLine, SiteBackdrop } from '../components/landing/SiteBackdrop';
-import { BrokerMarquee } from '../components/landing/BrokerMarquee';
+import { SiteBackdrop } from '../components/landing/SiteBackdrop';
+import { HeroBars } from '../components/landing/HeroBars';
+import { StickyCta } from '../components/landing/StickyCta';
 import { AssistantDemo } from '../components/landing/AssistantDemo';
 import { LazyOnView } from '../components/landing/LazyOnView';
 import { LandingFaq } from '../components/landing/LandingFaq';
@@ -17,11 +30,7 @@ import { lowestTierWith, TIER_PLANS, type Feature } from '../config/tiers';
 import { BrokerLogo } from '../components/brokers/BrokerLogo';
 import { brokerIdFromName } from '../utils/brokerIds';
 import { COMING_SOON_BROKERS, SUPPORTED_BROKERS } from '../data/brokers';
-import {
-  BROKER_COUNT_PHRASE,
-  BROKER_EXAMPLES,
-  SHORT_BROKER_EXAMPLES,
-} from '../data/brokerCopy';
+import { BROKER_COUNT_PHRASE, SHORT_BROKER_EXAMPLES } from '../data/brokerCopy';
 import { GUIDE_ARTICLES } from '../seo/guides';
 import { fetchBrokersConfig, type BrokerConfig } from '../services/brokersConfig';
 import type { ExtraNavRoute } from '../hooks/useRoute';
@@ -50,61 +59,55 @@ interface LandingPageProps {
   onNavigate?: (route: ExtraNavRoute) => void;
 }
 
+/** The hero's chip row: what the journal does, in six phrases a trader scans in a second. */
+const HERO_CHIPS: { icon: LucideIcon; label: string }[] = [
+  { icon: Link2, label: `Imports from ${BROKER_COUNT_PHRASE}` },
+  { icon: Calendar, label: 'P&L calendar' },
+  { icon: Gauge, label: 'Rule simulator' },
+  { icon: Bot, label: 'AI trade review' },
+  { icon: Lock, label: 'Read-only connections' },
+  { icon: FileText, label: 'Monthly PDF report' },
+];
+
 /*
- * What the page does not already show.
- *
- * This was six icon cards including Broker Sync and Trading Insights, both of which now have whole
- * sections above them — the real Performance panels and the broker strip — so describing them again
- * in small grey type was the page repeating itself. The four left are the ones with nothing to show.
+ * The everyday features, in one row of plain cards. Everything with something to show — the
+ * calendar, the Performance panels, the simulator, the assistant — has its own section above;
+ * these four are the ones whose whole description fits in a sentence.
  */
-const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
-  {
-    icon: Calendar,
-    title: 'P&L Calendar',
-    description:
-      'See your month at a glance — green days for profit, red for loss. Click any day to import trades or drill into that session.',
-  },
+const EVERYDAY: { icon: LucideIcon; title: string; body: string }[] = [
   {
     icon: Pencil,
-    title: 'Manual Trade Entry',
-    description:
-      'Log a trade in seconds — symbol, P/L, side, setup tags, and notes. Tag your setups so the analytics can tell you which ones actually pay.',
+    title: 'Log a trade in seconds',
+    body: 'Symbol, P/L, side, setup tags and notes. Tag your setups and the analytics tell you which ones pay.',
   },
   {
     icon: Cloud,
-    title: 'Optional Cloud Sync',
-    description:
-      'Sign in with Google or email to sync across devices — or stay local-only. One-click backup puts your entire journal in a file you own.',
+    title: 'Every device, one journal',
+    body: 'Sign in and your journal follows you from desk to phone. Or stay local-only — your call.',
   },
   {
     icon: Share2,
-    title: 'Share Cards',
-    description:
-      'Export your session, month or year as an image built for a story slot. Nothing is published anywhere: you get a file and decide where it goes.',
+    title: 'Share the month, not your login',
+    body: 'Export a session, month or year as an image built for a story slot. You get a file; nothing is posted for you.',
+  },
+  {
+    icon: Smartphone,
+    title: 'On your phone',
+    body: 'Add it to your home screen and it opens like an app — same journal, same numbers.',
   },
 ];
 
-const STEPS = [
-  { n: '01', title: 'Connect or log', body: 'Sync from your broker automatically, or enter trades manually — get your data into the journal in seconds.' },
-  { n: '02', title: 'Review on calendar', body: 'Daily P&L colors show winning and losing sessions at a glance.' },
-  { n: '03', title: 'Analyze your edge', body: 'See which setups pay and which bleed — streaks, expectancy, and your best and worst days.' },
-];
+/* How many broker logos fit in the bento card before it starts to look like a directory. */
+const BROKERS_SHOWN = 8;
 
 /**
- * Three section weights instead of one.
+ * The public home page.
  *
- * Every section on this page was py-16 md:py-24. That sounds tidy and reads as flat — if everything
- * carries identical emphasis then nothing is emphasised, and the page feels longer than it is
- * because no rhythm is telling you what matters. Major beats keep the full measure, supporting
- * sections tighten, and the closing pair sits between the two.
- *
- * Written as whole literal strings so Tailwind's source scanner still sees every class. Assembled
- * from fragments they would be invisible to it and would silently produce no CSS at all.
+ * One column, centred, black. Every section opens with a headline set the same way and shows one
+ * thing: the hero shows the calendar, the figure section shows one number, the showcase shows the
+ * real Performance panels, the statement shows three phrases. Lime is spent on the primary button
+ * and on a few words — see the public-site block in index.css for the palette and the reasoning.
  */
-const SECTION_MAJOR = 'py-16 md:py-24';
-const SECTION_SUPPORTING = 'py-12 md:py-16';
-const SECTION_CLOSING = 'py-14 md:py-20';
-
 export function LandingPage({
   onLaunch,
   onConnectBroker,
@@ -120,6 +123,7 @@ export function LandingPage({
     supported: SUPPORTED_BROKERS.map((b) => ({ ...b, methods: [...b.methods] })),
     comingSoon: [...COMING_SOON_BROKERS],
   });
+  const heroRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -131,6 +135,8 @@ export function LandingPage({
     };
   }, []);
 
+  const price = lowestPaidPrice();
+
   return (
     <div
       className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col"
@@ -139,101 +145,107 @@ export function LandingPage({
       <SiteBackdrop />
       <AnnouncementBar />
       <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate} />
+      <StickyCta watch={heroRef} label="Start for free" onClick={onLaunch} />
 
-      {/* Hero */}
-      <section className="relative z-10 max-w-[1680px] mx-auto w-full px-4 md:px-6 pt-12 md:pt-20 pb-10 md:pb-14">
-        <HeroTrendLine />
-        <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+      {/* Hero: the headline over a skyline of bars, the product itself underneath. */}
+      <section ref={heroRef} className="relative z-10 pt-20 md:pt-28 pb-6 overflow-hidden">
+        <div className="absolute inset-x-0 top-0 h-[560px] md:h-[680px]">
+          <HeroBars />
+        </div>
+        <div className="relative max-w-[960px] mx-auto px-4 md:px-6 text-center">
+          <h1 className="public-display text-[2.75rem] sm:text-6xl lg:text-[4.5rem]">
+            Know what every trade is really costing you
+          </h1>
+          <p className="mt-6 text-lg md:text-xl text-text-secondary leading-relaxed max-w-2xl mx-auto">
+            Trend Chasers is a trading journal. Import your fills from {BROKER_COUNT_PHRASE} —{' '}
+            {SHORT_BROKER_EXAMPLES} and more — or log trades by hand, and see where the month went.
+          </p>
+          <div className="mt-9 flex flex-col items-center gap-4">
+            <button type="button" onClick={onLaunch} className="btn-primary text-base px-8 py-4">
+              Start journaling for $0
+            </button>
+            <a href="#month" className="public-link text-sm">
+              See how it works
+              <ChevronRight size={16} aria-hidden />
+            </a>
+          </div>
+          {/* Scoped on purpose: the journal is free, the sync is not, and a line that says only
+              "free" next to a broker list has earned chargebacks before. */}
+          <p className="mt-5 text-xs text-text-secondary">
+            Journal free, no card needed. Broker sync from ${price} a month.
+          </p>
+        </div>
+
+        <ul className="relative mt-12 flex flex-wrap justify-center gap-2.5 max-w-[900px] mx-auto px-4" aria-label="What the journal does">
+          {HERO_CHIPS.map(({ icon: Icon, label }) => (
+            <li key={label} className="public-chip">
+              <Icon size={15} className="text-accent" aria-hidden />
+              {label}
+            </li>
+          ))}
+        </ul>
+
+        {/* The calendar, live, as the first thing under the fold — the product rather than a
+            description of it. Compact on a phone, where the full month is too wide to read. */}
+        <div id="month" className="relative mt-14 md:mt-20 max-w-[1120px] mx-auto px-4 md:px-6 scroll-mt-24">
           <FadeIn>
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs font-medium mb-6">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              One-tap import from {BROKER_COUNT_PHRASE}
+            <div className="device-frame">
+              <div className="md:hidden">
+                <DashboardPreview variant="compact" />
+              </div>
+              <div className="hidden md:block">
+                <DashboardPreview />
+              </div>
             </div>
-            {/*
-             * One gradient, on the payoff.
-             *
-             * The old headline led with the product name and coloured two separate phrases, which
-             * split the emphasis three ways and ran to three lines — while the logo directly above
-             * was already saying the name. Leading with the problem instead frees the sentence to
-             * be short and lets the single gradient land where the promise is.
-             *
-             * "Trading journal" moves down into the paragraph on purpose rather than being lost:
-             * the h1 is the strongest on-page signal, so dropping the phrase from it is a real
-             * trade, made knowingly, and the first sentence below carries it instead.
-             */}
-            <h1 className="text-4xl md:text-5xl lg:text-[3.25rem] font-bold leading-[1.1] tracking-tight">
-              Stop guessing what’s{' '}
-              <span className="text-gradient-brand">costing you money</span>
-            </h1>
-            {/* Two sentences, down from five. "Trading journal" stays in the first one — it is the
-                phrase the h1 gave up, see above. */}
-            <p className="mt-5 text-base md:text-lg text-slate-300/90 leading-relaxed max-w-xl">
-              Trend Chasers is a trading journal that shows where your P&amp;L actually goes. Import
-              your fills from {BROKER_COUNT_PHRASE} — {SHORT_BROKER_EXAMPLES} and more — or log trades
-              by hand.
-            </p>
-            <div className="mt-8 flex flex-col sm:flex-row gap-3">
-              <button type="button" onClick={onLaunch} className="btn-primary btn-shine text-base px-7 py-3.5">
-                Start journaling free
-              </button>
-              <button type="button" onClick={onBrokers} className="btn-secondary text-base px-7 py-3.5">
-                See supported brokers
-              </button>
-            </div>
-            <p className="mt-3 text-xs text-text-secondary">
-              No signup needed to try it — your journal stays in your browser until you choose to sync.
-            </p>
-            {/* On a phone the product was not in the first screen at all — headline, paragraph,
-                buttons, then a scroll. A compact preview goes straight under the buttons there;
-                the full one beside the copy is for wide screens. */}
-            <div className="mt-6 lg:hidden">
-              <DashboardPreview variant="compact" />
-            </div>
-            <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-text-secondary">
-              {/* Says what's free and what isn't. "Free — no credit card" sitting next to "broker
-                  sync" read as though the sync were free too, which stopped being true the day
-                  plans shipped — and a pricing surprise after signup is how you earn a chargeback. */}
-              {['Journal free — no credit card', `Broker sync from $${lowestPaidPrice()}/month`, 'Read-only broker connections'].map((item) => (
-                <span key={item} className="flex items-center gap-2">
-                  <Check size={14} className="text-emerald-400" />
-                  {item}
-                </span>
-              ))}
-            </div>
-          </div>
-          </FadeIn>
-          <FadeIn delay={120} className="hidden lg:block">
-          <div className="relative">
-            <div className="absolute -inset-4 bg-gradient-to-br from-emerald-500/20 via-transparent to-cyan-500/20 rounded-3xl blur-2xl" />
-            <DashboardPreview />
-          </div>
           </FadeIn>
         </div>
       </section>
 
-      {/* Answers "does it work with my broker" in the first screen, rather than a screen down. */}
-      <section className="relative z-10 pb-12 md:pb-16" aria-label="Supported brokers">
-        <div className="max-w-[1680px] mx-auto px-4 md:px-6">
-          <p className="text-center text-xs uppercase tracking-widest text-text-secondary mb-4">
-            Imports from {BROKER_COUNT_PHRASE}
-          </p>
-          <BrokerMarquee names={brokers.supported.map((b) => b.name)} />
+      {/*
+       * One number. The founder's own Schwab journal, replayed by the rule simulator: the days he
+       * placed eleven or more trades lost $496 on average, the days he placed one or two made $163.
+       * It is the pitch for the whole product in a figure, so it gets the whole screen.
+       */}
+      <section id="simulator" className="relative z-10 py-24 md:py-36 text-center overflow-hidden scroll-mt-24">
+        <div className="giant-glow" aria-hidden />
+        <div className="relative max-w-[1000px] mx-auto px-4 md:px-6">
+          <FadeIn>
+            <p className="giant-figure" aria-hidden>
+              $496
+            </p>
+            <h2 className="public-display mt-8 text-3xl sm:text-4xl md:text-5xl">
+              Lost per day on the days one trader placed eleven or more trades. On his one‑ and
+              two‑trade days, he made $163.
+            </h2>
+            <p className="mt-6 text-lg text-text-secondary leading-relaxed max-w-2xl mx-auto">
+              Real figures from the founder&apos;s own journal. The rule simulator replays your trades
+              against a cap you did not keep and finds the number that would have changed your month.
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-x-8 gap-y-3">
+              <a href="#rules" className="public-link">
+                Try the simulator
+                <ChevronRight size={16} aria-hidden />
+              </a>
+              <button type="button" onClick={onLaunch} className="public-link">
+                Run it on your trades
+                <ChevronRight size={16} aria-hidden />
+              </button>
+            </div>
+          </FadeIn>
         </div>
       </section>
 
       {/* The Performance screen's real panels, on sample data. */}
-      <section id="performance" className={`relative z-10 scroll-mt-24 border-t border-border/50 ${SECTION_MAJOR}`}>
-        <div className="max-w-[1680px] mx-auto px-4 md:px-6">
-          <FadeIn className="max-w-3xl mb-10 md:mb-12">
-            <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Performance</p>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">See exactly where your P&amp;L goes</h2>
-            <p className="mt-4 text-slate-300/90 leading-relaxed">
+      <section id="performance" className="relative z-10 py-20 md:py-28 scroll-mt-24">
+        <div className="max-w-[1400px] mx-auto px-4 md:px-6">
+          <FadeIn className="text-center max-w-3xl mx-auto mb-12 md:mb-16">
+            <h2 className="public-display text-4xl md:text-5xl lg:text-[3.5rem]">See exactly where your P&amp;L goes</h2>
+            <p className="mt-5 text-lg text-text-secondary leading-relaxed">
               Worked out from your broker&apos;s fills alone — no tagging, no typing. These are the
               journal&apos;s own panels, drawn from a sample journal; yours fill in from your trades.
             </p>
             {fromPlan('performanceAnalytics') && (
-              <p className="mt-3 text-xs text-text-secondary">{fromPlan('performanceAnalytics')}</p>
+              <p className="mt-3 text-sm text-text-secondary">{fromPlan('performanceAnalytics')}</p>
             )}
           </FadeIn>
           <LazyOnView minHeight="420px">
@@ -242,241 +254,105 @@ export function LandingPage({
         </div>
       </section>
 
-      <section id="simulator" className={`relative z-10 scroll-mt-24 ${SECTION_MAJOR}`}>
-        <div className="max-w-[1680px] mx-auto px-4 md:px-6">
-          <FadeIn className="max-w-3xl mb-10 md:mb-12">
-            <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">Rule simulator</p>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">What would a trade cap have saved you?</h2>
-            <p className="mt-4 text-slate-300/90 leading-relaxed">
-              Your own trades, replayed against a limit you did not keep. Try it on a sample journal —
-              drag the cap and watch the month change.
-            </p>
-            {fromPlan('ruleSimulator') && (
-              <p className="mt-3 text-xs text-text-secondary">{fromPlan('ruleSimulator')}</p>
-            )}
+      {/* The statement. Three phrases, three lime words, nothing else on the screen. */}
+      <section className="relative z-10 py-24 md:py-40">
+        <FadeIn className="max-w-[1180px] mx-auto px-4 md:px-6 text-center">
+          <p className="public-display text-[2.6rem] sm:text-6xl md:text-7xl lg:text-[5.75rem] leading-[0.98]">
+            Find the setup that <span className="text-accent">bleeds</span>, the hour that{' '}
+            <span className="text-accent">costs you</span>, and the habit worth{' '}
+            <span className="text-accent">keeping</span>.
+          </p>
+        </FadeIn>
+      </section>
+
+      {/* Bento: the simulator, the assistant and the brokers, each in its own slab. */}
+      <section id="features" className="relative z-10 pb-20 md:pb-28 scroll-mt-24">
+        <div className="max-w-[1400px] mx-auto px-4 md:px-6 grid gap-4 md:gap-5 lg:grid-cols-6">
+          <FadeIn className="lg:col-span-6">
+            <article id="rules" className="public-card p-6 md:p-10 scroll-mt-24">
+              <div className="max-w-2xl mb-8">
+                <h3 className="public-display text-3xl md:text-4xl">What would a trade cap have saved you?</h3>
+                <p className="mt-4 text-text-secondary leading-relaxed">
+                  Your own trades, replayed against a limit you did not keep. Drag the cap and watch
+                  the month change.
+                  {fromPlan('ruleSimulator') && <span className="block mt-2 text-sm">{fromPlan('ruleSimulator')}</span>}
+                </p>
+              </div>
+              <LazyOnView minHeight="380px">
+                <RuleSimulatorDemo onTry={onLaunch} />
+              </LazyOnView>
+            </article>
           </FadeIn>
-          <LazyOnView minHeight="380px">
-            <RuleSimulatorDemo onTry={onLaunch} />
-          </LazyOnView>
-        </div>
-      </section>
 
-      {/*
-       * Brokers — one section, not three.
-       *
-       * This used to be a Security callout, then a "Broker Sync" section, then a "Brokers" teaser,
-       * back to back. Between them the page claimed "read-only, your credentials never touch us,
-       * disconnect anytime" seven separate times and named the broker count eight. That repetition
-       * is what made the page feel long — not the number of sections. Said once, in one place, it
-       * lands harder and costs a screen less.
-       *
-       * The #security id moves onto the safety block rather than disappearing: the footer's
-       * "Security" link and the in-page scroll handler both target it.
-       */}
-      <section id="brokers" className={`relative z-10 scroll-mt-24 border-y border-border/50 bg-bg-secondary/30 ${SECTION_MAJOR}`}>
-        <div className="max-w-[1680px] mx-auto px-4 md:px-6">
-          <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-start">
-            {/* items-start, not items-center: the right column is a 20-tile grid and the left is
-                copy. Centering the short column against the tall one opened a ~330px hole. */}
-            <FadeIn>
-              <div className="lg:sticky lg:top-24">
-                <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Brokers</p>
-                <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-                  Connect once. Import whenever you want.
-                </h2>
-                <p className="text-text-secondary leading-relaxed mb-6 max-w-md">
-                  Link {BROKER_COUNT_PHRASE} — {BROKER_EXAMPLES} and more — through SnapTrade, then press
-                  Sync and your round-trip trades land on the calendar. Your broker is only ever
-                  contacted when you ask for it. Entirely optional: manual entry works just as well,
-                  and thinkorswim comes in through your Schwab connection.
-                </p>
+          <FadeIn className="lg:col-span-3" delay={60}>
+            <article id="assistant" className="public-card p-6 md:p-10 h-full flex flex-col scroll-mt-24">
+              <h3 className="public-display text-3xl md:text-4xl">Ask your journal what went wrong</h3>
+              <p className="mt-4 text-text-secondary leading-relaxed max-w-xl">
+                Your stats already know which setup is bleeding and which hour costs you money. Ask
+                about them in plain English and get an answer that cites your own numbers — it
+                reviews what you did, and never tells you what to trade next.
+              </p>
+              <div className="mt-8 flex-1">
+                <AssistantDemo />
+              </div>
+            </article>
+          </FadeIn>
 
-                <div
-                  id="security"
-                  className="glass-card rounded-xl p-5 md:p-6 mb-6 flex gap-4 scroll-mt-24"
-                >
-                  <span className="w-10 h-10 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                    <Lock size={18} className="text-emerald-400" />
-                  </span>
-                  <div className="min-w-0">
-                    <h3 className="font-semibold mb-1.5">Read-only, and never held by us</h3>
-                    <p className="text-sm text-text-secondary leading-relaxed">
-                      Your login goes to your broker or to SnapTrade&apos;s secure portal, never to Trend
-                      Chasers&apos; servers. Nothing can place a trade on your behalf, and disconnecting
-                      from Settings stops the sync immediately.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-x-6 gap-y-2 mb-6 text-sm">
-                  {[
-                    { name: 'Thinkorswim journal guide', path: '/brokers/thinkorswim' },
-                    { name: 'Schwab journal guide', path: '/brokers/charles-schwab' },
-                    { name: 'Robinhood journal guide', path: '/brokers/robinhood' },
-                  ].map((link) => (
-                    <a key={link.path} href={link.path} className="text-emerald-400 hover:underline">
-                      {link.name} →
-                    </a>
-                  ))}
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    type="button"
-                    onClick={onConnectBroker ?? onLaunch}
-                    className="btn-primary text-sm px-6 py-2.5"
+          <FadeIn className="lg:col-span-3" delay={120}>
+            <article id="brokers" className="public-card p-6 md:p-10 h-full flex flex-col scroll-mt-24">
+              <h3 className="public-display text-3xl md:text-4xl">Connect once. Import whenever you want.</h3>
+              <p className="mt-4 text-text-secondary leading-relaxed max-w-xl">
+                Link {BROKER_COUNT_PHRASE} through SnapTrade, then press Sync and your round-trip
+                trades land on the calendar. Your broker is only contacted when you ask.
+              </p>
+              <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {brokers.supported.slice(0, BROKERS_SHOWN).map((b) => (
+                  <div
+                    key={b.name}
+                    className="rounded-2xl bg-black/60 border border-white/5 px-3 py-2.5 flex items-center min-w-0"
                   >
-                    Connect a broker
-                  </button>
-                  <button type="button" onClick={onBrokers} className="btn-secondary text-sm px-6 py-2.5">
-                    View all supported brokers →
-                  </button>
-                </div>
+                    <BrokerLogo broker={brokerIdFromName(b.name)} compact />
+                  </div>
+                ))}
               </div>
-            </FadeIn>
-
-            <FadeIn delay={100}>
-              <div>
-                {/* Four across from lg: 20 brokers at three columns is seven rows, which is what
-                    made this the tallest section on the page. */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-2.5 mb-6">
-                  {brokers.supported.map((b) => (
-                    <div
-                      key={b.name}
-                      className="rounded-lg border border-border/60 bg-bg-primary/60 px-3 py-2.5 flex items-center hover:border-emerald-500/40 transition-colors min-w-0"
-                    >
-                      <BrokerLogo broker={brokerIdFromName(b.name)} compact />
-                    </div>
-                  ))}
-                </div>
-
-                {brokers.comingSoon.length > 0 && (
-                  <>
-                    <p className="text-xs uppercase tracking-widest text-text-secondary mb-3">Coming soon</p>
-                    <div className="flex flex-wrap gap-2 mb-8">
-                      {brokers.comingSoon.map((name) => (
-                        <span
-                          key={name}
-                          className="px-3 py-1.5 rounded-full text-xs border border-border/60 text-text-secondary bg-bg-primary/50"
-                        >
-                          {name}
-                        </span>
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                <div className="glass-card rounded-2xl p-5 md:p-6 glow-border-brand">
-                  <p className="text-xs uppercase tracking-widest text-text-secondary mb-4">How broker sync works</p>
-                  <ol className="space-y-4">
-                    {[
-                      { step: '1', text: 'Pick your broker and approve a read-only connection on their own site' },
-                      { step: '2', text: 'Trend Chasers pulls your recent activity and matches opens to closes' },
-                      { step: '3', text: 'Press Sync whenever you want your latest fills — they appear on your calendar, ready to tag' },
-                    ].map((s) => (
-                      <li key={s.step} className="flex gap-4">
-                        <span className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0">
-                          {s.step}
-                        </span>
-                        <p className="text-sm text-text-secondary pt-1">{s.text}</p>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
+              {/* #security stays on the page: the footer's Security link and the in-page scroll
+                  handler both target it. */}
+              <div id="security" className="mt-6 flex gap-3 text-sm text-text-secondary leading-relaxed scroll-mt-24">
+                <Lock size={16} className="shrink-0 mt-0.5 text-accent" aria-hidden />
+                <p>
+                  Read-only, and never held by us. Your login goes to your broker or to SnapTrade&apos;s
+                  portal, nothing can place a trade for you, and disconnecting stops the sync at once.
+                </p>
               </div>
-            </FadeIn>
-          </div>
-        </div>
-      </section>
-
-      {/* Trading assistant */}
-      <section id="assistant" className={`relative z-10 scroll-mt-24 border-t border-border/50 ${SECTION_SUPPORTING}`}>
-        <div className="max-w-[1680px] mx-auto px-4 md:px-6">
-          <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
-            <FadeIn>
-              <div>
-                <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">
-                  Trading Assistant
-                </p>
-                <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-                  Ask your journal what went wrong
-                </h2>
-                <p className="text-text-secondary leading-relaxed mb-6 max-w-md">
-                  Your stats already know which setup is bleeding and which hour of the day costs
-                  you money. Now you can ask about them in plain English — and get an answer that
-                  cites your own numbers.
-                </p>
-                <ul className="space-y-3 text-sm text-text-secondary mb-8">
-                  {[
-                    'Reads the stats your journal already computed — its numbers always match your dashboard',
-                    'Reviews what you actually did; it won’t tell you what to trade next',
-                    'Says when a sample is too small to mean anything',
-                  ].map((item) => (
-                    <li key={item} className="flex items-start gap-2">
-                      <span className="text-emerald-400 mt-0.5">→</span>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-                <button type="button" onClick={onLaunch} className="btn-primary text-sm px-6 py-2.5">
-                  Open your journal
+              <div className="mt-auto pt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+                <button type="button" onClick={onConnectBroker ?? onLaunch} className="btn-primary text-sm px-6 py-3">
+                  Connect a broker
+                </button>
+                <button type="button" onClick={onBrokers} className="public-link text-sm">
+                  All {brokers.supported.length} brokers
+                  {brokers.comingSoon.length > 0 && ` and ${brokers.comingSoon.length} coming`}
+                  <ChevronRight size={16} aria-hidden />
                 </button>
               </div>
-            </FadeIn>
-
-            <FadeIn delay={100}>
-              <AssistantDemo />
-            </FadeIn>
-          </div>
+            </article>
+          </FadeIn>
         </div>
       </section>
 
-      {/* Features */}
-      <section id="features" className={`relative z-10 scroll-mt-24 ${SECTION_MAJOR}`}>
-        <div className="max-w-[1680px] mx-auto px-4 md:px-6">
-          <FadeIn className="text-center max-w-2xl mx-auto mb-12 md:mb-16">
-            <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Features</p>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Everything you need to review your edge</h2>
-            <p className="mt-4 text-text-secondary">
-              Built for active traders who want clarity — not another spreadsheet.
-            </p>
+      {/* The everyday features — four plain cards. */}
+      <section className="relative z-10 pb-20 md:pb-28">
+        <div className="max-w-[1400px] mx-auto px-4 md:px-6">
+          <FadeIn className="text-center max-w-2xl mx-auto mb-10 md:mb-14">
+            <h2 className="public-display text-4xl md:text-5xl">On your way to a disciplined month</h2>
           </FadeIn>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
-            {FEATURES.map((f, i) => {
-              const Icon = f.icon;
-              return (
-              <FadeIn key={f.title} delay={i * 60}>
-              <article
-                className="glass-card spotlight rounded-xl p-5 md:p-6 hover:border-emerald-500/30 transition-colors group h-full"
-              >
-                <div className="w-10 h-10 rounded-lg bg-bg-primary/80 border border-border/60 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform text-emerald-400">
-                  <Icon size={20} />
-                </div>
-                <h3 className="text-base font-semibold mb-2">{f.title}</h3>
-                <p className="text-sm text-slate-300/85 leading-relaxed">{f.description}</p>
-              </article>
-              </FadeIn>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Workflow */}
-      <section className={`relative z-10 border-t border-border/50 bg-bg-secondary/20 ${SECTION_SUPPORTING}`}>
-        <div className="max-w-[1680px] mx-auto px-4 md:px-6">
-          <FadeIn className="text-center max-w-2xl mx-auto mb-12">
-            <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">Workflow</p>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Three steps to clarity</h2>
-          </FadeIn>
-          <div className="grid md:grid-cols-3 gap-6">
-            {STEPS.map((step, i) => (
-              <FadeIn key={step.n} delay={i * 80}>
-              <div className="glass-card spotlight rounded-xl p-6 md:p-7 h-full">
-                <span className="text-4xl font-bold text-gradient-brand opacity-80">{step.n}</span>
-                <h3 className="text-lg font-semibold mt-3 mb-2">{step.title}</h3>
-                <p className="text-sm text-slate-300/85 leading-relaxed">{step.body}</p>
-              </div>
+            {EVERYDAY.map(({ icon: Icon, title, body }, i) => (
+              <FadeIn key={title} delay={i * 60}>
+                <article className="public-card spotlight p-6 md:p-7 h-full">
+                  <Icon size={22} className="text-accent" aria-hidden />
+                  <h3 className="mt-5 text-xl font-semibold leading-snug">{title}</h3>
+                  <p className="mt-3 text-sm text-text-secondary leading-relaxed">{body}</p>
+                </article>
               </FadeIn>
             ))}
           </div>
@@ -484,16 +360,15 @@ export function LandingPage({
       </section>
 
       {/* Guides */}
-      <section id="guides" className={`relative z-10 scroll-mt-24 border-t border-border/50 bg-bg-secondary/20 ${SECTION_SUPPORTING}`}>
-        <div className="max-w-[1680px] mx-auto px-4 md:px-6">
-          <FadeIn className="text-center max-w-2xl mx-auto mb-10">
-            <p className="text-xs uppercase tracking-widest text-cyan-400 font-medium mb-3">Guides</p>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Free trading journal resources</h2>
-            <p className="mt-3 text-text-secondary text-sm md:text-base">
-              Learn how to track performance, use a P&L calendar, and get the most out of broker sync.
+      <section id="guides" className="relative z-10 pb-20 md:pb-28 scroll-mt-24">
+        <div className="max-w-[1400px] mx-auto px-4 md:px-6">
+          <FadeIn className="text-center max-w-2xl mx-auto mb-10 md:mb-14">
+            <h2 className="public-display text-4xl md:text-5xl">Learn the journal before you open it</h2>
+            <p className="mt-4 text-text-secondary text-lg">
+              How to track performance, read a P&amp;L calendar, and get the most out of broker sync.
             </p>
           </FadeIn>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
             {GUIDE_ARTICLES.map((guide, i) => (
               <FadeIn key={guide.slug} delay={i * 60}>
                 <a
@@ -504,18 +379,22 @@ export function LandingPage({
                       onGuide(guide.slug);
                     }
                   }}
-                  className="block glass-card spotlight rounded-xl p-5 h-full hover:border-emerald-500/30 transition-colors"
+                  className="public-card spotlight block p-6 h-full hover:border-white/20 transition-colors focus-ring"
                 >
-                  <h3 className="font-semibold text-base mb-2">{guide.title}</h3>
-                  <p className="text-sm text-slate-300/85 leading-relaxed">{guide.description}</p>
+                  <h3 className="text-lg font-semibold leading-snug">{guide.title}</h3>
+                  <p className="mt-3 text-sm text-text-secondary leading-relaxed">{guide.description}</p>
+                  <span className="public-link mt-5 text-sm">
+                    Read
+                    <ChevronRight size={16} aria-hidden />
+                  </span>
                 </a>
               </FadeIn>
             ))}
           </div>
           {onGuides && (
-            <div className="text-center mt-8">
-              <button type="button" onClick={onGuides} className="btn-secondary text-sm px-5 py-2.5">
-                View all guides
+            <div className="text-center mt-10">
+              <button type="button" onClick={onGuides} className="btn-secondary text-sm px-6 py-3">
+                All guides
               </button>
             </div>
           )}
@@ -523,30 +402,23 @@ export function LandingPage({
       </section>
 
       {/* FAQ */}
-      <section id="faq" className={`relative z-10 scroll-mt-24 ${SECTION_CLOSING}`}>
+      <section id="faq" className="relative z-10 pb-20 md:pb-28 scroll-mt-24">
         <LandingFaq />
       </section>
 
-      {/* CTA */}
-      <section className={`relative z-10 border-t border-border/50 ${SECTION_CLOSING}`}>
-        <FadeIn className="max-w-3xl mx-auto px-4 md:px-6 text-center">
-          <div className="sm:hidden flex justify-center mb-6">
-            <BrandLogo size="md" variant="compact" />
+      {/* The close. */}
+      <section className="relative z-10 py-24 md:py-36 overflow-hidden">
+        <div className="giant-glow opacity-60" aria-hidden />
+        <FadeIn className="relative max-w-3xl mx-auto px-4 md:px-6 text-center">
+          <div className="flex justify-center mb-10">
+            <BrandLogo size="md" variant="mark" />
           </div>
-          <div className="hidden sm:flex justify-center mb-8">
-            <BrandLogo size="lg" variant="full" />
-          </div>
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-8">Ready to track your edge?</h2>
-          {/*
-            "No credit card" scoped to the journal, as it is twelve hundred lines above — the same
-            sentence named broker sync and then said no card was needed, and connecting a broker
-            always needs one. The last unscoped instance on the page, and the final CTA on it.
-          */}
-          <p className="mt-4 text-text-secondary text-base md:text-lg">
-            Open your journal and log this month&apos;s trades yourself, free and with no credit
-            card, or connect a broker and let them import themselves. Just your data, your way.
+          <h2 className="public-display text-4xl sm:text-5xl md:text-6xl">Start journaling confidently</h2>
+          <p className="mt-6 text-lg text-text-secondary leading-relaxed">
+            Open your journal and log this month&apos;s trades yourself, free and with no card, or
+            connect a broker and let them import themselves.
           </p>
-          <button type="button" onClick={onLaunch} className="btn-primary btn-shine text-base px-8 py-3.5 mt-8">
+          <button type="button" onClick={onLaunch} className="btn-primary text-base px-8 py-4 mt-10">
             Open Trend Chasers
           </button>
         </FadeIn>

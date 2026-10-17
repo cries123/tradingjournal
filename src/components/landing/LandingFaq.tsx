@@ -25,7 +25,7 @@ export function LandingFaq() {
 
   const help = (
     <div className="glass-card rounded-xl p-5 flex items-start gap-4 text-left">
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-300">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-accent/20 bg-accent/10 text-accent">
         <Mail size={18} aria-hidden />
       </span>
       <div>
@@ -34,7 +34,7 @@ export function LandingFaq() {
           Email{' '}
           <a
             href={`mailto:${SUPPORT_EMAIL}`}
-            className="text-emerald-400 hover:text-emerald-300 underline-offset-4 hover:underline"
+            className="text-accent hover:text-accent underline-offset-4 hover:underline"
           >
             {SUPPORT_EMAIL}
           </a>{' '}
@@ -49,8 +49,7 @@ export function LandingFaq() {
       <div className="lg:col-span-4">
         <div className="lg:sticky lg:top-28">
           <FadeIn className="text-center lg:text-left">
-            <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">FAQ</p>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Common questions</h2>
+            <h2 className="public-display text-4xl md:text-5xl">Common questions</h2>
             <p className="mt-3 text-text-secondary text-sm md:text-base leading-relaxed max-w-md mx-auto lg:mx-0">
               Straight answers on broker sync, pricing, and where your trades are kept.
             </p>
@@ -73,13 +72,13 @@ export function LandingFaq() {
                   <FadeIn key={item.question} delay={n * 50}>
                     <details className="faq-item glass-card spotlight rounded-xl group" open={n === 0}>
                       <summary className="flex cursor-pointer list-none items-start gap-4 px-5 py-4 md:py-5">
-                        <span className="hidden sm:block w-6 shrink-0 pt-px font-mono text-xs tabular-nums text-emerald-400/80">
+                        <span className="hidden sm:block w-6 shrink-0 pt-px font-mono text-xs tabular-nums text-accent/80">
                           {String(n + 1).padStart(2, '0')}
                         </span>
                         <span className="flex-1 font-medium text-[15px] md:text-base leading-snug">{item.question}</span>
                         <span
                           aria-hidden
-                          className="grid h-7 w-7 shrink-0 -my-0.5 place-items-center rounded-full border border-border/60 text-text-secondary transition-[transform,color,border-color] duration-300 motion-reduce:transition-none group-open:rotate-45 group-open:border-emerald-500/40 group-open:text-emerald-300"
+                          className="grid h-7 w-7 shrink-0 -my-0.5 place-items-center rounded-full border border-border/60 text-text-secondary transition-[transform,color,border-color] duration-300 motion-reduce:transition-none group-open:rotate-45 group-open:border-accent/40 group-open:text-accent"
                         >
                           <Plus size={14} />
                         </span>

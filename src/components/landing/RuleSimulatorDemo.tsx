@@ -55,7 +55,7 @@ export default function RuleSimulatorDemo({ onTry }: { onTry: () => void }) {
           step={1}
           value={cap}
           onChange={(e) => setCap(Number(e.target.value))}
-          className="mt-4 w-full accent-emerald-400 cursor-pointer"
+          className="mt-4 w-full accent-accent cursor-pointer"
           aria-valuetext={cap >= NO_CAP ? 'No cap' : `${cap} trades per day`}
         />
 

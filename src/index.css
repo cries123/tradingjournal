@@ -322,6 +322,244 @@ body {
   box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.05), 0 20px 50px rgba(0, 0, 0, 0.45);
 }
 
+/*
+ * ───────────────────────────── The public site's look ─────────────────────────────
+ *
+ * Pure black, white type, and one lime — the identity the marketing pages carry. It is scoped to
+ * #root.route-public rather than written into @theme so that the signed-in app keeps its own
+ * navy palette and whichever accent the user chose in Settings: these are the same token names,
+ * re-pointed for the public subtree only, so every bg-bg-primary / text-accent utility on a
+ * marketing page picks them up without a second set of classes.
+ *
+ * The lime is the only colour allowed to shout. It goes on the primary button, on a few words in
+ * the big statements, and under the giant figure. Everything else is white at full or 56% opacity
+ * on black or #141414 — the restraint is what makes the one colour land.
+ */
+#root.route-public {
+  --color-bg-primary: #000000;
+  --color-bg-secondary: #0a0a0a;
+  --color-bg-tertiary: #141414;
+  --color-bg-card: #141414;
+  --color-border: #262626;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #9c9c9c;
+  --color-accent: #7aff45;
+  --color-accent-rgb: 122, 255, 69;
+  --color-profit-bright: #7aff45;
+  --color-profit-bright-rgb: 122, 255, 69;
+  --spot-rgb: 122, 255, 69;
+  font-family: "Figtree", var(--font-sans);
+  background: #000;
+}
+
+/* The overscroll edges on a phone show body, not #root. */
+body:has(#root.route-public) {
+  background: #000;
+}
+
+#root.route-public .brand-word {
+  color: var(--color-accent);
+}
+
+/* Pills, not rounded rectangles: the shape the whole public site is built on. */
+#root.route-public .btn-primary {
+  border-radius: 9999px;
+  background: var(--color-accent);
+  color: #06180a;
+  box-shadow: none;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+#root.route-public .btn-primary:hover {
+  opacity: 1;
+  transform: none;
+  background: #93ff69;
+  box-shadow: 0 0 0 6px rgba(122, 255, 69, 0.14);
+}
+
+#root.route-public .btn-secondary {
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+#root.route-public .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: none;
+}
+
+/* Solid surfaces. Blur over black is just black, and a lift on hover reads as a template. */
+#root.route-public .glass-card {
+  background: #141414;
+  border-color: rgba(255, 255, 255, 0.08);
+  backdrop-filter: none;
+}
+
+#root.route-public .glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: none;
+}
+
+#root.route-public .glow-border-brand {
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+
+#root.route-public .text-gradient-brand {
+  background: none;
+  color: var(--color-accent);
+}
+
+#root.route-public .landing-grid,
+#root.route-public .starfield-canvas {
+  display: none;
+}
+
+#root.route-public .site-aurora::before {
+  background: radial-gradient(circle, rgba(122, 255, 69, 0.1), transparent 62%);
+}
+
+#root.route-public .site-aurora::after {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.04), transparent 62%);
+}
+
+#root.route-public details.faq-item[open] {
+  border-color: rgba(122, 255, 69, 0.3);
+  background: #141a12;
+}
+
+/* Headlines: semibold, tight, and balanced across their lines. One treatment for every one. */
+.public-display {
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+.public-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.6rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.public-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  color: var(--color-accent);
+  font-weight: 500;
+  text-underline-offset: 4px;
+}
+
+.public-link:hover {
+  text-decoration: underline;
+}
+
+.public-card {
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 2rem;
+}
+
+/* The product shot in the hero sits in a slab, the way a phone would. */
+.device-frame {
+  border-radius: 2rem;
+  padding: 0.75rem;
+  background: #0d0d0d;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+/*
+ * The hero's backdrop: a skyline of dark bars rising behind the headline, the product's subject
+ * (a month of P&L) as a silhouette. They rise once on arrival — the page's single orchestrated
+ * moment — and sit still after.
+ */
+.hero-bars {
+  position: absolute;
+  inset: 0 0 0 0;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: clamp(10px, 2vw, 28px);
+  padding: 0 4vw;
+  mask-image: linear-gradient(180deg, transparent 0%, black 35%, black 80%, transparent 100%);
+}
+
+.hero-bars > span {
+  flex: 1 1 0;
+  max-width: 140px;
+  height: var(--h);
+  background: linear-gradient(180deg, #1c1c1c, #0f0f0f);
+  border-radius: 28px 28px 0 0;
+  transform-origin: bottom;
+  animation: bar-rise 1.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--d);
+}
+
+@keyframes bar-rise {
+  from { transform: scaleY(0.2); opacity: 0; }
+  to { transform: scaleY(1); opacity: 1; }
+}
+
+/* The giant figure: white fading to grey like a cast number, lit from below in lime. */
+.giant-figure {
+  font-size: clamp(6.5rem, 24vw, 19rem);
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  line-height: 0.9;
+  background: linear-gradient(180deg, #ffffff 25%, #8a8a8a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.giant-glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(85vw, 960px);
+  height: 340px;
+  transform: translate(-50%, -20%);
+  background: radial-gradient(ellipse at center, rgba(122, 255, 69, 0.42), rgba(122, 255, 69, 0.08) 45%, transparent 70%);
+  filter: blur(42px);
+  pointer-events: none;
+}
+
+/* The call to action that follows the reader once the hero's own button has scrolled away. */
+.sticky-cta {
+  position: fixed;
+  top: 0.875rem;
+  left: 50%;
+  z-index: 40;
+  transform: translate(-50%, -200%);
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sticky-cta.is-visible {
+  transform: translate(-50%, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-bars > span {
+    animation: none;
+  }
+
+  .sticky-cta {
+    transition: none;
+  }
+}
+
 .dashboard-bg {
   position: relative;
   background: var(--color-bg-primary);
