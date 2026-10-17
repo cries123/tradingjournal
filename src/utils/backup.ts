@@ -92,6 +92,9 @@ const RESTORABLE_SETTINGS_KEYS = [
   'currency',
   'defaultSymbol',
   'themeAccent',
+  // With the accent, or restoring a pre-rebrand backup would re-run the move to lime over the
+  // accent the person had since chosen.
+  'brandVersion',
   'setupTags',
   'accounts',
   'activeAccountId',

@@ -1,5 +1,6 @@
 import type { UserSettings } from '../types/settings';
 import { DEFAULT_SETTINGS } from '../types/settings';
+import { applyBrandMigration } from './brandMigration';
 
 const STORAGE_KEY = 'trading-journal-settings';
 
@@ -9,14 +10,17 @@ export function loadSettings(userId?: string | null): UserSettings {
     const raw = localStorage.getItem(key);
     if (!raw) return { ...DEFAULT_SETTINGS };
     const parsed = JSON.parse(raw) as Partial<UserSettings>;
-    return {
+    // Spread AFTER the defaults, so a saved document without brandVersion keeps it absent and the
+    // migration can see that it is pre-rebrand; the defaults alone would stamp it as current.
+    return applyBrandMigration({
       ...DEFAULT_SETTINGS,
       ...parsed,
+      brandVersion: parsed.brandVersion,
       setupTags: parsed.setupTags?.length ? parsed.setupTags : DEFAULT_SETTINGS.setupTags,
       accounts: parsed.accounts?.length ? parsed.accounts : DEFAULT_SETTINGS.accounts,
       strategies: parsed.strategies ?? DEFAULT_SETTINGS.strategies,
       tradingRules: { ...DEFAULT_SETTINGS.tradingRules, ...parsed.tradingRules },
-    };
+    });
   } catch {
     return { ...DEFAULT_SETTINGS };
   }

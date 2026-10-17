@@ -10,6 +10,7 @@ import type { ThemeAccent, UserSettings } from '../types/settings';
 import { DEFAULT_SETTINGS } from '../types/settings';
 import type { Strategy } from '../types/strategy';
 import { loadSettings, saveSettings } from '../utils/settingsStorage';
+import { applyBrandMigration } from '../utils/brandMigration';
 import { cleanRules } from '../utils/playbook';
 import { stripUndefinedDeep } from '../utils/firestoreData';
 import { reportErrorSilently } from '../services/errorReporting';
@@ -67,7 +68,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         const snap = await fs.getDoc(fs.doc(db, 'users', user.uid, 'settings', 'preferences'));
         if (snap.exists()) {
           const cloud = snap.data() as Partial<UserSettings>;
-          const merged = { ...DEFAULT_SETTINGS, ...cloud };
+          // brandVersion kept as the document has it (absent before the rebrand), so the one-time
+          // move to lime applies to the cloud copy as well as the local cache — see brandMigration.
+          const merged = applyBrandMigration({ ...DEFAULT_SETTINGS, ...cloud, brandVersion: cloud.brandVersion });
           setSettings(merged);
           saveSettings(merged, user.uid);
         }

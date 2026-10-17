@@ -69,12 +69,21 @@ export interface UserSettings {
   /** Which background the share card currently uses: a URL from shareCardBackgrounds above, or
    *  null for the default Milky Way starfield. */
   shareCardBackgroundId: string | null;
+  /**
+   * Which brand these settings have been brought up to — see utils/brandMigration.ts. Absent on
+   * everything saved before October 2026, which is how the one-time move to lime knows whom to move.
+   */
+  brandVersion?: number;
 }
+
+/** Bumped when a rebrand should reset every member's accent; the migration runs for anyone below it. */
+export const BRAND_VERSION = 1;
 
 export const DEFAULT_SETTINGS: UserSettings = {
   currency: 'USD',
   defaultSymbol: 'SPY',
   themeAccent: 'lime',
+  brandVersion: BRAND_VERSION,
   setupTags: ['BREAKOUT', 'FOMO', 'RSI CROSSED', 'REVERSAL'],
   accounts: [{ id: 'default', name: 'Primary journal' }],
   activeAccountId: 'default',
