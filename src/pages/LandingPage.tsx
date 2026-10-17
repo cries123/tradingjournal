@@ -5,13 +5,13 @@ import {
   Calendar,
   ChevronRight,
   Cloud,
+  Download,
   FileText,
   Gauge,
   Link2,
   Lock,
   Pencil,
   Share2,
-  Smartphone,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
@@ -22,6 +22,8 @@ import { FadeIn } from '../components/motion/FadeIn';
 import { SiteBackdrop } from '../components/landing/SiteBackdrop';
 import { HeroBars } from '../components/landing/HeroBars';
 import { StickyCta } from '../components/landing/StickyCta';
+import { ProofStrip } from '../components/landing/ProofStrip';
+import { PhoneShowcase } from '../components/landing/PhoneShowcase';
 import { AssistantDemo } from '../components/landing/AssistantDemo';
 import { LazyOnView } from '../components/landing/LazyOnView';
 import { LandingFaq } from '../components/landing/LandingFaq';
@@ -91,9 +93,10 @@ const EVERYDAY: { icon: LucideIcon; title: string; body: string }[] = [
     body: 'Export a session, month or year as an image built for a story slot. You get a file; nothing is posted for you.',
   },
   {
-    icon: Smartphone,
-    title: 'On your phone',
-    body: 'Add it to your home screen and it opens like an app — same journal, same numbers.',
+    // The phone card that was here has a whole section of its own now (PhoneShowcase).
+    icon: Download,
+    title: 'Your data, in a file you own',
+    body: 'One-click backup puts your entire journal in a file you keep. Export trades to CSV whenever you like.',
   },
 ];
 
@@ -143,7 +146,7 @@ export function LandingPage({
       onPointerMove={trackSpotlight}
     >
       <SiteBackdrop />
-      <AnnouncementBar />
+      <AnnouncementBar onConnectBroker={onConnectBroker ?? onLaunch} />
       <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate} />
       <StickyCta watch={heroRef} label="Start for free" onClick={onLaunch} />
 
@@ -200,6 +203,8 @@ export function LandingPage({
           </FadeIn>
         </div>
       </section>
+
+      <ProofStrip />
 
       {/*
        * One number. The founder's own Schwab journal, replayed by the rule simulator: the days he
@@ -335,6 +340,40 @@ export function LandingPage({
                 </button>
               </div>
             </article>
+          </FadeIn>
+        </div>
+      </section>
+
+      {/* The journal on a phone. It is already an installable app; the page now shows it as one. */}
+      <section id="mobile" className="relative z-10 py-20 md:py-28 overflow-hidden scroll-mt-24">
+        <div className="max-w-[1200px] mx-auto px-4 md:px-6 grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
+          <FadeIn className="text-center lg:text-left">
+            <h2 className="public-display text-4xl md:text-5xl lg:text-[3.5rem]">Your journal, in your pocket</h2>
+            <p className="mt-5 text-lg text-text-secondary leading-relaxed max-w-xl mx-auto lg:mx-0">
+              Add Trend Chasers to your home screen and it opens like an app — full screen, its own
+              icon, the same journal you keep at your desk. Sign in once and every trade follows you.
+            </p>
+            {/* Numbered because it is a sequence: three taps, in this order. */}
+            <ol className="mt-8 space-y-3 text-left max-w-md mx-auto lg:mx-0">
+              {[
+                'Open trendchasers.net on your phone.',
+                'iPhone: tap Share, then Add to Home Screen. Android: tap the menu, then Install app.',
+                'Open it from your home screen and sign in — your journal is already there.',
+              ].map((step, i) => (
+                <li key={step} className="flex gap-3">
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-accent text-sm font-semibold text-black">
+                    {i + 1}
+                  </span>
+                  <span className="pt-0.5 text-text-secondary leading-relaxed">{step}</span>
+                </li>
+              ))}
+            </ol>
+            <button type="button" onClick={onLaunch} className="btn-primary text-base px-8 py-4 mt-10">
+              Open your journal
+            </button>
+          </FadeIn>
+          <FadeIn delay={120}>
+            <PhoneShowcase />
           </FadeIn>
         </div>
       </section>
