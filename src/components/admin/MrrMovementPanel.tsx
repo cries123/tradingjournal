@@ -50,7 +50,7 @@ export function MrrMovementPanel({ rows }: MrrMovementPanelProps) {
             <span className="w-16 shrink-0 font-medium">{monthLabel(m.month)}</span>
 
             <span className="flex-1 tabular-nums text-text-secondary">
-              <span className="text-emerald-400">+{m.newCustomers}</span> new
+              <span className="text-accent">+{m.newCustomers}</span> new
               {m.churned > 0 && (
                 <>
                   {' · '}
@@ -66,7 +66,7 @@ export function MrrMovementPanel({ rows }: MrrMovementPanelProps) {
             */}
             <span
               className={`flex w-16 shrink-0 items-center justify-end gap-1 font-semibold tabular-nums ${
-                m.net > 0 ? 'text-emerald-400' : m.net < 0 ? 'text-red-400' : 'text-text-secondary'
+                m.net > 0 ? 'text-accent' : m.net < 0 ? 'text-red-400' : 'text-text-secondary'
               }`}
             >
               {m.net > 0 && <TrendingUp size={12} aria-hidden />}

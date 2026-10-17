@@ -32,7 +32,7 @@ export function TrialFunnelPanel({ stats, loaded, paidKnown }: TrialFunnelPanelP
   return (
     <div className="panel-card rounded-xl p-5 md:p-6">
       <div className="flex items-center gap-3 mb-3">
-        <div className="rounded-lg bg-emerald-500/10 p-2 text-emerald-400">
+        <div className="rounded-lg bg-accent/10 p-2 text-accent">
           <Sparkles size={18} />
         </div>
         <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
@@ -71,7 +71,7 @@ export function TrialFunnelPanel({ stats, loaded, paidKnown }: TrialFunnelPanelP
             </div>
             <div className="flex justify-between">
               <dt>Converted</dt>
-              <dd className="text-emerald-400">{paidKnown ? stats.converted : '—'}</dd>
+              <dd className="text-accent">{paidKnown ? stats.converted : '—'}</dd>
             </div>
             <div className="flex justify-between">
               <dt>Ended without paying</dt>

@@ -39,7 +39,7 @@ export function SignupTrendPanel({ serverStats, serverError, loading = false }: 
     return (
       <div className="panel-card rounded-xl p-5 md:p-6">
         <div className="flex items-center gap-2 mb-3">
-          <TrendingUp size={16} className="text-emerald-400" />
+          <TrendingUp size={16} className="text-accent" />
           <h2 className="text-sm font-semibold">Signups</h2>
         </div>
         <p className="text-xs text-text-secondary">
@@ -60,7 +60,7 @@ export function SignupTrendPanel({ serverStats, serverError, loading = false }: 
     <div className="panel-card rounded-xl p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
         <div className="flex items-center gap-2">
-          <TrendingUp size={16} className="text-emerald-400" />
+          <TrendingUp size={16} className="text-accent" />
           <div>
             <h2 className="text-sm font-semibold">Signups</h2>
             <p className="text-[10px] text-text-secondary mt-0.5">
@@ -69,7 +69,7 @@ export function SignupTrendPanel({ serverStats, serverError, loading = false }: 
           </div>
         </div>
         <div className="text-right">
-          <p className="text-2xl font-bold tabular-nums text-emerald-400">
+          <p className="text-2xl font-bold tabular-nums text-accent">
             {serverStats.authUserCount.toLocaleString()}
           </p>
           <p className="text-[10px] text-text-secondary">all time</p>
@@ -89,7 +89,7 @@ export function SignupTrendPanel({ serverStats, serverError, loading = false }: 
             {days.map((day) => (
               <div
                 key={day.date}
-                className="flex-1 bg-emerald-500/40 rounded-sm min-h-[2px] hover:bg-emerald-500/70 transition-colors"
+                className="flex-1 bg-accent/40 rounded-sm min-h-[2px] hover:bg-accent/70 transition-colors"
                 style={{ height: `${(day.count / maxDay) * 100}%` }}
                 title={`${day.date}: ${day.count} signup${day.count === 1 ? '' : 's'}`}
               />
@@ -107,7 +107,7 @@ export function SignupTrendPanel({ serverStats, serverError, loading = false }: 
         <Stat
           label="Active (30d)"
           value={`${serverStats.authActiveLast30Days.toLocaleString()} · ${activeShare.toFixed(0)}%`}
-          tone="text-cyan-300"
+          tone="text-accent"
         />
         <Stat
           label="Never signed in"

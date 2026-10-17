@@ -181,7 +181,7 @@ function ErrorRow({
                   type="button"
                   disabled={busy}
                   onClick={() => onStatusChange(event.id, 'resolved')}
-                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-colors disabled:opacity-50 focus-ring"
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-accent/15 text-accent hover:bg-accent/25 transition-colors disabled:opacity-50 focus-ring"
                 >
                   <Check size={13} /> Mark fixed
                 </button>

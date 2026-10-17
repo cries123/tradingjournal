@@ -104,12 +104,12 @@ export function AdminViewJournalSection({ uid, label }: { uid: string; label: st
                           </span>
                         )}
                         {j.accountId === snap.activeAccountId && (
-                          <span className="ml-2 text-[10px] uppercase text-emerald-400">Active</span>
+                          <span className="ml-2 text-[10px] uppercase text-accent">Active</span>
                         )}
                       </span>
                       <span
                         className={`text-xs tabular-nums ${
-                          j.netPnl >= 0 ? 'text-emerald-400' : 'text-red-400'
+                          j.netPnl >= 0 ? 'text-accent' : 'text-red-400'
                         }`}
                       >
                         {money(j.netPnl)}

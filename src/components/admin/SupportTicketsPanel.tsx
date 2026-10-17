@@ -116,7 +116,7 @@ function AdminTicketThread({
                 <div
                   className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words ${
                     fromSupport
-                      ? 'bg-emerald-500/15 rounded-br-sm'
+                      ? 'bg-accent/15 rounded-br-sm'
                       : 'bg-bg-tertiary/70 rounded-bl-sm'
                   }`}
                 >
@@ -230,7 +230,7 @@ export function SupportTicketsPanel({
                     </span>
                   )}
                   {ticket.status === 'resolved' && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400">
+                    <span className="inline-flex items-center gap-1 text-[10px] text-accent">
                       <CheckCircle2 size={11} /> Resolved
                     </span>
                   )}

@@ -30,7 +30,7 @@ import { AdminAnnouncementCard } from '../components/admin/AdminAnnouncementCard
 import { AdminCheckoutCard } from '../components/admin/AdminCheckoutCard';
 import { AdminUserDetailModal } from '../components/admin/AdminUserDetailModal';
 import { AdminHelpArticleModal } from '../components/admin/AdminHelpArticleModal';
-import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
+import { BrandLogo } from '../components/BrandLogo';
 import { useAuth } from '../context/useAuth';
 import type { ExtraNavRoute } from '../hooks/useRoute';
 import {
@@ -78,7 +78,7 @@ import { TrialFunnelPanel } from '../components/admin/TrialFunnelPanel';
 import { DormantSubscribersPanel } from '../components/admin/DormantSubscribersPanel';
 import { AdminAuditPanel } from '../components/admin/AdminAuditPanel';
 import { dormantSubscribers, moneyAtRisk, trialStats } from '../utils/adminRisk';
-import type { AdminTab } from '../components/admin/adminTabs';
+import { ADMIN_TABS, type AdminTab } from '../components/admin/adminTabs';
 import { BrokerStatusPanel } from '../components/admin/BrokerStatusPanel';
 import { fetchCostReport, type CostReport } from '../services/adminCosts';
 import {
@@ -127,7 +127,7 @@ import { TIER_PLANS, type Tier } from '../config/tiers';
 const PLAN_BADGE: Record<Exclude<Tier, 'free'>, string> = {
   silver: 'bg-slate-400/15 text-slate-300',
   gold: 'bg-amber-400/15 text-amber-300',
-  diamond: 'bg-cyan-400/15 text-cyan-300',
+  diamond: 'bg-accent/15 text-accent',
 };
 
 interface AdminPageProps {
@@ -236,7 +236,7 @@ function statusBadgeClass(status: BugReportStatus): string {
     case 'open':
       return 'bg-amber-500/15 text-amber-400';
     case 'resolved':
-      return 'bg-emerald-500/15 text-emerald-400';
+      return 'bg-accent/15 text-accent';
     case 'closed':
       return 'bg-zinc-500/15 text-zinc-400';
   }
@@ -312,7 +312,7 @@ function HealthTimeline({ label, values }: { label: string; values: boolean[] })
         {values.map((ok, i) => (
           <span
             key={i}
-            className={`h-4 flex-1 rounded-[2px] ${ok ? 'bg-emerald-400/70' : 'bg-red-400/80'}`}
+            className={`h-4 flex-1 rounded-[2px] ${ok ? 'bg-accent/70' : 'bg-red-400/80'}`}
           />
         ))}
       </div>
@@ -343,7 +343,7 @@ function formatDateTime(iso: string | null): string {
 function HealthDot({ ok }: { ok: boolean }) {
   return (
     <span
-      className={`inline-block w-2 h-2 rounded-full ${ok ? 'bg-emerald-400' : 'bg-red-400'}`}
+      className={`inline-block w-2 h-2 rounded-full ${ok ? 'bg-accent' : 'bg-red-400'}`}
       aria-hidden
     />
   );
@@ -419,7 +419,7 @@ function ActivityFeedItem({ item }: { item: AdminActivityItem }) {
     return (
       <li className="flex gap-3 text-xs">
         <span className="shrink-0 w-16 text-text-secondary">{time.split(',')[0]}</span>
-        <span className="text-emerald-400 font-medium">Signup</span>
+        <span className="text-accent font-medium">Signup</span>
         <span className="text-text-secondary truncate">
           {item.username ? `@${item.username}` : item.email || item.uid.slice(0, 8)}
         </span>
@@ -477,7 +477,7 @@ function StatusFilterBar({
           onClick={() => onChange(key)}
           className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
             value === key
-              ? 'bg-emerald-500/20 text-emerald-400'
+              ? 'bg-accent/20 text-accent'
               : 'bg-bg-tertiary/60 text-text-secondary hover:text-text-primary'
           }`}
         >
@@ -573,7 +573,7 @@ function NeedsAttention({
         <button
           type="button"
           onClick={review}
-          className="text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors focus-ring rounded shrink-0"
+          className="text-xs font-medium text-accent hover:text-accent transition-colors focus-ring rounded shrink-0"
         >
           Review &rarr;
         </button>
@@ -604,7 +604,7 @@ function ExportMenu({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary hover:border-emerald-400/40 transition-colors focus-ring"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors focus-ring"
       >
         <Download size={13} />
         Export
@@ -638,7 +638,9 @@ function ExportMenu({
   );
 }
 
-export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onGuides, onNavigate }: AdminPageProps) {
+// Only onHome is read: the marketing nav and footer that took the rest are gone from this page —
+// an admin panel is a tool, not a page on the site, and it is framed like one now.
+export function AdminPage({ onHome }: AdminPageProps) {
   const { user, username, loading, firebaseEnabled, logout } = useAuth();
   const [state, setState] = useState<AdminState>({ phase: 'loading', step: 'access' });
   const [tab, setTab] = useState<AdminTab>('overview');
@@ -1304,43 +1306,110 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
   );
 
   return (
-    <div className="min-h-dvh bg-bg-primary text-text-primary overflow-x-hidden flex flex-col">
-      <div className="landing-grid pointer-events-none fixed inset-0" aria-hidden />
-      <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate} />
-
+    /*
+     * An admin shell, not a marketing page with an admin section in it.
+     *
+     * This sat under the site's nav bar and above its footer, with a back link, a 36px "Admin" title
+     * and an identity row before any number — a web page about the business rather than a tool for
+     * running it. It is framed the way every admin tool is now: sections down a rail on the left
+     * (the same pill-and-bar nav the journal's sidebar uses), a slim top bar with the section's
+     * name and the utilities, and the content full width beside them. On a phone the rail folds
+     * into a grid of pills under the top bar, so every section stays one tap away.
+     *
+     * No backdrop-filter anywhere in the frame: the Export menu's fixed overlay lives inside the
+     * top bar, and a blur there would make the bar its containing block — the bug that has bitten
+     * this panel twice.
+     */
+    <div className="min-h-dvh bg-bg-primary text-text-primary flex">
       {state.phase === 'auth-required' && firebaseEnabled && !loading && !user && <AuthModal />}
 
-      {/*
-        max-w-5xl was 1024px, so on a 1824px screen roughly 800px — nearly half the window — went
-        to empty margin while the panels inside were squeezed. This matches the width the journal
-        and the marketing pages already use, and the grids below were already written with lg:
-        breakpoints they never had room to reach.
-      */}
-      <main className="relative z-10 flex-1 max-w-[1680px] mx-auto px-4 md:px-6 py-4 md:py-12 w-full">
-        <button
-          type="button"
-          onClick={back.goBack}
-          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-emerald-400 transition-colors mb-4 md:mb-8"
-        >
-          <ArrowLeft size={16} />
-          {back.label}
-        </button>
-
-        {/*
-          Smaller and tighter on a phone.
-
-          The first screen of a 390px device was almost entirely chrome: a back link with 32px under
-          it, a 30px title beside a boxed icon, then an identity line, a build stamp and two buttons —
-          four stacked rows before a single number. The icon and the display size are what a desktop
-          page has room for, so they stay behind md.
-        */}
-        <div className="flex items-center gap-2.5 mb-2 md:gap-3">
-          <div className="hidden rounded-lg bg-emerald-500/10 p-2 text-emerald-400 md:block">
-            <ShieldCheck size={22} />
+      <aside className="hidden lg:flex w-60 shrink-0 flex-col sticky top-0 h-dvh border-r border-white/5 bg-bg-secondary">
+        <div className="flex h-16 items-center gap-2.5 border-b border-white/5 px-4">
+          <BrandLogo size="sm" variant="mark" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold leading-none">Trend Chasers</p>
+            <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-text-secondary">Admin</p>
           </div>
-          <h1 className="text-xl font-bold tracking-tight md:text-4xl">Admin</h1>
         </div>
+        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-3 py-3">
+          {ready && (
+            <AdminTabBar
+              variant="rail"
+              tab={tab}
+              onChange={setTab}
+              openCount={openCount}
+              userCount={ready.users.length}
+              ticketsWaiting={ticketsWaiting}
+              openErrors={openErrorCount}
+            />
+          )}
+        </div>
+        <div className="space-y-2 border-t border-white/5 p-3">
+          <button
+            type="button"
+            onClick={back.goBack}
+            className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-white/5 transition-colors focus-ring"
+          >
+            <ArrowLeft size={14} />
+            {back.label}
+          </button>
+          {user && (
+            <p className="truncate px-2 text-[11px] text-text-secondary">
+              {user.email}
+              {username ? ` (@${username})` : ''}
+            </p>
+          )}
+          {/* Which bundle is actually running: makes "I deployed but nothing changed" a glance. */}
+          <p className="px-2 text-[10px] tabular-nums text-text-secondary/60" title={`Bundle built ${BUILD_TIME} from commit ${BUILD_SHA}`}>
+            Build {formatBuildStamp()}
+          </p>
+        </div>
+      </aside>
 
+      <div className="flex-1 min-w-0 flex flex-col">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-white/5 bg-bg-primary/95 px-4 md:px-6">
+          <button
+            type="button"
+            onClick={back.goBack}
+            aria-label={back.label}
+            className="lg:hidden -ml-1 rounded-lg p-1.5 text-text-secondary hover:text-text-primary hover:bg-white/5 transition-colors focus-ring"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <span className="lg:hidden">
+            <BrandLogo size="sm" variant="mark" />
+          </span>
+          <div className="min-w-0 flex items-baseline gap-2">
+            <h1 className="truncate text-base font-semibold md:text-lg">
+              {ready ? ADMIN_TABS.find((t) => t.id === tab)?.label : 'Admin'}
+            </h1>
+            {ready && <span className="hidden text-xs text-text-secondary sm:inline">Admin</span>}
+          </div>
+          {ready && (
+            <div className="ml-auto flex items-center gap-2">
+              <ExportMenu
+                onUsers={() => exportUsersCsv(ready.users, ready.userNotes)}
+                onBugs={() => exportBugReportsCsv(ready.reports)}
+              />
+              <button
+                type="button"
+                disabled={refreshing}
+                onClick={() => {
+                  // Silent: the panel stays on screen and the icon carries the busy state, rather
+                  // than the whole thing being replaced by "Checking access…" for a second.
+                  setRefreshing(true);
+                  void loadAdmin(true).finally(() => setRefreshing(false));
+                }}
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary hover:border-white/20 transition-colors focus-ring disabled:opacity-60"
+              >
+                <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
+                <span className="hidden sm:inline">{refreshing ? 'Refreshing…' : 'Refresh'}</span>
+              </button>
+            </div>
+          )}
+        </header>
+
+      <main className="relative flex-1 w-full max-w-[1680px] mx-auto px-4 md:px-6 py-4 md:py-6">
         {state.phase === 'loading' && (
           <p className="text-text-secondary">
             {state.step === 'access' ? 'Checking access…' : 'Loading the panel…'}
@@ -1379,58 +1448,23 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         {ready && (
           <>
             {ready.isNewClaim && (
-              <div className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+              <div className="mb-6 rounded-xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent">
                 You are now the site administrator. This account is the only one that can access this
                 panel going forward.
               </div>
             )}
 
-            {/* One header bar: who you are, what build is live, and the utilities. Export used to
-                be a panel of its own, competing for attention with the data it exports. */}
-            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-4 md:mb-5">
-              {/*
-                Who is signed in, not a second title.
-
-                This said "Admin" again, in a second <h1>, fifty pixels under the one at the top of
-                the page — so the word appeared twice at two sizes, and on a phone the first screen
-                was mostly chrome before any content. The identity line was always the useful part.
-              */}
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-text-primary truncate">
-                  {user?.email}
-                  {username ? ` (@${username})` : ''}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Which bundle is actually running. Makes "I deployed but nothing changed"
-                    a one-glance check instead of a guess. */}
-                {/* Hidden on a phone. Useful, but not worth a row of the first screen — and the
-                    question it answers ("did my deploy land") is one you ask at a desk. */}
-                <span
-                  className="mr-1 hidden text-[11px] tabular-nums text-text-secondary/70 sm:inline"
-                  title={`Bundle built ${BUILD_TIME} from commit ${BUILD_SHA}`}
-                >
-                  Build {formatBuildStamp()}
-                </span>
-                <ExportMenu
-                  onUsers={() => exportUsersCsv(ready.users, ready.userNotes)}
-                  onBugs={() => exportBugReportsCsv(ready.reports)}
-                />
-                <button
-                  type="button"
-                  disabled={refreshing}
-                  onClick={() => {
-                    // Silent: the panel stays on screen and the icon carries the busy state, rather
-                    // than the whole thing being replaced by "Checking access…" for a second.
-                    setRefreshing(true);
-                    void loadAdmin(true).finally(() => setRefreshing(false));
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary hover:border-emerald-400/40 transition-colors focus-ring disabled:opacity-60"
-                >
-                  <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
-                  {refreshing ? 'Refreshing…' : 'Refresh'}
-                </button>
-              </div>
+            {/* The phone's nav: the rail is in the side column from lg up. */}
+            <div className="lg:hidden">
+              <AdminTabBar
+                variant="grid"
+                tab={tab}
+                onChange={setTab}
+                openCount={openCount}
+                userCount={ready.users.length}
+                ticketsWaiting={ticketsWaiting}
+                openErrors={openErrorCount}
+              />
             </div>
 
             <NeedsAttention
@@ -1441,15 +1475,6 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
               onGoToRequests={() => setTab('requests')}
               onGoToSupport={() => setTab('support')}
               onGoToErrors={() => setTab('errors')}
-            />
-
-            <AdminTabBar
-              tab={tab}
-              onChange={setTab}
-              openCount={openCount}
-              userCount={ready.users.length}
-              ticketsWaiting={ticketsWaiting}
-              openErrors={openErrorCount}
             />
 
             {actionError && (
@@ -1610,7 +1635,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                     <p className="mt-2 text-xs text-text-secondary">
                       Yearly plans:{' '}
                       {ready.health.payments.annualReady ? (
-                        <span className="text-emerald-300">on sale</span>
+                        <span className="text-accent">on sale</span>
                       ) : (
                         <>
                           off — add{' '}
@@ -1716,7 +1741,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                 <div className="panel-card rounded-xl p-5 md:p-6">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
+                    <div className="p-2 rounded-lg bg-accent/10 text-accent">
                       <Eye size={18} />
                     </div>
                     <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
@@ -1734,7 +1759,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                       {ready.visitorStats.dailyLast7.map((day) => (
                         <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
                           <div
-                            className="w-full bg-cyan-500/40 rounded-sm min-h-[2px]"
+                            className="w-full bg-accent/40 rounded-sm min-h-[2px]"
                             style={{ height: `${(day.visitors / maxDailyVisitors) * 100}%` }}
                             title={`${day.visitors} visitor${day.visitors === 1 ? '' : 's'}`}
                           />
@@ -1751,7 +1776,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
 
                 <div className="panel-card rounded-xl p-5 md:p-6">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+                    <div className="p-2 rounded-lg bg-accent/10 text-accent">
                       <Users size={18} />
                     </div>
                     <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
@@ -1767,7 +1792,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                       {signupStats.dailyLast7.map((day) => (
                         <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
                           <div
-                            className="w-full bg-emerald-500/40 rounded-sm min-h-[2px]"
+                            className="w-full bg-accent/40 rounded-sm min-h-[2px]"
                             style={{ height: `${(day.count / maxDailySignup) * 100}%` }}
                             title={`${day.count} signup${day.count === 1 ? '' : 's'}`}
                           />
@@ -1799,7 +1824,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
               {platformStats && (
                 <div className="panel-card rounded-xl p-5 md:p-6 mb-8">
                   <div className="flex items-center gap-2 mb-4">
-                    <BarChart3 size={16} className="text-emerald-400" />
+                    <BarChart3 size={16} className="text-accent" />
                     <div>
                       <h2 className="text-sm font-semibold text-text-primary">Journaling activity</h2>
                       <p className="text-[10px] text-text-secondary mt-0.5">
@@ -1841,7 +1866,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                     <div>
                       <p
                         className={`text-2xl font-bold tracking-tight ${
-                          platformStats.combinedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'
+                          platformStats.combinedPnl >= 0 ? 'text-accent' : 'text-red-400'
                         }`}
                       >
                         {formatCurrency(platformStats.combinedPnl)}
@@ -1858,7 +1883,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                 <div className="grid md:grid-cols-2 gap-4 mb-8">
                 <div className="panel-card rounded-xl p-5 md:p-6">
                   <div className="flex items-center gap-2 mb-4">
-                    <Activity size={16} className="text-emerald-400" />
+                    <Activity size={16} className="text-accent" />
                     <h2 className="text-sm font-semibold text-text-primary">Site activity</h2>
                   </div>
                   {activityFeed.length === 0 ? (
@@ -1871,7 +1896,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                 </div>
               <div className="panel-card rounded-xl p-5 md:p-6">
                 <div className="flex items-center gap-2 mb-4">
-                  <ScrollText size={16} className="text-emerald-400" />
+                  <ScrollText size={16} className="text-accent" />
                   <h2 className="text-sm font-semibold text-text-primary">Your recent actions</h2>
                 </div>
                 {ready.auditLog.length === 0 ? (
@@ -1904,7 +1929,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
               <div className="panel-card rounded-xl p-5 md:p-6 mb-8">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                   <div className="flex items-center gap-2">
-                    <Users size={16} className="text-emerald-400" />
+                    <Users size={16} className="text-accent" />
                     <h2 className="text-sm font-semibold text-text-primary">
                       Users ({ready.users.length})
                       {/* Shown at zero too: a count that disappears when it is 0 reads as "not
@@ -1926,7 +1951,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                       aria-pressed={brokerOnly}
                       className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
                         brokerOnly
-                          ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
+                          ? 'border-accent/50 bg-accent/15 text-accent'
                           : 'border-border/60 text-text-secondary hover:text-text-primary hover:border-border'
                       }`}
                     >
@@ -1978,7 +2003,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                         <button
                           type="button"
                           onClick={() => setSelectedUser(entry)}
-                          className="w-full text-left rounded-lg border border-border/40 bg-bg-tertiary/40 px-3 py-2.5 text-xs hover:border-emerald-500/30 transition-colors"
+                          className="w-full text-left rounded-lg border border-border/40 bg-bg-tertiary/40 px-3 py-2.5 text-xs hover:border-accent/30 transition-colors"
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="min-w-0">
@@ -2022,7 +2047,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                                 {/* Names the institution when SnapTrade told us one — "Schwab" is
                                     a more useful answer than "connected". */}
                                 {brokerByUid.get(entry.uid)?.connected && (
-                                  <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 text-[9px] font-medium uppercase tracking-wide">
+                                  <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-accent/15 text-accent text-[9px] font-medium uppercase tracking-wide">
                                     <Link2 size={9} />
                                     {brokerByUid.get(entry.uid)?.institutions[0] ?? 'Broker'}
                                     {(brokerByUid.get(entry.uid)?.accountCount ?? 0) > 1 && (
@@ -2051,7 +2076,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                               {entry.totalPnl != null && entry.tradeCount > 0 && (
                                 <p
                                   className={`mt-0.5 font-medium ${
-                                    entry.totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'
+                                    entry.totalPnl >= 0 ? 'text-accent' : 'text-red-400'
                                   }`}
                                 >
                                   {formatCurrency(entry.totalPnl)}
@@ -2146,7 +2171,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                   <button
                     type="button"
                     onClick={() => setTab('support')}
-                    className="text-emerald-400 hover:text-emerald-300 transition-colors focus-ring rounded"
+                    className="text-accent hover:text-accent transition-colors focus-ring rounded"
                   >
                     {bugTickets} open bug ticket{bugTickets === 1 ? '' : 's'} in Support &rarr;
                   </button>
@@ -2222,7 +2247,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
                       {report.pageUrl && (
                         <p className="mt-3 text-xs text-text-secondary truncate">
                           Page:{' '}
-                          <a href={report.pageUrl} className="text-emerald-400 hover:underline">
+                          <a href={report.pageUrl} className="text-accent hover:underline">
                             {report.pageUrl}
                           </a>
                         </p>
@@ -2276,7 +2301,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
               <div className="panel-card rounded-xl p-5 md:p-6 mb-8">
                 <div className="flex items-center justify-between gap-3 mb-4">
                   <div className="flex items-center gap-2">
-                    <LifeBuoy size={16} className="text-emerald-400" />
+                    <LifeBuoy size={16} className="text-accent" />
                     <h2 className="text-sm font-semibold text-text-primary">Help Center articles</h2>
                   </div>
                   {missingStarterCount > 0 && (
@@ -2442,7 +2467,7 @@ export function AdminPage({ onHome, onLaunch, onPrivacy, onTerms, onBrokers, onG
         />
       )}
 
-      <LandingFooter onPrivacy={onPrivacy} onTerms={onTerms} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate} onLaunch={onLaunch} />
+      </div>
     </div>
   );
 }

@@ -89,14 +89,14 @@ export function AdminCheckoutCard({ onAudit }: AdminCheckoutCardProps) {
     <div className="panel-card rounded-xl p-5 md:p-6 mb-8">
       <div className="flex items-start justify-between gap-3 mb-1">
         <div className="flex items-center gap-2 min-w-0">
-          <CreditCard size={16} className="text-emerald-400 shrink-0" aria-hidden />
+          <CreditCard size={16} className="text-accent shrink-0" aria-hidden />
           <h3 className="font-semibold text-text-primary">Plan checkout</h3>
         </div>
         {!loading && (
           <span
             className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${
               saved.enabled
-                ? 'bg-emerald-500/15 text-emerald-300'
+                ? 'bg-accent/15 text-accent'
                 : 'bg-amber-500/15 text-amber-300'
             }`}
           >
@@ -123,12 +123,12 @@ export function AdminCheckoutCard({ onAudit }: AdminCheckoutCardProps) {
             role="switch"
             aria-checked={enabled}
             onClick={() => setEnabled((v) => !v)}
-            className="flex w-full items-center gap-3 rounded-lg border border-border/60 bg-bg-primary/40 p-3 text-left transition-colors hover:border-emerald-500/40 focus-ring"
+            className="flex w-full items-center gap-3 rounded-lg border border-border/60 bg-bg-primary/40 p-3 text-left transition-colors hover:border-accent/40 focus-ring"
           >
             <span
               aria-hidden
               className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-                enabled ? 'bg-emerald-500' : 'bg-bg-tertiary border border-border/60'
+                enabled ? 'bg-accent' : 'bg-bg-tertiary border border-border/60'
               }`}
             >
               <span
@@ -202,7 +202,7 @@ export function AdminCheckoutCard({ onAudit }: AdminCheckoutCardProps) {
             )}
           </div>
 
-          {note && <p className="mt-3 text-sm text-emerald-400">{note}</p>}
+          {note && <p className="mt-3 text-sm text-accent">{note}</p>}
           {error && <p className="mt-3 text-sm text-loss-bright">{error}</p>}
 
           <p className="mt-3 text-[11px] text-text-secondary/70 leading-relaxed">

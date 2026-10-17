@@ -172,7 +172,7 @@ export function AdminUserEmailComposer({ uid, email, displayName, onDone, onErro
       {failed && <p className="text-[11px] text-red-400">{failed}</p>}
       {sent && (
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[11px] text-emerald-300">{sent}</p>
+          <p className="text-[11px] text-accent">{sent}</p>
           <button
             type="button"
             onClick={() => {

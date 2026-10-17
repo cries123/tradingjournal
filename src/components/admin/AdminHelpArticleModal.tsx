@@ -118,7 +118,7 @@ export function AdminHelpArticleModal({
         >
           <div className="flex items-start justify-between gap-3 mb-5">
             <div className="flex items-center gap-2">
-              <LifeBuoy size={18} className="text-emerald-400" />
+              <LifeBuoy size={18} className="text-accent" />
               <h3 id="help-article-modal-title" className="text-lg font-semibold">
                 {isEdit ? 'Edit article' : 'New article'}
               </h3>
@@ -185,7 +185,7 @@ export function AdminHelpArticleModal({
                 type="checkbox"
                 checked={published}
                 onChange={(e) => setPublished(e.target.checked)}
-                className="h-4 w-4 rounded border-border/60 accent-emerald-500"
+                className="h-4 w-4 rounded border-border/60 accent-accent"
               />
               <span className="text-sm text-text-primary">Published (visible on the public Help Center)</span>
             </label>

@@ -105,7 +105,7 @@ export function BrokerStatusPanel({ adminUid }: BrokerStatusPanelProps) {
                   ) : live?.kind === 'degraded' ? (
                     <AlertTriangle size={15} className="text-amber-400" />
                   ) : (
-                    <CircleCheck size={15} className="text-emerald-400" />
+                    <CircleCheck size={15} className="text-accent" />
                   )}
                   <p className="text-sm font-semibold">{entry.name}</p>
                   {overridden && (
@@ -131,7 +131,7 @@ export function BrokerStatusPanel({ adminUid }: BrokerStatusPanelProps) {
                             ? 'bg-red-500/20 text-red-300'
                             : k.id === 'degraded'
                               ? 'bg-amber-500/20 text-amber-300'
-                              : 'bg-emerald-500/20 text-emerald-300'
+                              : 'bg-accent/20 text-accent'
                           : 'text-text-secondary hover:text-text-primary'
                       }`}
                     >
@@ -171,7 +171,7 @@ export function BrokerStatusPanel({ adminUid }: BrokerStatusPanelProps) {
                   {saving === entry.key ? (
                     <Loader2 size={13} className="animate-spin" />
                   ) : saved === entry.key ? (
-                    <Check size={13} className="text-emerald-400" />
+                    <Check size={13} className="text-accent" />
                   ) : null}
                   {saved === entry.key ? 'Saved' : 'Save'}
                 </button>

@@ -232,7 +232,7 @@ export function AdminUserDetailModal({
           <div className="sticky -top-6 z-10 -mx-6 -mt-6 px-6 pt-6 pb-3 bg-bg-card border-b border-border/40 mb-4">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0">
-                <User size={18} className="text-emerald-400 shrink-0" />
+                <User size={18} className="text-accent shrink-0" />
                 <h3 id="user-detail-title" className="text-lg font-semibold truncate">
                   {user.username ? `@${user.username}` : 'User details'}
                 </h3>
@@ -334,7 +334,7 @@ export function AdminUserDetailModal({
               <div>
                 <dt className="text-xs text-text-secondary uppercase tracking-wider">Performance</dt>
                 <dd className="mt-0.5">
-                  <span className={user.totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                  <span className={user.totalPnl >= 0 ? 'text-accent' : 'text-red-400'}>
                     {formatCurrency(user.totalPnl)} net
                   </span>
                   {user.winRate != null && (
@@ -572,7 +572,7 @@ export function AdminUserDetailModal({
                 type="button"
                 disabled={busy !== null}
                 onClick={() => void setSuspended(false)}
-                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm rounded-lg border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 transition-colors disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm rounded-lg border border-accent/30 text-accent hover:bg-accent/10 transition-colors disabled:opacity-50"
               >
                 <UserCheck size={15} />
                 {busy === 'suspend' ? 'Restoring…' : 'Restore sign-in'}

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { AlertTriangle, Bug, FileText, LayoutDashboard, LifeBuoy, Users, Wallet, type LucideIcon } from 'lucide-react';
 import { ADMIN_TABS, type AdminTab } from './adminTabs';
 
 interface AdminTabBarProps {
@@ -8,24 +8,35 @@ interface AdminTabBarProps {
   userCount: number;
   ticketsWaiting: number;
   openErrors: number;
+  /**
+   * rail: the vertical list in the admin shell's side column, from lg up.
+   * grid: four columns of pills under the top bar, for everything narrower.
+   */
+  variant?: 'rail' | 'grid';
 }
+
+const ICONS: Record<AdminTab, LucideIcon> = {
+  overview: LayoutDashboard,
+  users: Users,
+  support: LifeBuoy,
+  requests: Bug,
+  errors: AlertTriangle,
+  costs: Wallet,
+  content: FileText,
+};
 
 /**
  * The admin panel's navigation.
  *
- * On a phone this was a single row that scrolled sideways: seven tabs, four of them past the right
- * edge, reachable only by a horizontal swipe nothing on screen suggested. Scrolling the active one
- * into view papered over the symptom — you still could not SEE where else you could go, which is
- * the entire job of a nav.
+ * Two layouts, because a side rail and a phone want different things. From lg up the sections sit
+ * down the shell's left column with an icon each, the way every admin tool a person has used puts
+ * them, and the active one carries the same filled pill and left bar the journal's own sidebar
+ * uses — one product, two sides of it. Below lg it is a grid of pills under the top bar: every
+ * destination visible without a swipe, each a 44px target, with the counts cornered so the one
+ * wide label does not spill out of its cell.
  *
- * So below md it is a grid, not a strip. Four columns, two rows, every destination visible without
- * moving anything; from md up, where seven tabs fit comfortably, it stays the underlined row it was.
- * Two layouts rather than one compromise, because a 44px tap target and an underline that reads as
- * a tab want different things.
- *
- * Sticky at both sizes: the nav is most wanted after a long queue has been scrolled. Near-opaque
- * rather than blurred — a backdrop-filter here would make this the containing block for any
- * fixed-position descendant, which is the bug that has bitten this panel twice.
+ * No backdrop-filter on either: it would make this the containing block for any fixed-position
+ * descendant, which is the bug that has bitten this panel twice.
  */
 export function AdminTabBar({
   tab,
@@ -34,76 +45,79 @@ export function AdminTabBar({
   userCount,
   ticketsWaiting,
   openErrors,
+  variant = 'grid',
 }: AdminTabBarProps) {
-  const badgeFor = (id: AdminTab): string | null => {
-    if (id === 'requests' && openCount > 0) return String(openCount);
-    if (id === 'support' && ticketsWaiting > 0) return String(ticketsWaiting);
-    if (id === 'errors' && openErrors > 0) return String(openErrors);
-    if (id === 'users') return String(userCount);
+  const badgeFor = (id: AdminTab): { text: string; tone: 'alert' | 'warn' | 'quiet' } | null => {
+    if (id === 'requests' && openCount > 0) return { text: String(openCount), tone: 'warn' };
+    if (id === 'support' && ticketsWaiting > 0) return { text: String(ticketsWaiting), tone: 'warn' };
+    if (id === 'errors' && openErrors > 0) return { text: String(openErrors), tone: 'alert' };
+    if (id === 'users') return { text: String(userCount), tone: 'quiet' };
     return null;
   };
 
-  /*
-   * Still scrolled into view, for the md-and-up row.
-   *
-   * "Review →" in the attention banner switches tab without touching the nav, so on a narrow
-   * desktop window the tab you just landed on could sit off the right edge while its panel was on
-   * screen. Harmless on the phone grid, where nothing is ever out of view.
-   */
-  const activeRef = useRef<HTMLButtonElement | null>(null);
+  const badgeTone = {
+    alert: 'bg-red-500/15 text-red-400',
+    warn: 'bg-amber-500/15 text-amber-400',
+    quiet: 'bg-white/10 text-text-secondary',
+  };
 
-  useEffect(() => {
-    activeRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  }, [tab]);
-
-  return (
-    <nav
-      aria-label="Admin sections"
-      className="sticky top-0 z-20 mb-6 bg-bg-primary/95 md:border-b md:border-border/60"
-    >
-      <div className="grid grid-cols-4 gap-1.5 px-1 pb-2 pt-1 md:flex md:items-center md:gap-1 md:overflow-x-auto md:px-0 md:pb-0 md:pt-0">
+  if (variant === 'rail') {
+    return (
+      <nav aria-label="Admin sections" className="flex flex-col gap-0.5">
         {ADMIN_TABS.map((t) => {
           const active = t.id === tab;
           const badge = badgeFor(t.id);
+          const Icon = ICONS[t.id];
           return (
             <button
               key={t.id}
-              ref={active ? activeRef : undefined}
               type="button"
               onClick={() => onChange(t.id)}
               aria-current={active ? 'page' : undefined}
-              className={`relative flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 text-[13px] font-medium transition-colors focus-ring md:min-h-0 md:justify-start md:rounded-t-lg md:rounded-b-none md:px-3.5 md:py-2.5 md:text-sm ${
-                active
-                  ? // On the phone grid the active tab is a filled pill: an underline on one cell of
-                    // a two-row grid reads as a stray rule, not as "you are here".
-                    'bg-emerald-500/10 text-emerald-300 md:bg-transparent md:text-text-primary'
-                  : 'bg-bg-tertiary/40 text-text-secondary hover:text-text-primary md:bg-transparent'
+              className={`group relative flex w-full items-center gap-2.5 rounded-xl pl-3 pr-2.5 py-2.5 text-sm transition-colors focus-ring ${
+                active ? 'bg-accent/10 text-accent font-medium' : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
               }`}
             >
-              {t.label}
+              {active && <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-accent" aria-hidden />}
+              <Icon size={16} className="shrink-0" aria-hidden />
+              <span className="flex-1 text-left truncate">{t.label}</span>
               {badge && (
-                /*
-                 * Cornered on the phone, inline from md.
-                 *
-                 * Four columns of a 390px screen is about 88px a cell, and "Requests" with a count
-                 * beside it is wider than that — it was the one tab that spilled out of its own
-                 * pill. Out of the flow it costs no width at all, which is what keeps every tab on
-                 * two rows instead of three.
-                 */
-                <span
-                  className={`absolute -right-1 -top-1 min-w-[18px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold tabular-nums md:static md:min-w-0 md:text-left ${
-                    t.id === 'errors'
-                      ? 'bg-red-500/15 text-red-400'
-                      : t.id === 'requests' || t.id === 'support'
-                        ? 'bg-amber-500/15 text-amber-400'
-                        : 'bg-bg-tertiary text-text-secondary'
-                  }`}
-                >
-                  {badge}
+                <span className={`shrink-0 min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold tabular-nums ${badgeTone[badge.tone]}`}>
+                  {badge.text}
                 </span>
               )}
-              {active && (
-                <span className="absolute inset-x-2 -bottom-px hidden h-0.5 rounded-full bg-emerald-400 md:block" />
+            </button>
+          );
+        })}
+      </nav>
+    );
+  }
+
+  return (
+    <nav aria-label="Admin sections" className="sticky top-14 z-20 mb-5 bg-bg-primary/95 pb-2">
+      <div className="grid grid-cols-4 gap-1.5">
+        {ADMIN_TABS.map((t) => {
+          const active = t.id === tab;
+          const badge = badgeFor(t.id);
+          const Icon = ICONS[t.id];
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => onChange(t.id)}
+              aria-current={active ? 'page' : undefined}
+              className={`relative flex min-h-[44px] flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-medium leading-none transition-colors focus-ring ${
+                active ? 'bg-accent/10 text-accent' : 'bg-white/[0.04] text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <Icon size={15} aria-hidden />
+              <span className="truncate max-w-full">{t.label}</span>
+              {badge && (
+                /* Out of the flow: four columns of a 390px screen is about 88px a cell, and a label
+                   with a count beside it was the one tab that spilled out of its own pill. */
+                <span className={`absolute -right-1 -top-1 min-w-[18px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold tabular-nums ${badgeTone[badge.tone]}`}>
+                  {badge.text}
+                </span>
               )}
             </button>
           );

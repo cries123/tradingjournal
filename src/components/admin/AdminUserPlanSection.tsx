@@ -207,13 +207,13 @@ export function AdminUserPlanSection({ uid, onDone, onError, onAudit }: AdminUse
 
       <p className="text-sm text-text-secondary flex items-start gap-2">
         {record?.source === 'admin' && (
-          <BadgeCheck size={15} className="mt-0.5 shrink-0 text-emerald-400" aria-hidden />
+          <BadgeCheck size={15} className="mt-0.5 shrink-0 text-accent" aria-hidden />
         )}
         <span>{loading ? 'Checking…' : describe(record, now)}</span>
       </p>
 
       {liveComp && (
-        <p className="text-sm text-emerald-300 flex items-start gap-2">
+        <p className="text-sm text-accent flex items-start gap-2">
           <Gift size={15} className="mt-0.5 shrink-0" aria-hidden />
           <span>
             Plus {TIER_PLANS[liveComp.tier].name} on the house until {day(liveComp.until)}
@@ -234,7 +234,7 @@ export function AdminUserPlanSection({ uid, onDone, onError, onAudit }: AdminUse
               onClick={() => void grant(tier)}
               className={`rounded-lg border px-2 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed ${
                 active
-                  ? 'border-emerald-400/50 bg-emerald-400/10 text-emerald-300'
+                  ? 'border-accent/50 bg-accent/10 text-accent'
                   : 'border-border text-text-secondary hover:text-text-primary hover:border-slate-500 disabled:opacity-50'
               }`}
             >
@@ -264,7 +264,7 @@ export function AdminUserPlanSection({ uid, onDone, onError, onAudit }: AdminUse
       {/* ---------------------------------------------------------------- extend */}
       <div className="rounded-lg border border-border/60 bg-bg-tertiary/30 p-3 space-y-3">
         <p className="text-xs font-semibold text-text-primary flex items-center gap-1.5">
-          <CalendarPlus size={13} className="text-emerald-400" aria-hidden />
+          <CalendarPlus size={13} className="text-accent" aria-hidden />
           Extend access
         </p>
 
@@ -277,7 +277,7 @@ export function AdminUserPlanSection({ uid, onDone, onError, onAudit }: AdminUse
               onClick={() => setExtendTier(tier)}
               className={`rounded-md border px-2 py-1 text-[11px] font-medium transition-colors disabled:opacity-50 ${
                 chosenTier === tier
-                  ? 'border-emerald-400/50 bg-emerald-400/10 text-emerald-300'
+                  ? 'border-accent/50 bg-accent/10 text-accent'
                   : 'border-border text-text-secondary hover:text-text-primary'
               }`}
             >
@@ -298,7 +298,7 @@ export function AdminUserPlanSection({ uid, onDone, onError, onAudit }: AdminUse
               }}
               className={`rounded-md border px-2 py-1 text-[11px] font-medium transition-colors disabled:opacity-50 ${
                 !untilDate && days === preset
-                  ? 'border-emerald-400/50 bg-emerald-400/10 text-emerald-300'
+                  ? 'border-accent/50 bg-accent/10 text-accent'
                   : 'border-border text-text-secondary hover:text-text-primary'
               }`}
             >

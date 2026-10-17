@@ -112,7 +112,7 @@ export function AdminAnnouncementCard({ onAudit }: AdminAnnouncementCardProps) {
     <div className="panel-card rounded-xl p-5 md:p-6 mb-8">
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
-          <Megaphone size={16} className="text-emerald-400" />
+          <Megaphone size={16} className="text-accent" />
           <h2 className="text-sm font-semibold text-text-primary">Site announcement</h2>
         </div>
         <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
@@ -120,7 +120,7 @@ export function AdminAnnouncementCard({ onAudit }: AdminAnnouncementCardProps) {
             type="checkbox"
             checked={draft.enabled}
             onChange={(e) => set('enabled', e.target.checked)}
-            className="rounded border-border accent-emerald-500"
+            className="rounded border-border accent-accent"
           />
           Show it
         </label>
@@ -305,7 +305,7 @@ export function AdminAnnouncementCard({ onAudit }: AdminAnnouncementCardProps) {
             never seen. It can take up to five minutes to reach people already on the site.
           </p>
 
-          {message && <p className="text-sm text-emerald-400">{message}</p>}
+          {message && <p className="text-sm text-accent">{message}</p>}
           {error && <p className="text-sm text-loss-bright">{error}</p>}
         </div>
       )}

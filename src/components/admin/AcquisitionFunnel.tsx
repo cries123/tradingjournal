@@ -61,8 +61,8 @@ export function AcquisitionFunnel({
       hint: 'Unique logged-out browsers seen in the last 12 months',
       value: visitors.uniqueVisitors,
       icon: <Eye size={16} />,
-      accent: 'text-cyan-400 bg-cyan-500/10',
-      bar: 'bg-cyan-500/50',
+      accent: 'text-accent bg-accent/10',
+      bar: 'bg-accent/50',
     },
     {
       key: 'opened',
@@ -79,8 +79,8 @@ export function AcquisitionFunnel({
       hint: 'Accounts created in the last 12 months',
       value: annualSignups,
       icon: <UserPlus size={16} />,
-      accent: 'text-emerald-400 bg-emerald-500/10',
-      bar: 'bg-emerald-500/50',
+      accent: 'text-accent bg-accent/10',
+      bar: 'bg-accent/50',
     },
     {
       key: 'broker',
@@ -107,7 +107,7 @@ export function AcquisitionFunnel({
         </div>
         <div className="text-right">
           <p className="text-[10px] uppercase tracking-wider text-text-secondary">Visitor → signup</p>
-          <p className="text-sm font-semibold text-emerald-300">
+          <p className="text-sm font-semibold text-accent">
             {pct(visitors.converted, visitors.uniqueVisitors)}
           </p>
         </div>
@@ -171,7 +171,7 @@ export function AcquisitionFunnel({
         </div>
         <div>
           <p className="text-[10px] uppercase tracking-wider text-text-secondary">Last 7 days</p>
-          <p className="text-lg font-bold tabular-nums text-cyan-300">
+          <p className="text-lg font-bold tabular-nums text-accent">
             {visitors.last7DaysVisitors.toLocaleString()}
           </p>
           <p className="text-[10px] text-text-secondary mt-0.5">

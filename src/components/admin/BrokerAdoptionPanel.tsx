@@ -77,7 +77,7 @@ export function BrokerAdoptionPanel({ serverStats, serverError, loading = false 
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-lg bg-bg-tertiary/50 border border-border/40 px-3 py-2.5">
           <p className="text-[9px] uppercase tracking-wide text-text-secondary">Connected</p>
-          <p className="text-xl font-bold tabular-nums text-emerald-400 mt-0.5">
+          <p className="text-xl font-bold tabular-nums text-accent mt-0.5">
             {brokerConnectedCount.toLocaleString()}
           </p>
           <p className="text-[10px] text-text-secondary mt-0.5">

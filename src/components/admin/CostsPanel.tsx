@@ -81,14 +81,14 @@ export function CostsPanel({ report, error, loading, onOpenUser, canOpenUser }: 
           {
             label: 'Collected this month',
             value: money(collected),
-            tone: 'text-emerald-400',
+            tone: 'text-accent',
             note: `${current?.counts.charges ?? 0} payment${(current?.counts.charges ?? 0) === 1 ? '' : 's'}`,
           },
           { label: 'Spend this month', value: money(spend), tone: 'text-text-primary', note: 'estimated' },
           {
             label: 'Net this month',
             value: money(netNow),
-            tone: netNow >= 0 ? 'text-emerald-400' : 'text-red-400',
+            tone: netNow >= 0 ? 'text-accent' : 'text-red-400',
             note: 'collected minus spend',
           },
           {
@@ -144,7 +144,7 @@ export function CostsPanel({ report, error, loading, onOpenUser, canOpenUser }: 
                 {monthLabel(m.month)}
                 {m.partial && <span className="ml-1.5 text-[10px] text-text-secondary">so far</span>}
               </p>
-              <p className="text-sm font-semibold tabular-nums text-emerald-400">
+              <p className="text-sm font-semibold tabular-nums text-accent">
                 {m.counts.revenue > 0 ? money(m.counts.revenue) : '—'}
                 <span className="ml-1 text-[10px] font-normal uppercase tracking-wider text-text-secondary">
                   in
@@ -262,7 +262,7 @@ export function CostsPanel({ report, error, loading, onOpenUser, canOpenUser }: 
                   <td className="text-right px-3 py-2.5 font-semibold">
                     {money(m.breakdown.total)}
                   </td>
-                  <td className="text-right px-4 py-2.5 font-semibold text-emerald-400">
+                  <td className="text-right px-4 py-2.5 font-semibold text-accent">
                     {m.counts.revenue > 0 ? money(m.counts.revenue) : '—'}
                   </td>
                 </tr>
@@ -287,7 +287,7 @@ export function CostsPanel({ report, error, loading, onOpenUser, canOpenUser }: 
           <div className="panel-card rounded-xl divide-y divide-border/30">
             {report.purchases.map((p) => (
               <div key={`${p.uid}-${p.at}`} className="flex items-center gap-3 px-4 py-2.5 text-xs">
-                <Receipt size={13} className="text-emerald-400 shrink-0" />
+                <Receipt size={13} className="text-accent shrink-0" />
                 <span className="truncate flex-1 min-w-0">
                   <AdminUserRef uid={p.uid} onOpen={onOpenUser} canOpen={canOpenUser}>
                     {p.email || <span className="font-mono text-text-secondary">{p.uid}</span>}
@@ -299,7 +299,7 @@ export function CostsPanel({ report, error, loading, onOpenUser, canOpenUser }: 
                 <span className="text-text-secondary tabular-nums shrink-0 hidden sm:inline">
                   {p.at ? new Date(p.at).toLocaleDateString() : ''}
                 </span>
-                <span className="font-semibold tabular-nums w-14 text-right shrink-0 text-emerald-400">
+                <span className="font-semibold tabular-nums w-14 text-right shrink-0 text-accent">
                   {money(p.amount)}
                 </span>
               </div>
@@ -350,7 +350,7 @@ export function CostsPanel({ report, error, loading, onOpenUser, canOpenUser }: 
                 </dl>
                 <p
                   className={`text-xs font-semibold mt-2.5 pt-2.5 border-t border-border/40 tabular-nums ${
-                    margin > 0 ? 'text-emerald-400' : 'text-red-400'
+                    margin > 0 ? 'text-accent' : 'text-red-400'
                   }`}
                 >
                   {margin > 0 ? 'Floor margin ' : 'Loses '}
