@@ -141,8 +141,8 @@ export function PhoneShowcase() {
                 <Gauge size={16} />
                 Performance
               </span>
-              <span className="-mt-5 grid h-11 w-11 place-items-center rounded-full bg-accent text-black shadow-[0_8px_24px_rgba(var(--color-accent-rgb),0.35)]">
-                <Plus size={20} />
+              <span className="-mt-2 grid h-9 w-9 place-items-center rounded-full bg-accent text-black shadow-[0_8px_24px_rgba(var(--color-accent-rgb),0.35)]">
+                <Plus size={18} />
               </span>
               <span className="flex flex-col items-center gap-1">
                 <Bot size={16} />
