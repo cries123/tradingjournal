@@ -23,8 +23,12 @@ import { allJournalsView } from '../utils/journalScope';
 // the whole authenticated app — including the share card's nebula glow, badge and username (see
 // the theme accent). Only the landing page and the "TREND CHASERS"
 // wordmark itself (everywhere it appears, share card included) intentionally stay fixed brand
-// emerald, same as the logo.
+// lime, same as the logo.
+//
+// Lime uses one colour for both: on the brand's black there is one highlight, and a second hue
+// beside it was what made the old navy look busy. The other three keep their two-tone pairs.
 const ACCENT_VARS: Record<ThemeAccent, { profit: string; profitRgb: string; accent: string; accentRgb: string }> = {
+  lime: { profit: '#7aff45', profitRgb: '122, 255, 69', accent: '#7aff45', accentRgb: '122, 255, 69' },
   emerald: { profit: '#34d399', profitRgb: '52, 211, 153', accent: '#38bdf8', accentRgb: '56, 189, 248' },
   cyan: { profit: '#22d3ee', profitRgb: '34, 211, 238', accent: '#2dd4bf', accentRgb: '45, 212, 191' },
   violet: { profit: '#a78bfa', profitRgb: '167, 139, 250', accent: '#818cf8', accentRgb: '129, 140, 248' },

@@ -12,7 +12,6 @@ import { useEntitlement } from '../context/useEntitlement';
 import type { OnboardingStepId } from '../utils/onboardingSteps';
 import { SettingsPage } from '../components/SettingsPage';
 import { Sidebar, type SidebarAppView } from '../components/Sidebar';
-import { Starfield } from '../components/Starfield';
 import { BrokerConnectContent } from '../components/brokers/BrokerConnectContent';
 import { LockedFeature } from '../components/plan/LockedFeature';
 import { BrokersContent } from '../components/support/BrokersContent';
@@ -326,10 +325,11 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
         isDesktop ? 'min-h-dvh' : 'h-full min-h-0 flex-1 flex flex-col overflow-hidden'
       }`}
     >
-      <Starfield subtle />
+      {/* No starfield behind the journal since the rebrand: on pure black the specks read as dust
+          on the screen, and the surfaces are the only thing that should sit on it. The auth and
+          username modals keep theirs — a full-screen moment, not a page of numbers. */}
       {isDesktop && <Sidebar variant="desktop" onHome={onHome} {...sidebarActions} />}
 
-      {/* relative: keeps this content painting above the fixed Starfield canvas behind it */}
       <div className={`relative flex-1 flex flex-col min-w-0 w-full ${isDesktop ? '' : 'min-h-0'}`}>
         {!isDesktop && <MobileHeader onHome={onHome} account={headerTools} />}
 

@@ -2,7 +2,8 @@ import type { Strategy, TradingRules } from './strategy';
 import { DEFAULT_TRADING_RULES } from './strategy';
 
 export type CurrencyCode = 'USD' | 'EUR' | 'GBP' | 'CAD';
-export type ThemeAccent = 'emerald' | 'cyan' | 'violet';
+/** Lime is the brand's own and the default since the October 2026 rebrand; the rest stay as choices. */
+export type ThemeAccent = 'lime' | 'emerald' | 'cyan' | 'violet';
 
 export interface JournalAccount {
   id: string;
@@ -73,7 +74,7 @@ export interface UserSettings {
 export const DEFAULT_SETTINGS: UserSettings = {
   currency: 'USD',
   defaultSymbol: 'SPY',
-  themeAccent: 'emerald',
+  themeAccent: 'lime',
   setupTags: ['BREAKOUT', 'FOMO', 'RSI CROSSED', 'REVERSAL'],
   accounts: [{ id: 'default', name: 'Primary journal' }],
   activeAccountId: 'default',

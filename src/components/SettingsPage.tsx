@@ -418,12 +418,12 @@ export function SettingsPage({
         <div>
           <span className="text-xs text-text-secondary mb-2 block">Theme accent</span>
           <div className="flex gap-2">
-            {(['emerald', 'cyan', 'violet'] as ThemeAccent[]).map((accent) => (
+            {(['lime', 'emerald', 'cyan', 'violet'] as ThemeAccent[]).map((accent) => (
               <button
                 key={accent}
                 type="button"
                 onClick={() => updateSettings({ themeAccent: accent })}
-                className={`px-4 py-2 rounded-lg text-sm capitalize border transition-colors focus-ring ${
+                className={`px-4 py-2 rounded-full text-sm capitalize border transition-colors focus-ring ${
                   settings.themeAccent === accent
                     ? 'border-accent/50 bg-accent/10 text-accent'
                     : 'border-border text-text-secondary hover:border-border/80'
