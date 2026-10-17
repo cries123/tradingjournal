@@ -1,27 +1,13 @@
-import { Sparkles, X } from 'lucide-react';
+import { ChevronRight, X } from 'lucide-react';
 import type { Announcement, AnnouncementTone } from '../../services/announcement';
 import { useAnnouncement } from '../../hooks/useAnnouncement';
 import { hasAnnouncementCta, runAnnouncementCta } from '../../utils/announcementVisibility';
 
-const TONE: Record<AnnouncementTone, { wrap: string; icon: string; lead: string; link: string }> = {
-  info: {
-    wrap: 'border-accent/30 bg-accent/10',
-    icon: 'text-accent',
-    lead: 'text-accent',
-    link: 'text-accent hover:text-accent/80',
-  },
-  success: {
-    wrap: 'border-emerald-500/30 bg-emerald-500/10',
-    icon: 'text-emerald-400',
-    lead: 'text-emerald-300',
-    link: 'text-emerald-300 hover:text-emerald-200',
-  },
-  warning: {
-    wrap: 'border-amber-400/30 bg-amber-400/10',
-    icon: 'text-amber-400',
-    lead: 'text-amber-300',
-    link: 'text-amber-300 hover:text-amber-200',
-  },
+/** One dot carries the tone. Lime is the brand's "good news", amber the "heads up". */
+const DOT: Record<AnnouncementTone, string> = {
+  info: 'bg-white',
+  success: 'bg-accent shadow-[0_0_12px_rgba(var(--color-accent-rgb),0.7)]',
+  warning: 'bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.6)]',
 };
 
 interface AnnouncementBarProps {
@@ -30,11 +16,16 @@ interface AnnouncementBarProps {
 }
 
 /**
- * The slim bar across the very top of the public site, written from the admin panel.
+ * The announcement on the public site, written from the admin panel.
+ *
+ * A floating pill under the nav rather than a tinted strip across the top of the page. The strip
+ * was a web-page convention — a coloured band with an icon in it — and on a black site it read as
+ * a browser warning. This is a dark pill with one glowing dot for the tone, the headline in white,
+ * the detail in grey and the action in lime: the same vocabulary as the chips and the buttons
+ * below it, so it reads as part of the page rather than something stuck on top of it.
  *
  * Same message and same dismissal as the dashboard card (see useAnnouncement) — one announcement,
- * closed once. The bar leads with the headline and keeps the body on one line, because it sits
- * above the hero and anything taller pushes the whole page down.
+ * closed once.
  */
 export function AnnouncementBar({ preview }: AnnouncementBarProps) {
   const live = useAnnouncement();
@@ -44,31 +35,39 @@ export function AnnouncementBar({ preview }: AnnouncementBarProps) {
 
   if (!announcement || !visible) return null;
 
-  const tone = TONE[announcement.tone];
   const short = announcement.bodyShort.trim() || announcement.body.trim();
 
   return (
-    <div className={`relative z-20 border-b ${tone.wrap}`}>
-      <div className="max-w-6xl mx-auto px-4 md:px-6 py-2.5 flex items-center gap-3 text-sm">
-        <Sparkles size={16} className={`shrink-0 ${tone.icon}`} aria-hidden />
-        <p className="flex-1 min-w-0 leading-snug text-text-primary">
-          <span className={`font-semibold ${tone.lead}`}>{announcement.title}</span>
-          {short && <span className="text-text-secondary"> — {short}</span>}
-          {hasAnnouncementCta(announcement) && (
-            <button
-              type="button"
-              onClick={() => runAnnouncementCta(announcement)}
-              className={`ml-1.5 font-medium underline underline-offset-2 whitespace-nowrap ${tone.link}`}
-            >
-              {announcement.ctaLabel} →
-            </button>
+    <div className="relative z-20 px-4 pt-4">
+      <div
+        role="status"
+        className="mx-auto flex w-fit max-w-3xl items-center gap-3 rounded-full border border-white/8 bg-[#141414] py-2 pl-4 pr-2 text-sm shadow-[0_12px_40px_rgba(0,0,0,0.5)]"
+      >
+        <span className={`h-2 w-2 shrink-0 rounded-full ${DOT[announcement.tone]}`} aria-hidden />
+        <p className="min-w-0 leading-snug">
+          <span className="font-semibold text-text-primary">{announcement.title}</span>
+          {short && (
+            <span className="text-text-secondary">
+              {' '}
+              <span className="hidden sm:inline">— {short}</span>
+            </span>
           )}
         </p>
+        {hasAnnouncementCta(announcement) && (
+          <button
+            type="button"
+            onClick={() => runAnnouncementCta(announcement)}
+            className="public-link shrink-0 whitespace-nowrap text-sm"
+          >
+            {announcement.ctaLabel}
+            <ChevronRight size={15} aria-hidden />
+          </button>
+        )}
         <button
           type="button"
           onClick={live.dismiss}
           aria-label="Dismiss announcement"
-          className="shrink-0 p-1 rounded text-text-secondary hover:text-text-primary hover:bg-white/5 transition-colors focus-ring"
+          className="shrink-0 rounded-full p-1.5 text-text-secondary hover:text-text-primary hover:bg-white/10 transition-colors focus-ring"
         >
           <X size={14} />
         </button>
