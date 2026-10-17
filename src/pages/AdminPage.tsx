@@ -79,6 +79,7 @@ import { DormantSubscribersPanel } from '../components/admin/DormantSubscribersP
 import { AdminAuditPanel } from '../components/admin/AdminAuditPanel';
 import { dormantSubscribers, moneyAtRisk, trialStats } from '../utils/adminRisk';
 import { ADMIN_TABS, type AdminTab } from '../components/admin/adminTabs';
+import { publishedFigure, TRADERS_FLOOR, TRADES_FLOOR } from '../utils/publicFigures';
 import { BrokerStatusPanel } from '../components/admin/BrokerStatusPanel';
 import { fetchCostReport, type CostReport } from '../services/adminCosts';
 import {
@@ -583,6 +584,26 @@ function NeedsAttention({
 }
 
 /** CSV exports collapsed into one control. They were a full panel competing with real data. */
+/** One of the proof strip's figures: the raw count, and what the public sees (or why nothing yet). */
+function ProofFigure({ label, raw, floor }: { label: string; raw: number | null; floor: number }) {
+  const shown = publishedFigure(raw, floor);
+  return (
+    <div className="mt-2 first:mt-0">
+      <p className="text-xs text-text-secondary">{label}</p>
+      <p className="text-xl font-bold tracking-tight tabular-nums">
+        {raw === null ? '—' : raw.toLocaleString()}
+        <span className="ml-2 text-xs font-medium text-text-secondary">
+          {raw === null
+            ? 'not counted'
+            : shown !== null
+              ? `shows as ${shown.toLocaleString()}+`
+              : `hidden until ${floor.toLocaleString()}`}
+        </span>
+      </p>
+    </div>
+  );
+}
+
 function ExportMenu({
   onUsers,
   onBugs,
@@ -1801,6 +1822,32 @@ export function AdminPage({ onHome }: AdminPageProps) {
                       ))}
                     </div>
                   )}
+                </div>
+
+                {/*
+                  What the landing page's proof strip is saying, and how close each withheld figure
+                  is to showing. The strip publishes only floored, rounded values; this is the raw
+                  count beside the rule, so "when will traders show up" has an answer.
+                */}
+                <div className="panel-card rounded-xl p-5 md:p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-lg bg-accent/10 text-accent">
+                      <BarChart3 size={18} />
+                    </div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                      Proof strip
+                    </p>
+                  </div>
+                  <ProofFigure
+                    label="Trades journaled"
+                    raw={ready.serverStats?.journalTradeCount ?? null}
+                    floor={TRADES_FLOOR}
+                  />
+                  <ProofFigure
+                    label="Traders"
+                    raw={ready.serverStats?.firestoreUserCount ?? null}
+                    floor={TRADERS_FLOOR}
+                  />
                 </div>
 
                 <div className="panel-card rounded-xl p-5 md:p-6">

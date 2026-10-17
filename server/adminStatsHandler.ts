@@ -48,6 +48,13 @@ export interface AdminStatsResponse {
    * ever started the connect flow appear — everyone else is trivially not connected.
    */
   brokerUsers: AdminBrokerUser[];
+  /**
+   * Every journal entry across every user — the raw count behind the landing page's proof strip,
+   * so the owner can see how far each public figure is from its floor. The strip itself publishes
+   * only floored, rounded values (server/publicStats.ts); this is the admin's view of the truth.
+   * Null when the count could not be read.
+   */
+  journalTradeCount: number | null;
 }
 
 export interface AdminBrokerUser {
@@ -409,11 +416,22 @@ export async function handleAdminStatsRequest(
       pageToken = result.pageToken;
     } while (pageToken);
 
-    const [firestoreUserCountSnap, usernameCountSnap, firestoreUsersSnap, brokerStats] =
+    const [firestoreUserCountSnap, usernameCountSnap, firestoreUsersSnap, journalTradeCount, brokerStats] =
       await Promise.all([
         db.collection('users').count().get(),
         db.collection('usernames').count().get(),
         db.collection('users').select().get(),
+        // A collection-group count: one read per thousand entries, and allowed to fail alone — the
+        // tile says "unknown" rather than the whole panel failing over a figure for the landing page.
+        db
+          .collectionGroup('trades')
+          .count()
+          .get()
+          .then((s) => s.data().count as number)
+          .catch((err: unknown) => {
+            console.warn('[admin-stats] journal trade count failed:', err);
+            return null;
+          }),
         collectBrokerStats(db).catch((err) => {
           console.warn('[admin-stats] broker stats failed:', err);
           return {
@@ -466,6 +484,7 @@ export async function handleAdminStatsRequest(
       brokerInstitutions: brokerStats.institutions,
       brokerStatsPartial: brokerStats.partial,
       brokerNeedsReconnectCount: brokerStats.needsReconnect,
+      journalTradeCount,
       brokerUsers: brokerStats.users,
     };
 

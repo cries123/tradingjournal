@@ -18,8 +18,11 @@
  * most — against a site that has run out of its daily read quota before.
  */
 
-export const TRADES_FLOOR = 1_000;
-export const TRADERS_FLOOR = 100;
+import { publishedFigure, roundDownForDisplay, TRADERS_FLOOR, TRADES_FLOOR } from '../src/utils/publicFigures';
+
+// The rules live in src/utils/publicFigures.ts so the admin tile can say how close a figure is to
+// showing; re-exported here for the callers and tests that read them from the server side.
+export { roundDownForDisplay, TRADERS_FLOOR, TRADES_FLOOR };
 
 export interface PublicCounts {
   /** Every journal entry, across every user — the `trades` subcollection under users/{uid}. */
@@ -34,21 +37,11 @@ export interface PublicStats {
   updatedAt: string;
 }
 
-/** 12,437 → 12,000; 1,874 → 1,800; 437 → 430. Never rounds up, so the "+" is always true. */
-export function roundDownForDisplay(n: number): number {
-  if (!Number.isFinite(n) || n <= 0) return 0;
-  const digits = Math.floor(Math.log10(n)) + 1;
-  const unit = 10 ** Math.max(0, digits - 2);
-  return Math.floor(n / unit) * unit;
-}
-
 /** Applies the floors and the rounding. A figure that could not be counted stays null. */
 export function publicFigures(counts: PublicCounts, now: Date): PublicStats {
-  const shown = (n: number | null, floor: number) =>
-    n === null || n < floor ? null : roundDownForDisplay(n);
   return {
-    trades: shown(counts.trades, TRADES_FLOOR),
-    traders: shown(counts.traders, TRADERS_FLOOR),
+    trades: publishedFigure(counts.trades, TRADES_FLOOR),
+    traders: publishedFigure(counts.traders, TRADERS_FLOOR),
     updatedAt: now.toISOString(),
   };
 }

@@ -26,6 +26,8 @@ export interface AdminServerStats {
   brokerStatsPartial: boolean;
   /** Users whose stored secret the current SnapTrade credentials rejected — they must reconnect. */
   brokerNeedsReconnectCount: number;
+  /** Every journal entry across every user; null when it could not be counted or the function predates it. */
+  journalTradeCount: number | null;
   /** Per-user connection state. Only users who ever started the connect flow appear here. */
   brokerUsers: AdminBrokerUser[];
 }
@@ -98,6 +100,10 @@ export async function fetchAdminServerStats(): Promise<AdminServerStatsResult> {
         brokerInstitutions: Array.isArray(data.brokerInstitutions) ? data.brokerInstitutions : [],
         brokerStatsPartial: data.brokerStatsPartial === true,
         brokerNeedsReconnectCount: num(data.brokerNeedsReconnectCount),
+        journalTradeCount:
+          typeof data.journalTradeCount === 'number' && Number.isFinite(data.journalTradeCount)
+            ? data.journalTradeCount
+            : null,
         // An older deploy of the function won't send this. An empty list means the Users tab shows
         // "unknown" rather than confidently claiming nobody is connected.
         brokerUsers: Array.isArray(data.brokerUsers)
