@@ -287,7 +287,7 @@ export function ShareCardModal({ period, stats, dateKey = '', year, month = 0, o
                 title="Milky Way (default)"
                 aria-label="Use the default Milky Way background"
               >
-                <span className="absolute inset-0 bg-gradient-to-br from-[#111827] via-[#0a0f18] to-[#07090f]" />
+                <span className="absolute inset-0 bg-gradient-to-br from-[#111827] via-[#0a0f18] to-[#000000]" />
                 <Sparkles size={14} className="absolute inset-0 m-auto text-white/70" />
               </button>
 

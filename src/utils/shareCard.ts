@@ -128,9 +128,9 @@ const STARFIELD_DEFS = `<linearGradient id="starFadeLandscape" x1="0" y1="0" x2=
     <clipPath id="cardClipLandscape"><rect width="600" height="400" rx="32"/></clipPath>
     <clipPath id="cardClipPortrait"><rect width="450" height="800" rx="40"/></clipPath>
     <linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#07090f" stop-opacity="0.62"/>
-      <stop offset="46%" stop-color="#07090f" stop-opacity="0.32"/>
-      <stop offset="100%" stop-color="#07090f" stop-opacity="0.8"/>
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.62"/>
+      <stop offset="46%" stop-color="#000000" stop-opacity="0.32"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.8"/>
     </linearGradient>`;
 
 /** Per-accent nebula glow gradients — regenerated with the resolved accent colors rather than
@@ -214,7 +214,7 @@ function backgroundLayer(orientation: ShareCardOrientation, backgroundImageHref?
 
   if (backgroundImageHref) {
     const clip = orientation === 'portrait' ? 'cardClipPortrait' : 'cardClipLandscape';
-    return `<rect width="${width}" height="${height}" fill="#07090f"/>
+    return `<rect width="${width}" height="${height}" fill="#000000"/>
   <image href="${escapeXml(backgroundImageHref)}" x="0" y="0" width="${width}" height="${height}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clip})"/>
   <rect width="${width}" height="${height}" fill="url(#scrim)"/>`;
   }
@@ -420,7 +420,7 @@ function buildShareSvgLandscape(
     <linearGradient id="bg" x1="0" y1="0" x2="0.6" y2="1">
       <stop offset="0%" stop-color="#111827"/>
       <stop offset="55%" stop-color="#0a0f18"/>
-      <stop offset="100%" stop-color="#07090f"/>
+      <stop offset="100%" stop-color="#000000"/>
     </linearGradient>
     <filter id="pnlGlow" x="-20%" y="-20%" width="140%" height="140%">
       <feGaussianBlur stdDeviation="3" result="blur"/>
@@ -502,7 +502,7 @@ function buildShareSvgPortrait(
     <linearGradient id="bg" x1="0" y1="0" x2="0.4" y2="1">
       <stop offset="0%" stop-color="#111827"/>
       <stop offset="55%" stop-color="#0a0f18"/>
-      <stop offset="100%" stop-color="#07090f"/>
+      <stop offset="100%" stop-color="#000000"/>
     </linearGradient>
     <filter id="pnlGlow" x="-20%" y="-20%" width="140%" height="140%">
       <feGaussianBlur stdDeviation="3" result="blur"/>

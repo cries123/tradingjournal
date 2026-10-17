@@ -11,7 +11,15 @@
       nobody recognised was the one search results and tabs actually showed. Removed rather than
       redrawn: the logo has no vector original, and an SVG wrapping a bitmap buys nothing.
     -->
+    <!--
+      48 and 96 as well as 16 and 32: Google only picks up a favicon that is a multiple of 48px,
+      so search results showed the generic globe for as long as 32 was the largest on offer. The
+      home-screen icons are in the manifest (Android, desktop) and the apple-touch-icon (iOS); all
+      of them are the mark on black, drawn by dist/icons.mjs from favicon.png.
+    -->
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon-96.png" type="image/png" sizes="96x96" />
+    <link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48" />
     <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="/favicon-16.png" type="image/png" sizes="16x16" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
@@ -23,7 +31,7 @@
     <meta name="description" content="Free trading journal with a visual P&amp;L calendar. Import from 20 brokers including Schwab and Robinhood, or log by hand. Track win rate and profit factor." />
     <meta name="keywords" content="Trend Chasers, trading journal, P&amp;L calendar, trade tracker, options journal, day trading journal" />
     <meta name="robots" content="index, follow" />
-    <meta name="theme-color" content="#07090f" />
+    <meta name="theme-color" content="#000000" />
     <link rel="canonical" href="https://trendchasers.net/" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://trendchasers.net/" />
