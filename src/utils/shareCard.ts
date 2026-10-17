@@ -439,7 +439,7 @@ function buildShareSvgLandscape(
   <line x1="0" y1="96" x2="600" y2="96" stroke="rgba(148,163,184,0.12)" stroke-width="1"/>
 
   ${shareLogoMark(markHref)}
-  <text x="92" y="52" fill="#6cd59f" font-family="Montserrat, system-ui, sans-serif" font-size="14" font-weight="900" letter-spacing="1.5">TREND</text>
+  <text x="92" y="52" fill="#7aff45" font-family="Montserrat, system-ui, sans-serif" font-size="14" font-weight="900" letter-spacing="1.5">TREND</text>
   <text x="92" y="68" fill="#f8fafc" font-family="Montserrat, system-ui, sans-serif" font-size="14" font-weight="900" letter-spacing="1.5">CHASERS</text>
   <text x="92" y="82" fill="#8e939d" font-family="system-ui, sans-serif" font-size="10">Track · Analyze · Improve</text>
   <text x="552" y="62" fill="${accent.primary}" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="600" text-anchor="end">@${username}</text>
@@ -519,7 +519,7 @@ function buildShareSvgPortrait(
   ${backgroundLayer('portrait', backgroundImageHref)}
 
   <image href="${markHref}" x="196" y="24" width="58" height="56"/>
-  <text x="225" y="118" fill="#6cd59f" font-family="Montserrat, system-ui, sans-serif" font-size="15" font-weight="900" letter-spacing="1.5" text-anchor="middle">TREND CHASERS</text>
+  <text x="225" y="118" fill="#7aff45" font-family="Montserrat, system-ui, sans-serif" font-size="15" font-weight="900" letter-spacing="1.5" text-anchor="middle">TREND CHASERS</text>
   <text x="225" y="138" fill="#8e939d" font-family="system-ui, sans-serif" font-size="11" text-anchor="middle">Track · Analyze · Improve</text>
   <text x="225" y="168" fill="${accent.primary}" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="600" text-anchor="middle">@${username}</text>
 

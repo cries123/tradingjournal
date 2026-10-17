@@ -422,7 +422,7 @@ function ShareCardPreview({
 
         <div className="px-5 pt-6 pb-4 text-center border-b border-white/5">
           <img src="/logo-mark.svg" alt="" aria-hidden className="w-12 h-12 mx-auto mb-3" />
-          <p className="text-xs font-black tracking-[0.12em] text-[#6cd59f]">TREND CHASERS</p>
+          <p className="text-xs font-black tracking-[0.12em] text-[#7aff45]">TREND CHASERS</p>
           <p className="text-[10px] text-[#8e939d] mt-1">Track · Analyze · Improve</p>
           <p className="text-xs font-semibold mt-3" style={usernameStyle}>@{username}</p>
         </div>
@@ -491,7 +491,7 @@ function ShareCardPreview({
           <div className="flex items-center gap-3 min-w-0">
             <img src="/logo-mark.svg" alt="" aria-hidden className="w-10 h-10 shrink-0" />
             <div className="min-w-0 leading-none">
-              <p className="text-xs font-black tracking-[0.12em] text-[#6cd59f]">TREND</p>
+              <p className="text-xs font-black tracking-[0.12em] text-[#7aff45]">TREND</p>
               <p className="text-xs font-black tracking-[0.12em] text-text-primary">CHASERS</p>
               <p className="text-[10px] text-[#8e939d] mt-1">Track · Analyze · Improve</p>
             </div>
