@@ -391,9 +391,18 @@ describe('the stylesheet', () => {
   })();
 
   it('switches the new animations off under reduced motion', () => {
-    for (const name of ['.animate-scale-out', '.animate-backdrop-out', '.skeleton-shimmer', '.animate-msg-in', '.typing-dot']) {
+    for (const name of ['.animate-scale-out', '.animate-backdrop-out', '.skeleton-shimmer', '.animate-msg-in', '.typing-dot', '.hero-flip']) {
       expect(reduce).toContain(name);
     }
+  });
+
+  it('sweeps the P&L card only when the sign flips, not on arrival', () => {
+    // A first paint has no previous sign to flip from, so the sweep is never in the snapshot.
+    const html = paint(createElement(StatsCards, { stats: computeStats([trade({ pnl: 200 })]) }));
+    expect(html).not.toContain('hero-flip');
+    const source = readFileSync('src/components/StatsCards.tsx', 'utf8');
+    expect(source).toContain('if (was === null || sign === null || was === sign) return;');
+    expect(source).toContain('<span key={flip} className="hero-flip"');
   });
 
   it('only hides a card or a bar while waiting when motion is welcome', () => {

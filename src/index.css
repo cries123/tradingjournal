@@ -903,6 +903,30 @@ body {
   border-color: rgba(248, 113, 113, 0.22);
 }
 
+/*
+ * The sweep that crosses the P&L card when the month changes sign — once, in the colour it just
+ * became. StatsCards mounts it with a fresh key on each flip so it replays; it paints on the
+ * compositor only (transform and opacity) and is gone in under a second.
+ */
+.hero-flip {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(var(--color-profit-bright-rgb), 0.28) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: hero-flip 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.hero-card.hero-loss .hero-flip {
+  background: linear-gradient(100deg, transparent 30%, rgba(248, 113, 113, 0.26) 50%, transparent 70%);
+}
+
+@keyframes hero-flip {
+  from { transform: translateX(-100%); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+
 .hero-card.hero-loss::before {
   background: radial-gradient(ellipse 60% 90% at 8% 0%, rgba(248, 113, 113, 0.12), transparent 60%);
 }
@@ -1122,7 +1146,8 @@ details.faq-item[open] summary {
   .animate-backdrop-out,
   .skeleton-shimmer,
   .animate-msg-in,
-  .typing-dot {
+  .typing-dot,
+  .hero-flip {
     animation: none !important;
   }
 

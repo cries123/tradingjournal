@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Flame, Target } from 'lucide-react';
 import { CountUp } from './motion/CountUp';
 import { useSettings } from '../context/useSettings';
@@ -47,8 +47,28 @@ export function StatsCards({
 
   const tone = (good: boolean) => (good ? 'text-profit-bright' : 'text-loss-bright');
 
+  /*
+   * The moment the month changes sign.
+   *
+   * The figure already rolls to its new value; the card did not mark the one change that matters
+   * — green to red, or red back to green — so a sync that pushed the month under water looked like
+   * any other update. A sweep of the new colour crosses the card once when the sign flips with
+   * trades on both sides of the change (a first trade is an arrival, not a flip). The key makes
+   * the sweep replay on each flip; reduced motion turns it off in the stylesheet.
+   */
+  const sign = hasTrades ? isProfit : null;
+  const lastSign = useRef<boolean | null>(sign);
+  const [flip, setFlip] = useState(0);
+  useEffect(() => {
+    const was = lastSign.current;
+    lastSign.current = sign;
+    if (was === null || sign === null || was === sign) return;
+    setFlip((n) => n + 1);
+  }, [sign]);
+
   return (
     <div className={`hero-card ${!isProfit && hasTrades ? 'hero-loss' : ''} shrink-0 p-3 md:p-5`}>
+      {flip > 0 && <span key={flip} className="hero-flip" aria-hidden />}
       <div className="relative flex flex-col md:flex-row md:items-center gap-3 md:gap-8">
         <div className="min-w-0 shrink-0">
           <p className="text-[9px] md:text-[11px] uppercase tracking-[0.2em] text-text-secondary font-semibold">
