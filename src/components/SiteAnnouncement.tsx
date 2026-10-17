@@ -2,6 +2,7 @@ import { ChevronRight, X } from 'lucide-react';
 import type { Announcement, AnnouncementTone } from '../services/announcement';
 import { useAnnouncement } from '../hooks/useAnnouncement';
 import { hasAnnouncementCta, runAnnouncementCta } from '../utils/announcementVisibility';
+import { AnnouncementModal } from './AnnouncementModal';
 
 /**
  * The tone is a glow along the card's left edge and the colour of the dot — not a tinted box. A
@@ -45,6 +46,17 @@ export function SiteAnnouncement({ onConnectBroker, preview }: SiteAnnouncementP
   const visible = preview ? Boolean(preview.title.trim()) : live.visible;
 
   if (!announcement || !visible) return null;
+
+  if (announcement.display === 'modal') {
+    return (
+      <AnnouncementModal
+        announcement={announcement}
+        inline={Boolean(preview)}
+        onDismiss={live.dismiss}
+        onCta={() => runAnnouncementCta(announcement, { onConnectBroker })}
+      />
+    );
+  }
 
   const tone = TONE[announcement.tone];
   const showCta = hasAnnouncementCta(announcement);

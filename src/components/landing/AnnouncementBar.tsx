@@ -2,6 +2,7 @@ import { ChevronRight, X } from 'lucide-react';
 import type { Announcement, AnnouncementTone } from '../../services/announcement';
 import { useAnnouncement } from '../../hooks/useAnnouncement';
 import { hasAnnouncementCta, runAnnouncementCta } from '../../utils/announcementVisibility';
+import { AnnouncementModal } from '../AnnouncementModal';
 
 /** One dot carries the tone. Lime is the brand's "good news", amber the "heads up". */
 const DOT: Record<AnnouncementTone, string> = {
@@ -13,6 +14,8 @@ const DOT: Record<AnnouncementTone, string> = {
 interface AnnouncementBarProps {
   /** Renders a fixed announcement instead of the published one, for the admin preview. */
   preview?: Announcement;
+  /** For a "Connect broker" button, which on the public site opens the journal on that screen. */
+  onConnectBroker?: () => void;
 }
 
 /**
@@ -27,13 +30,24 @@ interface AnnouncementBarProps {
  * Same message and same dismissal as the dashboard card (see useAnnouncement) — one announcement,
  * closed once.
  */
-export function AnnouncementBar({ preview }: AnnouncementBarProps) {
+export function AnnouncementBar({ preview, onConnectBroker }: AnnouncementBarProps) {
   const live = useAnnouncement();
 
   const announcement = preview ?? live.announcement;
   const visible = preview ? Boolean(preview.title.trim()) : live.visible;
 
   if (!announcement || !visible) return null;
+
+  if (announcement.display === 'modal') {
+    return (
+      <AnnouncementModal
+        announcement={announcement}
+        inline={Boolean(preview)}
+        onDismiss={live.dismiss}
+        onCta={() => runAnnouncementCta(announcement, { onConnectBroker })}
+      />
+    );
+  }
 
   const short = announcement.bodyShort.trim() || announcement.body.trim();
 
@@ -56,7 +70,7 @@ export function AnnouncementBar({ preview }: AnnouncementBarProps) {
         {hasAnnouncementCta(announcement) && (
           <button
             type="button"
-            onClick={() => runAnnouncementCta(announcement)}
+            onClick={() => runAnnouncementCta(announcement, { onConnectBroker })}
             className="public-link shrink-0 whitespace-nowrap text-sm"
           >
             {announcement.ctaLabel}

@@ -6,8 +6,14 @@ import {
   saveAnnouncement,
   type Announcement,
   type AnnouncementCta,
+  type AnnouncementDisplay,
   type AnnouncementTone,
 } from '../../services/announcement';
+
+const DISPLAYS: { id: AnnouncementDisplay; label: string }[] = [
+  { id: 'banner', label: 'Banner — stays at the top until closed' },
+  { id: 'modal', label: 'Pop-up card — shown once, mid-screen' },
+];
 import { SiteAnnouncement } from '../SiteAnnouncement';
 import { AnnouncementBar } from '../landing/AnnouncementBar';
 
@@ -84,6 +90,7 @@ export function AdminAnnouncementCard({ onAudit }: AdminAnnouncementCardProps) {
           body: draft.body.trim(),
           bodyShort: draft.bodyShort.trim(),
           tone: draft.tone,
+          display: draft.display,
           cta: draft.cta,
           ctaLabel: draft.ctaLabel.trim(),
           ctaUrl: draft.ctaUrl.trim(),
@@ -172,6 +179,24 @@ export function AdminAnnouncementCard({ onAudit }: AdminAnnouncementCardProps) {
             />
           </div>
 
+          <div>
+            <label className={label} htmlFor="ann-display">
+              Show it as
+            </label>
+            <select
+              id="ann-display"
+              className={field}
+              value={draft.display}
+              onChange={(e) => set('display', e.target.value as AnnouncementDisplay)}
+            >
+              {DISPLAYS.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className={label} htmlFor="ann-tone">
@@ -250,7 +275,16 @@ export function AdminAnnouncementCard({ onAudit }: AdminAnnouncementCardProps) {
                 </span>
               )}
             </p>
-            {draft.title.trim() ? (
+            {draft.title.trim() && draft.display === 'modal' ? (
+              <div>
+                <p className="text-[11px] text-text-secondary/70 mb-1.5">
+                  Pops up once on the site and in the journal, a moment after the page loads
+                </p>
+                <div className="rounded-xl border border-border/60 bg-black p-6">
+                  <SiteAnnouncement preview={{ ...draft, enabled: true }} />
+                </div>
+              </div>
+            ) : draft.title.trim() ? (
               <>
                 <div>
                   <p className="text-[11px] text-text-secondary/70 mb-1.5">

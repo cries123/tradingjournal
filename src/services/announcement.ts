@@ -4,6 +4,13 @@ import { lazyFirestore } from '../lib/lazyFirestore';
 
 export type AnnouncementTone = 'info' | 'success' | 'warning';
 
+/**
+ * How it is shown. A banner sits at the top of the page until it is closed; a pop-up is a card in
+ * the middle of the screen, once — the format for a launch or an offer, where a line at the top of
+ * the page is too easy to scroll past.
+ */
+export type AnnouncementDisplay = 'banner' | 'modal';
+
 /** Where the banner's button sends people. A fixed list, not a free-form path, so a typo in the
  *  admin panel can't produce a dead link — and so nothing arbitrary can be injected into a nav. */
 export type AnnouncementCta = 'none' | 'connect-broker' | 'pricing' | 'help-center' | 'whats-new' | 'url';
@@ -16,6 +23,8 @@ export interface Announcement {
   /** The phone version. Falls back to `body` when empty. */
   bodyShort: string;
   tone: AnnouncementTone;
+  /** Absent on everything published before pop-ups existed, which reads as 'banner'. */
+  display: AnnouncementDisplay;
   cta: AnnouncementCta;
   ctaLabel: string;
   /** Only used when cta === 'url'. */
@@ -35,6 +44,7 @@ export const EMPTY_ANNOUNCEMENT: Announcement = {
   body: '',
   bodyShort: '',
   tone: 'info',
+  display: 'banner',
   cta: 'none',
   ctaLabel: '',
   ctaUrl: '',
@@ -72,13 +82,15 @@ function writeCache(value: Announcement): void {
   }
 }
 
-function normalize(data: Partial<Announcement>): Announcement {
+/** Only the shapes we accept — exported so the "old documents read as a banner" rule is tested. */
+export function normalizeAnnouncement(data: Partial<Announcement>): Announcement {
   return {
     enabled: data.enabled === true,
     title: typeof data.title === 'string' ? data.title : '',
     body: typeof data.body === 'string' ? data.body : '',
     bodyShort: typeof data.bodyShort === 'string' ? data.bodyShort : '',
     tone: data.tone === 'success' || data.tone === 'warning' ? data.tone : 'info',
+    display: data.display === 'modal' ? 'modal' : 'banner',
     cta:
       data.cta === 'connect-broker' ||
       data.cta === 'pricing' ||
@@ -105,7 +117,7 @@ export async function fetchAnnouncement(options?: { fresh?: boolean }): Promise<
   try {
     const { fs, db } = await lazyFirestore();
     const snap = await fs.getDoc(fs.doc(db, 'config', 'announcement'));
-    const value = snap.exists() ? normalize(snap.data() as Partial<Announcement>) : EMPTY_ANNOUNCEMENT;
+    const value = snap.exists() ? normalizeAnnouncement(snap.data() as Partial<Announcement>) : EMPTY_ANNOUNCEMENT;
     writeCache(value);
     return value;
   } catch {

@@ -364,6 +364,7 @@ describe('dialogs play out instead of vanishing', () => {
     'src/components/OnboardingOverlay.tsx',
     'src/components/search/JournalSearch.tsx',
     'src/components/analytics/AssistantDock.tsx',
+    'src/components/AnnouncementModal.tsx',
   ];
 
   it('route every way out through the exit animation', () => {
