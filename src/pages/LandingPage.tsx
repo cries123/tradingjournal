@@ -147,8 +147,11 @@ export function LandingPage({
       onPointerMove={trackSpotlight}
     >
       <SiteBackdrop />
-      <AnnouncementBar onConnectBroker={onConnectBroker ?? onLaunch} />
       <LandingNav onLaunch={onLaunch} onHome={onHome} onBrokers={onBrokers} onGuides={onGuides} onNavigate={onNavigate} />
+      {/* Under the nav, not above it: a pill above the header left a dark band over the whole site
+          with one small object floating in it. Here it sits at the top of the hero, where a pinned
+          notice belongs, and the header stays the first thing on the page. */}
+      <AnnouncementBar onConnectBroker={onConnectBroker ?? onLaunch} />
       <StickyCta watch={heroRef} label="Start for free" onClick={onLaunch} />
 
       {/* Hero: the headline over a skyline of bars, the product itself underneath. */}

@@ -52,7 +52,8 @@ export function AnnouncementBar({ preview, onConnectBroker }: AnnouncementBarPro
   const short = announcement.bodyShort.trim() || announcement.body.trim();
 
   return (
-    <div className="relative z-20 px-4 pt-4">
+    /* Negative bottom margin: the hero's own top padding is the space under this, not more of it. */
+    <div className="relative z-20 px-4 pt-5 -mb-8 md:-mb-12">
       <div
         role="status"
         className="mx-auto flex w-fit max-w-3xl items-center gap-3 rounded-full border border-white/8 bg-[#141414] py-2 pl-4 pr-2 text-sm shadow-[0_12px_40px_rgba(0,0,0,0.5)]"
