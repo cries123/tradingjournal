@@ -65,20 +65,12 @@ export const BROKER_REGISTRY: BrokerRegistryEntry[] = [
     matchNeedles: ['schwab'],
     access: 'Read & sync',
     hasLogo: true,
-    // Not an outage. Each brokerage approves a production API key separately, and Schwab's review
-    // takes about a week — Robinhood and Fidelity clear in a day or two, which is why they worked
-    // immediately and this did not. Until Schwab approves, Akoya answers "Subscription
-    // unavailable" before their login is ever reached. Production key approved 2026-08-31, so
-    // expect this to clear in the week after. Delete this status block once it does.
-    status: {
-      kind: 'down',
-      message:
-        'Schwab is finishing its review of our connection — brokerages approve each app ' +
-        'individually, and Schwab’s takes about a week. Connections will open as soon as they ' +
-        'approve it. Trades you have already imported are unaffected, and Robinhood and manual ' +
-        'entry work as normal in the meantime.',
-      since: '2026-08-31',
-    },
+    // No status block: Schwab approved the production key on 2026-08-31 and the connection has
+    // worked since. A hardcoded "down" sat here for six weeks after that, cleared in production
+    // only by the admin panel's override — so every prerendered page, every visitor whose status
+    // read failed, and every local build still said "Temporarily unavailable" for Schwab and
+    // thinkorswim. The registry is the fallback and the fallback has to be true; taking a broker
+    // down is the override's job (admin → Broker status), not this file's.
   },
   { key: 'ROBINHOOD', name: 'Robinhood', brokerId: 'robinhood', matchNeedles: ['robinhood'], access: 'Read-only', hasLogo: true },
   { key: 'WEBULL', name: 'Webull', brokerId: 'webull', matchNeedles: ['webull'], excludeNeedles: ['canada'], access: 'Read-only', hasLogo: true },

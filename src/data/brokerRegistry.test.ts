@@ -21,12 +21,24 @@ describe('broker status', () => {
     }
   });
 
-  it('keeps Schwab reachable in the registry while it is down', () => {
+  it('keeps Schwab reachable in the registry whatever its status', () => {
     // Down must not mean removed: existing connections still sync and the key has to keep
     // resolving, or a user with a live Schwab connection loses access to their own account.
     const schwab = brokerRegistryEntry('SCHWAB');
     expect(schwab).toBeDefined();
     expect(schwab?.name).toBe('Charles Schwab');
+  });
+
+  it('ships no broker hardcoded as down — availability is the admin override’s job', () => {
+    /*
+     * Schwab carried a hardcoded "down" for six weeks after its key was approved. The override in
+     * Firestore cleared it in production, but the registry is what the prerendered pages, a failed
+     * status read and every local build show — so thinkorswim and Schwab read "Temporarily
+     * unavailable" on the public brokers page long after both worked. The registry is the fallback,
+     * and the fallback has to be the truth; taking a broker down lives in admin → Broker status.
+     */
+    const hardcodedDown = BROKER_REGISTRY.filter((b) => b.status?.kind === 'down').map((b) => b.key);
+    expect(hardcodedDown).toEqual([]);
   });
 });
 
