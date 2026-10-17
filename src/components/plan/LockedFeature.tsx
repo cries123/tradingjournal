@@ -100,7 +100,11 @@ export function LockedFeature({
         {children}
       </div>
 
-      <div className="[grid-area:1/1] flex items-center justify-center p-4 sm:p-6">
+      {/* Pinned a fixed distance from the top, not centred: centring put the card wherever half the
+          preview's height happened to be, so it sat high on Performance and the simulator (tall
+          previews, clipped at the cap) and low on the assistant and track record (short ones). The
+          same card in the same place on every locked screen is what makes it read as one paywall. */}
+      <div className="[grid-area:1/1] flex items-start justify-center p-4 pt-10 sm:p-6 sm:pt-16">
         <div className="w-full max-w-md rounded-2xl border border-border bg-bg-card/95 backdrop-blur-sm p-5 sm:p-6 text-center shadow-2xl">
           <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-bg-tertiary mb-3">
             <Lock className="w-4 h-4 text-text-secondary" aria-hidden />
