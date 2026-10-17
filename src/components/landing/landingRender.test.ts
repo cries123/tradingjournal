@@ -5,8 +5,11 @@ import { describe, expect, it } from 'vitest';
 import { DashboardPreview } from './DashboardPreview';
 import { AssistantDemo } from './AssistantDemo';
 import { BrokerMarquee } from './BrokerMarquee';
+import { BrokerGrid } from './BrokerGrid';
 import { LandingFaq } from './LandingFaq';
 import { LANDING_FAQ } from '../../seo/faq';
+import { SUPPORTED_BROKERS } from '../../data/brokers';
+import { resolveBroker } from '../../utils/brokerIds';
 import { demoInsights, demoJournal } from './landingDemo';
 
 /*
@@ -63,6 +66,73 @@ describe('the broker strip', () => {
 
   it('renders nothing with no brokers', () => {
     expect(renderToString(createElement(BrokerMarquee, { names: [] }))).toBe('');
+  });
+});
+
+describe('the broker card', () => {
+  const html = renderToString(createElement(BrokerGrid, { names: SUPPORTED_BROKERS.map((b) => b.name) }));
+
+  /*
+   * Every word a tile can show, in the tile's font — Figtree 600 at 14px — measured with
+   * canvas.measureText in Chrome on 2026-10-17. A broker added with a word that is not here fails
+   * the last test, which is the prompt to measure it before it can wrap mid-word on the live page.
+   */
+  const WORD_PX: Record<string, number> = {
+    Management: 83.8, TradeStation: 82.2, thinkorswim: 78.5, Robinhood: 69.2, Interactive: 69.1,
+    tastytrade: 66.5, Vanguard: 61.6, 'E*TRADE': 59.8, Coinbase: 59.5, Moomoo: 56.6, Schwab: 50.7,
+    Edward: 48.4, Brokers: 48.1, Charles: 48, Fidelity: 47.3, Wealth: 44.8, Tradier: 44.4,
+    Alpaca: 43.7, Webull: 43.6, Chase: 39.6, Public: 38.9, Jones: 37.8, TIAA: 31.5, PNC: 29.3,
+    Citi: 22.6,
+  };
+  const widest = Math.max(...Object.values(WORD_PX));
+
+  it('is what the landing page shows', () => {
+    expect(readFileSync('src/pages/LandingPage.tsx', 'utf8')).toContain('<BrokerGrid');
+  });
+
+  it('wraps a name only between words', () => {
+    // At 1600px this card printed "thinkors / wim" and "Vanguar / d": min-w-0 let the name shrink
+    // below its longest word and break-words then split the word to fit.
+    const labels = [...html.matchAll(/<span class="([^"]*)">([^<]+)<\/span>/g)];
+    expect(labels.map(([, , name]) => name)).toContain('thinkorswim');
+    expect(labels).toHaveLength(8);
+    for (const [, classes] of labels) {
+      const list = classes.split(' ');
+      expect(list).toContain('break-normal');
+      for (const splitter of ['min-w-0', 'break-words', 'break-all', 'wrap-anywhere', 'wrap-break-word']) {
+        expect(list).not.toContain(splitter);
+      }
+    }
+  });
+
+  it('takes its columns and its tile layout from the card, not the screen', () => {
+    // sm:grid-cols-4 was a screen width. From lg the card shares its row and is half as wide, so
+    // four columns held on as the tiles shrank to 93px.
+    expect(html).not.toMatch(/\b(sm|md|lg|xl|2xl):grid-cols-/);
+    expect(html).toMatch(/<div class="@container"><div class="grid /);
+    expect(html.match(/class="@container [^"]*px-3[^"]*"/g)).toHaveLength(8);
+  });
+
+  it('leaves room for the widest word at every column count and in both tile layouts', () => {
+    // A tile's content box is its width less 24px of padding and 2px of border; tiles are 8px apart.
+    expect(html).toMatch(/grid-cols-1 [^"]*\bgap-2\b/);
+    const steps = [...html.matchAll(/@min-\[([\d.]+)rem\]:grid-cols-(\d+)/g)].map(([, rem, cols]) => ({
+      container: Number(rem) * 16,
+      cols: Number(cols),
+    }));
+    expect(steps.map((s) => s.cols)).toEqual([2, 4]);
+    for (const { container, cols } of steps) {
+      expect((container - (cols - 1) * 8) / cols - 26).toBeGreaterThanOrEqual(widest);
+    }
+    // Side by side only once the tile holds the 44px badge, the 10px gap and the word.
+    const sideBySide = html.match(/@min-\[([\d.]+)rem\]:flex-row/);
+    expect(sideBySide).not.toBeNull();
+    expect(Number(sideBySide![1]) * 16 - 44 - 10).toBeGreaterThanOrEqual(widest);
+  });
+
+  it('has a measurement for every word a supported broker shows', () => {
+    const words = SUPPORTED_BROKERS.flatMap((b) => (resolveBroker(b.name)?.name ?? b.name).split(' '));
+    expect(words.filter((w) => !(w in WORD_PX))).toEqual([]);
   });
 });
 
