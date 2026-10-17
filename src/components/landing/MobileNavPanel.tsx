@@ -105,7 +105,7 @@ export function MobileNavPanel({
             <div className="flex items-center gap-3 rounded-lg bg-bg-tertiary/40 px-3 py-3">
               <span
                 aria-hidden
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-emerald-500/15 text-sm font-bold text-emerald-300"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent/15 text-sm font-bold text-accent"
               >
                 {accountInitial(username, user)}
               </span>
@@ -130,7 +130,7 @@ export function MobileNavPanel({
           onClick={launch}
           className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
         >
-          <BookOpen className="h-4 w-4 text-emerald-400 shrink-0" aria-hidden />
+          <BookOpen className="h-4 w-4 text-accent shrink-0" aria-hidden />
           <span className="text-sm font-medium text-text-primary">Journal</span>
         </button>
         <button
@@ -138,7 +138,7 @@ export function MobileNavPanel({
           onClick={() => go('ai-assistant')}
           className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
         >
-          <Sparkles className="h-4 w-4 text-emerald-400 shrink-0" aria-hidden />
+          <Sparkles className="h-4 w-4 text-accent shrink-0" aria-hidden />
           <span className="text-sm font-medium text-text-primary">AI Assistant</span>
         </button>
         <button
@@ -146,7 +146,7 @@ export function MobileNavPanel({
           onClick={() => go('verified-records')}
           className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
         >
-          <BadgeCheck className="h-4 w-4 text-emerald-400 shrink-0" aria-hidden />
+          <BadgeCheck className="h-4 w-4 text-accent shrink-0" aria-hidden />
           <span className="text-sm font-medium text-text-primary">Verified Track Record</span>
         </button>
         <button
@@ -154,7 +154,7 @@ export function MobileNavPanel({
           onClick={() => go('pricing')}
           className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
         >
-          <Tag className="h-4 w-4 text-emerald-400 shrink-0" aria-hidden />
+          <Tag className="h-4 w-4 text-accent shrink-0" aria-hidden />
           <span className="text-sm font-medium text-text-primary">Pricing</span>
         </button>
         <button
@@ -162,7 +162,7 @@ export function MobileNavPanel({
           onClick={() => go('whats-new')}
           className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
         >
-          <Megaphone className="h-4 w-4 text-emerald-400 shrink-0" aria-hidden />
+          <Megaphone className="h-4 w-4 text-accent shrink-0" aria-hidden />
           <span className="text-sm font-medium text-text-primary">What&apos;s New</span>
         </button>
         <button
@@ -170,7 +170,7 @@ export function MobileNavPanel({
           onClick={() => go('market-simulator')}
           className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
         >
-          <Gauge className="h-4 w-4 text-emerald-400 shrink-0" aria-hidden />
+          <Gauge className="h-4 w-4 text-accent shrink-0" aria-hidden />
           <span className="text-sm font-medium text-text-primary">Market Simulator</span>
           <SoonBadge />
         </button>
@@ -182,7 +182,7 @@ export function MobileNavPanel({
           onClick={goGuides}
           className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
         >
-          <GraduationCap className="h-4 w-4 text-emerald-400 shrink-0" aria-hidden />
+          <GraduationCap className="h-4 w-4 text-accent shrink-0" aria-hidden />
           <span className="text-sm font-medium text-text-primary">Tutorials</span>
         </button>
         {showBrokersLink && (
@@ -191,7 +191,7 @@ export function MobileNavPanel({
             onClick={goBrokers}
             className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
           >
-            <Building2 className="h-4 w-4 text-emerald-400 shrink-0" aria-hidden />
+            <Building2 className="h-4 w-4 text-accent shrink-0" aria-hidden />
             <span className="text-sm font-medium text-text-primary">Brokers</span>
           </button>
         )}
@@ -200,7 +200,7 @@ export function MobileNavPanel({
           onClick={() => go('help-center')}
           className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
         >
-          <LifeBuoy className="h-4 w-4 text-emerald-400 shrink-0" aria-hidden />
+          <LifeBuoy className="h-4 w-4 text-accent shrink-0" aria-hidden />
           <span className="text-sm font-medium text-text-primary">Help Center</span>
         </button>
 

@@ -98,7 +98,7 @@ export function BrokerGuidePage({
           <ul className="space-y-2">
             {otherGuides.map((g) => (
               <li key={g.slug}>
-                <a href={g.path} className="text-emerald-400 hover:underline text-sm">
+                <a href={g.path} className="text-accent hover:underline text-sm">
                   {g.brokerName} trading journal →
                 </a>
               </li>

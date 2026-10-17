@@ -100,7 +100,7 @@ export function exportMonthReport(
   table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
   th, td { border-bottom: 1px solid #eee; padding: 0.5rem; text-align: left; }
   th { font-size: 0.75rem; text-transform: uppercase; color: #666; }
-  .win { color: #059669; }
+  .win { color: #2f7a0c; }
   .loss { color: #dc2626; }
   @media print { body { padding: 0; } }
 </style></head><body>

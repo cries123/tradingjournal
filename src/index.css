@@ -116,8 +116,8 @@ body {
 /* Landing page */
 .landing-grid {
   background-image:
-    linear-gradient(rgba(52, 211, 153, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(52, 211, 153, 0.03) 1px, transparent 1px);
+    linear-gradient(rgba(122, 255, 69, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(122, 255, 69, 0.03) 1px, transparent 1px);
   background-size: 48px 48px;
   mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black, transparent);
 }
@@ -149,14 +149,14 @@ body {
 .site-aurora::before {
   top: -25vmax;
   left: -15vmax;
-  background: radial-gradient(circle, rgba(52, 211, 153, 0.16), transparent 65%);
+  background: radial-gradient(circle, rgba(122, 255, 69, 0.16), transparent 65%);
   animation: aurora-a 28s ease-in-out infinite alternate;
 }
 
 .site-aurora::after {
   top: -20vmax;
   right: -20vmax;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.14), transparent 65%);
+  background: radial-gradient(circle, rgba(122, 255, 69, 0.14), transparent 65%);
   animation: aurora-b 34s ease-in-out infinite alternate;
 }
 
@@ -248,7 +248,7 @@ body {
   opacity: 0;
   transition: opacity 0.3s ease;
   /* Brand green on the landing page; inside the app --spot-rgb is the theme accent (.app-spotlight). */
-  background: radial-gradient(420px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(var(--spot-rgb, 52, 211, 153), 0.09), transparent 45%);
+  background: radial-gradient(420px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(var(--spot-rgb, 122, 255, 69), 0.09), transparent 45%);
 }
 
 @media (hover: hover) {
@@ -286,7 +286,7 @@ body {
 /* Fixed brand gradient — landing page only. Intentionally NOT theme-reactive: the public marketing
    page keeps one fixed look regardless of what a signed-in user later picks in Settings. */
 .text-gradient-brand {
-  background: linear-gradient(135deg, #34d399 0%, #38bdf8 100%);
+  background: linear-gradient(135deg, #7aff45 0%, #7aff45 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -324,8 +324,8 @@ body {
 
 /* Fixed brand glow border — landing page only, not theme-reactive. */
 .glow-border-brand {
-  border: 1px solid rgba(52, 211, 153, 0.2);
-  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.05), 0 20px 50px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(122, 255, 69, 0.2);
+  box-shadow: 0 0 0 1px rgba(122, 255, 69, 0.05), 0 20px 50px rgba(0, 0, 0, 0.45);
 }
 
 /*
@@ -849,7 +849,7 @@ body {
  * Unlayered, this `border` shorthand and this `box-shadow` beat every utility on the element. Six
  * cards outside the admin panel already carried an accent border that was doing nothing —
  * border-red-500/25 on both danger zones, border-amber-500/30 on the broker warning,
- * border-emerald-500/25 on the simulator and track-record cards — plus two hover:border-accent/40
+ * border-accent/25 on the simulator and track-record cards — plus two hover:border-accent/40
  * that lost to .panel-card:hover. The stale support ticket's ring-1 ring-amber-500/40 was the one
  * that made it visible: the ticket that has been waiting longest is the only card in the queue
  * meant to look different, and after the admin panel moved onto this treatment it stopped doing so.
@@ -1068,7 +1068,7 @@ details.faq-item:hover {
 }
 
 details.faq-item[open] {
-  border-color: rgba(52, 211, 153, 0.26);
+  border-color: rgba(122, 255, 69, 0.26);
   background: linear-gradient(145deg, rgba(14, 30, 28, 0.95), rgba(13, 17, 26, 0.88));
 }
 

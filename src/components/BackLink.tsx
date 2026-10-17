@@ -19,7 +19,7 @@ export function BackLink({ onHome, className = '' }: { onHome: () => void; class
         e.preventDefault();
         goBack();
       }}
-      className={`inline-flex items-center gap-2 text-sm text-text-secondary hover:text-emerald-400 transition-colors ${className}`}
+      className={`inline-flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors ${className}`}
     >
       <span aria-hidden>←</span> {label}
     </a>

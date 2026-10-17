@@ -9,7 +9,7 @@ type Currency = Parameters<typeof formatCurrency>[1];
  * it prints legibly on any printer and reads the same in a PDF viewer as it did in the app. Greens
  * and reds are darker than the app's, which are tuned for a dark background and wash out on paper.
  */
-const GAIN = 'text-emerald-700';
+const GAIN = 'text-[#2f7a0c]';
 const LOSS = 'text-red-600';
 const tone = (n: number) => (n > 0 ? GAIN : n < 0 ? LOSS : 'text-slate-500');
 
@@ -56,7 +56,7 @@ export function MonthlyReportDocument({
     <article className="monthly-report bg-white text-slate-900 font-sans">
       <header className="flex items-start justify-between gap-6 border-b-2 border-slate-900 pb-4">
         <div>
-          <p className="text-[11px] font-extrabold uppercase tracking-[0.22em] text-emerald-700">Trend Chasers</p>
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.22em] text-[#2f7a0c]">Trend Chasers</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">{report.label}</h1>
           <p className="text-sm text-slate-600">Monthly performance report</p>
         </div>
@@ -144,7 +144,7 @@ export function MonthlyReportDocument({
                               d.pnl === null
                                 ? 'border-slate-200'
                                 : d.pnl >= 0
-                                  ? 'border-emerald-300 bg-emerald-50'
+                                  ? 'border-[#b8f59a] bg-[#f2fdea]'
                                   : 'border-red-300 bg-red-50'
                             }`}
                           >

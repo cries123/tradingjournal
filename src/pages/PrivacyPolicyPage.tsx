@@ -113,7 +113,7 @@ export function PrivacyPolicyPage({ onHome, onLaunch, onPrivacy, onTerms, onBrok
           trades, notes, journals, settings, usernames, any published track record and the brokerage
           connection, and it cannot be undone. If you would rather we did it, or you have a question
           about any of this, email{' '}
-          <a href="mailto:support@trendchasers.net" className="text-emerald-400 hover:underline">
+          <a href="mailto:support@trendchasers.net" className="text-accent hover:underline">
             support@trendchasers.net
           </a>
           .
@@ -132,7 +132,7 @@ export function PrivacyPolicyPage({ onHome, onLaunch, onPrivacy, onTerms, onBrok
         <h2>Contact</h2>
         <p>
           Questions about privacy, or a deletion request? Email{' '}
-          <a href="mailto:support@trendchasers.net" className="text-emerald-400 hover:underline">
+          <a href="mailto:support@trendchasers.net" className="text-accent hover:underline">
             support@trendchasers.net
           </a>
           , or open a support ticket from the site footer.

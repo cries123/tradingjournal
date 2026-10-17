@@ -93,14 +93,14 @@ export default function RuleSimulatorDemo({ onTry }: { onTry: () => void }) {
         <svg viewBox="0 0 600 220" className="w-full h-auto overflow-visible" role="img" aria-label="Equity curve as traded and with the cap">
           <line x1={0} x2={600} y1={zeroY} y2={zeroY} stroke="rgba(148,163,184,0.25)" strokeWidth={1} />
           <polyline points={actualPts} fill="none" stroke="rgba(248,113,113,0.75)" strokeWidth={2} strokeDasharray="5 5" />
-          <polyline points={simPts} fill="none" stroke="#34d399" strokeWidth={2.5} />
+          <polyline points={simPts} fill="none" stroke="#7aff45" strokeWidth={2.5} />
         </svg>
         <figcaption className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-text-secondary">
           <span className="flex items-center gap-1.5">
             <span className="inline-block w-4 border-t-2 border-dashed border-red-400/80" aria-hidden /> As traded
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="inline-block w-4 border-t-2 border-emerald-400" aria-hidden /> With the cap
+            <span className="inline-block w-4 border-t-2 border-accent" aria-hidden /> With the cap
           </span>
           <span>Sample journal · 30 trading days</span>
         </figcaption>

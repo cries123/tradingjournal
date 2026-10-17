@@ -161,7 +161,7 @@ function Result({
           <span className="text-[11px] text-text-secondary">{hit.date}</span>
           {hit.pnl != null && (
             <span
-              className={`text-[11px] tabular-nums ${hit.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+              className={`text-[11px] tabular-nums ${hit.pnl >= 0 ? 'text-accent' : 'text-red-400'}`}
             >
               {formatCurrency(hit.pnl)}
             </span>

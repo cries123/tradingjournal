@@ -55,7 +55,7 @@ const TIER_ACCENT: Record<Tier, { ring: string; text: string; chip: string; butt
     text: 'text-sky-300',
     chip: 'bg-sky-400/10 text-sky-300',
     button:
-      'bg-gradient-to-r from-sky-400 to-emerald-400 text-slate-950 hover:from-sky-300 hover:to-emerald-300 font-semibold',
+      'bg-gradient-to-r from-sky-400 to-accent text-slate-950 hover:from-sky-300 hover:to-accent font-semibold',
   },
 };
 
@@ -221,14 +221,14 @@ export function PricingContent({
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-emerald-400 transition-colors mb-8"
+          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors mb-8"
         >
           <ArrowLeft className="w-4 h-4" aria-hidden /> {backLabel}
         </button>
       )}
 
       <header className="max-w-3xl">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400 mb-3">Plans</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent mb-3">Plans</p>
         <h1 className="text-3xl md:text-5xl font-bold tracking-tight mb-4 text-balance">
           Journalling is free. Automation is the part that costs money.
         </h1>
@@ -278,7 +278,7 @@ export function PricingContent({
       </div>
 
       {justPaid && (
-        <div className="mt-8 rounded-xl border border-emerald-400/40 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200 flex items-center gap-2">
+        <div className="mt-8 rounded-xl border border-accent/40 bg-accent/10 px-4 py-3 text-sm text-accent flex items-center gap-2">
           <BadgeCheck className="w-4 h-4 shrink-0" aria-hidden />
           Payment received. Your plan updates here within a few seconds.
         </div>
@@ -313,7 +313,7 @@ export function PricingContent({
       )}
 
       {notice && (
-        <div className="mt-8 rounded-xl border border-emerald-400/40 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200 flex items-center gap-2">
+        <div className="mt-8 rounded-xl border border-accent/40 bg-accent/10 px-4 py-3 text-sm text-accent flex items-center gap-2">
           <BadgeCheck className="w-4 h-4 shrink-0" aria-hidden />
           {notice}
         </div>
@@ -359,7 +359,7 @@ export function PricingContent({
                 </span>
               )}
               {isCurrent && (
-                <span className="absolute -top-2.5 right-6 rounded-full bg-emerald-400 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-950">
+                <span className="absolute -top-2.5 right-6 rounded-full bg-accent px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-950">
                   Your plan
                 </span>
               )}
@@ -372,7 +372,7 @@ export function PricingContent({
                     buy button with nothing explaining the difference. Signed-out visitors keep it:
                     the public page is advertising to people who have no record yet. */}
                 {tier === TRIAL_TIER && !yearly && (!user || trialOnOffer) && (
-                  <span className="ml-auto rounded-full bg-emerald-400/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
+                  <span className="ml-auto rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
                     {TRIAL_DAYS}-day free trial
                   </span>
                 )}
@@ -427,7 +427,7 @@ export function PricingContent({
                     {isCurrent ? 'Open your journal' : 'Start free'}
                   </button>
                 ) : isCurrent ? (
-                  <div className="w-full rounded-lg border border-emerald-400/40 bg-emerald-400/10 px-4 py-2.5 text-center text-sm font-medium text-emerald-300">
+                  <div className="w-full rounded-lg border border-accent/40 bg-accent/10 px-4 py-2.5 text-center text-sm font-medium text-accent">
                     {source === 'admin'
                       ? 'Granted to your account'
                       : onTrial && trialEndsAt
@@ -515,7 +515,7 @@ export function PricingContent({
             type="button"
             onClick={() => void handlePortal()}
             disabled={portalBusy}
-            className="text-emerald-400 hover:text-emerald-300 transition-colors disabled:opacity-60"
+            className="text-accent hover:text-accent transition-colors disabled:opacity-60"
           >
             {portalBusy ? 'Opening…' : 'Manage billing or cancel →'}
           </button>
@@ -524,7 +524,7 @@ export function PricingContent({
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-border bg-bg-secondary/60 p-5">
-          <ShieldCheck className="w-4 h-4 text-emerald-400 mb-2.5" aria-hidden />
+          <ShieldCheck className="w-4 h-4 text-accent mb-2.5" aria-hidden />
           <h3 className="text-sm font-semibold mb-1.5">{REFUND_WINDOW_DAYS}-day money back</h3>
           <p className="text-sm text-text-secondary leading-relaxed">
             Ask within the first {REFUND_WINDOW_DAYS} days and you get every cent back. No questions,
@@ -534,7 +534,7 @@ export function PricingContent({
             <button
               type="button"
               onClick={onRefunds}
-              className="mt-2.5 text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
+              className="mt-2.5 text-sm text-accent hover:text-accent transition-colors"
             >
               Read the refund policy →
             </button>
@@ -542,7 +542,7 @@ export function PricingContent({
         </div>
 
         <div className="rounded-xl border border-border bg-bg-secondary/60 p-5">
-          <Sparkles className="w-4 h-4 text-emerald-400 mb-2.5" aria-hidden />
+          <Sparkles className="w-4 h-4 text-accent mb-2.5" aria-hidden />
           <h3 className="text-sm font-semibold mb-1.5">Cancel in a click</h3>
           <p className="text-sm text-text-secondary leading-relaxed">
             No contract, no call to make. Cancel and you keep the plan until the period you already
@@ -551,7 +551,7 @@ export function PricingContent({
         </div>
 
         <div className="rounded-xl border border-border bg-bg-secondary/60 p-5">
-          <BadgeCheck className="w-4 h-4 text-emerald-400 mb-2.5" aria-hidden />
+          <BadgeCheck className="w-4 h-4 text-accent mb-2.5" aria-hidden />
           <h3 className="text-sm font-semibold mb-1.5">Works with your broker</h3>
           <p className="text-sm text-text-secondary leading-relaxed">
             {BROKER_COUNT_PHRASE} connect directly, read-only — we can see fills, never move money,
@@ -561,7 +561,7 @@ export function PricingContent({
             <button
               type="button"
               onClick={onBrokers}
-              className="mt-2.5 text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
+              className="mt-2.5 text-sm text-accent hover:text-accent transition-colors"
             >
               See supported brokers →
             </button>

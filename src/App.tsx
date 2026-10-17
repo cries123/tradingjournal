@@ -37,7 +37,7 @@ function RouteLoading() {
       aria-busy="true"
       aria-label="Loading page"
     >
-      <div className="w-8 h-8 rounded-full border-2 border-emerald-400/30 border-t-emerald-400 animate-spin" />
+      <div className="w-8 h-8 rounded-full border-2 border-accent/30 border-t-accent animate-spin" />
     </div>
   );
 }

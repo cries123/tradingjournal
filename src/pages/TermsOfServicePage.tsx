@@ -125,7 +125,7 @@ export function TermsOfServicePage({ onHome, onLaunch, onPrivacy, onTerms, onBro
         <h2>Contact</h2>
         <p>
           Questions about these terms? Email{' '}
-          <a href="mailto:support@trendchasers.net" className="text-emerald-400 hover:underline">
+          <a href="mailto:support@trendchasers.net" className="text-accent hover:underline">
             support@trendchasers.net
           </a>
           .

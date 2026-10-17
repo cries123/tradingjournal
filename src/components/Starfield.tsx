@@ -17,7 +17,7 @@ function hexToRgb(hex: string): [number, number, number] {
   const clean = hex.trim().replace('#', '');
   const full = clean.length === 3 ? clean.split('').map((c) => c + c).join('') : clean;
   const bigint = parseInt(full, 16);
-  if (Number.isNaN(bigint)) return [52, 211, 153];
+  if (Number.isNaN(bigint)) return [122, 255, 69];
   return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
 }
 
@@ -75,7 +75,7 @@ interface StarfieldProps {
 export function Starfield({ reactive = true, subtle = false, drift = false }: StarfieldProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const starsRef = useRef<Star[]>([]);
-  const colorsRef = useRef<[string, string]>(['#34d399', '#38bdf8']);
+  const colorsRef = useRef<[string, string]>(['#7aff45', '#7aff45']);
   const rafRef = useRef<number | null>(null);
   /** Last frame's timestamp, so a resize redraws where the field actually is. */
   const lastTRef = useRef(0);
@@ -95,8 +95,8 @@ export function Starfield({ reactive = true, subtle = false, drift = false }: St
     function refreshColors() {
       if (!reactive) return; // colorsRef already holds the fixed emerald/blue default — never overwritten.
       const styles = getComputedStyle(document.documentElement);
-      const profit = styles.getPropertyValue('--color-profit-bright').trim() || '#34d399';
-      const accent = styles.getPropertyValue('--color-accent').trim() || '#38bdf8';
+      const profit = styles.getPropertyValue('--color-profit-bright').trim() || '#7aff45';
+      const accent = styles.getPropertyValue('--color-accent').trim() || '#7aff45';
       colorsRef.current = [profit, accent];
     }
 

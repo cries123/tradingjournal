@@ -66,7 +66,7 @@ export function ProductsDropdown({ onLaunch, onNavigate }: ProductsDropdownProps
             onClick={launch}
             className="w-full flex items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-bg-primary transition-colors"
           >
-            <BookOpen className="h-4 w-4 mt-0.5 text-emerald-400 shrink-0" aria-hidden />
+            <BookOpen className="h-4 w-4 mt-0.5 text-accent shrink-0" aria-hidden />
             <span>
               <span className="block text-sm font-medium text-text-primary">Journal</span>
               <span className="block text-xs text-text-secondary">Log trades, track P&amp;L on a calendar</span>
@@ -79,7 +79,7 @@ export function ProductsDropdown({ onLaunch, onNavigate }: ProductsDropdownProps
             onClick={() => go('ai-assistant')}
             className="w-full flex items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-bg-primary transition-colors"
           >
-            <Sparkles className="h-4 w-4 mt-0.5 text-emerald-400 shrink-0" aria-hidden />
+            <Sparkles className="h-4 w-4 mt-0.5 text-accent shrink-0" aria-hidden />
             <span className="flex-1 min-w-0">
               <span className="block text-sm font-medium text-text-primary">AI Assistant</span>
               <span className="block text-xs text-text-secondary">
@@ -94,7 +94,7 @@ export function ProductsDropdown({ onLaunch, onNavigate }: ProductsDropdownProps
             onClick={() => go('verified-records')}
             className="w-full flex items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-bg-primary transition-colors"
           >
-            <BadgeCheck className="h-4 w-4 mt-0.5 text-emerald-400 shrink-0" aria-hidden />
+            <BadgeCheck className="h-4 w-4 mt-0.5 text-accent shrink-0" aria-hidden />
             <span className="flex-1 min-w-0">
               <span className="block text-sm font-medium text-text-primary">Verified Track Record</span>
               <span className="block text-xs text-text-secondary">

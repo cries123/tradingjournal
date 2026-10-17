@@ -93,8 +93,8 @@ export function AiAssistantPage({
         <section className="max-w-[1100px] mx-auto px-4 md:px-6 pt-12 md:pt-20 pb-12 md:pb-16">
           <FadeIn>
             <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs font-medium mb-6">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse motion-reduce:animate-none" />
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-accent/30 bg-accent/10 text-accent text-xs font-medium mb-6">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse motion-reduce:animate-none" />
                 Now live on {gold.name} and {diamond.name}
               </div>
               <h1 className="text-4xl md:text-5xl lg:text-[3.25rem] font-bold leading-[1.1] tracking-tight">
@@ -126,7 +126,7 @@ export function AiAssistantPage({
         {/* The real questions */}
         <section className="max-w-[1100px] mx-auto px-4 md:px-6 py-12 md:py-16 border-t border-border/40">
           <FadeIn>
-            <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Ask it anything</p>
+            <p className="text-xs uppercase tracking-widest text-accent font-medium mb-3">Ask it anything</p>
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
               The questions you’d ask a coach who read every trade
             </h2>
@@ -142,7 +142,7 @@ export function AiAssistantPage({
                   key={q}
                   className="inline-flex items-center gap-2 rounded-full border border-border bg-bg-tertiary/40 px-4 py-2 text-sm text-text-primary"
                 >
-                  <MessageSquare className="h-3.5 w-3.5 text-emerald-400 shrink-0" aria-hidden />
+                  <MessageSquare className="h-3.5 w-3.5 text-accent shrink-0" aria-hidden />
                   {q}
                 </span>
               ))}
@@ -155,7 +155,7 @@ export function AiAssistantPage({
           <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-start">
             <FadeIn>
               <div>
-                <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">How it works</p>
+                <p className="text-xs uppercase tracking-widest text-accent font-medium mb-3">How it works</p>
                 <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
                   It explains your numbers. It never does the arithmetic.
                 </h2>
@@ -166,8 +166,8 @@ export function AiAssistantPage({
                   them matters and say what to do about it.
                 </p>
                 <div className="glass-card rounded-xl p-5 md:p-6 flex gap-4">
-                  <span className="w-10 h-10 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                    <Calculator className="h-5 w-5 text-emerald-400" aria-hidden />
+                  <span className="w-10 h-10 rounded-lg bg-accent/20 border border-accent/30 flex items-center justify-center shrink-0">
+                    <Calculator className="h-5 w-5 text-accent" aria-hidden />
                   </span>
                   <p className="text-sm text-text-secondary leading-relaxed">
                     If it quotes you a figure, that figure came from your journal. It cannot invent one,
@@ -185,7 +185,7 @@ export function AiAssistantPage({
                 <ul className="space-y-3">
                   {SEES.map((item) => (
                     <li key={item} className="flex gap-3 text-sm text-text-secondary leading-relaxed">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" aria-hidden />
+                      <CheckCircle2 className="h-4 w-4 text-accent shrink-0 mt-0.5" aria-hidden />
                       {item}
                     </li>
                   ))}
@@ -202,8 +202,8 @@ export function AiAssistantPage({
         <section className="max-w-[1100px] mx-auto px-4 md:px-6 py-12 md:py-16 border-t border-border/40">
           <FadeIn>
             <div className="glass-card rounded-2xl p-6 md:p-8 flex flex-col md:flex-row gap-6 items-start">
-              <span className="w-12 h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                <GitCompareArrows className="h-6 w-6 text-emerald-400" aria-hidden />
+              <span className="w-12 h-12 rounded-xl bg-accent/15 border border-accent/30 flex items-center justify-center shrink-0">
+                <GitCompareArrows className="h-6 w-6 text-accent" aria-hidden />
               </span>
               <div>
                 <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-3">
@@ -224,7 +224,7 @@ export function AiAssistantPage({
           <div className="grid lg:grid-cols-2 gap-10 lg:gap-14">
             <FadeIn>
               <div>
-                <p className="text-xs uppercase tracking-widest text-emerald-400 font-medium mb-3">Where the line is</p>
+                <p className="text-xs uppercase tracking-widest text-accent font-medium mb-3">Where the line is</p>
                 <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
                   It reviews. It doesn’t advise.
                 </h2>
@@ -245,8 +245,8 @@ export function AiAssistantPage({
 
             <FadeIn delay={100}>
               <div className="glass-card rounded-xl p-5 md:p-6">
-                <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/15 border border-emerald-500/30 mb-4">
-                  <Lock className="h-5 w-5 text-emerald-400" aria-hidden />
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-accent/15 border border-accent/30 mb-4">
+                  <Lock className="h-5 w-5 text-accent" aria-hidden />
                 </span>
                 <h3 className="text-lg font-semibold mb-3">Your notes stay yours</h3>
                 <p className="text-sm text-text-secondary leading-relaxed">
@@ -264,7 +264,7 @@ export function AiAssistantPage({
         <section className="max-w-[1100px] mx-auto px-4 md:px-6 py-12 md:py-20 border-t border-border/40">
           <FadeIn>
             <div className="text-center max-w-2xl mx-auto">
-              <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-400/10 text-emerald-400 mb-5">
+              <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent mb-5">
                 <Sparkles className="h-6 w-6" aria-hidden />
               </span>
               <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">

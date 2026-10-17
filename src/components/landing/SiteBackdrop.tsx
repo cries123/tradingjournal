@@ -40,9 +40,9 @@ export function HeroTrendLine() {
     >
       <defs>
         <linearGradient id="hero-trend-stroke" x1="0" x2="1" y1="0" y2="0">
-          <stop offset="0%" stopColor="#34d399" stopOpacity="0" />
-          <stop offset="30%" stopColor="#34d399" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.35" />
+          <stop offset="0%" stopColor="#7aff45" stopOpacity="0" />
+          <stop offset="30%" stopColor="#7aff45" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="#7aff45" stopOpacity="0.35" />
         </linearGradient>
       </defs>
       <path

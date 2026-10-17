@@ -491,7 +491,7 @@ export function SupportTicketsContent({
                       </span>
                     )}
                     {t.status === 'resolved' && (
-                      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 shrink-0">
+                      <span className="inline-flex items-center gap-1 text-[10px] text-accent shrink-0">
                         <CheckCircle2 size={11} /> Resolved
                       </span>
                     )}

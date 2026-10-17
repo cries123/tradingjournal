@@ -72,13 +72,13 @@ export function AssistantDemo() {
       </p>
 
       <div className="flex justify-end mb-3">
-        <p className="max-w-[85%] rounded-2xl rounded-br-md bg-emerald-500/15 border border-emerald-500/25 px-4 py-2.5 text-sm text-emerald-100">
+        <p className="max-w-[85%] rounded-2xl rounded-br-md bg-accent/15 border border-accent/25 px-4 py-2.5 text-sm text-accent">
           {QUESTION}
         </p>
       </div>
 
       <div className="flex gap-3">
-        <span className="w-8 h-8 shrink-0 rounded-lg bg-cyan-500/15 text-cyan-300 flex items-center justify-center">
+        <span className="w-8 h-8 shrink-0 rounded-lg bg-accent/15 text-accent flex items-center justify-center">
           <Sparkles size={15} aria-hidden />
         </span>
         <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md bg-bg-primary/60 border border-border/60 px-4 py-3 text-sm leading-relaxed text-slate-200 min-h-[7.5rem]">
@@ -98,7 +98,7 @@ export function AssistantDemo() {
             ) : (
               <>
                 {shownText}
-                {!done && <span className="inline-block w-1.5 h-4 align-[-2px] ml-0.5 bg-cyan-300/80 motion-safe:animate-pulse" />}
+                {!done && <span className="inline-block w-1.5 h-4 align-[-2px] ml-0.5 bg-accent/80 motion-safe:animate-pulse" />}
               </>
             )}
           </span>

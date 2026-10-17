@@ -80,7 +80,7 @@ export function WhatsNewPage({
                         {entry.date}
                       </span>
                       {latest && (
-                        <span className="rounded-md bg-emerald-400/10 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-400">
+                        <span className="rounded-md bg-accent/10 px-1.5 py-0.5 text-[11px] font-semibold text-accent">
                           Latest
                         </span>
                       )}

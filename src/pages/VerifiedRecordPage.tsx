@@ -111,7 +111,7 @@ export function VerifiedRecordPage({
       <main className="relative z-10 flex-1 px-4 md:px-6 py-16 md:py-24">
         <div className="max-w-3xl mx-auto">
           <FadeIn>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-accent">
               <BadgeCheck className="h-3.5 w-3.5" aria-hidden />
               Broker verified
             </span>
@@ -171,7 +171,7 @@ export function VerifiedRecordPage({
               <div className="grid sm:grid-cols-2 gap-5 mt-6">
                 {HOLDS.map(({ icon: Icon, title, body }) => (
                   <div key={title} className="panel-card p-5">
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-400/10 text-emerald-400">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-accent/10 text-accent">
                       <Icon className="h-4.5 w-4.5" aria-hidden />
                     </span>
                     <h3 className="text-sm font-semibold mt-3">{title}</h3>
@@ -187,14 +187,14 @@ export function VerifiedRecordPage({
               <h2 className="text-xl md:text-2xl font-bold tracking-tight">What you need</h2>
               <ul className="mt-5 space-y-3 text-sm text-text-secondary leading-relaxed">
                 <li className="flex gap-3">
-                  <span className="text-emerald-400 font-semibold tabular-nums shrink-0">1</span>
+                  <span className="text-accent font-semibold tabular-nums shrink-0">1</span>
                   <span>
                     A connected brokerage. Trades arrive through a read-only connection that never
                     sees your balance and cannot place an order.
                   </span>
                 </li>
                 <li className="flex gap-3">
-                  <span className="text-emerald-400 font-semibold tabular-nums shrink-0">2</span>
+                  <span className="text-accent font-semibold tabular-nums shrink-0">2</span>
                   <span>
                     At least {MIN_TRADES_TO_PUBLISH} imported trades. Less than that is a fortnight,
                     not a record, and the word &ldquo;verified&rdquo; over it would be doing work it
@@ -202,7 +202,7 @@ export function VerifiedRecordPage({
                   </span>
                 </li>
                 <li className="flex gap-3">
-                  <span className="text-emerald-400 font-semibold tabular-nums shrink-0">3</span>
+                  <span className="text-accent font-semibold tabular-nums shrink-0">3</span>
                   <span>
                     {plan
                       ? `Any paid plan — from $${plan.price} a month on ${plan.name}.`

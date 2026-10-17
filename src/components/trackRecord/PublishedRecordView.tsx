@@ -84,7 +84,7 @@ export function PublishedRecordView({
 
   return (
     <article className="panel-card p-5 md:p-8">
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-accent">
         <BadgeCheck className="h-3.5 w-3.5" aria-hidden />
         Broker verified
       </span>
@@ -142,17 +142,17 @@ export function PublishedRecordView({
             <Figure
               label="Net P&L"
               value={formatCurrency(record.netPnl)}
-              tone={record.netPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}
+              tone={record.netPnl >= 0 ? 'text-accent' : 'text-red-400'}
             />
           )}
           {amounts && record.avgWin !== undefined && (
-            <Figure label="Average win" value={formatCurrency(record.avgWin)} tone="text-emerald-400" />
+            <Figure label="Average win" value={formatCurrency(record.avgWin)} tone="text-accent" />
           )}
           {amounts && record.avgLoss !== undefined && (
             <Figure label="Average loss" value={formatCurrency(record.avgLoss)} tone="text-red-400" />
           )}
           {amounts && record.bestDay !== undefined && (
-            <Figure label="Best day" value={formatCurrency(record.bestDay)} tone="text-emerald-400" />
+            <Figure label="Best day" value={formatCurrency(record.bestDay)} tone="text-accent" />
           )}
           {amounts && record.worstDay !== undefined && (
             <Figure label="Worst day" value={formatCurrency(record.worstDay)} tone="text-red-400" />
@@ -194,10 +194,10 @@ export function PublishedRecordView({
         promise, it is what firestore.rules enforces — every client write to this collection is
         denied, and the only writer is a server function that recomputes from the trades.
       */}
-      <Band title="Stamped and verified by Trend Chasers" className="border-emerald-500/30">
+      <Band title="Stamped and verified by Trend Chasers" className="border-accent/30">
         <div className="flex flex-col sm:flex-row sm:items-start gap-4">
           <div className="shrink-0 flex sm:block justify-center">
-            <span className="inline-flex h-16 w-16 items-center justify-center rounded-full border-2 border-emerald-500/40 bg-emerald-500/10 text-emerald-400">
+            <span className="inline-flex h-16 w-16 items-center justify-center rounded-full border-2 border-accent/40 bg-accent/10 text-accent">
               <BadgeCheck className="h-8 w-8" aria-hidden />
             </span>
           </div>
@@ -205,7 +205,7 @@ export function PublishedRecordView({
           <div className="min-w-0">
             <ul className="space-y-2 text-sm text-text-secondary leading-relaxed">
               <li className="flex gap-2 items-start">
-                <Lock className="h-3.5 w-3.5 mt-1 shrink-0 text-emerald-400" aria-hidden />
+                <Lock className="h-3.5 w-3.5 mt-1 shrink-0 text-accent" aria-hidden />
                 <span>
                   <strong className="text-text-primary">The trader cannot edit these figures.</strong>{' '}
                   They are computed by Trend Chasers from the imported trades. There is no way to
@@ -214,7 +214,7 @@ export function PublishedRecordView({
                 </span>
               </li>
               <li className="flex gap-2 items-start">
-                <Lock className="h-3.5 w-3.5 mt-1 shrink-0 text-emerald-400" aria-hidden />
+                <Lock className="h-3.5 w-3.5 mt-1 shrink-0 text-accent" aria-hidden />
                 <span>
                   <strong className="text-text-primary">
                     Every trade came from a read-only brokerage connection.
@@ -224,7 +224,7 @@ export function PublishedRecordView({
                 </span>
               </li>
               <li className="flex gap-2 items-start">
-                <Lock className="h-3.5 w-3.5 mt-1 shrink-0 text-emerald-400" aria-hidden />
+                <Lock className="h-3.5 w-3.5 mt-1 shrink-0 text-accent" aria-hidden />
                 <span>
                   <strong className="text-text-primary">
                     A trade typed in by hand can never reach these figures.

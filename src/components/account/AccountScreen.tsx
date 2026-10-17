@@ -50,7 +50,7 @@ export function AccountPanel({ title, description, children }: AccountPanelProps
 /** Success in green, failure in red, nothing at all when there is nothing to say. */
 export function FormNote({ error, success }: { error?: string | null; success?: string | null }) {
   if (error) return <p className="text-sm text-red-400">{error}</p>;
-  if (success) return <p className="text-sm text-emerald-400">{success}</p>;
+  if (success) return <p className="text-sm text-accent">{success}</p>;
   return null;
 }
 

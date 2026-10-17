@@ -87,7 +87,7 @@ export interface ShareCardAccent {
   secondary: string;
 }
 
-export const DEFAULT_SHARE_ACCENT: ShareCardAccent = { primary: '#34d399', secondary: '#22d3ee' };
+export const DEFAULT_SHARE_ACCENT: ShareCardAccent = { primary: '#7aff45', secondary: '#7aff45' };
 
 /** Reads the live theme accent the same way Starfield.tsx does. Falls back to the fixed default
  *  when called outside a browser (SSR/prerender) or before the theme vars are set. */
@@ -406,7 +406,7 @@ function buildShareSvgLandscape(
   backgroundImageHref?: string | null,
   markHref: string = SHARE_MARK_PATH,
 ): string {
-  const pnlColor = data.isProfit ? '#34d399' : '#f87171';
+  const pnlColor = data.isProfit ? '#7aff45' : '#f87171';
   const badge = PERIOD_BADGE[data.period];
   const badgeWidth = data.period === 'day' ? 168 : data.period === 'month' ? 148 : 152;
   const username = escapeXml(data.username);
@@ -484,7 +484,7 @@ function buildShareSvgPortrait(
   backgroundImageHref?: string | null,
   markHref: string = SHARE_MARK_PATH,
 ): string {
-  const pnlColor = data.isProfit ? '#34d399' : '#f87171';
+  const pnlColor = data.isProfit ? '#7aff45' : '#f87171';
   const badge = PERIOD_BADGE[data.period];
   const badgeWidth = data.period === 'day' ? 168 : data.period === 'month' ? 148 : 152;
   const username = escapeXml(data.username);

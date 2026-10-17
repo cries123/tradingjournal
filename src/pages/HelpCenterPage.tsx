@@ -148,7 +148,7 @@ export function HelpCenterPage({
         <BackLink onHome={onHome} className="mb-8" />
 
         <div className="flex items-center gap-2 mb-2">
-          <LifeBuoy className="h-6 w-6 text-emerald-400" aria-hidden />
+          <LifeBuoy className="h-6 w-6 text-accent" aria-hidden />
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Help Center</h1>
         </div>
         <p className="text-base text-text-secondary mb-8 leading-relaxed max-w-xl">
@@ -181,7 +181,7 @@ export function HelpCenterPage({
               onClick={() => setCategory('all')}
               className={`shrink-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 category === 'all'
-                  ? 'bg-emerald-500/15 text-emerald-400'
+                  ? 'bg-accent/15 text-accent'
                   : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60'
               }`}
             >
@@ -197,7 +197,7 @@ export function HelpCenterPage({
                 onClick={() => setCategory(c.key)}
                 className={`shrink-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   category === c.key
-                    ? 'bg-emerald-500/15 text-emerald-400'
+                    ? 'bg-accent/15 text-accent'
                     : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60'
                 }`}
               >

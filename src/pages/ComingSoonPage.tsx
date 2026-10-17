@@ -43,10 +43,10 @@ export function ComingSoonPage({
 
       <main className="relative z-10 flex-1 flex items-center justify-center px-4 md:px-6 py-20">
         <div className="max-w-lg text-center">
-          <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-400/10 text-emerald-400 mb-6">
+          <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/10 text-accent mb-6">
             <Construction className="h-7 w-7" aria-hidden />
           </span>
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400 mb-3">{eyebrow}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-accent mb-3">{eyebrow}</p>
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">{feature}</h1>
           <p className="text-base text-text-secondary leading-relaxed mb-8">{description}</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
