@@ -56,7 +56,41 @@ function tawk(): TawkApi {
   return w.Tawk_API;
 }
 
+/**
+ * Tawk's tab nudge: "1 new message", flashed into the document title whenever its automated
+ * greeting fires, because the greeting counts as an unread message. Every visitor saw a tab
+ * claiming a message that nobody had sent. The dashboard trigger is the real fix; this keeps the
+ * title ours in the meantime, and whenever a trigger is added again.
+ */
+export function isTawkTitleNudge(title: string): boolean {
+  return /^\(?\d+\)?\s*new message/i.test(title.trim());
+}
+
+/** Puts the page's own title back whenever the widget swaps it for its nudge. */
+function keepTitle(): () => void {
+  const titleEl = document.querySelector('title');
+  if (!titleEl) return () => {};
+  let own = document.title;
+  const observer = new MutationObserver(() => {
+    const now = document.title;
+    if (isTawkTitleNudge(now)) {
+      if (now !== own) document.title = own;
+    } else {
+      // A real change — a route's own title — becomes the one to restore to.
+      own = now;
+    }
+  });
+  observer.observe(titleEl, { childList: true, characterData: true, subtree: true });
+  return () => observer.disconnect();
+}
+
 export function useLiveChat(route: AppRoute): void {
+  useEffect(() => {
+    const src = embedSrc();
+    if (!src) return;
+    return keepTitle();
+  }, []);
+
   useEffect(() => {
     const src = embedSrc();
     if (!src) return;
