@@ -19,6 +19,7 @@ import { buildSampleTrades, isSampleTrade } from '../utils/sampleData';
 import { tradeTags } from '../utils/tradeHelpers';
 import { describeJournalWriteError } from '../utils/journalWriteError';
 import { reportErrorSilently } from '../services/errorReporting';
+import { subscribeFirestoreLatch } from '../lib/firestoreLatch';
 
 /** 'error' means the cloud journal is not working — shown, never guessed at silently. */
 export type SyncStatus = 'loading' | 'local' | 'cloud' | 'syncing' | 'error';
@@ -35,6 +36,21 @@ export function useTrades() {
   const migratedRef = useRef(false);
   const activitySyncedRef = useRef(false);
   const activeUidRef = useRef<string | null>(null);
+
+  /*
+   * The tab's Firestore client can stop for good without the trades listener ever reporting it —
+   * the SDK announces an internal assertion as an unhandled rejection and then goes quiet. Heard
+   * from the global error listener instead, so the reload banner goes up rather than the journal
+   * carrying on with its last snapshot and saving nothing.
+   */
+  useEffect(
+    () =>
+      subscribeFirestoreLatch((error) => {
+        setSyncStatus('error');
+        setSyncError(describeJournalWriteError(error));
+      }),
+    [],
+  );
 
   const [filters, setFilters] = useState<Filters>({
     symbol: '',

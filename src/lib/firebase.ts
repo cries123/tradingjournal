@@ -3,10 +3,12 @@ import {
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
+  persistentSingleTabManager,
   type Firestore,
 } from 'firebase/firestore';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
 import { getFirebaseApp } from './firebaseAuth';
+import { tabManagerFor } from './firestoreTabs';
 
 /*
  * The app and sign-in live in firebaseAuth.ts, which the public pages import on their own so they do
@@ -37,14 +39,18 @@ let storage: FirebaseStorage | null = null;
  *
  * The multi-tab manager matters because traders keep the journal open in a pinned tab and open a
  * second one — without it the second tab can't share the cache and falls back to server reads.
+ * Except on iPhones, iPads and Safari, where it broke the write queue; see firestoreTabs.ts.
  */
 export function getFirebaseDb(): Firestore {
   if (db) return db;
 
   const firebaseApp = getFirebaseApp();
   try {
+    const kind = tabManagerFor(navigator.userAgent, navigator.maxTouchPoints ?? 0);
     db = initializeFirestore(firebaseApp, {
-      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+      localCache: persistentLocalCache({
+        tabManager: kind === 'single' ? persistentSingleTabManager({}) : persistentMultipleTabManager(),
+      }),
     });
   } catch {
     // Private browsing, a browser without IndexedDB, or initializeFirestore already having run.

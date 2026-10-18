@@ -1,4 +1,5 @@
 import { BUILD_SHA } from '../config/build';
+import { noteFirestoreFailure } from '../lib/firestoreLatch';
 import {
   normalizeError,
   safePath,
@@ -143,10 +144,13 @@ export function installGlobalErrorReporting(): void {
   window.addEventListener('error', (event: ErrorEvent) => {
     // event.error is absent for cross-origin script errors; the message alone is filtered out
     // downstream as "Script error." because there is nothing in it worth a row.
+    noteFirestoreFailure(event.error ?? event.message);
     reportErrorSilently(event.error ?? event.message, 'window');
   });
 
   window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
+    // A latched Firestore client only ever announces itself here; the journal is listening.
+    noteFirestoreFailure(event.reason);
     reportErrorSilently(event.reason, 'promise');
   });
 }
