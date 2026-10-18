@@ -419,40 +419,34 @@ export function BrokerConnectContent({
       title="Import trades from your broker"
       icon={Link2}
       onBack={onBack}
-      subtitle={
-        <>
-          Connect any of the brokers below through SnapTrade, a broker-data connection provider, and
-          pull your trade history in with one tap — no typing it out. Your broker credentials go
-          directly to your broker or to SnapTrade&apos;s secure portal — never to Trend Chasers. You
-          can disconnect anytime. Prefer not to connect? You can still log trades manually.
-        </>
-      }
+      /*
+       * One sentence. This was two paragraphs — what SnapTrade is, where the credentials go, that
+       * you can disconnect, that you can log by hand, that re-syncing is safe — before the first
+       * account, and one of its claims ("never pulls from your broker on its own") stopped being
+       * true the day Diamond's morning import shipped. The detail lives in each account's "How
+       * the connection works" disclosure below, where somebody who wants it can open it.
+       */
+      subtitle="Link a broker and your fills import with one tap. Read-only — your login never touches Trend Chasers, and you can disconnect any time."
     >
-      <p className="text-sm text-text-secondary leading-relaxed rounded-xl border border-border/60 bg-bg-tertiary/40 px-4 py-3">
-        <span className="font-semibold text-text-primary">Syncing is on your say-so.</span>{' '}
-        Trend Chasers never pulls from your broker on its own — press{' '}
-        <span className="font-medium text-text-primary">Sync</span> on an account below whenever
-        you want the latest fills. Re-syncing is safe: trades you already have are recognised and
-        skipped, never added twice.
-        {/* Shown from the plan, not from a count of what's on screen: someone who has downgraded
-            still sees the connections they made, and the honest number is what their plan allows
-            now — otherwise a refused Connect looks like a bug. */}
-        {limits.brokers > 0 && (
-          <span className="block mt-1.5">
-            {TIER_PLANS[tier].name} includes{' '}
-            <span className="text-text-primary font-medium">{brokersLabel(limits).toLowerCase()}</span>{' '}
-            and{' '}
-            <span className="text-text-primary font-medium">{syncsLabel(limits).toLowerCase()}</span>
-            {(usage.syncsRemaining < limits.syncsPerDay || (usage.syncCredits ?? 0) > 0) && (
-              <>
-                {' '}— {usage.syncsRemaining} left today
-                {(usage.syncCredits ?? 0) > 0 && <> (including {usage.syncCredits} bonus)</>}
-              </>
-            )}
-            .
-          </span>
-        )}
-      </p>
+      {/* The plan's allowance in one line, from the plan rather than a count of what's on screen:
+          someone who has downgraded still sees the connections they made, and the honest number is
+          what their plan allows now — otherwise a refused Connect looks like a bug. */}
+      {limits.brokers > 0 && (
+        <p className="text-sm text-text-secondary rounded-xl border border-border/60 bg-bg-tertiary/40 px-4 py-2.5">
+          <span className="font-semibold text-text-primary">{TIER_PLANS[tier].name}</span>
+          {' · '}
+          {brokersLabel(limits).toLowerCase()}
+          {' · '}
+          {syncsLabel(limits).toLowerCase()}
+          {(usage.syncsRemaining < limits.syncsPerDay || (usage.syncCredits ?? 0) > 0) && (
+            <>
+              {' — '}
+              <span className="text-text-primary font-medium">{usage.syncsRemaining} left today</span>
+              {(usage.syncCredits ?? 0) > 0 && <> (incl. {usage.syncCredits} bonus)</>}
+            </>
+          )}
+        </p>
+      )}
 
       {/*
         * Offered before they press anything.
