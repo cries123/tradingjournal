@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react';
 import type { DailySummary } from '../types';
 import { useSettings } from '../context/useSettings';
 import { formatCurrency, formatCurrencyCompact } from '../utils/format';
@@ -14,6 +15,11 @@ interface DashboardDayCellProps {
   compact?: boolean;
   /** This day just gained its first trade — a sync or an import landed on it. It pops in. */
   fresh?: boolean;
+  /**
+   * One of the trader's own rules was broken on this day — over the trade cap, past the daily
+   * loss limit. A month's discipline should read off the grid, not only off the breach list.
+   */
+  ruleBroken?: boolean;
 }
 
 const cellShell =
@@ -30,6 +36,7 @@ export function DashboardDayCell({
   isToday = false,
   compact = false,
   fresh = false,
+  ruleBroken = false,
 }: DashboardDayCellProps) {
   const { settings } = useSettings();
   const heightClass = compact ? COMPACT_HEIGHT : FULL_HEIGHT;
@@ -67,12 +74,26 @@ export function DashboardDayCell({
         isToday ? 'day-today' : ''
       } ${fresh ? 'animate-cell-pop' : ''} hover:bg-bg-tertiary cursor-pointer group focus-ring`}
     >
-      <span
-        className={`text-[9px] md:text-xs leading-none ${
-          isToday ? 'text-accent font-semibold' : 'text-text-secondary'
-        }`}
-      >
-        {dayNumber}
+      <span className="flex items-start justify-between gap-1">
+        <span
+          className={`text-[9px] md:text-xs leading-none ${
+            isToday ? 'text-accent font-semibold' : 'text-text-secondary'
+          }`}
+        >
+          {dayNumber}
+        </span>
+        {ruleBroken && !compact && (
+          /* Amber, like the rule banner: the one colour on the grid that is neither win nor loss,
+             so a broken rule on a green day still reads as a broken rule. */
+          <span
+            className="grid h-3 w-3 md:h-4 md:w-4 shrink-0 place-items-center rounded-full bg-amber-400/20 text-amber-300"
+            title="Broke one of your rules"
+            aria-label="Broke one of your rules"
+          >
+            <AlertTriangle size={9} className="md:hidden" aria-hidden />
+            <AlertTriangle size={11} className="hidden md:block" aria-hidden />
+          </span>
+        )}
       </span>
       {hasTrades && !compact ? (
         <div className="mt-auto min-w-0 w-full">

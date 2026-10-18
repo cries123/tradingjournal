@@ -58,6 +58,8 @@ interface DashboardViewProps {
   hasBrokerTrades?: boolean;
   /** Opens the monthly report for the month on screen. */
   onOpenReport?: () => void;
+  /** Days on which one of the trader's rules was broken, judged on the active journal alone. */
+  ruleDates?: ReadonlySet<string>;
 }
 
 export function DashboardView({
@@ -87,6 +89,7 @@ export function DashboardView({
   onSyncBroker,
   hasBrokerTrades = false,
   onOpenReport,
+  ruleDates,
 }: DashboardViewProps) {
   const { settings, viewingAllJournals } = useSettings();
   const [mode, setMode] = useState<DashboardMode>('month');
@@ -272,6 +275,7 @@ export function DashboardView({
             onPrevMonth={onPrevMonth}
             onNextMonth={onNextMonth}
             onMonthChange={onMonthChange}
+            ruleDates={ruleDates}
           />
         ) : (
           <YearMonths

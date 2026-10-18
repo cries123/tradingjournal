@@ -44,6 +44,7 @@ import { computeStats, getMonthTrades, getYearTrades } from '../utils/stats';
 import { takePendingAppView } from '../utils/pendingAppView';
 import { AssistantDock } from '../components/analytics/AssistantDock';
 import { formatMonthYear } from '../utils/format';
+import { checkRuleViolations } from '../utils/tradingRules';
 import { currentView, popView, pushView } from '../utils/viewStack';
 import { JournalOfflineBanner } from '../components/JournalOfflineBanner';
 import { InAppProvider } from '../components/layout/PageFrame';
@@ -86,6 +87,19 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
     loadSampleData,
     clearSampleData,
   } = useTrades();
+
+  /*
+   * The days the calendar marks as rule breaks, from the active journal alone — the same scope as
+   * the rule banner. In the all-journals view the limits were set for one account, so judging the
+   * sum of several against them would mark breaches no account had; there, nothing is marked.
+   */
+  const ruleDates = useMemo(
+    () =>
+      viewingAllJournals || !settings.tradingRules.enabled
+        ? new Set<string>()
+        : new Set(checkRuleViolations(activeJournalTrades, settings.tradingRules).map((v) => v.date)),
+    [viewingAllJournals, settings.tradingRules, activeJournalTrades],
+  );
 
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -555,6 +569,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                   sampleActive={sampleActive}
                   onLoadSample={loadSampleData}
                   onClearSample={clearSampleData}
+                  ruleDates={ruleDates}
                 />
               </>
             )}

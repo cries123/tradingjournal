@@ -1,10 +1,18 @@
 import { useMemo, useState } from 'react';
 import type { Trade } from '../types';
-import { aggregateTradesByDay, buildCalendarWeeks, getMonthTotalPnl } from '../utils/calendar';
+import {
+  aggregateTradesByDay,
+  buildCalendarWeeks,
+  getMonthTotalPnl,
+  monthHasTrades,
+  previousMonth,
+  weekShares,
+} from '../utils/calendar';
 import { formatCurrency, formatMonthYear } from '../utils/format';
 import { useSettings } from '../context/useSettings';
 import { DashboardDayCell } from './DashboardDayCell';
 import { DashboardWeekTotalCell } from './DashboardWeekTotalCell';
+import { DashboardCalendarList } from './DashboardCalendarList';
 import { MonthPicker } from './MonthPicker';
 import { CountUp } from './motion/CountUp';
 import { filledDays, nextDaySeen, type DaySeen } from '../utils/freshDays';
@@ -17,9 +25,10 @@ interface DashboardCalendarProps {
   onPrevMonth: () => void;
   onNextMonth: () => void;
   onMonthChange: (year: number, month: number) => void;
+  /** Days on which one of the trader's rules was broken — marked on the grid. */
+  ruleDates?: ReadonlySet<string>;
 }
 
-const WEEKDAYS_SHORT = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 /**
  * All seven days are shown.
@@ -30,6 +39,8 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
  * that can hide a trade is worse than one with a mostly-quiet column.
  */
 const DAYS_PER_WEEK = 7;
+
+const NO_DATES: ReadonlySet<string> = new Set();
 
 /** "2026-07-04" for a day of a 0-based month — the key trades and summaries are filed under. */
 function dayKey(year: number, month: number, day: number): string {
@@ -50,11 +61,23 @@ export function DashboardCalendar({
   onPrevMonth,
   onNextMonth,
   onMonthChange,
+  ruleDates = NO_DATES,
 }: DashboardCalendarProps) {
   const { settings } = useSettings();
   const summaries = useMemo(() => aggregateTradesByDay(trades), [trades]);
   const weeks = useMemo(() => buildCalendarWeeks(year, month, summaries), [year, month, summaries]);
   const monthTotal = useMemo(() => getMonthTotalPnl(summaries, year, month), [summaries, year, month]);
+  const shares = useMemo(() => weekShares(weeks), [weeks]);
+
+  /*
+   * Last month beside this one. The total on its own says how the month went; against the month
+   * before it says whether things are getting better. Only when there was a last month to compare
+   * with — "vs $0.00" for a trader who started this month is not a comparison.
+   */
+  const prior = useMemo(() => {
+    const p = previousMonth(year, month);
+    return monthHasTrades(summaries, p.year, p.month) ? getMonthTotalPnl(summaries, p.year, p.month) : null;
+  }, [summaries, year, month]);
 
   /*
    * Days that just gained their first trade while this month is on screen pop into the grid — the
@@ -83,6 +106,7 @@ export function DashboardCalendar({
 
   const today = new Date();
   const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+  const fmt = (n: number) => formatCurrency(n, settings.currency);
 
   return (
     <div className="panel-card p-2 md:p-4 shrink-0">
@@ -94,9 +118,16 @@ export function DashboardCalendar({
           <h2 key={monthKey} className="text-xs md:text-lg font-semibold animate-page-in">{formatMonthYear(year, month)}</h2>
         </div>
         <div className="flex items-center gap-1.5 md:gap-3 shrink-0 ml-auto">
-          {/* Rolls from last month's total to this one's while the grid fades in. */}
-          <span className={`text-[10px] md:text-sm font-semibold tabular-nums ${monthTotal >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}>
-            <CountUp value={monthTotal} format={(n) => formatCurrency(n, settings.currency)} />
+          <span className="text-right leading-tight">
+            {/* Rolls from last month's total to this one's while the grid fades in. */}
+            <span className={`block text-[10px] md:text-sm font-semibold tabular-nums ${monthTotal >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}>
+              <CountUp value={monthTotal} format={fmt} />
+            </span>
+            {prior !== null && (
+              <span className="hidden sm:block text-[10px] md:text-[11px] text-text-secondary tabular-nums">
+                vs <span className={prior >= 0 ? 'text-profit-bright/80' : 'text-loss-bright/80'}>{fmt(prior)}</span> last month
+              </span>
+            )}
           </span>
           <MonthPicker
             year={year}
@@ -108,20 +139,33 @@ export function DashboardCalendar({
         </div>
       </div>
 
-      <div className="grid grid-cols-8 gap-0.5 md:gap-2 mb-0.5 md:mb-1">
+      {/* The phone layout: one row per trading day. See DashboardCalendarList for why. */}
+      <div className="md:hidden">
+        <DashboardCalendarList
+          weeks={weeks}
+          year={year}
+          month={month}
+          today={isCurrentMonth ? today : null}
+          fresh={fresh}
+          ruleDates={ruleDates}
+          shares={shares}
+          dayKey={dayKey}
+          onDayClick={onDayClick}
+        />
+      </div>
+
+      <div className="hidden md:grid grid-cols-8 gap-2 mb-1">
         {WEEKDAYS.map((day, i) => (
-          <div key={`${day}-${i}`} className="text-[8px] md:text-[11px] text-text-secondary text-center py-0.5 md:py-1 font-medium uppercase tracking-wide">
-            <span className="md:hidden">{WEEKDAYS_SHORT[i]}</span>
-            <span className="hidden md:inline">{day}</span>
+          <div key={`${day}-${i}`} className="text-[11px] text-text-secondary text-center py-1 font-medium uppercase tracking-wide">
+            {day}
           </div>
         ))}
-        <div className="text-[8px] md:text-[11px] text-accent/80 text-center py-0.5 md:py-1 font-medium uppercase tracking-wide">
-          <span className="md:hidden">Tot</span>
-          <span className="hidden md:inline">Week total</span>
+        <div className="text-[11px] text-accent/80 text-center py-1 font-medium uppercase tracking-wide">
+          Week total
         </div>
       </div>
 
-      <div key={`${year}-${month}`} className="grid grid-cols-8 gap-0.5 md:gap-2 animate-fade-up motion-safe:animate-fade-up">
+      <div key={`${year}-${month}`} className="hidden md:grid grid-cols-8 gap-2 animate-fade-up motion-safe:animate-fade-up">
         {weeks.flatMap((week, wi) => {
           // Weeks with nothing in them collapse to a slim row. A month that begins on a Friday
           // otherwise opens with two full-height rows of empty cells, which pushed the actual
@@ -143,6 +187,7 @@ export function DashboardCalendar({
                 }
                 isToday={isCurrentMonth && day.date?.getDate() === today.getDate()}
                 fresh={day.date ? fresh.has(dayKey(year, month, day.date.getDate())) : false}
+                ruleBroken={day.date ? ruleDates.has(dayKey(year, month, day.date.getDate())) : false}
                 onClick={
                   day.date
                     ? () => onDayClick(dayKey(year, month, day.date!.getDate()))
@@ -150,7 +195,7 @@ export function DashboardCalendar({
                 }
               />
             )),
-            <DashboardWeekTotalCell key={`week-total-${wi}`} summary={week.summary} compact={compact} />,
+            <DashboardWeekTotalCell key={`week-total-${wi}`} summary={week.summary} compact={compact} share={shares[wi]} />,
           ];
         })}
       </div>

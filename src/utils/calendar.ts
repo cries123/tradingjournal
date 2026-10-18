@@ -93,6 +93,31 @@ export function aggregateTradesByDay(trades: Trade[]): Map<string, DailySummary>
   return map;
 }
 
+/** The month before, as a 0-based month: January 2026 → December 2025. */
+export function previousMonth(year: number, month: number): { year: number; month: number } {
+  return month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 };
+}
+
+/** Whether any day of the month has a trade — the difference between "$0" and "nothing". */
+export function monthHasTrades(summaries: Map<string, DailySummary>, year: number, month: number): boolean {
+  const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+  for (const [key, summary] of summaries) {
+    if (key.startsWith(prefix) && summary.tradeCount > 0) return true;
+  }
+  return false;
+}
+
+/**
+ * The size of each week against the month's biggest, for the bar in the week-total column.
+ *
+ * Judged on absolute P&L, so a −$935 week draws as long a bar as a +$935 one: the bar says how
+ * much happened, the colour says which way.
+ */
+export function weekShares(weeks: { summary: WeekSummary }[]): number[] {
+  const max = Math.max(0, ...weeks.map((w) => Math.abs(w.summary.totalPnl)));
+  return weeks.map((w) => (max > 0 && w.summary.tradeCount > 0 ? Math.abs(w.summary.totalPnl) / max : 0));
+}
+
 export function getMonthTotalPnl(summaries: Map<string, DailySummary>, year: number, month: number): number {
   let total = 0;
   const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
