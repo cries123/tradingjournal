@@ -12,7 +12,6 @@ import { formatCurrency, formatMonthYear } from '../utils/format';
 import { useSettings } from '../context/useSettings';
 import { DashboardDayCell } from './DashboardDayCell';
 import { DashboardWeekTotalCell } from './DashboardWeekTotalCell';
-import { DashboardCalendarList } from './DashboardCalendarList';
 import { MonthPicker } from './MonthPicker';
 import { CountUp } from './motion/CountUp';
 import { filledDays, nextDaySeen, type DaySeen } from '../utils/freshDays';
@@ -139,22 +138,7 @@ export function DashboardCalendar({
         </div>
       </div>
 
-      {/* The phone layout: one row per trading day. See DashboardCalendarList for why. */}
-      <div className="md:hidden">
-        <DashboardCalendarList
-          weeks={weeks}
-          year={year}
-          month={month}
-          today={isCurrentMonth ? today : null}
-          fresh={fresh}
-          ruleDates={ruleDates}
-          shares={shares}
-          dayKey={dayKey}
-          onDayClick={onDayClick}
-        />
-      </div>
-
-      <div className="hidden md:grid grid-cols-8 gap-2 mb-1">
+      <div className="grid grid-cols-8 gap-2 mb-1">
         {WEEKDAYS.map((day, i) => (
           <div key={`${day}-${i}`} className="text-[11px] text-text-secondary text-center py-1 font-medium uppercase tracking-wide">
             {day}
@@ -165,7 +149,7 @@ export function DashboardCalendar({
         </div>
       </div>
 
-      <div key={`${year}-${month}`} className="hidden md:grid grid-cols-8 gap-2 animate-fade-up motion-safe:animate-fade-up">
+      <div key={`${year}-${month}`} className="grid grid-cols-8 gap-2 animate-fade-up motion-safe:animate-fade-up">
         {weeks.flatMap((week, wi) => {
           // Weeks with nothing in them collapse to a slim row. A month that begins on a Friday
           // otherwise opens with two full-height rows of empty cells, which pushed the actual

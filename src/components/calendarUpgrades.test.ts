@@ -2,11 +2,11 @@ import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { DailySummary, Trade } from '../types';
-import { monthHasTrades, previousMonth, weekShares, aggregateTradesByDay, buildCalendarWeeks } from '../utils/calendar';
+import { monthHasTrades, previousMonth, weekShares, aggregateTradesByDay } from '../utils/calendar';
 
 /*
  * The calendar's second pass: rule-break marks on the days, the week's figure as a figure with a
- * bar, last month beside this month's total, and a list instead of a grid on a phone.
+ * bar, and last month beside this month's total.
  */
 
 vi.mock('../context/useSettings', () => ({
@@ -18,7 +18,6 @@ vi.mock('../context/useSettings', () => ({
 
 const { DashboardDayCell } = await import('./DashboardDayCell');
 const { DashboardWeekTotalCell } = await import('./DashboardWeekTotalCell');
-const { DashboardCalendarList } = await import('./DashboardCalendarList');
 
 const text = (html: string) => html.replace(/<!-- -->/g, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 const paint = (el: Parameters<typeof renderToString>[0]) => renderToString(el).replaceAll('<!-- -->', '');
@@ -84,73 +83,5 @@ describe('last month beside this one', () => {
     const summaries = aggregateTradesByDay([trade('2026-10-06', -742), trade('2026-09-12', 300)]);
     expect(monthHasTrades(summaries, 2026, 8)).toBe(true);
     expect(monthHasTrades(summaries, 2026, 7)).toBe(false);
-  });
-});
-
-describe('the phone list', () => {
-  const trades = [trade('2026-10-01', 184), trade('2026-10-01', 90), trade('2026-10-06', -742), trade('2026-10-09', 175)];
-  const summaries = aggregateTradesByDay(trades);
-  const weeks = buildCalendarWeeks(2026, 9, summaries);
-  const dayKey = (y: number, m: number, d: number) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-  const render = (over: Partial<Parameters<typeof DashboardCalendarList>[0]> = {}) =>
-    paint(
-      createElement(DashboardCalendarList, {
-        weeks,
-        year: 2026,
-        month: 9,
-        today: null,
-        fresh: new Set<string>(),
-        ruleDates: new Set<string>(),
-        shares: weekShares(weeks),
-        dayKey,
-        onDayClick: () => undefined,
-        ...over,
-      }),
-    );
-
-  it('lists the days that were traded, with the day’s figure, count and split, and nothing else', () => {
-    const words = text(render());
-    expect(words).toContain('Thu 1');
-    expect(words).toContain('$274.00');
-    expect(words).toContain('2 trades · 2W 0L');
-    expect(words).toContain('Tue 6');
-    expect(words).toContain('-$742.00');
-    // A day with no trades is not a row.
-    expect(words).not.toContain('Fri 2');
-    expect(words).not.toContain('Mon 5');
-  });
-
-  it('shows today even when it is empty, as the one tap worth offering', () => {
-    const words = text(render({ today: new Date(2026, 9, 20) }));
-    expect(words).toContain('Tue 20');
-    expect(words).toContain('Today — log a trade');
-  });
-
-  it('marks a rule break on the row', () => {
-    expect(text(render({ ruleDates: new Set(['2026-10-06']) }))).toContain('Rule');
-    expect(text(render())).not.toContain(' Rule ');
-  });
-
-  it('heads each week with its range and its figure', () => {
-    const words = text(render());
-    expect(words).toContain('Sun 4 – Sat 10');
-    expect(words).toContain('-$567.00');
-  });
-
-  it('says so when the month is empty', () => {
-    const html = paint(
-      createElement(DashboardCalendarList, {
-        weeks: buildCalendarWeeks(2026, 9, new Map()),
-        year: 2026,
-        month: 9,
-        today: null,
-        fresh: new Set<string>(),
-        ruleDates: new Set<string>(),
-        shares: [],
-        dayKey,
-        onDayClick: () => undefined,
-      }),
-    );
-    expect(text(html)).toContain('No trades this month yet.');
   });
 });
