@@ -12,6 +12,8 @@
  * if a file under src/ ever imports a value from server/ again.
  */
 
+import { historyWasLoadingRow, NEXT_DAY_NOTE } from './brokerHistoryStatus';
+
 export type JournalEventType = 'sync' | 'clear';
 
 export interface SyncOutcome {
@@ -114,7 +116,17 @@ function describeIgnored(byType: Record<string, number>): string {
  * The interpretation, not the presentation: "12 activities, 0 trades" is data, and "the broker
  * sent 12 activities and all 12 were DIVIDEND" is the reply to the support ticket.
  */
-export function describeEvent(event: JournalEvent): string {
+/**
+ * Who is reading the row.
+ *
+ * Support wants the raw fact — "0 activities", and whether a sync was spent for nothing — because
+ * that is what closes a ticket. The trader wants to know whether it worked and what to do next,
+ * and reads "the broker returned no activity at all" as "it does not work". People cancelled over
+ * exactly that line, under a brand-new connection whose history SnapTrade was still loading.
+ */
+export type EventAudience = 'support' | 'trader';
+
+export function describeEvent(event: JournalEvent, audience: EventAudience = 'support'): string {
   if (event.type === 'clear') {
     const c = event.clear;
     if (!c) return 'Cleared a journal.';
@@ -126,16 +138,18 @@ export function describeEvent(event: JournalEvent): string {
   const s = event.sync;
   if (!s) return 'Synced.';
 
-  const where = s.institution ?? 'a broker';
+  const trader = audience === 'trader';
+  const where = s.institution ?? (trader ? 'your broker' : 'a broker');
   const verb = s.automatic ? `Morning import from ${where}` : `Synced ${where}`;
   // An automatic run spends nothing, and a refunded sync was not spent either, so "spent for
   // nothing" is only true of a Sync button press the allowance kept. A row from before `refunded`
-  // was recorded says neither: it cannot tell a charged sync from one handed back.
+  // was recorded says neither: it cannot tell a charged sync from one handed back. The trader is
+  // told what it cost them only when it cost nothing; "spent for nothing" is support's line.
   const wasted = s.automatic
     ? ''
     : s.refunded === true
-      ? ' This sync was not charged.'
-      : s.refunded === false
+      ? trader ? ' This did not use a sync.' : ' This sync was not charged.'
+      : s.refunded === false && !trader
         ? ' A sync was spent for nothing.'
         : '';
   const open = s.openPositions ? ` ${s.openPositions} ${s.openPositions === 1 ? 'position is' : 'positions are'} still open.` : '';
@@ -146,8 +160,30 @@ export function describeEvent(event: JournalEvent): string {
         ? ' Reached back to an open position.'
         : '';
 
+  /*
+   * A pull that asked for everything and got nothing is the history still on its way from the
+   * broker: SnapTrade loads a new connection in the background and answers empty until it has
+   * finished, whatever the account's flag said at the time. A narrow window that comes back empty
+   * on an account that has imported before is the ordinary case — no new fills, and SnapTrade
+   * delivers transactions a day late anyway. windowStart is null for a full pull whatever the
+   * reason; the reasons cover rows written before windowStart was recorded.
+   */
+  const fullHistory = s.windowStart === null || s.windowReason === 'first-sync' || s.windowReason === 'repairing';
+
   if (s.activityCount === 0) {
-    return `${verb} — the broker returned no activity at all.${open}${scope}${wasted}`;
+    if (trader) {
+      const broker = s.institution ?? 'Your broker';
+      if (fullHistory) {
+        return s.automatic
+          ? `${verb} — ${historyWasLoadingRow(broker)} The next import will try again.`
+          : `${historyWasLoadingRow(broker)} Try again in about 30 minutes.${wasted}`;
+      }
+      return s.automatic
+        ? `${verb} — no new trades since the last import. ${NEXT_DAY_NOTE}`
+        : `${verb} — no new trades since your last sync. ${NEXT_DAY_NOTE}${wasted}`;
+    }
+    const loading = fullHistory ? ' Full-history pull, so SnapTrade was most likely still loading it.' : '';
+    return `${verb} — the broker returned no activity at all.${loading}${open}${scope}${wasted}`;
   }
 
   if (s.tradesReturned === 0) {

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { describeEvent, wasWasted, type JournalEvent } from '../utils/journalEvents';
 
@@ -142,6 +143,99 @@ describe('describeEvent, for a clear', () => {
 
     expect(out).toContain('j1');
     expect(out).toContain('1 trade deleted');
+  });
+});
+
+describe('describeEvent, as the trader reads it', () => {
+  /*
+   * Jay: "instead of saying no activity we need to say broker is still sending snaptrade your trade
+   * history please wait and try again in 30 minutes … because people dont think it works and they
+   * are canceling." The trader's own history is the second place they read it, after the connect
+   * screen, so it says the same thing — and never "no activity" or "spent for nothing".
+   */
+  const empty = (over: Partial<NonNullable<JournalEvent['sync']>> = {}) =>
+    sync({ activityCount: 0, tradesReturned: 0, institution: 'Charles Schwab', refunded: true, ...over });
+
+  it('reads an empty full-history pull as the history still on its way, with the wait and the cost', () => {
+    for (const row of [empty({ windowReason: 'first-sync' }), empty({ windowReason: 'repairing' }), empty({ windowStart: null })]) {
+      const line = describeEvent(row, 'trader');
+      expect(line).toBe(
+        'Charles Schwab was still sending SnapTrade your trade history, so there was nothing to import yet. Try again in about 30 minutes. This did not use a sync.',
+      );
+    }
+  });
+
+  it('does not depend on the flag: a full pull that came back empty reads the same way', () => {
+    // The flag was already true, or missing, for the connection that prompted this — the feed was
+    // empty all the same. windowStart null is the full pull, whatever the reason recorded.
+    const line = describeEvent(empty({ windowReason: 'window', windowStart: null }), 'trader');
+    expect(line).toContain('still sending SnapTrade your trade history');
+  });
+
+  it('reads an empty narrow window as no new trades, which is the normal day-late delivery', () => {
+    const line = describeEvent(empty({ windowReason: 'window', windowStart: '2026-10-04' }), 'trader');
+    expect(line).toBe(
+      'Synced Charles Schwab — no new trades since your last sync. Trades usually arrive the day after they happen. This did not use a sync.',
+    );
+    expect(line).not.toContain('still sending');
+  });
+
+  it('never shows the trader "no activity" or "spent for nothing"', () => {
+    for (const row of [
+      empty({ windowReason: 'first-sync' }),
+      empty({ windowReason: 'window', windowStart: '2026-10-04' }),
+      empty({ windowReason: 'first-sync', refunded: false }),
+      empty({ windowReason: 'first-sync', refunded: undefined }),
+      empty({ activityCount: 12, ignored: 12, ignoredByType: { DIVIDEND: 12 } }),
+      empty({ automatic: true, windowReason: 'first-sync' }),
+      empty({ automatic: true, windowReason: 'window', windowStart: '2026-10-04' }),
+    ]) {
+      const line = describeEvent(row, 'trader');
+      expect(line.toLowerCase(), line).not.toContain('no activity');
+      expect(line, line).not.toContain('spent for nothing');
+    }
+  });
+
+  it('says nothing about the cost on a row that cannot know it', () => {
+    expect(describeEvent(empty({ windowReason: 'first-sync', refunded: undefined }), 'trader')).not.toContain('sync.');
+  });
+
+  it('tells a Diamond trader the morning import will try again', () => {
+    const line = describeEvent(empty({ automatic: true, windowReason: 'first-sync' }), 'trader');
+    expect(line).toContain('Morning import from Charles Schwab');
+    expect(line).toContain('still sending SnapTrade your trade history');
+    expect(line).toContain('The next import will try again.');
+  });
+
+  it('falls back to "your broker" rather than "a broker"', () => {
+    const line = describeEvent(empty({ institution: null, windowReason: 'first-sync' }), 'trader');
+    expect(line).toMatch(/^Your broker was still sending/);
+  });
+
+  it('keeps the matcher explanation when activity came back and nothing paired', () => {
+    const line = describeEvent(empty({ activityCount: 6, unmatchedCloses: 6 }), 'trader');
+    expect(line).toContain('6 activities came back but nothing paired into a trade.');
+    expect(line).toContain('no opening fill');
+    expect(line).toContain('This did not use a sync.');
+  });
+
+  it('leaves a working sync alone', () => {
+    expect(describeEvent(sync(), 'trader')).toBe(describeEvent(sync()));
+  });
+
+  it('keeps the raw fact for support, with a hint when the pull was a full one', () => {
+    const line = describeEvent(empty({ windowReason: 'first-sync' }));
+    expect(line).toContain('the broker returned no activity at all');
+    expect(line).toContain('SnapTrade was most likely still loading it');
+    expect(line).toContain('This sync was not charged.');
+    expect(describeEvent(empty({ windowReason: 'window', windowStart: '2026-10-04' }))).not.toContain('still loading');
+  });
+
+  it('is what the connect screen shows, while the admin panel keeps the support line', () => {
+    const screen = readFileSync('src/components/brokers/BrokerConnectContent.tsx', 'utf8');
+    expect(screen).toContain("describe={(e) => describeEvent(e, 'trader')}");
+    const admin = readFileSync('src/components/admin/AdminJournalEventsSection.tsx', 'utf8');
+    expect(admin).toContain('{describeEvent(event)}');
   });
 });
 

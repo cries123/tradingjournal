@@ -1,4 +1,5 @@
 import type { SyncStartReason } from './syncPlan';
+import { historyLoadingLine, noNewTradesLine } from './brokerHistoryStatus';
 
 /**
  * The one sentence a sync ends with, for every way a sync can end.
@@ -12,6 +13,8 @@ import type { SyncStartReason } from './syncPlan';
 export interface SyncResult {
   /** The account's name, or its institution. */
   label: string;
+  /** The brokerage, for the sentences that are about the broker rather than the account. */
+  institution?: string | null;
   /** Rows the broker returned, before matching. */
   activityCount: number;
   /** Round trips the server built from them. */
@@ -23,6 +26,31 @@ export interface SyncResult {
   refundNotice: string | null;
   /** Why the server asked for the window it did. */
   windowReason?: SyncStartReason;
+  /** The first day the server asked for, or null when it asked for everything. */
+  windowStart?: string | null;
+}
+
+/**
+ * True when the pull asked for the account's whole history.
+ *
+ * windowStart is null for every full pull whatever the reason; the two reasons cover an answer
+ * from a server that did not send windowStart.
+ */
+export function fullHistoryPull(r: Pick<SyncResult, 'windowReason' | 'windowStart'>): boolean {
+  return r.windowStart === null || r.windowReason === 'first-sync' || r.windowReason === 'repairing';
+}
+
+/**
+ * True when nothing came back from a pull that asked for everything: the history is still on its
+ * way from the broker, not absent.
+ *
+ * Not keyed on the account's `initial_sync_completed` flag, which the Sync button checks before
+ * pulling. The connection that prompted this answered empty at six and fourteen minutes and had
+ * 880 activities three days later; whether the flag was already true then is not known, and an
+ * empty full pull means the same thing either way. The screen puts this answer in the wait box.
+ */
+export function historyStillOnItsWay(r: Pick<SyncResult, 'activityCount' | 'windowReason' | 'windowStart'>): boolean {
+  return r.activityCount === 0 && fullHistoryPull(r);
 }
 
 function plural(n: number, one: string, many = `${one}s`): string {
@@ -33,7 +61,16 @@ export function describeSyncResult(r: SyncResult): string {
   let line: string;
 
   if (r.activityCount === 0) {
-    line = `No trade activity came back from ${r.label}.`;
+    /*
+     * Never "no activity". Jay: "instead of saying no activity we need to say broker is still
+     * sending snaptrade your trade history please wait and try again in 30 minutes … because people
+     * dont think it works and they are canceling." An empty full pull is that. An empty narrow
+     * window on an account that has imported before is the other normal case — nothing new, and
+     * SnapTrade delivers a day late anyway — and is told apart so a trader checking today's fills
+     * is not told to wait for a history they already have.
+     */
+    const broker = r.institution || r.label;
+    line = fullHistoryPull(r) ? historyLoadingLine(broker) : noNewTradesLine(broker);
   } else if (r.tradesReturned === 0) {
     // The count is the clue: it tells the trader the connection works and the feed is not empty,
     // and that the explanation is in the notes underneath rather than in their broker settings.
@@ -49,8 +86,11 @@ export function describeSyncResult(r: SyncResult): string {
     line += ' This account has more activity than one sync can pull in — the oldest history was left out.';
   }
 
-  // Why it took as long as it did, when it did.
-  if (r.windowReason === 'first-sync' || r.windowReason === 'repairing') {
+  // Why it took as long as it did, when it did. Not after an empty feed: "read your full history"
+  // next to "still sending your trade history" would contradict it.
+  if (r.activityCount === 0) {
+    // nothing to add
+  } else if (r.windowReason === 'first-sync' || r.windowReason === 'repairing') {
     line += ' This sync read your full history.';
   } else if (r.windowReason === 'widened-for-open-position') {
     line += ' It reached back to a position you still hold.';

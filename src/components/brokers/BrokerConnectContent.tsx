@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { syncStartDate } from '../../utils/syncWindow';
 import { manualSyncTradeId } from '../../utils/brokerTradeIds';
-import { describeSyncResult } from '../../utils/syncOutcomeCopy';
+import { describeSyncResult, historyStillOnItsWay } from '../../utils/syncOutcomeCopy';
 import { readCachedBrokerStatus, writeCachedBrokerStatus } from '../../services/brokerStatusCache';
 import { describeEvent, type JournalEvent } from '../../utils/journalEvents';
 import { historyLoadingMessage, historyLoadingNote } from '../../utils/brokerHistoryStatus';
@@ -298,7 +298,7 @@ export function BrokerConnectContent({
       const {
         trades, truncated, syncsRemaining, syncsPerDay, syncCredits, activityCount,
         unmatchedCloses, assumedShorts, inferredOrderDays, ignored, negativeFees,
-        openPositions, orientationAssumed, windowReason, syncRefundNotice,
+        openPositions, orientationAssumed, windowReason, windowStart, syncRefundNotice,
         historyLoading, message,
         /*
          * A window, not the whole account.
@@ -361,15 +361,21 @@ export function BrokerConnectContent({
       }));
       const outcome = {
         label,
+        institution: account.institutionName,
         activityCount: activityCount ?? trades.length * 2,
         tradesReturned: trades.length,
         truncated,
         refundNotice: syncRefundNotice ?? null,
         windowReason,
+        windowStart,
       };
 
       if (freshTrades.length === 0) {
-        setSyncMessage(describeSyncResult({ ...outcome, fresh: 0 }));
+        const line = describeSyncResult({ ...outcome, fresh: 0 });
+        // An empty full-history pull is the history still on its way, not a result: it goes in the
+        // wait box, not under a green tick, whatever the account's flag said before the pull.
+        if (historyStillOnItsWay(outcome)) setWaiting(line);
+        else setSyncMessage(line);
         loadHistory();
         return;
       }
@@ -588,7 +594,8 @@ export function BrokerConnectContent({
         </div>
       )}
 
-      {history && history.length > 0 && <SyncHistory events={history} describe={describeEvent} />}
+      {/* The trader's wording, not support's: see EventAudience. */}
+      {history && history.length > 0 && <SyncHistory events={history} describe={(e) => describeEvent(e, 'trader')} />}
 
       {/* Twenty brokers down one 768px column was five screens of scrolling to find yours. A grid
           puts every one of them within a glance on a desktop. */}

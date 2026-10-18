@@ -139,7 +139,7 @@ describe('pressing Sync while SnapTrade is still loading the history', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.historyLoading).toBe(true);
     expect(res.body.message).toBe(
-      'Charles Schwab is still sending us your history. This usually takes a few minutes after connecting. Try again shortly. This did not use a sync.',
+      'Charles Schwab is still sending SnapTrade your trade history, so there is nothing to import yet. Please wait and try again in about 30 minutes. This did not use a sync.',
     );
     expect(res.body.trades).toEqual([]);
     expect(consumeDaily).not.toHaveBeenCalled();
