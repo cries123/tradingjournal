@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, History, RefreshCw, Trash2 } from 'lucide-react';
-import { adminReadJournalEvents } from '../../services/adminUserManagement';
-import { describeEvent, wasWasted, type JournalEvent } from '../../utils/journalEvents';
+import { adminDeleteJournalEvents, adminReadJournalEvents } from '../../services/adminUserManagement';
+import { describeEvent, MAX_EVENT_DELETES, wasWasted, type JournalEvent } from '../../utils/journalEvents';
 
 /**
  * What this account's syncs actually did.
@@ -36,6 +36,15 @@ export function AdminJournalEventsSection({ uid }: { uid: string }) {
   } | null>(null);
   const [reload, setReload] = useState(0);
   const [open, setOpen] = useState(false);
+  /*
+   * Rows ticked for deletion, keyed to the load they were ticked on so a refresh or another user
+   * never carries a stale selection into a delete.
+   */
+  const [picked, setPicked] = useState<{ key: string; ids: Set<string> }>({ key: '', ids: new Set() });
+  /** Two steps: the first press arms it, the second deletes. Undo does not exist for this. */
+  const [armed, setArmed] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteNote, setDeleteNote] = useState<string | null>(null);
 
   const key = `${uid}:${reload}`;
 
@@ -67,6 +76,34 @@ export function AdminJournalEventsSection({ uid }: { uid: string }) {
   const busy = open && !current;
 
   const wasted = events?.filter(wasWasted).length ?? 0;
+  const selected = picked.key === key ? picked.ids : new Set<string>();
+
+  const toggle = (id: string) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setPicked({ key, ids: next });
+    setArmed(false);
+  };
+
+  const deleteSelected = async () => {
+    if (!armed) {
+      setArmed(true);
+      return;
+    }
+    setDeleting(true);
+    setDeleteNote(null);
+    try {
+      const { message } = await adminDeleteJournalEvents(uid, [...selected]);
+      setDeleteNote(message);
+      setReload((n) => n + 1);
+    } catch (err) {
+      setDeleteNote(err instanceof Error ? err.message : 'Could not delete those rows.');
+    } finally {
+      setDeleting(false);
+      setArmed(false);
+    }
+  };
 
   return (
     <section className="border-t border-border/50 pt-4 mt-4">
@@ -112,6 +149,49 @@ export function AdminJournalEventsSection({ uid }: { uid: string }) {
 
           {!busy && events && events.length > 0 && (
             <>
+              {/*
+                Deleting rows rewrites the history the trader reads on their own connect screen,
+                which is the point: a sync that timed out still says "8,790 trades out" there.
+              */}
+              <div className="mb-2 flex flex-wrap items-center gap-2 min-h-[28px]">
+                {selected.size > 0 ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void deleteSelected()}
+                      disabled={deleting || selected.size > MAX_EVENT_DELETES}
+                      className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors focus-ring disabled:opacity-50 ${
+                        armed
+                          ? 'bg-red-500 text-white hover:bg-red-600'
+                          : 'border border-red-500/40 text-red-300 hover:bg-red-500/10'
+                      }`}
+                    >
+                      <Trash2 size={11} />
+                      {deleting
+                        ? 'Deleting…'
+                        : armed
+                          ? `Confirm: delete ${selected.size} from their history`
+                          : `Delete ${selected.size} selected`}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPicked({ key, ids: new Set() });
+                        setArmed(false);
+                      }}
+                      className="text-[11px] text-text-secondary hover:text-text-primary focus-ring rounded px-2 py-1"
+                    >
+                      Clear
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-[11px] text-text-secondary">
+                    Tick rows to remove them. They disappear from the trader&apos;s own sync history too.
+                  </p>
+                )}
+                {deleteNote && <p className="text-[11px] text-text-secondary">{deleteNote}</p>}
+              </div>
+
               {wasted > 0 && (
                 /* Counted at the top because it is the shape of the complaint, and scrolling a
                    long list to spot the pattern is how it gets missed. */
@@ -124,7 +204,7 @@ export function AdminJournalEventsSection({ uid }: { uid: string }) {
               <ul className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
                 {events.map((event, i) => (
                   <li
-                    key={`${event.at}-${i}`}
+                    key={event.id ?? `${event.at}-${i}`}
                     className={`rounded-lg border px-3 py-2 ${
                       wasWasted(event)
                         ? 'border-amber-500/25 bg-amber-500/[0.04]'
@@ -134,6 +214,15 @@ export function AdminJournalEventsSection({ uid }: { uid: string }) {
                     }`}
                   >
                     <div className="flex items-start gap-2">
+                      {event.id && (
+                        <input
+                          type="checkbox"
+                          checked={selected.has(event.id)}
+                          onChange={() => toggle(event.id!)}
+                          aria-label={`Select the ${formatWhen(event.at)} row for deletion`}
+                          className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-red-500 cursor-pointer"
+                        />
+                      )}
                       {event.type === 'clear' && (
                         <Trash2 size={12} className="mt-0.5 shrink-0 text-red-400" />
                       )}

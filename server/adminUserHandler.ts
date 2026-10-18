@@ -4,7 +4,8 @@ import { getAdminAuth, getAdminFirestore } from './firebaseAdmin';
 import { adminEmailFor, logAdminActionServer } from './adminAudit';
 import { purgeAccount } from './accountTeardown';
 import { readEntitlement, resolveAccess, writeEntitlement } from './entitlements';
-import { readJournalEvents } from './journalEvents';
+import { deleteJournalEvents, readJournalEvents } from './journalEvents';
+import { MAX_EVENT_DELETES, parseEventIds } from '../src/utils/journalEvents';
 import { readUserJournal } from './adminUserJournal';
 import {
   adjustCredits,
@@ -33,6 +34,7 @@ import {
 export type AdminUserAction =
   | 'readUsage'
   | 'readJournalEvents'
+  | 'deleteJournalEvents'
   | 'readUserJournal'
   | 'impersonate'
   | 'updateEmail'
@@ -68,6 +70,8 @@ export interface AdminUserRequestBody {
   /** emailUser */
   subject?: unknown;
   message?: unknown;
+  /** deleteJournalEvents: the history rows to remove. */
+  eventIds?: unknown;
 }
 
 /** What the panel shows for one person's metered use: lifetime, today, and the bank. */
@@ -505,6 +509,42 @@ export async function handleAdminUserRequest(
          */
         const events = await readJournalEvents(targetUid);
         return { statusCode: 200, body: { ok: true, events } };
+      }
+      case 'deleteJournalEvents': {
+        /*
+         * Removes rows from their sync history — which is also the history they see themselves.
+         *
+         * Logged from here rather than from the browser, like impersonation: it rewrites a record
+         * the customer reads, so the entry saying who did it must not depend on the panel staying
+         * open long enough to write it.
+         */
+        const ids = parseEventIds(body.eventIds);
+        if (!ids) {
+          return {
+            statusCode: 400,
+            body: { error: `Name between 1 and ${MAX_EVENT_DELETES} history rows to delete.` },
+          };
+        }
+        const deleted = await deleteJournalEvents(targetUid, ids);
+        await logAdminActionServer({
+          adminUid: callerUid,
+          adminEmail: await adminEmailFor(callerUid),
+          action: 'user.sync-history-deleted',
+          targetType: 'user',
+          targetId: targetUid,
+          targetLabel: email?.trim() || (await adminEmailFor(targetUid)),
+          detail: `Deleted ${deleted} sync history row${deleted === 1 ? '' : 's'}.`,
+        });
+        return {
+          statusCode: 200,
+          body: {
+            ok: true,
+            deleted,
+            message: deleted === 0
+              ? 'Those rows were already gone.'
+              : `Deleted ${deleted} row${deleted === 1 ? '' : 's'} from their sync history.`,
+          },
+        };
       }
       case 'updateEmail': {
         if (!email?.trim()) {

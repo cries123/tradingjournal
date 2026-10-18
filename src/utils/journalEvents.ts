@@ -60,10 +60,34 @@ export interface ClearOutcome {
 }
 
 export interface JournalEvent {
+  /** The Firestore document id. Present on rows read back, so support can delete one. */
+  id?: string;
   type: JournalEventType;
   at: string;
   sync?: SyncOutcome;
   clear?: ClearOutcome;
+}
+
+/**
+ * The most rows one delete may name. A support clean-up is a handful of bad syncs; a number
+ * past this is a mistake or a script, and the history only keeps a couple of hundred anyway.
+ */
+export const MAX_EVENT_DELETES = 50;
+
+/** What `.add()` mints: twenty letters and digits. Anything else is not one of these rows. */
+const EVENT_ID = /^[A-Za-z0-9]{1,64}$/;
+
+/**
+ * The ids a delete request named, or null when the request is not one to act on.
+ *
+ * All or nothing: one malformed id refuses the lot, rather than deleting the valid part of a list
+ * that was evidently built wrong. Duplicates collapse, so the count reported back is real.
+ */
+export function parseEventIds(input: unknown): string[] | null {
+  if (!Array.isArray(input) || input.length === 0) return null;
+  if (!input.every((id): id is string => typeof id === 'string' && EVENT_ID.test(id))) return null;
+  const ids = [...new Set(input)];
+  return ids.length > MAX_EVENT_DELETES ? null : ids;
 }
 
 /** "8 DIVIDEND, 2 FEE", biggest first — the shape of what the broker actually sent. */

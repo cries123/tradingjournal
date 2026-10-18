@@ -55,5 +55,26 @@ export async function readJournalEvents(uid: string, max = 100): Promise<Journal
     .limit(Math.min(max, MAX_EVENTS_PER_USER))
     .get();
 
-  return snap.docs.map((d) => d.data() as JournalEvent);
+  // With the document id, so the admin panel can name a row to delete.
+  return snap.docs.map((d) => ({ ...(d.data() as JournalEvent), id: d.id }));
+}
+
+/**
+ * Deletes named rows from one user's history. Returns how many existed and were removed.
+ *
+ * For support: a sync that timed out still recorded "8,790 trades out", and that row then sits in
+ * the trader's own history claiming an import that never reached their journal. The ids are
+ * checked by the caller (parseEventIds); a row already gone is simply not counted.
+ */
+export async function deleteJournalEvents(uid: string, ids: string[]): Promise<number> {
+  const db = getAdminFirestore();
+  const refs = ids.map((id) => db.doc(`${JOURNAL_EVENTS}/${uid}/events/${id}`));
+  const snaps = await Promise.all(refs.map((ref) => ref.get()));
+  const existing = refs.filter((_, i) => snaps[i].exists);
+  if (existing.length === 0) return 0;
+
+  const batch = db.batch();
+  for (const ref of existing) batch.delete(ref);
+  await batch.commit();
+  return existing.length;
 }

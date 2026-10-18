@@ -46,7 +46,9 @@ export function getFirebaseDb(): Firestore {
 
   const firebaseApp = getFirebaseApp();
   try {
-    const kind = tabManagerFor(navigator.userAgent, navigator.maxTouchPoints ?? 0);
+    // Read loosely: the server's TypeScript config types navigator without maxTouchPoints.
+    const touchPoints = (navigator as { maxTouchPoints?: number }).maxTouchPoints ?? 0;
+    const kind = tabManagerFor(navigator.userAgent, touchPoints);
     db = initializeFirestore(firebaseApp, {
       localCache: persistentLocalCache({
         tabManager: kind === 'single' ? persistentSingleTabManager({}) : persistentMultipleTabManager(),

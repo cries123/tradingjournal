@@ -15,6 +15,8 @@ export type AdminAuditAction =
    * action in the panel leaving no trace at all, while handing over full write access to an account.
    */
   | 'user.impersonated'
+  /** Logged by the server, like impersonation: it rewrites a record the customer reads. */
+  | 'user.sync-history-deleted'
   | 'user.tier-granted'
   | 'user.tier-grant-cleared'
   | 'user.access-extended'
@@ -75,6 +77,7 @@ export const AUDIT_ACTION_LABELS: Record<AdminAuditAction, string> = {
   'user.password-reset-sent': 'Sent password reset to',
   'user.deleted': 'Deleted user',
   'user.impersonated': 'Signed in as',
+  'user.sync-history-deleted': 'Deleted sync history rows for',
   'announcement.published': 'Updated the site announcement',
   'checkout.toggled': 'Changed plan checkout availability',
   'user.tier-granted': 'Granted a plan to',

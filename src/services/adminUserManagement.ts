@@ -23,6 +23,7 @@ interface AdminApiPayload {
   suspended?: boolean;
   subject?: string;
   message?: string;
+  eventIds?: string[];
 }
 
 async function adminApiPost<Extra extends Record<string, unknown> = Record<string, never>>(
@@ -172,6 +173,14 @@ export async function adminReadJournalEvents(targetUid: string): Promise<Journal
   const data = (await res.json().catch(() => ({}))) as { events?: JournalEvent[]; error?: string };
   if (!res.ok) throw new Error(data.error ?? 'Could not load the journal history.');
   return data.events ?? [];
+}
+
+/** Removes rows from their sync history — the same history they see on the connect screen. */
+export async function adminDeleteJournalEvents(
+  targetUid: string,
+  eventIds: string[],
+): Promise<{ message: string; deleted: number }> {
+  return adminApiPost<{ deleted: number }>({ action: 'deleteJournalEvents', targetUid, eventIds });
 }
 
 /** Sends Firebase's standard password reset email to the user. */

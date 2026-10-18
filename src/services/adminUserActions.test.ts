@@ -49,7 +49,17 @@ const fakeDb = {
     },
     path,
   }),
-  batch: () => ({ delete: () => undefined, commit: async () => undefined }),
+  batch: () => {
+    const deletes: string[] = [];
+    return {
+      delete: (ref: { path?: string }) => {
+        if (ref?.path) deletes.push(ref.path);
+      },
+      commit: async () => {
+        for (const path of deletes) store.delete(path);
+      },
+    };
+  },
   runTransaction: async <T,>(fn: (tx: unknown) => Promise<T>) =>
     fn({
       get: async (ref: { path: string }) => snapshotOf(ref.path),
@@ -419,6 +429,57 @@ describe('the door', () => {
     expect((await call({ action: 'launchRockets' as never })).statusCode).toBe(400);
     expect((await handleAdminUserRequest(HEADERS, { action: 'readUsage', targetUid: ' ' })).statusCode).toBe(400);
     expect((await handleAdminUserRequest({}, { action: 'readUsage', targetUid: TARGET })).statusCode).toBe(401);
+  });
+});
+
+describe('deleting rows from a user’s sync history', () => {
+  /*
+   * For the sync that timed out after the server had already written "8,790 trades out": the row
+   * sat in the trader's own history claiming an import that never reached their journal.
+   */
+  const row = (id: string) => `journalEvents/${TARGET}/events/${id}`;
+
+  beforeEach(() => {
+    store.set(row('aaa111'), { type: 'sync', at: '2026-10-18T19:00:00Z' });
+    store.set(row('bbb222'), { type: 'sync', at: '2026-10-18T19:01:00Z' });
+    store.set(row('ccc333'), { type: 'sync', at: '2026-10-18T15:00:00Z' });
+  });
+
+  it('deletes the named rows, leaves the rest, and counts only what existed', async () => {
+    const result = await call({ action: 'deleteJournalEvents', eventIds: ['aaa111', 'bbb222', 'gone999'] });
+
+    expect(result.statusCode).toBe(200);
+    expect(result.body.deleted).toBe(2);
+    expect(store.has(row('aaa111'))).toBe(false);
+    expect(store.has(row('bbb222'))).toBe(false);
+    expect(store.has(row('ccc333'))).toBe(true);
+  });
+
+  it('only ever touches the target user’s history', async () => {
+    store.set(`journalEvents/someone-else/events/aaa111`, { type: 'sync', at: '2026-10-18T19:00:00Z' });
+    await call({ action: 'deleteJournalEvents', eventIds: ['aaa111'] });
+    expect(store.has('journalEvents/someone-else/events/aaa111')).toBe(true);
+  });
+
+  it('leaves an audit entry saying who removed how many', async () => {
+    await call({ action: 'deleteJournalEvents', eventIds: ['aaa111', 'aaa111'], email: 'trader@example.com' });
+    expect(audit).toHaveLength(1);
+    expect(audit[0]).toMatchObject({
+      adminUid: 'admin-1',
+      action: 'user.sync-history-deleted',
+      targetId: TARGET,
+      targetLabel: 'trader@example.com',
+      detail: 'Deleted 1 sync history row.',
+    });
+  });
+
+  it('refuses a request that is not a clean list of row ids, and deletes nothing', async () => {
+    for (const eventIds of [undefined, [], 'aaa111', ['aaa111', '../../users/x'], ['aaa111', 7], Array.from({ length: 51 }, (_, i) => `id${i}`)]) {
+      const result = await call({ action: 'deleteJournalEvents', eventIds });
+      expect(result.statusCode).toBe(400);
+    }
+    expect(store.has(row('aaa111'))).toBe(true);
+    expect(audit).toHaveLength(0);
   });
 });
 
