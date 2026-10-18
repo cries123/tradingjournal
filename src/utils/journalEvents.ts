@@ -50,6 +50,15 @@ export interface SyncOutcome {
   automatic?: boolean;
   /** Of tradesReturned, the ones that were not already in the journal — known only after dedupe. */
   fresh?: number;
+  /**
+   * Whether the sync was handed back to the allowance (see src/utils/syncRefund.ts).
+   *
+   * The row said "A sync was spent for nothing" of every empty manual sync, while the handler had
+   * refunded it a line earlier — the same row showed "5 syncs left after this one" twice running.
+   * Absent on rows older than this field and on automatic runs, which spend nothing; a row without
+   * it makes no claim either way, because it cannot know.
+   */
+  refunded?: boolean;
 }
 
 export interface ClearOutcome {
@@ -119,8 +128,16 @@ export function describeEvent(event: JournalEvent): string {
 
   const where = s.institution ?? 'a broker';
   const verb = s.automatic ? `Morning import from ${where}` : `Synced ${where}`;
-  // An automatic run spends nothing, so "spent for nothing" is only true of the Sync button.
-  const wasted = s.automatic ? '' : ' A sync was spent for nothing.';
+  // An automatic run spends nothing, and a refunded sync was not spent either, so "spent for
+  // nothing" is only true of a Sync button press the allowance kept. A row from before `refunded`
+  // was recorded says neither: it cannot tell a charged sync from one handed back.
+  const wasted = s.automatic
+    ? ''
+    : s.refunded === true
+      ? ' This sync was not charged.'
+      : s.refunded === false
+        ? ' A sync was spent for nothing.'
+        : '';
   const open = s.openPositions ? ` ${s.openPositions} ${s.openPositions === 1 ? 'position is' : 'positions are'} still open.` : '';
   const scope =
     s.windowReason === 'first-sync' || s.windowReason === 'repairing'

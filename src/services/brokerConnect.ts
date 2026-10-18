@@ -12,6 +12,13 @@ export interface BrokerAccountSummary {
   institutionName: string;
   authorizationId: string;
   status?: unknown;
+  /**
+   * False while SnapTrade is still loading this account's history, when every sync would come
+   * back empty. Absent on an answer from an older server or the cache, which reads as loaded.
+   */
+  historyLoaded?: boolean;
+  /** The oldest transaction SnapTrade holds for it, YYYY-MM-DD, when it said. */
+  firstTransactionDate?: string | null;
 }
 
 export interface BrokerStatus {
@@ -250,6 +257,12 @@ export async function syncBrokerAccount(
   /** True when this sync cost nothing, with the sentence to say so. */
   syncRefunded?: boolean;
   syncRefundNotice?: string | null;
+  /**
+   * True when SnapTrade had not finished loading the account's history, so nothing was pulled and
+   * nothing was spent. `message` says so in the trader's terms; every count above is zero.
+   */
+  historyLoading?: boolean;
+  message?: string;
 }> {
   return brokerApiPost({ action: 'sync', accountId, startDate, endDate });
 }

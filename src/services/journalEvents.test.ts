@@ -38,9 +38,40 @@ describe('describeEvent, for a sync', () => {
 
   it('says plainly when a sync was spent for nothing', () => {
     // The exact complaint that prompted this. It has to be findable by eye in a long list.
-    const empty = describeEvent(sync({ activityCount: 0, tradesReturned: 0 }));
+    const empty = describeEvent(sync({ activityCount: 0, tradesReturned: 0, refunded: false }));
     expect(empty).toContain('no activity at all');
     expect(empty).toContain('spent for nothing');
+  });
+
+  it('says a refunded sync was not charged, instead of calling it spent', () => {
+    /*
+     * The row claimed "A sync was spent for nothing" of every empty manual sync, while the handler
+     * had refunded it a line earlier — so a trader whose two syncs of a brand-new connection came
+     * back empty read, twice, that they had paid for nothing, under a count that said otherwise.
+     */
+    for (const row of [
+      sync({ activityCount: 0, tradesReturned: 0, refunded: true }),
+      sync({ activityCount: 12, tradesReturned: 0, ignored: 12, ignoredByType: { DIVIDEND: 12 }, refunded: true }),
+    ]) {
+      const out = describeEvent(row);
+      expect(out).toContain('This sync was not charged.');
+      expect(out).not.toContain('spent for nothing');
+    }
+  });
+
+  it('makes no claim about the charge on a row written before it was recorded', () => {
+    // Those rows cannot tell a charged sync from a refunded one, and most of the empty ones were
+    // refunded. Saying nothing is the only line that cannot be wrong.
+    const old = describeEvent(sync({ activityCount: 0, tradesReturned: 0 }));
+    expect(old).toContain('no activity at all');
+    expect(old).not.toContain('spent for nothing');
+    expect(old).not.toContain('not charged');
+  });
+
+  it('never mentions the charge on an automatic run, which spends nothing', () => {
+    const out = describeEvent(sync({ activityCount: 0, tradesReturned: 0, automatic: true, refunded: false }));
+    expect(out).not.toContain('spent for nothing');
+    expect(out).not.toContain('not charged');
   });
 
   it('separates an empty feed from one that returned unusable activity', () => {
