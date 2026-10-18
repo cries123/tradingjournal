@@ -19,6 +19,16 @@ export type SyncOutcome =
   | 'empty-feed'
   /** Activity arrived, none of it paired into a round trip. */
   | 'nothing-matched'
+  /**
+   * The pull ran out of time before the end of its window and handed over what it had.
+   *
+   * Refunded whether or not that part held trades. The trader asked for their history and got a
+   * slice of it with "sync again to continue"; charging each slice would make a large first import
+   * cost a day's allowance, for pulls that cost us nothing — SnapTrade meters a manual holdings
+   * refresh, not a read. The daily cap is a rate limit, and a cut-short pull is already limited by
+   * the clock that cut it.
+   */
+  | 'partial'
   /** The broker or the aggregator was unreachable or 5xx. */
   | 'upstream-outage'
   /** The brokerage refused the stored credential and reconnecting is required. */
@@ -50,6 +60,7 @@ export function shouldRefundSync(outcome: SyncOutcome): boolean {
       return false;
     case 'empty-feed':
     case 'nothing-matched':
+    case 'partial':
     case 'upstream-outage':
     case 'credential-rejected':
     case 'rate-limited':
@@ -80,6 +91,7 @@ export function remainingAfterSync(remainingAfterSpend: number, refunded: boolea
 export function refundNotice(outcome: SyncOutcome): string | null {
   if (!shouldRefundSync(outcome)) return null;
 
+  if (outcome === 'partial') return 'This did not use one of your syncs, because it could not finish.';
   return outcome === 'empty-feed' || outcome === 'nothing-matched'
     ? 'This did not use one of your syncs, because nothing came back.'
     : 'This did not use one of your syncs.';

@@ -151,19 +151,19 @@ describe('the automatic pull covers its window', () => {
   const source = codeOnly(readFileSync('server/brokerConnectHandler.ts', 'utf8'));
   const pull = source.slice(source.indexOf('export async function pullRecentActivityForUser'));
 
-  it('asks for more than the first page', () => {
-    expect(pull).toContain('offset: page * PAGE_SIZE');
-    expect(pull).toMatch(/for \(let page = 0; page < MAX_PAGES/);
+  it('pages through the same pull as the manual sync, with the page cap as its budget', () => {
+    // One paging loop for both paths — the second copy of it is where the page-cap bug lived.
+    expect(pull).toMatch(/await pullWindow\(fetchPage, \{[^}]*maxPages: AUTO_SYNC_MAX_PAGES/);
+    expect(pull).not.toMatch(/for \(let page = 0/);
   });
 
-  it('stops as soon as a page comes back short', () => {
-    // Otherwise every pull costs the full page budget in round trips.
-    expect(pull).toContain('if (batch.length < PAGE_SIZE) break;');
+  it('reads the pagination metadata, which a newest-first feed is paged from the end by', () => {
+    expect(pull).toContain('total: res.data.pagination?.total');
   });
 
   it('says so when it hits the cap instead of returning a quiet subset', () => {
-    expect(pull).toContain('truncated = true');
-    expect(pull).toMatch(/truncated,/);
+    expect(pull).toMatch(/if \(pull\.partial\) \{\s*partial = true;/);
+    expect(pull).toMatch(/partial: pull\.partial,/);
   });
 
   it('is surfaced by the job that calls it', () => {
@@ -174,8 +174,8 @@ describe('the automatic pull covers its window', () => {
      */
     const job = codeOnly(readFileSync('netlify/functions/auto-sync.ts', 'utf8'));
 
-    expect(job).toMatch(/const \{[^}]*truncated[^}]*\} =\s*await pullRecentActivityForUser/);
-    expect(job).toMatch(/if \(truncated\) \{\s*console\.warn\(/);
+    expect(job).toMatch(/const \{[^}]*partial[^}]*\} =\s*await pullRecentActivityForUser/);
+    expect(job).toMatch(/if \(partial\) \{\s*console\.warn\(/);
   });
 });
 
@@ -325,7 +325,7 @@ describe('the sync window is planned on the server', () => {
   });
 
   it('has the automatic pull plan every account the same way', () => {
-    expect(automatic).toMatch(/const window = await planWindow\(uid, account\.id, startDate\);/);
+    expect(automatic).toMatch(/const window = await planWindow\(uid, accountId, startDate\);/);
     expect(automatic).toContain('startDate: window.startDate,');
   });
 
@@ -334,9 +334,12 @@ describe('the sync window is planned on the server', () => {
     expect(automatic).toMatch(/await writeSyncState\(\s*uid,\s*accountId,\s*nextSyncState\(/);
   });
 
-  it('hands the matcher the direction an earlier pull saw, on both paths', () => {
-    expect(manual).toContain('mapSnapTradeActivities(activities, { feedDirection: window.previous?.feedDirection })');
-    expect(automatic).toContain('mapSnapTradeActivities(activities, { feedDirection: window.previous?.feedDirection })');
+  it('hands the pull the direction and the open lots an earlier pull left, on both paths', () => {
+    for (const path of [manual, automatic]) {
+      expect(path).toContain('hint: window.previous?.feedDirection,');
+      expect(path).toContain('openLots: window.openLots,');
+      expect(path).toContain('openLots: mapped.openLots,');
+    }
   });
 });
 

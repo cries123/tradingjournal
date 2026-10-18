@@ -32,18 +32,40 @@ export const JOURNAL_EVENTS = 'journalEvents';
 export const MAX_EVENTS_PER_USER = 200;
 
 /**
- * Records an event. Never throws.
+ * Records an event. Never throws. Returns the new row's id, or null when it could not be written.
  *
  * A failure to write history must not fail the sync that was being recorded — the trader's import
  * is the thing that matters and this is the note about it. Logged loudly instead, so a broken
  * logger shows up in the error feed rather than silently leaving gaps that look like "they never
  * synced".
  */
-export async function recordJournalEvent(uid: string, event: JournalEvent): Promise<void> {
+export async function recordJournalEvent(uid: string, event: JournalEvent): Promise<string | null> {
   try {
-    await getAdminFirestore().collection(`${JOURNAL_EVENTS}/${uid}/events`).add(event);
+    const ref = await getAdminFirestore().collection(`${JOURNAL_EVENTS}/${uid}/events`).add(event);
+    return ref.id;
   } catch (err) {
     console.error(`[journal-events] could not record a ${event.type} for ${uid}:`, err);
+    return null;
+  }
+}
+
+/**
+ * The browser's word that a manual sync's trades were saved, and how many were new. Never throws.
+ *
+ * The sync row is written before the answer goes out, by the only side that knows what the pull
+ * found; the save happens on the other side of the network, in the browser. Without this the row
+ * could only ever say what was sent, and "8,790 trades out" stood in a trader's history for an
+ * answer that had died at Netlify's time limit. A row that is never confirmed now says so.
+ *
+ * Scoped by uid in the path, so a caller can only ever confirm their own rows.
+ */
+export async function confirmJournalEvent(uid: string, id: string, fresh: number): Promise<void> {
+  try {
+    await getAdminFirestore()
+      .doc(`${JOURNAL_EVENTS}/${uid}/events/${id}`)
+      .update({ 'sync.fresh': fresh, 'sync.landed': true });
+  } catch (err) {
+    console.warn(`[journal-events] could not confirm sync ${id} for ${uid}:`, err);
   }
 }
 

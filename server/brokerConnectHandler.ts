@@ -2,9 +2,12 @@ import type { IncomingHttpHeaders } from 'http';
 import { assertCallerUid, BrokerRequestError } from './snaptradeAuth';
 import { logServerError } from './errorReports';
 import { getSnaptrade, resolveBrokerSlug, SNAPTRADE_CONFIGURED } from './snaptradeClient';
+import { FieldPath } from 'firebase-admin/firestore';
 import { getAdminFirestore } from './firebaseAdmin';
-import { mapSnapTradeActivities, type SnapTradeActivityLike } from './mapSnapTradeActivities';
+import type { SnapTradeActivityLike } from './mapSnapTradeActivities';
+import { PAGE_SIZE, pullWindow, type FetchPage } from './activityPull';
 import type { ParsedTradeInput } from '../src/types';
+import { isJournalEventId } from '../src/utils/journalEvents';
 import { BROKER_REGISTRY, brokerRegistryEntry, isBrokerRegistryKey } from '../src/data/brokerRegistry';
 import {
   BROKER_STATUS_DOC,
@@ -20,7 +23,7 @@ import {
   shouldRefundSync,
   type SyncOutcome,
 } from '../src/utils/syncRefund';
-import { readJournalEvents, recordJournalEvent } from './journalEvents';
+import { confirmJournalEvent, readJournalEvents, recordJournalEvent } from './journalEvents';
 import { nextSyncState, planSyncStart, type AccountSyncState, type SyncStartReason } from '../src/utils/syncPlan';
 import { isClientRejected, isUpstreamOutage, upstreamSummary } from './upstreamErrors';
 import {
@@ -33,7 +36,7 @@ import { brokersUnlimited, lowestTierWith, TIER_PLANS, type Tier } from '../src/
 
 export type SupportedBroker = string;
 
-export type BrokerConnectAction = 'connect' | 'status' | 'sync' | 'disconnect' | 'history';
+export type BrokerConnectAction = 'connect' | 'status' | 'sync' | 'disconnect' | 'history' | 'imported';
 
 export interface BrokerConnectRequestBody {
   action: BrokerConnectAction;
@@ -42,12 +45,67 @@ export interface BrokerConnectRequestBody {
   authorizationId?: string;
   startDate?: string;
   endDate?: string;
+  /** 'imported': the history row a sync answered with, and how many of its trades were new. */
+  eventId?: string;
+  fresh?: number;
 }
 
 export interface BrokerConnectResult {
   statusCode: number;
   body: Record<string, unknown>;
 }
+
+export interface BrokerConnectOptions {
+  /**
+   * Epoch ms by which the function must have answered. The Netlify handler reads it from the
+   * runtime; anything else gets the default limit from the moment the request is handled.
+   */
+  deadline?: number;
+}
+
+/**
+ * Netlify's synchronous function limit, when the runtime does not say.
+ *
+ * Ten seconds is the default for every plan; a longer one has to be asked for. The sync is the only
+ * request in the app that gets near it, and it used to get past it: see activityPull.ts.
+ */
+export const DEFAULT_FUNCTION_LIMIT_MS = 10_000;
+
+/** The limit to plan against. Settable without a deploy if Netlify raises the function's limit. */
+export function syncTimeLimitMs(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = Number(env.BROKER_SYNC_TIME_LIMIT_MS);
+  return Number.isFinite(raw) && raw >= 3_000 && raw <= 60_000 ? raw : DEFAULT_FUNCTION_LIMIT_MS;
+}
+
+/**
+ * When the function must have answered by.
+ *
+ * The runtime's own remaining time wins when it is SHORTER — a cold start has already spent some
+ * of the limit before the handler runs — but never when it is longer, because the number Lambda
+ * reports and the one Netlify's gateway cuts at are not known to be the same. The configured limit
+ * is the ceiling either way.
+ */
+export function functionDeadline(now: number, remainingMs?: number): number {
+  const limit = syncTimeLimitMs();
+  return now + (remainingMs === undefined ? limit : Math.min(limit, Math.max(0, remainingMs)));
+}
+
+/**
+ * What the sync still has to do once the last page is in: match, write the sync state, refund,
+ * write the history row, and serialise up to MAX_TRADE_BYTES of trades. Three Firestore round trips
+ * and a few hundred milliseconds of CPU on a cold function; the rest is margin for the runtime's
+ * own overhead on the way out.
+ */
+export const RESERVE_AFTER_PULL_MS = 2_500;
+
+/**
+ * Safety backstops only — not real limits on anyone's history. A runaway loop on malformed
+ * pagination metadata is what they stop; the clock is what normally ends a pull. The morning import
+ * has no clock, so for it the cap IS the budget: three pages per account keeps a run of forty users
+ * inside the scheduled function's limit, and what it leaves is resumed, not lost.
+ */
+export const MAX_PAGES = 25;
+export const AUTO_SYNC_MAX_PAGES = 3;
 
 // Stored under a private subcollection (not `users/{uid}` itself) so the client-side Firestore
 // rules never need to, and never accidentally do, expose this secret — only the admin SDK (this
@@ -72,17 +130,32 @@ function brokerSyncStateDoc(uid: string) {
 async function readSyncState(uid: string, accountId: string): Promise<AccountSyncState | null> {
   try {
     const snap = await brokerSyncStateDoc(uid).get();
-    const accounts = (snap.data()?.accounts ?? {}) as Record<string, AccountSyncState>;
-    return accounts[accountId] ?? null;
+    const accounts = (snap.data()?.accounts ?? {}) as Record<string, AccountSyncState | undefined>;
+    const state = accounts[accountId];
+    if (!state) return null;
+    // A resume point is a date or it is nothing. Anything else stored there — a null from an older
+    // write, say — would be compared as a string and plan a window from "null".
+    const { resumeFrom, ...rest } = state;
+    return typeof resumeFrom === 'string' ? { ...rest, resumeFrom } : rest;
   } catch (err) {
     console.warn(`[broker-connect] could not read sync state for ${uid}; pulling everything:`, err);
     return null;
   }
 }
 
+/**
+ * Replaces one account's state and leaves the other accounts' alone.
+ *
+ * mergeFields, not merge: a plain merge deep-merges the account's map, so a finished pull that
+ * omits `resumeFrom` would leave the previous pull's resume point in place and every later sync
+ * would start from a day it had already read. The account's map has to be replaced whole.
+ */
 async function writeSyncState(uid: string, accountId: string, state: AccountSyncState): Promise<void> {
   try {
-    await brokerSyncStateDoc(uid).set({ accounts: { [accountId]: state } }, { merge: true });
+    await brokerSyncStateDoc(uid).set(
+      { accounts: { [accountId]: state } },
+      { mergeFields: [new FieldPath('accounts', accountId)] },
+    );
   } catch (err) {
     console.error(`[broker-connect] could not write sync state for ${uid}:`, err);
   }
@@ -93,12 +166,23 @@ interface SyncWindow {
   startDate: string | undefined;
   reason: SyncStartReason;
   previous: AccountSyncState | null;
+  /** The lots open at startDate, when this pull continues one that was cut short. */
+  openLots: SnapTradeActivityLike[] | undefined;
+  /** How many rows the window is expected to hold, when the last pull counted them. */
+  expectedRows: number | undefined;
 }
 
 async function planWindow(uid: string, accountId: string, requested: string | undefined): Promise<SyncWindow> {
   const previous = await readSyncState(uid, accountId);
   const plan = planSyncStart(requested, previous);
-  return { startDate: plan.startDate, reason: plan.reason, previous };
+  // Stored loosely so src/ has no view of the server's activity shape; the matcher wrote them.
+  const openLots = plan.openLots as SnapTradeActivityLike[] | undefined;
+  return { startDate: plan.startDate, reason: plan.reason, previous, openLots, expectedRows: plan.expectedRows };
+}
+
+/** What a pull counted as still unread past its cut, for the next pull to find the far end by. */
+function rowsLeftAfter(pull: { totalActivityCount: number | undefined; matchedCount: number }): number | undefined {
+  return pull.totalActivityCount === undefined ? undefined : pull.totalActivityCount - pull.matchedCount;
 }
 
 /**
@@ -465,7 +549,13 @@ async function isOnTrial(uid: string): Promise<boolean> {
   }
 }
 
-async function handleSync(uid: string, accountId?: string, startDate?: string, endDate?: string): Promise<BrokerConnectResult> {
+async function handleSync(
+  uid: string,
+  deadline: number,
+  accountId?: string,
+  startDate?: string,
+  endDate?: string,
+): Promise<BrokerConnectResult> {
   if (!accountId) {
     throw new BrokerRequestError('accountId is required', 400);
   }
@@ -523,7 +613,7 @@ async function handleSync(uid: string, accountId?: string, startDate?: string, e
   const window = await planWindow(uid, accountId, startDate || undefined);
 
   try {
-    return await pullActivities(uid, creds, accountId, window, endDate, spend.remaining, limits.syncsPerDay, tier, spend.credits, syncedInstitution, spend.source);
+    return await pullActivities(uid, creds, accountId, window, endDate, spend.remaining, limits.syncsPerDay, tier, spend.credits, syncedInstitution, spend.source, deadline);
   } catch (err) {
     // Two failures that are nobody's fault on the user's side: no answer at all, and SnapTrade
     // refusing the app. The listing above usually catches the second before anything is spent;
@@ -573,22 +663,15 @@ async function pullActivities(
   syncCredits: number,
   institution: string | null,
   spendSource: SpendSource,
+  deadline: number,
 ): Promise<BrokerConnectResult> {
   const snaptrade = getSnaptrade();
-  const PAGE_SIZE = 1000;
-  // Safety backstop only — not a real limit for anyone's trade history. Prevents a runaway loop if
-  // SnapTrade's pagination metadata is ever malformed.
-  const MAX_PAGES = 25;
-
-  const activities: SnapTradeActivityLike[] = [];
-  let total: number | undefined;
-  let truncated = false;
 
   // Reassigned if the first page recovers a fresh secret, so the remaining pages use the working
   // credential rather than the one that was just rejected.
   let active = creds;
 
-  for (let page = 0; page < MAX_PAGES; page++) {
+  const fetchPage: FetchPage = async (offset) => {
     const res = await withCredentialRecovery(uid, active, (c) => {
       active = c;
       return snaptrade.accountInformation.getAccountActivities({
@@ -596,44 +679,61 @@ async function pullActivities(
         userSecret: c.userSecret,
         accountId,
         // Unset, SnapTrade returns the account's full known history — what a first sync and a
-        // repair both need. Otherwise the planned window, which reaches every open position.
+        // repair both need. Otherwise the planned window, which reaches every open position and
+        // every day a cut-short pull left unread.
         startDate: window.startDate,
         endDate: endDate || undefined,
-        offset: page * PAGE_SIZE,
+        offset,
         limit: PAGE_SIZE,
       });
     });
+    return { batch: (res.data.data ?? []) as SnapTradeActivityLike[], total: res.data.pagination?.total };
+  };
 
-    const batch = (res.data.data ?? []) as SnapTradeActivityLike[];
-    activities.push(...batch);
-    total = res.data.pagination?.total ?? total;
+  /*
+   * Paged against the clock. The deadline handed down is the function's; what is left after the
+   * pages is the reserve, for everything below this line. See activityPull.ts for why a cut-short
+   * pull is safe to match and where the next one starts.
+   */
+  const pull = await pullWindow(fetchPage, {
+    deadline: deadline - RESERVE_AFTER_PULL_MS,
+    maxPages: MAX_PAGES,
+    hint: window.previous?.feedDirection,
+    openLots: window.openLots,
+    expectedTotal: window.expectedRows,
+  });
+  const { mapped, partial, resumeFrom } = pull;
+  const { trades, diagnostics } = mapped;
 
-    if (batch.length < PAGE_SIZE) break; // last page reached
-    if (page === MAX_PAGES - 1) truncated = true;
-  }
-
-  if (truncated) {
+  if (partial) {
     console.warn(
-      `[broker-connect] sync for account ${accountId} hit the ${MAX_PAGES * PAGE_SIZE}-activity safety cap; some older history may be missing from this sync.`,
+      `[broker-connect] sync for account ${accountId} stopped early (${pull.stoppedBy}) after ${pull.pages} pages; ` +
+        (resumeFrom ? `the next sync continues from ${resumeFrom}.` : 'no resume point could be set.'),
     );
   }
 
-  const mapped = mapSnapTradeActivities(activities, { feedDirection: window.previous?.feedDirection });
-  const { trades, diagnostics } = mapped;
-
-  // What this pull leaves behind for the next one: the oldest open lot, and the feed's direction.
-  await writeSyncState(
-    uid,
-    accountId,
-    nextSyncState({
-      previous: window.previous,
-      startDate: window.startDate,
-      truncated,
-      oldestOpenDate: mapped.oldestOpenDate,
-      observedDirection: mapped.observedDirection,
-      now: new Date().toISOString(),
-    }),
-  );
+  /*
+   * What this pull leaves behind for the next one: the oldest open lot, where to resume, and the
+   * feed's direction. Not written when a cut-short pull matched nothing — it learned nothing about
+   * the open lots, and overwriting the previous state with "nothing open" would be a lie the next
+   * window is planned from. The previous state already plans the same pull again.
+   */
+  if (!(partial && pull.matchedCount === 0)) {
+    await writeSyncState(
+      uid,
+      accountId,
+      nextSyncState({
+        previous: window.previous,
+        startDate: window.startDate,
+        resumeFrom,
+        oldestOpenDate: mapped.oldestOpenDate,
+        openLots: mapped.openLots,
+        remainingRows: rowsLeftAfter(pull),
+        observedDirection: mapped.observedDirection ?? pull.direction,
+        now: new Date().toISOString(),
+      }),
+    );
+  }
 
   /*
    * A sync that brought back nothing does not cost a sync.
@@ -655,8 +755,13 @@ async function pullActivities(
    * This end only names what happened — and it is decided here, above the journal row, because
    * that row reports the allowance the trader was actually left with.
    */
-  const outcome: SyncOutcome =
-    trades.length > 0 ? 'trades' : activities.length === 0 ? 'empty-feed' : 'nothing-matched';
+  const outcome: SyncOutcome = partial
+    ? 'partial'
+    : trades.length > 0
+      ? 'trades'
+      : pull.activityCount === 0
+        ? 'empty-feed'
+        : 'nothing-matched';
   const refunded = shouldRefundSync(outcome);
   if (refunded) await refundDaily('sync', uid, spendSource);
 
@@ -667,24 +772,30 @@ async function pullActivities(
    * "I synced and nothing imported" was unanswerable — the trade total cannot tell an empty
    * sync from one that worked. Awaited rather than fired off: the write never throws, and a
    * floating promise here would reject into the global handler as minified frames.
+   *
+   * The row's id goes back with the answer so the browser can confirm the save ('imported'); until
+   * it does, `landed: false` says the trades were sent and nothing more — see confirmJournalEvent.
    */
-  await recordJournalEvent(uid, {
+  const eventId = await recordJournalEvent(uid, {
     type: 'sync',
     at: new Date().toISOString(),
     sync: {
       accountId,
       institution,
-      activityCount: activities.length,
+      activityCount: pull.activityCount,
       tradesReturned: trades.length,
       unmatchedCloses: diagnostics.unmatchedOptionCloses.length,
       assumedShorts: diagnostics.assumedShorts.length,
       openPositions: diagnostics.openPositions,
       ignored: Object.values(diagnostics.ignored).reduce((a, b) => a + b, 0),
       ignoredByType: diagnostics.ignored,
-      truncated,
       windowReason: window.reason,
       windowStart: window.startDate ?? null,
       syncsRemaining: remainingAfterSync(syncsRemaining, refunded),
+      partial,
+      resumeFrom: resumeFrom ?? null,
+      ...(pull.stoppedBy ? { stoppedBy: pull.stoppedBy } : {}),
+      landed: false,
     },
   });
 
@@ -706,9 +817,18 @@ async function pullActivities(
       // Why the window was what it was, so the screen can say why a sync took as long as it did.
       windowReason: window.reason,
       windowStart: window.startDate ?? null,
-      activityCount: activities.length,
-      totalActivityCount: total ?? activities.length,
-      truncated,
+      activityCount: pull.activityCount,
+      totalActivityCount: pull.totalActivityCount ?? pull.activityCount,
+      /**
+       * The pull stopped before the end of its window; the trades are the history before
+       * `resumeFrom`, and the next sync carries on from there. The screen's one instruction for it
+       * is "sync again".
+       */
+      partial,
+      resumeFrom: resumeFrom ?? null,
+      pages: pull.pages,
+      /** The history row this sync wrote, for the browser to confirm once the trades are saved. */
+      eventId,
       // Corrected for the refund above, so the badge does not count down a sync the user got
       // back. The client trusts this number over its own arithmetic.
       syncsRemaining: remainingAfterSync(syncsRemaining, refunded),
@@ -836,7 +956,9 @@ export interface PulledAccount {
   openPositions: number;
   ignored: number;
   ignoredByType: Record<string, number>;
-  truncated: boolean;
+  /** The page cap stopped this account short; `resumeFrom` is where the next pull continues. */
+  partial: boolean;
+  resumeFrom: string | null;
   windowReason: SyncStartReason;
   windowStart: string | null;
 }
@@ -857,8 +979,8 @@ export async function pullRecentActivityForUser(
   /** Each trade tagged with the brokerage account it came from — see the push below. */
   trades: PulledTrade[];
   pulls: number;
-  /** An account hit the page cap, so the oldest of the window was left out. */
-  truncated: boolean;
+  /** An account hit the page cap; its newest days wait for the next pull, which resumes there. */
+  partial: boolean;
   skippedAccounts: number;
   perAccount: PulledAccount[];
   /**
@@ -869,7 +991,7 @@ export async function pullRecentActivityForUser(
 }> {
   const creds = await getCredsIfRegistered(uid);
   if (!creds) {
-    return { accounts: 0, trades: [], pulls: 0, truncated: false, skippedAccounts: 0, perAccount: [], earliestStart: startDate };
+    return { accounts: 0, trades: [], pulls: 0, partial: false, skippedAccounts: 0, perAccount: [], earliestStart: startDate };
   }
 
   const snaptrade = getSnaptrade();
@@ -884,68 +1006,67 @@ export async function pullRecentActivityForUser(
   const perAccount: PulledAccount[] = [];
   let pulls = 0;
   /** True when an account hit the page cap, so the caller can say the window was not fully covered. */
-  let truncated = false;
+  let partial = false;
   let earliestStart: string | undefined = startDate;
   let anyFullPull = false;
 
   for (const account of listed.data) {
     if (!account.id) continue;
     if (pulls >= maxAccounts) break;
+    const accountId = account.id;
 
     // The same planning as a manual sync. The ten-day lookback is the request; a position still
-    // open from before it widens the window, and an account with no trusted state pulls everything.
-    const window = await planWindow(uid, account.id, startDate);
+    // open from before it widens the window, an account with no trusted state pulls everything,
+    // and one whose last pull stopped early carries on from where it stopped.
+    const window = await planWindow(uid, accountId, startDate);
     if (window.startDate === undefined) anyFullPull = true;
     else if (earliestStart === undefined || window.startDate < earliestStart) earliestStart = window.startDate;
 
     /*
-     * Paged, like the manual sync beside it.
+     * The same pull as the manual sync, with the page cap as its budget.
      *
-     * This asked for one page of 1,000 and used whatever came back, with no offset, no read of the
-     * pagination metadata and no check for hitting the cap — so an account past 1,000 activities in
-     * the window was silently truncated, and nothing told the trader or the log. The manual path has
-     * done this properly all along, which is where the shape below comes from.
+     * This had its own copy of the paging loop, written after it was found asking for one page of
+     * 1,000 and using whatever came back. A second copy of the manual loop was a second place for
+     * the next paging bug, and it had one: hitting the cap marked the account's state incomplete,
+     * so the next manual sync pulled the ENTIRE history again — the request that cannot finish in
+     * ten seconds. Now the cap leaves a resume point like the clock does, and what it leaves is read
+     * next time, by whichever sync runs first.
      *
-     * The repo's own estimate is what makes it reachable: "ten days of an active 0DTE account is
-     * comfortably more than 500 round trips", and a round trip is at least two activities.
-     *
-     * Three pages is plenty for a ten-day window and keeps the wall-clock budget this job runs under;
-     * hitting it is recorded rather than ignored.
+     * No clock here: the scheduled job's budget is its caps — pages per account, accounts per user,
+     * users per run. No response either, so no size cut.
      */
-    const PAGE_SIZE = 1000;
-    const MAX_PAGES = 3;
-    const activities: SnapTradeActivityLike[] = [];
-    let accountTruncated = false;
-
-    for (let page = 0; page < MAX_PAGES; page++) {
+    const fetchPage: FetchPage = async (offset) => {
       const res = await withCredentialRecovery(uid, active, (c) => {
         active = c;
         return snaptrade.accountInformation.getAccountActivities({
           userId: c.userId,
           userSecret: c.userSecret,
-          accountId: account.id,
-          // Usually a window, topping up a journal a manual sync backfilled. Unset for an account
-          // whose open positions are not yet known: three pages is most accounts' whole history,
-          // and one that is longer is left incomplete for a manual sync to repair, and says so.
+          accountId,
           startDate: window.startDate,
-          offset: page * PAGE_SIZE,
+          offset,
           limit: PAGE_SIZE,
         });
       });
+      return { batch: (res.data.data ?? []) as SnapTradeActivityLike[], total: res.data.pagination?.total };
+    };
 
-      const batch = (res.data.data ?? []) as SnapTradeActivityLike[];
-      activities.push(...batch);
-
-      if (batch.length < PAGE_SIZE) break;
-      if (page === MAX_PAGES - 1) {
-        accountTruncated = true;
-        truncated = true;
-        console.warn(
-          `[broker-pull] ${uid}: account ${account.id} hit ${MAX_PAGES * PAGE_SIZE} activities; the oldest of the window was left for a manual sync.`,
-        );
-      }
-    }
+    const pull = await pullWindow(fetchPage, {
+      deadline: Number.POSITIVE_INFINITY,
+      maxPages: AUTO_SYNC_MAX_PAGES,
+      hint: window.previous?.feedDirection,
+      openLots: window.openLots,
+      expectedTotal: window.expectedRows,
+      maxTradeBytes: Number.POSITIVE_INFINITY,
+    });
     pulls += 1;
+
+    if (pull.partial) {
+      partial = true;
+      console.warn(
+        `[broker-pull] ${uid}: account ${accountId} hit ${AUTO_SYNC_MAX_PAGES} pages (${pull.stoppedBy}); ` +
+          (pull.resumeFrom ? `the next sync continues from ${pull.resumeFrom}.` : 'no resume point could be set.'),
+      );
+    }
 
     /*
      * Matched per account, never across accounts.
@@ -954,35 +1075,40 @@ export async function pullRecentActivityForUser(
      * would otherwise have a buy in one closed by a sell in the other — a fabricated round trip
      * with a P&L that never happened to anybody.
      */
-    const accountId = account.id;
-    const mapped = mapSnapTradeActivities(activities, { feedDirection: window.previous?.feedDirection });
+    const mapped = pull.mapped;
 
-    await writeSyncState(
-      uid,
-      accountId,
-      nextSyncState({
-        previous: window.previous,
-        startDate: window.startDate,
-        truncated: accountTruncated,
-        oldestOpenDate: mapped.oldestOpenDate,
-        observedDirection: mapped.observedDirection,
-        now: new Date().toISOString(),
-      }),
-    );
+    // Same rule as the manual sync: a cut-short pull that matched nothing learned nothing.
+    if (!(pull.partial && pull.matchedCount === 0)) {
+      await writeSyncState(
+        uid,
+        accountId,
+        nextSyncState({
+          previous: window.previous,
+          startDate: window.startDate,
+          resumeFrom: pull.resumeFrom,
+          oldestOpenDate: mapped.oldestOpenDate,
+          openLots: mapped.openLots,
+          remainingRows: rowsLeftAfter(pull),
+          observedDirection: mapped.observedDirection ?? pull.direction,
+          now: new Date().toISOString(),
+        }),
+      );
+    }
 
     // Kept, not dropped: the morning import used to throw these away, so a Diamond trader whose
     // swing trades vanished had nothing to look at. The caller writes them to the sync history.
     perAccount.push({
       accountId,
       institution: account.institution_name ?? null,
-      activityCount: activities.length,
+      activityCount: pull.activityCount,
       tradesReturned: mapped.trades.length,
       unmatchedCloses: mapped.diagnostics.unmatchedOptionCloses.length,
       assumedShorts: mapped.diagnostics.assumedShorts.length,
       openPositions: mapped.diagnostics.openPositions,
       ignored: Object.values(mapped.diagnostics.ignored).reduce((a, b) => a + b, 0),
       ignoredByType: mapped.diagnostics.ignored,
-      truncated: accountTruncated,
+      partial: pull.partial,
+      resumeFrom: pull.resumeFrom ?? null,
       windowReason: window.reason,
       windowStart: window.startDate ?? null,
     });
@@ -1002,7 +1128,7 @@ export async function pullRecentActivityForUser(
     accounts: listed.data.length,
     trades,
     pulls,
-    truncated,
+    partial,
     skippedAccounts: Math.max(0, listed.data.length - pulls),
     perAccount,
     earliestStart: anyFullPull ? undefined : earliestStart,
@@ -1012,7 +1138,11 @@ export async function pullRecentActivityForUser(
 export async function handleBrokerConnectRequest(
   headers: IncomingHttpHeaders,
   body: BrokerConnectRequestBody,
+  options: BrokerConnectOptions = {},
 ): Promise<BrokerConnectResult> {
+  // Read first, before anything else has spent any of it.
+  const deadline = options.deadline ?? functionDeadline(Date.now());
+
   if (!SNAPTRADE_CONFIGURED) {
     return {
       statusCode: 503,
@@ -1032,9 +1162,24 @@ export async function handleBrokerConnectRequest(
       case 'status':
         return await handleStatus(uid);
       case 'sync':
-        return await handleSync(uid, body.accountId, body.startDate, body.endDate);
+        return await handleSync(uid, deadline, body.accountId, body.startDate, body.endDate);
       case 'disconnect':
         return await handleDisconnect(uid, body.authorizationId);
+      case 'imported': {
+        /*
+         * The browser saying a sync's trades are in the journal, and how many were new. The row
+         * was written by the sync before it answered — the only side that knew what the pull
+         * found — and until this arrives it says `landed: false`. The id can only be one this
+         * caller's own sync returned: the path is scoped by uid, so nobody can confirm anyone
+         * else's row, and an id that is not one of ours is refused rather than looked up.
+         */
+        const { eventId, fresh } = body;
+        if (!isJournalEventId(eventId) || !Number.isInteger(fresh) || (fresh as number) < 0) {
+          throw new BrokerRequestError('eventId and a whole-number fresh count are required', 400);
+        }
+        await confirmJournalEvent(uid, eventId, fresh as number);
+        return { statusCode: 200, body: { ok: true } };
+      }
       case 'history': {
         /*
          * What each sync did, for the person it happened to. This history existed for a year and was

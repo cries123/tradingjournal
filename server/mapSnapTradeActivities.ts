@@ -37,6 +37,8 @@ interface RawActivity {
   hasTimeOfDay: boolean;
   accountId: string;
   accountName?: string;
+  /** The row as the broker sent it, so a lot it opens can be carried to the next pull. */
+  raw: SnapTradeActivityLike;
 }
 
 // Loose shape matching the fields we read off SnapTrade's UniversalActivity — kept minimal
@@ -128,20 +130,32 @@ export function hasTimeOfDay(isoOrDate: string): boolean {
  * last, the feed is newest-first and is reversed; then a stable sort on the date alone keeps
  * feed order within each timestamp.
  */
-function orientOldestFirst(
-  activities: SnapTradeActivityLike[],
-  hint: FeedDirection | undefined,
-): { ordered: SnapTradeActivityLike[]; observed: FeedDirection | null; assumed: boolean } {
+/**
+ * Which way a feed runs, read off its dates, or null when every dated row shares one day.
+ *
+ * Exported because the pull loop needs the same answer before the matcher ever runs: it decides
+ * which end of a long feed to page from (see server/activityPull.ts), and two readings of "which way
+ * is this feed going" that could disagree would be a bug waiting for a single-day page.
+ */
+export function readFeedDirection(activities: SnapTradeActivityLike[]): FeedDirection | null {
   const dates = activities.map((a) => a.trade_date).filter((d): d is string => Boolean(d));
   const first = dates[0];
   // The last date that differs from the first. Two rows on different days are enough to read the
   // direction; a feed where every row shares one day has nothing to read it from.
   const other = first === undefined ? undefined : [...dates].reverse().find((d) => d !== first);
+  if (first === undefined || other === undefined) return null;
+  return first.localeCompare(other) > 0 ? 'newest-first' : 'oldest-first';
+}
 
-  if (first !== undefined && other !== undefined) {
-    const observed: FeedDirection = first.localeCompare(other) > 0 ? 'newest-first' : 'oldest-first';
+function orientOldestFirst(
+  activities: SnapTradeActivityLike[],
+  hint: FeedDirection | undefined,
+): { ordered: SnapTradeActivityLike[]; observed: FeedDirection | null; assumed: boolean } {
+  const observed = readFeedDirection(activities);
+  if (observed !== null) {
     return { ordered: observed === 'newest-first' ? [...activities].reverse() : activities, observed, assumed: false };
   }
+  const dates = activities.map((a) => a.trade_date).filter((d): d is string => Boolean(d));
 
   /*
    * A single day's fills, or none. The direction is a property of SnapTrade's API rather than of the
@@ -158,11 +172,22 @@ function normalize(
   activities: SnapTradeActivityLike[],
   diagnostics: SyncDiagnostics,
   hint: FeedDirection | undefined,
+  openLots: SnapTradeActivityLike[],
 ): { rows: RawActivity[]; observed: FeedDirection | null } {
   const out: RawActivity[] = [];
   const seen = new Map<string, number>();
-  const { ordered, observed, assumed } = orientOldestFirst(activities, hint);
-  diagnostics.orientationAssumed = assumed;
+  const oriented = orientOldestFirst(activities, hint);
+  diagnostics.orientationAssumed = oriented.assumed;
+
+  /*
+   * Carried lots go in front, AFTER the feed has been oriented.
+   *
+   * They are the inventory at the start of the window, in queue order, and every one of them is
+   * dated before the window — so once sorted they sit ahead of every fill the broker sent, in the
+   * order the previous pull was holding them. Prepending them before orientation would have their
+   * old dates read as the feed's first date and a newest-first feed taken for oldest-first.
+   */
+  const ordered = [...openLots, ...oriented.ordered];
 
   for (const [feedIndex, a] of ordered.entries()) {
     const type = (a.type || '').toUpperCase();
@@ -233,6 +258,7 @@ function normalize(
       hasTimeOfDay: hasTimeOfDay(a.trade_date),
       accountId: a.account?.id || 'unknown',
       accountName: a.account?.name || undefined,
+      raw: a,
     });
   }
 
@@ -243,7 +269,7 @@ function normalize(
       || tieRank(x) - tieRank(y)
       || x.feedIndex - y.feedIndex,
   );
-  return { rows: out, observed };
+  return { rows: out, observed: oriented.observed };
 }
 
 /**
@@ -660,6 +686,14 @@ export interface MappedSync {
   openPositions: OpenPosition[];
   /** The earliest openDate above, or null with nothing open. What the next sync window must reach. */
   oldestOpenDate: string | null;
+  /**
+   * The lots still open when the feed ended, as the opening fills that created them, sized to what
+   * is still open. Fed back through MapOptions.openLots, they put the next pull's matcher in exactly
+   * the state this one finished in — so a pull cut short by the clock can be continued from the cut
+   * instead of re-read from the oldest open position, which for a position held for a year is the
+   * same twelve pages again, cut at the same place, every time.
+   */
+  openLots: SnapTradeActivityLike[];
   /** Which way the feed ran, when it spanned two dates. The handler remembers it for single-day pulls. */
   observedDirection: FeedDirection | null;
 }
@@ -667,6 +701,21 @@ export interface MappedSync {
 export interface MapOptions {
   /** The feed direction an earlier pull observed, for a feed with only one day to read it from. */
   feedDirection?: FeedDirection;
+  /** The inventory at the start of the window: an earlier pull's `openLots`, when this one continues it. */
+  openLots?: SnapTradeActivityLike[];
+}
+
+/**
+ * An open lot as a row the next pull can be seeded with.
+ *
+ * The opening fill as the broker sent it, with the size and the entry fee reduced to what is still
+ * open — a lot scaled out of twice is carried as the remainder, with the remainder's share of the
+ * commission. The id is pinned to the one this pull resolved, so a row that had to be given a
+ * derived id (see fallbackActivityId) keeps it across pulls and the trade it eventually closes into
+ * gets the same sourceId it would have had from one uninterrupted pull.
+ */
+function carriedOpenLot(lot: OpenLot): SnapTradeActivityLike {
+  return { ...lot.open.raw, id: lot.open.id, units: Math.abs(lot.qty), fee: lot.fee };
 }
 
 /**
@@ -714,7 +763,7 @@ export function mapSnapTradeActivities(activities: SnapTradeActivityLike[], opti
     openPositions: 0,
     orientationAssumed: false,
   };
-  const { rows: normalized, observed } = normalize(activities, diagnostics, options.feedDirection);
+  const { rows: normalized, observed } = normalize(activities, diagnostics, options.feedDirection, options.openLots ?? []);
   const flaggedOptions = normalized.filter((a) => a.isOption && a.positionEffect !== undefined);
   const flaglessOptions = normalized.filter((a) => a.isOption && a.positionEffect === undefined);
   const stocks = normalized.filter((a) => !a.isOption);
@@ -731,8 +780,9 @@ export function mapSnapTradeActivities(activities: SnapTradeActivityLike[], opti
 
   // Both matchers shift a lot off its queue once it is scaled down to nothing (to the same
   // tolerance they match with), so every lot still queued has size and is a real open position.
-  const openPositions: OpenPosition[] = matched
-    .flatMap((m) => m.open)
+  // Queue order is kept: it is the FIFO order the next pull has to rebuild.
+  const openLots = matched.flatMap((m) => m.open);
+  const openPositions: OpenPosition[] = openLots
     .map((lot): OpenPosition => ({
       symbol: lot.open.optionTicker ?? lot.open.underlyingSymbol,
       openDate: journalDate(lot.open.tradeDate),
@@ -749,6 +799,7 @@ export function mapSnapTradeActivities(activities: SnapTradeActivityLike[], opti
     diagnostics,
     openPositions,
     oldestOpenDate: openPositions[0]?.openDate ?? null,
+    openLots: openLots.map(carriedOpenLot),
     observedDirection: observed,
   };
 }

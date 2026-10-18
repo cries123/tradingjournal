@@ -18,6 +18,7 @@ import {
   BrokerApiError,
   isReportableBrokerFailure,
   checkBrokerConnectAvailable,
+  confirmSyncImport,
   disconnectBroker,
   fetchBrokerStatus,
   fetchSyncHistory,
@@ -196,6 +197,22 @@ export function BrokerConnectContent({
       .catch((err: unknown) => reportErrorSilently(err, 'promise', 'broker-sync-history'));
   };
 
+  /**
+   * Confirms a sync's row once its trades are in the journal, then reloads the history so the row
+   * reads "N new" rather than "not confirmed as saved". Never throws: the save already happened,
+   * and a lost confirmation leaves a row that says so, which is the honest state.
+   */
+  const confirmImport = async (eventId: string | null | undefined, fresh: number) => {
+    if (eventId) {
+      try {
+        await confirmSyncImport(eventId, fresh);
+      } catch (err) {
+        reportErrorSilently(err, 'promise', 'broker-sync-confirm');
+      }
+    }
+    loadHistory();
+  };
+
   const canConnect = firebaseEnabled && !loading && Boolean(user);
 
   useEffect(() => {
@@ -286,7 +303,7 @@ export function BrokerConnectContent({
     const startedAt = new Date();
     try {
       const {
-        trades, truncated, syncsRemaining, syncsPerDay, syncCredits, activityCount,
+        trades, partial, eventId, syncsRemaining, syncsPerDay, syncCredits, activityCount,
         unmatchedCloses, assumedShorts, inferredOrderDays, ignored, negativeFees,
         openPositions, orientationAssumed, windowReason, syncRefundNotice,
         /*
@@ -335,14 +352,17 @@ export function BrokerConnectContent({
         label,
         activityCount: activityCount ?? trades.length * 2,
         tradesReturned: trades.length,
-        truncated,
+        // A cut-short pull: the sentence tells the trader to press Sync again, and the server has
+        // already refunded it and saved where to continue from.
+        partial: partial === true,
         refundNotice: syncRefundNotice ?? null,
         windowReason,
       };
 
       if (freshTrades.length === 0) {
         setSyncMessage(describeSyncResult({ ...outcome, fresh: 0 }));
-        loadHistory();
+        // Nothing to save, so the row is confirmed at once: "0 new", not "not confirmed".
+        await confirmImport(eventId, 0);
         return;
       }
 
@@ -381,7 +401,8 @@ export function BrokerConnectContent({
         return;
       }
       setSyncMessage(describeSyncResult({ ...outcome, fresh: freshTrades.length }));
-      loadHistory();
+      // After the save, never before it: the confirmation is the claim that these are in the journal.
+      await confirmImport(eventId, freshTrades.length);
     } catch (err) {
       // A failed sync usually still costs one. The server now says how many are left even when it
       // fails — and says so after refunding, when the failure was an outage rather than a rejected

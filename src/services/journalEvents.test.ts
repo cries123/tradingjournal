@@ -88,6 +88,29 @@ describe('describeEvent, for a sync', () => {
   it('falls back when the institution is unknown rather than printing null', () => {
     expect(describeEvent(sync({ institution: null }))).toContain('a broker');
   });
+
+  /*
+   * The row that started this: "Synced Robinhood — 11,491 activities in, 8,790 trades out", for an
+   * answer the browser never received. Two facts were missing from it, and both are here now.
+   */
+  it('says where a pull that ran out of time stopped, and that it was not charged', () => {
+    const out = describeEvent(sync({ partial: true, resumeFrom: '2025-06-12', tradesReturned: 1204 }));
+    expect(out).toContain('Ran out of time at 2025-06-12');
+    expect(out).toContain('continues from there');
+    expect(describeEvent(sync({ partial: true, resumeFrom: '2025-06-12', tradesReturned: 0 }))).not.toContain('spent for nothing');
+  });
+
+  it('says when the browser never confirmed saving the trades', () => {
+    expect(describeEvent(sync({ landed: false }))).toContain('Not confirmed as saved by the browser');
+    expect(describeEvent(sync({ landed: true, fresh: 12 }))).not.toContain('Not confirmed');
+    expect(describeEvent(sync({ landed: true, fresh: 12 }))).toContain('12 new');
+    // Rows older than the field, and automatic runs, say nothing either way.
+    expect(describeEvent(sync())).not.toContain('confirmed');
+  });
+
+  it('says a sync carried on from where the last one stopped', () => {
+    expect(describeEvent(sync({ windowReason: 'resuming' }))).toContain('Carried on from where the last pull stopped');
+  });
 });
 
 describe('describeEvent, for a clear', () => {

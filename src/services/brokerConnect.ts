@@ -224,7 +224,17 @@ export async function syncBrokerAccount(
   trades: ParsedTradeInput[];
   activityCount: number;
   totalActivityCount: number;
-  truncated: boolean;
+  /** An older server's page-cap flag. No longer sent. */
+  truncated?: boolean;
+  /**
+   * The pull stopped before the end of its window — the clock, the page cap or the response size —
+   * and these trades are the history before `resumeFrom`. The next sync carries on from there;
+   * the screen's instruction is to press Sync again.
+   */
+  partial?: boolean;
+  resumeFrom?: string | null;
+  /** The history row this sync wrote, to confirm with 'imported' once the trades are saved. */
+  eventId?: string | null;
   /** Closing fills whose opening trade is older than the history the brokerage returned. */
   unmatchedCloses?: number;
   /** Positions opened by a sale with no prior purchase — a real short, or a pre-existing holding. */
@@ -252,6 +262,18 @@ export async function syncBrokerAccount(
   syncRefundNotice?: string | null;
 }> {
   return brokerApiPost({ action: 'sync', accountId, startDate, endDate });
+}
+
+/**
+ * Tells the server a sync's trades are in the journal, and how many were new.
+ *
+ * The sync row is written on the server before the answer goes out; the save happens here, in the
+ * browser, and the server cannot see it. Without this a row could only ever say what was SENT, and
+ * one said "8,790 trades out" for an answer that never arrived. Best-effort: a failure to confirm
+ * is reported, never shown as a failed sync — the trades are already saved by the time this runs.
+ */
+export async function confirmSyncImport(eventId: string, fresh: number): Promise<void> {
+  await brokerApiPost({ action: 'imported', eventId, fresh });
 }
 
 /** The caller's own recent syncs, newest first — manual and automatic alike. */

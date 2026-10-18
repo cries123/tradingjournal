@@ -70,6 +70,54 @@ describe('open positions left by a pull', () => {
   });
 });
 
+/*
+ * A pull cut short by the clock continues on the next sync from the day it stopped. For that to
+ * pair the same way one uninterrupted pull would, the next matcher has to start in the state this
+ * one finished in: the open lots, as the fills that opened them, sized to what is still open.
+ */
+describe('carrying open lots to the next pull', () => {
+  const open = stock('o1', 'BUY', 100, 10, '2026-03-02T15:00:00Z', { fee: 10 });
+  const scaleOut = stock('c1', 'SELL', 40, 12, '2026-03-03T15:00:00Z', { fee: 2 });
+  const close = stock('c2', 'SELL', 60, 13, '2026-03-05T15:00:00Z', { fee: 3 });
+
+  it('hands back each open lot as its opening fill, sized to what is still open', () => {
+    const { openLots } = mapSnapTradeActivities([open, scaleOut]);
+    // 60 of the 100 shares, and the 60 shares' share of the $10 commission.
+    expect(openLots).toEqual([{ ...open, units: 60, fee: 6 }]);
+  });
+
+  it('seeded with them, the next pull closes the lot exactly as one pull would', () => {
+    const whole = mapSnapTradeActivities([open, scaleOut, close]);
+    const first = mapSnapTradeActivities([open, scaleOut]);
+    const second = mapSnapTradeActivities([close], { openLots: first.openLots });
+
+    expect([...first.trades, ...second.trades]).toEqual(whole.trades);
+    expect(second.trades[0].sourceId).toBe('snaptrade:o1:c2');
+    expect(second.openLots).toEqual([]);
+  });
+
+  it('keeps a derived id across pulls, so the sourceId does not change with the lot’s size', () => {
+    const { id: _dropped, ...noId } = open;
+    void _dropped;
+    const first = mapSnapTradeActivities([noId, scaleOut]);
+    const second = mapSnapTradeActivities([close], { openLots: first.openLots });
+    expect(second.trades[0].sourceId).toBe(first.trades[0].sourceId!.replace(':c1', ':c2'));
+  });
+
+  it('seeds after orienting the feed, so a newest-first window is still read oldest first', () => {
+    const later = [
+      stock('b2', 'BUY', 10, 20, '2026-03-05T14:00:00Z', { symbol: 'MSFT' }),
+      stock('s2', 'SELL', 10, 21, '2026-03-06T14:00:00Z', { symbol: 'MSFT' }),
+      close,
+    ];
+    const first = mapSnapTradeActivities([open, scaleOut]);
+    const forward = mapSnapTradeActivities(later, { openLots: first.openLots });
+    const reversed = mapSnapTradeActivities([...later].reverse(), { openLots: first.openLots });
+    expect(reversed.trades).toEqual(forward.trades);
+    expect(reversed.observedDirection).toBe('newest-first');
+  });
+});
+
 describe('the direction of a one-day feed', () => {
   // A day of long trades. Read newest-first, forward, every one of them becomes a short.
   const DAY = '2026-03-02T00:00:00Z';

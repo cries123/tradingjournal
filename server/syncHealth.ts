@@ -47,7 +47,8 @@ export function assessSyncHealth(connected: ConnectedAccount[], today: string): 
     accounts: rows.length,
     activities: rows.reduce((n, r) => n + r.activityCount, 0),
     fresh: rows.reduce((n, r) => n + (r.fresh ?? 0), 0),
-    truncated: rows.filter((r) => r.truncated).length,
+    // `truncated` is what rows older than the resumable pull wrote; `partial` is what they write now.
+    truncated: rows.filter((r) => r.truncated || r.partial).length,
     emptyFeeds: rows.filter((r) => r.activityCount === 0).length,
   };
 
@@ -77,7 +78,7 @@ export function assessSyncHealth(connected: ConnectedAccount[], today: string): 
 
   if (summary.truncated > 0) {
     problems.push(
-      `${summary.truncated} ${summary.truncated === 1 ? 'account' : 'accounts'} hit the page cap, so the oldest of the window was left out and the sync state stays incomplete until a manual sync repairs it.`,
+      `${summary.truncated} ${summary.truncated === 1 ? 'account' : 'accounts'} hit the page cap, so the newest days of the window were not read; each row has the day the next sync, automatic or manual, continues from.`,
     );
   }
 

@@ -148,6 +148,19 @@ blank chart.
   "nothing paired", which used to be reported as "no activity found" with no notes.
 - The matcher guards: zero-unit fills counted as `ZERO_UNITS` (they divided the fee by zero), non-finite fees
   read as 0, and every diagnostic date is the Eastern trading day, like the trades.
+- **A pull has a clock, and resumes** (`server/activityPull.ts`, after a 11,491-activity Robinhood first sync
+  died at Netlify's 10 s limit with "8,790 trades out" already in the history). The Netlify function hands the
+  handler its deadline (`BROKER_SYNC_TIME_LIMIT_MS` caps it, 10 s default); no page is started that is not
+  expected back before `deadline − RESERVE_AFTER_PULL_MS`. Only the OLDEST end of a window is ever matched — a
+  newest-first feed is paged from its last offset using `pagination.total` — and the newest UTC day in hand is
+  held back whole. The cut is stored in the sync state as `resumeFrom` with the lots open there (`openLots`,
+  seeded into the next matcher) and the rows left (`remainingRows`, so a newest-first resume starts at the far
+  end); `planSyncStart` then answers `'resuming'` from exactly that day, ignoring the client's window. Partial
+  syncs are refunded (`'partial'` in syncRefund.ts) and the screen says "Imported part of your history — sync
+  again to continue." Responses are cut the same way at `MAX_TRADE_BYTES` (Netlify caps bodies at 6 MB). The
+  morning import uses the same pull with its 3-page cap as the budget, so the cap no longer forces a
+  pull-everything repair. The browser confirms a saved import with `action: 'imported'`; a history row with
+  `landed: false` is an answer that never reached a journal.
 
 ### SnapTrade credentials — never delete a stored secret to "recover"
 

@@ -23,6 +23,7 @@ const ALL: SyncOutcome[] = [
   'trades',
   'empty-feed',
   'nothing-matched',
+  'partial',
   'upstream-outage',
   'credential-rejected',
   'rate-limited',
@@ -50,6 +51,13 @@ describe('shouldRefundSync', () => {
     expect(shouldRefundSync('credential-rejected')).toBe(true);
     expect(shouldRefundSync('rate-limited')).toBe(true);
     expect(shouldRefundSync('our-fault')).toBe(true);
+  });
+
+  it('refunds a pull that ran out of time, even one that brought trades back', () => {
+    // A large first import arrives in slices now. Charging each slice would spend a day's allowance
+    // on one history, for pulls that cost us nothing; the clock already limits them.
+    expect(shouldRefundSync('partial')).toBe(true);
+    expect(refundNotice('partial')).toContain('could not finish');
   });
 
   it('still charges a malformed request, on purpose', () => {

@@ -100,18 +100,19 @@ async function journalCandidates(uid: string): Promise<Trade[]> {
 
 async function importFor(uid: string, activeAccountId: string, today: string) {
   const since = lookbackStart(today);
-  const { accounts, trades, pulls, skippedAccounts, truncated, perAccount, earliestStart } =
+  const { accounts, trades, pulls, skippedAccounts, partial, perAccount, earliestStart } =
     await pullRecentActivityForUser(uid, since, accountsPerRun());
   if (skippedAccounts > 0) {
     console.info(
       `[auto-sync] ${uid}: refreshed ${pulls} of ${accounts} accounts; ${skippedAccounts} left for a manual sync.`,
     );
   }
-  if (truncated) {
+  if (partial) {
     // An account past the page cap. Said out loud, because the alternative — what this used to do —
-    // is a morning import that quietly covers less of the window than it claims to.
+    // is a morning import that quietly covers less of the window than it claims to. The days it
+    // did not read are resumed by the next sync, automatic or manual; the history row has the date.
     console.warn(
-      `[auto-sync] ${uid}: an account returned more activity than one run pages through; the oldest of the window needs a manual sync.`,
+      `[auto-sync] ${uid}: an account returned more activity than one run pages through; its newest days wait for the next sync.`,
     );
   }
 
