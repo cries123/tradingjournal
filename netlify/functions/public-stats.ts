@@ -26,7 +26,7 @@ export const handler: Handler = async () => {
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300' },
-        body: JSON.stringify({ trades: null, traders: null, updatedAt: new Date(now).toISOString() }),
+        body: JSON.stringify({ trades: null, traders: null, pnl: null, updatedAt: new Date(now).toISOString() }),
       };
     }
   }

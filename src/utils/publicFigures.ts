@@ -8,6 +8,13 @@
  */
 export const TRADES_FLOOR = 1_000;
 export const TRADERS_FLOOR = 100;
+/**
+ * Combined P&L across every journal, in dollars. The floor is higher than the others because a
+ * dollar figure is read as a performance claim: "$900 combined" says the product's users barely
+ * make money, and anything negative says they lose it. Below this it is withheld and the trade
+ * count takes its place, which is a fact about journaling rather than about trading.
+ */
+export const PNL_FLOOR = 10_000;
 
 /** 12,437 → 12,000; 1,874 → 1,800; 437 → 430. Never rounds up, so the "+" is always true. */
 export function roundDownForDisplay(n: number): number {

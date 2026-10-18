@@ -28,6 +28,8 @@ export interface AdminServerStats {
   brokerNeedsReconnectCount: number;
   /** Every journal entry across every user; null when it could not be counted or the function predates it. */
   journalTradeCount: number | null;
+  /** Signed sum of every journal entry's P&L, in dollars; null when it could not be read. */
+  journalPnlTotal: number | null;
   /** Per-user connection state. Only users who ever started the connect flow appear here. */
   brokerUsers: AdminBrokerUser[];
 }
@@ -103,6 +105,10 @@ export async function fetchAdminServerStats(): Promise<AdminServerStatsResult> {
         journalTradeCount:
           typeof data.journalTradeCount === 'number' && Number.isFinite(data.journalTradeCount)
             ? data.journalTradeCount
+            : null,
+        journalPnlTotal:
+          typeof data.journalPnlTotal === 'number' && Number.isFinite(data.journalPnlTotal)
+            ? data.journalPnlTotal
             : null,
         // An older deploy of the function won't send this. An empty list means the Users tab shows
         // "unknown" rather than confidently claiming nobody is connected.

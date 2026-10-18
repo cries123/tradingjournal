@@ -79,7 +79,7 @@ import { DormantSubscribersPanel } from '../components/admin/DormantSubscribersP
 import { AdminAuditPanel } from '../components/admin/AdminAuditPanel';
 import { dormantSubscribers, moneyAtRisk, trialStats } from '../utils/adminRisk';
 import { ADMIN_TABS, type AdminTab } from '../components/admin/adminTabs';
-import { publishedFigure, TRADERS_FLOOR, TRADES_FLOOR } from '../utils/publicFigures';
+import { PNL_FLOOR, publishedFigure, TRADERS_FLOOR, TRADES_FLOOR } from '../utils/publicFigures';
 import { BrokerStatusPanel } from '../components/admin/BrokerStatusPanel';
 import { fetchCostReport, type CostReport } from '../services/adminCosts';
 import {
@@ -585,19 +585,32 @@ function NeedsAttention({
 
 /** CSV exports collapsed into one control. They were a full panel competing with real data. */
 /** One of the proof strip's figures: the raw count, and what the public sees (or why nothing yet). */
-function ProofFigure({ label, raw, floor }: { label: string; raw: number | null; floor: number }) {
+function ProofFigure({
+  label,
+  raw,
+  floor,
+  prefix = '',
+}: {
+  label: string;
+  raw: number | null;
+  floor: number;
+  /** "$" for the P&L figure, so the raw and published values read as money. */
+  prefix?: string;
+}) {
   const shown = publishedFigure(raw, floor);
+  // A signed figure keeps its sign in front of the prefix: -$1,200, not $-1,200.
+  const money = (n: number) => `${n < 0 ? '-' : ''}${prefix}${Math.abs(Math.round(n)).toLocaleString()}`;
   return (
     <div className="mt-2 first:mt-0">
       <p className="text-xs text-text-secondary">{label}</p>
-      <p className="text-xl font-bold tracking-tight tabular-nums">
-        {raw === null ? '—' : raw.toLocaleString()}
+      <p className={`text-xl font-bold tracking-tight tabular-nums ${raw !== null && raw < 0 ? 'text-loss-bright' : ''}`}>
+        {raw === null ? '—' : money(raw)}
         <span className="ml-2 text-xs font-medium text-text-secondary">
           {raw === null
             ? 'not counted'
             : shown !== null
-              ? `shows as ${shown.toLocaleString()}+`
-              : `hidden until ${floor.toLocaleString()}`}
+              ? `shows as ${money(shown)}+`
+              : `hidden until ${money(floor)}`}
         </span>
       </p>
     </div>
@@ -1839,7 +1852,13 @@ export function AdminPage({ onHome }: AdminPageProps) {
                     </p>
                   </div>
                   <ProofFigure
-                    label="Trades journaled"
+                    label="Combined P&L"
+                    raw={ready.serverStats?.journalPnlTotal ?? null}
+                    floor={PNL_FLOOR}
+                    prefix="$"
+                  />
+                  <ProofFigure
+                    label="Trades journaled (shown while P&L is hidden)"
                     raw={ready.serverStats?.journalTradeCount ?? null}
                     floor={TRADES_FLOOR}
                   />

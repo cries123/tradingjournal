@@ -2,6 +2,8 @@
 export interface PublicStats {
   trades: number | null;
   traders: number | null;
+  /** Combined P&L across every journal, in whole dollars, already floored and rounded down. */
+  pnl: number | null;
 }
 
 /**
@@ -16,7 +18,7 @@ export async function fetchPublicStats(): Promise<PublicStats | null> {
     if (!res.ok) return null;
     const data = (await res.json()) as Partial<PublicStats>;
     const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null);
-    return { trades: n(data.trades), traders: n(data.traders) };
+    return { trades: n(data.trades), traders: n(data.traders), pnl: n(data.pnl) };
   } catch {
     return null;
   }

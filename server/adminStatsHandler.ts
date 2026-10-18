@@ -2,6 +2,7 @@ import type { IncomingHttpHeaders } from 'http';
 import type { Firestore } from 'firebase-admin/firestore';
 import { AdminRequestError, assertCallerIsAdmin, getBearerToken } from './adminAuth';
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin';
+import { PNL_AGGREGATE } from './publicStats';
 import { getSnaptrade, SNAPTRADE_CLIENT_ID, SNAPTRADE_CONFIGURED } from './snaptradeClient';
 import { isRejectedCredential } from './upstreamErrors';
 
@@ -55,6 +56,11 @@ export interface AdminStatsResponse {
    * Null when the count could not be read.
    */
   journalTradeCount: number | null;
+  /**
+   * The sum of `pnl` over those entries, in dollars — what the proof strip's combined P&L figure
+   * is cut from. Unlike the published figure this is signed: the admin sees a loss as a loss.
+   */
+  journalPnlTotal: number | null;
 }
 
 export interface AdminBrokerUser {
@@ -416,7 +422,7 @@ export async function handleAdminStatsRequest(
       pageToken = result.pageToken;
     } while (pageToken);
 
-    const [firestoreUserCountSnap, usernameCountSnap, firestoreUsersSnap, journalTradeCount, brokerStats] =
+    const [firestoreUserCountSnap, usernameCountSnap, firestoreUsersSnap, journalTradeCount, journalPnlTotal, brokerStats] =
       await Promise.all([
         db.collection('users').count().get(),
         db.collection('usernames').count().get(),
@@ -430,6 +436,21 @@ export async function handleAdminStatsRequest(
           .then((s) => s.data().count as number)
           .catch((err: unknown) => {
             console.warn('[admin-stats] journal trade count failed:', err);
+            return null;
+          }),
+        // The same sum the public function runs, so the tile shows the raw number behind the
+        // strip's figure. It needs `pnl` indexed at collection-group scope; until then this is the
+        // warning that carries Firestore's link to create it.
+        db
+          .collectionGroup('trades')
+          .aggregate(PNL_AGGREGATE)
+          .get()
+          .then((s) => {
+            const sum = s.data().pnl;
+            return typeof sum === 'number' && Number.isFinite(sum) ? sum : null;
+          })
+          .catch((err: unknown) => {
+            console.warn('[admin-stats] journal pnl sum failed:', err);
             return null;
           }),
         collectBrokerStats(db).catch((err) => {
@@ -485,6 +506,7 @@ export async function handleAdminStatsRequest(
       brokerStatsPartial: brokerStats.partial,
       brokerNeedsReconnectCount: brokerStats.needsReconnect,
       journalTradeCount,
+      journalPnlTotal,
       brokerUsers: brokerStats.users,
     };
 
