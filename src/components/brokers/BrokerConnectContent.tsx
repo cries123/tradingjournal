@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { syncStartDate } from '../../utils/syncWindow';
 import { manualSyncTradeId } from '../../utils/brokerTradeIds';
 import { describeSyncResult } from '../../utils/syncOutcomeCopy';
+import { readCachedBrokerStatus, writeCachedBrokerStatus } from '../../services/brokerStatusCache';
 import { describeEvent, type JournalEvent } from '../../utils/journalEvents';
 import { SyncHistory } from './SyncHistory';
 import { CheckCircle2, ExternalLink, Link2, Loader2, RefreshCw, Unlink } from 'lucide-react';
@@ -165,7 +166,18 @@ export function BrokerConnectContent({
   );
   const { noteUsage, limits, tier, usage, refresh, trialAvailable } = useEntitlement();
   const [available, setAvailable] = useState<boolean | null>(null);
-  const [status, setStatus] = useState<{ registered: boolean; accounts: BrokerAccountSummary[] } | null>(null);
+  /*
+   * Starts from the last answer this browser saw, so the accounts are on screen at once.
+   *
+   * The live status is a cold serverless function plus a SnapTrade round trip — four or five
+   * seconds, during which this screen drew nothing and a trader who connected Schwab last week saw
+   * no Schwab. The list only changes from this screen (connect, disconnect), so the previous answer
+   * is almost always the current one; it is shown immediately and replaced when the live one lands.
+   * The user may still be resolving on the first render, so the effect below hydrates it too.
+   */
+  const [status, setStatus] = useState<{ registered: boolean; accounts: BrokerAccountSummary[] } | null>(() =>
+    user ? readCachedBrokerStatus(user.uid) : null,
+  );
   const [statusLoading, setStatusLoading] = useState(false);
   const [connectingBroker, setConnectingBroker] = useState<SupportedBroker | null>(null);
   const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
@@ -225,6 +237,7 @@ export function BrokerConnectContent({
     try {
       const next = await fetchBrokerStatus();
       setStatus(next);
+      if (user) writeCachedBrokerStatus(user.uid, next);
       return next;
     } catch (err) {
       showError(err, 'Could not load broker connections', 'broker-status');
@@ -235,12 +248,13 @@ export function BrokerConnectContent({
   };
 
   useEffect(() => {
-    // Clearing state before the fetch or subscription below. This is the external-system sync
-    // the rule's own guidance describes as a legitimate effect; the alternative is tracking which
-    // request each piece of state belongs to, through auth, settings and trades, to satisfy a lint
-    // rule rather than to fix a bug.
+    if (!canConnect || !available || !user) return;
+    // The cached list first, if the first render ran before the user had resolved — see the state
+    // above. Syncing from an external store, which is what the rule allows an effect to do.
+    const cached = readCachedBrokerStatus(user.uid);
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (canConnect && available) void refreshStatus();
+    if (cached) setStatus((current) => current ?? cached);
+    void refreshStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canConnect, available]);
 
@@ -660,7 +674,8 @@ export function BrokerConnectContent({
           className="self-start inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors focus-ring rounded px-1"
         >
           {statusLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-          Refresh connections
+          {/* While the live answer is on its way the list above is last visit's; say so. */}
+          {statusLoading ? 'Checking your connections…' : 'Refresh connections'}
         </button>
       )}
     </PageFrame>

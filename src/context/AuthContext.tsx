@@ -25,6 +25,7 @@ import {
 } from 'firebase/auth';
 import { getFirebaseAuth, isFirebaseConfigured } from '../lib/firebaseAuth';
 import { isAccountDeleted } from '../services/deletedAccounts';
+import { clearCachedBrokerStatus } from '../services/brokerStatusCache';
 import { ensureUserProfile } from '../services/userProfile';
 import { reportErrorSilently } from '../services/errorReporting';
 import { UsernameTakenError, claimUsername as claimUsernameDoc, cacheUsername, clearCachedUsername, fetchUsername, readCachedUsername } from '../services/username';
@@ -380,7 +381,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const auth = getFirebaseAuth();
     const uid = auth.currentUser?.uid;
     await signOut(auth);
-    if (uid) clearCachedUsername(uid);
+    if (uid) {
+      clearCachedUsername(uid);
+      // The last broker status this browser saw for them — never the next person's first paint.
+      clearCachedBrokerStatus(uid);
+    }
     setUsername(null);
   }, []);
 
