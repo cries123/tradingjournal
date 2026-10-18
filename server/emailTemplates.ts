@@ -183,6 +183,49 @@ export function ticketReplyEmail(options: {
   };
 }
 
+/**
+ * "Support sent you a message" — for a thread support started, where "we've replied" would be
+ * false. Same rule as the reply notice: a short preview and a link, never the whole message.
+ */
+export function supportMessageEmail(options: {
+  subject: string;
+  preview: string;
+  siteUrl: string;
+}): TicketReplyEmail {
+  const link = `${options.siteUrl}/support`;
+  const trimmed = options.preview.trim().replace(/\s+/g, ' ').slice(0, 180);
+  const snippet = trimmed.length === 180 ? `${trimmed}…` : trimmed;
+
+  const body = `
+    <p style="margin:0 0 12px 0;">Trend Chasers support sent you a message: <strong>${escapeHtml(options.subject)}</strong>.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-left:3px solid #0ea5e9;border-radius:6px;margin:0 0 12px 0;">
+      <tr><td style="padding:12px 14px;font-size:14px;line-height:1.55;color:#374151;">${escapeHtml(snippet)}</td></tr>
+    </table>
+    <p style="margin:0;">Open it to read the whole message and reply. The conversation stays in your Support inbox.</p>`;
+
+  const text = [
+    `Trend Chasers support sent you a message: "${options.subject}".`,
+    '',
+    snippet,
+    '',
+    `Read it and reply here: ${link}`,
+    '',
+    'Trend Chasers support',
+  ].join('\n');
+
+  return {
+    subject: options.subject,
+    html: layout({
+      title: 'A message from support',
+      body,
+      ctaLabel: 'Open the message',
+      ctaUrl: link,
+      footerNote: 'You are getting this because Trend Chasers support wrote to you about your account.',
+    }),
+    text,
+  };
+}
+
 /* ------------------------------------------------------------------ weekly recap */
 
 function money(value: number): string {

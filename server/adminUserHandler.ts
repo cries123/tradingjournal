@@ -5,6 +5,7 @@ import { adminEmailFor, logAdminActionServer } from './adminAudit';
 import { purgeAccount } from './accountTeardown';
 import { readEntitlement, resolveAccess, writeEntitlement } from './entitlements';
 import { deleteJournalEvents, readJournalEvents } from './journalEvents';
+import { openSupportThread } from './adminSupportMessage';
 import { MAX_EVENT_DELETES, parseEventIds } from '../src/utils/journalEvents';
 import { readUserJournal } from './adminUserJournal';
 import {
@@ -49,6 +50,7 @@ export type AdminUserAction =
   | 'setSuspended'
   | 'resetBrokerLink'
   | 'emailUser'
+  | 'openSupportThread'
   | 'readTrialClaim';
 
 export interface AdminUserRequestBody {
@@ -610,6 +612,22 @@ export async function handleAdminUserRequest(
       case 'readTrialClaim': {
         const claim = await readTrialClaimFor(targetUid);
         return { statusCode: 200, body: { ok: true, claim } };
+      }
+      case 'openSupportThread': {
+        const result = await openSupportThread(
+          { db: getAdminFirestore(), auth: getAdminAuth() },
+          { targetUid, adminUid: callerUid, subject: body.subject, message: body.message },
+        );
+        return {
+          statusCode: 200,
+          body: {
+            ok: true,
+            ...result,
+            message: result.emailed
+              ? 'Sent to their Support inbox, and emailed them a notice.'
+              : 'Sent to their Support inbox. The notice email did not go out, but the badge will show in the app.',
+          },
+        };
       }
       case 'emailUser': {
         const subject = typeof body.subject === 'string' ? body.subject : '';

@@ -27,6 +27,7 @@ export type AdminAuditAction =
   | 'user.reactivated'
   | 'user.broker-link-reset'
   | 'user.emailed'
+  | 'user.support-message-sent'
   | 'user.note-saved'
   | 'user.flagged'
   | 'user.unflagged'
@@ -90,6 +91,7 @@ export const AUDIT_ACTION_LABELS: Record<AdminAuditAction, string> = {
   'user.reactivated': 'Restored sign-in for',
   'user.broker-link-reset': 'Reset the broker link for',
   'user.emailed': 'Emailed',
+  'user.support-message-sent': 'Sent a support message to',
   'user.note-saved': 'Updated internal note for',
   'user.flagged': 'Flagged',
   'user.unflagged': 'Unflagged',

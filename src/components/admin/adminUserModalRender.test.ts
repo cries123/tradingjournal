@@ -86,7 +86,7 @@ describe('the new admin sections render', () => {
         uid: 'u1', email: 'trader@example.com', displayName: '@chelo618', onDone: noop, onError: noop, onAudit: noop,
       }),
     );
-    expect(html).toContain('Email this user');
+    expect(html).toContain('Message this user');
     expect(html).not.toContain('Subject');
   });
 
@@ -124,7 +124,7 @@ describe('the new admin sections render', () => {
     expect(html).toContain('Restore sign-in');
     expect(html).not.toContain('Suspend sign-in');
     expect(html).toContain('Reset broker link');
-    expect(html).toContain('Email this user');
+    expect(html).toContain('Message this user');
     expect(html).toContain('History');
   });
 });

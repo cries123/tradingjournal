@@ -175,6 +175,15 @@ export async function adminReadJournalEvents(targetUid: string): Promise<Journal
   return data.events ?? [];
 }
 
+/** Opens a conversation in their Support inbox with this as support's first message. */
+export async function adminOpenSupportThread(
+  targetUid: string,
+  subject: string,
+  message: string,
+): Promise<{ message: string; ticketId: string; emailed: boolean }> {
+  return adminApiPost<{ ticketId: string; emailed: boolean }>({ action: 'openSupportThread', targetUid, subject, message });
+}
+
 /** Removes rows from their sync history — the same history they see on the connect screen. */
 export async function adminDeleteJournalEvents(
   targetUid: string,

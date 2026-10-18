@@ -1,7 +1,10 @@
 import { useState } from 'react';
-import { Send } from 'lucide-react';
-import { ADMIN_MESSAGE_LIMITS } from '../../config/adminMessage';
-import { adminEmailUser } from '../../services/adminUserManagement';
+import { Inbox, Mail, MessageSquare, Send } from 'lucide-react';
+import { ADMIN_MESSAGE_LIMITS, SUPPORT_THREAD_LIMITS } from '../../config/adminMessage';
+import { adminEmailUser, adminOpenSupportThread } from '../../services/adminUserManagement';
+import { SegmentedControl } from '../ui/SegmentedControl';
+
+type Channel = 'support' | 'email';
 
 interface AdminUserEmailComposerProps {
   uid: string;
@@ -10,7 +13,7 @@ interface AdminUserEmailComposerProps {
   displayName: string;
   onDone: (message: string) => void;
   onError: (message: string) => void;
-  onAudit: (action: 'user.emailed', detail: string) => void;
+  onAudit: (action: 'user.emailed' | 'user.support-message-sent', detail: string) => void;
 }
 
 interface Template {
@@ -33,24 +36,44 @@ const TEMPLATES: Template[] = [
     label: 'Issue fixed',
     subject: 'The problem you reported is fixed',
     body: (name) =>
-      `Hi ${name},\n\nThe issue you ran into has been fixed and is live now. If you still see it, reply to this email and we'll take another look.\n\nThanks for reporting it.`,
+      `Hi ${name},\n\nThe issue you ran into has been fixed and is live now. If you still see it, reply here and we'll take another look.\n\nThanks for reporting it.`,
+  },
+  {
+    id: 'sync-timeout',
+    label: "Sync didn't import",
+    subject: "Why your last sync didn't import",
+    body: (name) =>
+      `Hi ${name},\n\nYour last broker sync found your trades but ran out of time before they reached your journal, so nothing was imported. That's on our side, not yours, and we've given the sync back.\n\nA fix is on the way. We'll message you here as soon as it's live so you can sync again.`,
   },
   {
     id: 'syncs',
     label: 'Gave syncs back',
-    subject: "Your syncs are back",
+    subject: 'Your syncs are back',
     body: (name) =>
       `Hi ${name},\n\nWe've put back the syncs you lost and added a few extra so you're not out of pocket. The fix behind it is live too.\n\nThanks for your patience.`,
   },
 ];
 
+const CHANNELS = [
+  { id: 'support' as const, label: 'Support inbox', icon: Inbox },
+  { id: 'email' as const, label: 'Email only', icon: Mail },
+];
+
 /**
- * A note to the account holder, sent from support@ so a reply comes back to the inbox that can
- * answer it. Templates are starting points, not canned mail — the text is editable right up to
- * Send, and what was sent goes into the audit trail by subject.
+ * A note to the account holder, either as a conversation in their Support inbox or as a plain
+ * email from support@.
+ *
+ * The inbox is the default because it keeps the conversation in the product: it lights the badge
+ * on their sidebar, they reply in the same thread every support conversation uses, and it emails
+ * them a short notice so they know to look. Email only is for somebody who cannot get into the app
+ * — a sign-in problem, a deleted journal — where a message waiting inside it would never be read.
+ *
+ * Templates are starting points, not canned mail — the text is editable right up to Send, and what
+ * was sent goes into the audit trail by subject.
  */
 export function AdminUserEmailComposer({ uid, email, displayName, onDone, onError, onAudit }: AdminUserEmailComposerProps) {
   const [open, setOpen] = useState(false);
+  const [channel, setChannel] = useState<Channel>('support');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
@@ -66,16 +89,28 @@ export function AdminUserEmailComposer({ uid, email, displayName, onDone, onErro
   const [failed, setFailed] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
 
-  const canSend = Boolean(email) && subject.trim().length > 0 && body.trim().length > 0 && !sending;
+  // The inbox thread follows the ticket rules' own bounds; email allows a little more.
+  const limits = channel === 'support' ? SUPPORT_THREAD_LIMITS : ADMIN_MESSAGE_LIMITS;
+  const subjectOk = channel === 'support' ? subject.trim().length >= SUPPORT_THREAD_LIMITS.subjectMin : subject.trim().length > 0;
+  const canSend =
+    (channel === 'support' || Boolean(email)) &&
+    subjectOk &&
+    subject.trim().length <= limits.subject &&
+    body.trim().length > 0 &&
+    body.trim().length <= limits.body &&
+    !sending;
 
   const send = async () => {
     setSending(true);
     setFailed(null);
     setSent(null);
     try {
-      const { message } = await adminEmailUser(uid, subject, body);
+      const { message } =
+        channel === 'support'
+          ? await adminOpenSupportThread(uid, subject, body)
+          : await adminEmailUser(uid, subject, body);
       onDone(message);
-      onAudit('user.emailed', subject.trim());
+      onAudit(channel === 'support' ? 'user.support-message-sent' : 'user.emailed', subject.trim());
       setSubject('');
       setBody('');
       // The form stays open on success, showing what happened. Collapsing it the instant the send
@@ -83,8 +118,9 @@ export function AdminUserEmailComposer({ uid, email, displayName, onDone, onErro
       // confirmation was off-screen.
       setSent(message);
     } catch (err) {
-      setFailed(err instanceof Error ? err.message : 'Could not send the email');
-      onError(err instanceof Error ? err.message : 'Could not send the email');
+      const text = err instanceof Error ? err.message : 'Could not send that';
+      setFailed(text);
+      onError(text);
     } finally {
       setSending(false);
     }
@@ -94,21 +130,19 @@ export function AdminUserEmailComposer({ uid, email, displayName, onDone, onErro
     return (
       <button
         type="button"
-        disabled={!email}
         onClick={() => setOpen(true)}
-        title={email ? `Email ${email}` : 'No email on file'}
-        className="w-full flex items-center justify-center gap-2 btn-secondary py-2.5 text-sm disabled:opacity-50"
+        className="w-full flex items-center justify-center gap-2 btn-secondary py-2.5 text-sm"
       >
-        <Send size={15} />
-        Email this user
+        <MessageSquare size={15} />
+        Message this user
       </button>
     );
   }
 
   return (
     <div className="rounded-lg border border-border/60 bg-bg-tertiary/30 p-3 space-y-2.5">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-text-primary">To {email}</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <SegmentedControl options={CHANNELS} value={channel} onChange={setChannel} label="Send as" />
         <button
           type="button"
           onClick={() => setOpen(false)}
@@ -117,6 +151,14 @@ export function AdminUserEmailComposer({ uid, email, displayName, onDone, onErro
           Cancel
         </button>
       </div>
+
+      <p className="text-[11px] text-text-secondary leading-relaxed">
+        {channel === 'support'
+          ? `Opens a conversation in ${displayName}'s Support inbox, lights the badge in their sidebar, and emails them a short notice. They reply in the app.`
+          : email
+            ? `Sends an email to ${email} from support@trendchasers.net. Replies come back to the support inbox.`
+            : 'No email on file for this account. Send it to their Support inbox instead.'}
+      </p>
 
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Templates">
         {TEMPLATES.map((t) => (
@@ -138,7 +180,7 @@ export function AdminUserEmailComposer({ uid, email, displayName, onDone, onErro
         type="text"
         value={subject}
         onChange={(e) => setSubject(e.target.value)}
-        maxLength={ADMIN_MESSAGE_LIMITS.subject}
+        maxLength={limits.subject}
         placeholder="Subject"
         className="input-field text-sm w-full"
         aria-label="Subject"
@@ -146,17 +188,14 @@ export function AdminUserEmailComposer({ uid, email, displayName, onDone, onErro
       <textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
-        maxLength={ADMIN_MESSAGE_LIMITS.body}
+        maxLength={limits.body}
         rows={6}
         placeholder="Write it like a person. Blank lines make paragraphs."
         className="input-field text-sm w-full resize-y min-h-[120px]"
         aria-label="Message"
       />
 
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[11px] text-text-secondary">
-          From Trend Chasers &lt;support@trendchasers.net&gt; · replies go to support
-        </p>
+      <div className="flex items-center justify-end gap-3">
         <button
           type="button"
           disabled={!canSend}
@@ -164,7 +203,7 @@ export function AdminUserEmailComposer({ uid, email, displayName, onDone, onErro
           className="inline-flex items-center gap-1.5 btn-secondary px-3 py-1.5 text-xs shrink-0 disabled:opacity-50"
         >
           <Send size={13} aria-hidden />
-          {sending ? 'Sending…' : 'Send'}
+          {sending ? 'Sending…' : channel === 'support' ? 'Send to their inbox' : 'Send email'}
         </button>
       </div>
 

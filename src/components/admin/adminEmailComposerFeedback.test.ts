@@ -33,7 +33,8 @@ describe('admin email composer feedback', () => {
 
   it('still tells the parent, so the audit trail and shared banner keep working', () => {
     expect(COMPOSER).toContain('onDone(message)');
-    expect(COMPOSER).toContain("onAudit('user.emailed'");
+    // Audited under whichever channel actually sent it.
+    expect(COMPOSER).toContain("onAudit(channel === 'support' ? 'user.support-message-sent' : 'user.emailed'");
     expect(COMPOSER).toMatch(/onError\(/);
   });
 
