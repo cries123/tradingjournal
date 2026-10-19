@@ -15,7 +15,10 @@ interface TradeLogProps {
   ruleTrades?: Trade[];
   /** Days a rule was broken (the active journal's), marked on the day's header. */
   ruleDates?: ReadonlySet<string>;
+  /** A day's own row opens the day. */
   onDayClick: (date: string) => void;
+  /** A trade's row opens the trade, with its note. Without it, a trade's row opens its day. */
+  onTradeClick?: (trade: Trade) => void;
   /** Opens the full trade list. */
   onAllTrades?: () => void;
   /** "September" — the period, in the card's heading. */
@@ -74,14 +77,16 @@ function ExpiryPill({ line }: { line: TradeLine }) {
  * The period's trades, newest day first, each day with its result.
  *
  * The Overview never listed a single trade — a front page of totals, with the trades one drawer away
- * per day. Every row opens its day, where the trade is edited and the day's note lives, so this list
+ * per day. A day's row opens the day, where the day's note lives; a trade's row opens that trade, with
+ * its own note (Jay: "click on a trade it should show them trade info … not go to the day"). This list
  * never writes anything itself.
  *
  * In the order the day was traded, the order the rules and the simulator read. One table for every
  * day on desktop, so the columns line up down the page; the Time column only when a trade has a
  * time, since Schwab sends dates without fills and a column of dashes says nothing.
  */
-export function TradeLog({ trades, ruleTrades, ruleDates = NONE, onDayClick, onAllTrades, periodName, days = 3 }: TradeLogProps) {
+export function TradeLog({ trades, ruleTrades, ruleDates = NONE, onDayClick, onTradeClick, onAllTrades, periodName, days = 3 }: TradeLogProps) {
+  const openTrade = (trade: Trade) => (onTradeClick ? onTradeClick(trade) : onDayClick(trade.date));
   const { settings } = useSettings();
   const [limit, setLimit] = useState(days);
   const grouped = useMemo(() => [...tradesByDay(trades).entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)), [trades]);
@@ -167,7 +172,7 @@ export function TradeLog({ trades, ruleTrades, ruleDates = NONE, onDayClick, onA
                 const line = tradeLine(trade);
                 const tags = tradeTags(trade);
                 return (
-                  <tr key={trade.id} onClick={() => onDayClick(date)} className="cursor-pointer hover:bg-white/[0.02]">
+                  <tr key={trade.id} onClick={() => openTrade(trade)} className="cursor-pointer hover:bg-white/[0.02]">
                     {anyTime && <td className="whitespace-nowrap border-b border-white/[0.06] px-2 py-2 tabular-nums text-text-secondary">{trade.entryTime?.slice(0, 5) ?? '—'}</td>}
                     <td className="whitespace-nowrap border-b border-white/[0.06] px-2 py-2 font-semibold">
                       {line.dated}
@@ -223,7 +228,7 @@ export function TradeLog({ trades, ruleTrades, ruleDates = NONE, onDayClick, onA
                   <button
                     key={trade.id}
                     type="button"
-                    onClick={() => onDayClick(date)}
+                    onClick={() => openTrade(trade)}
                     className="mb-1.5 grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-[3px] rounded-[14px] border border-white/[0.07] bg-bg-card px-3 py-[11px] text-left focus-ring"
                   >
                     <span className="flex min-w-0 items-center gap-1.5 text-[15px] font-semibold">
