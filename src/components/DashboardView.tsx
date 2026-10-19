@@ -18,6 +18,7 @@ import { ShareCardModal } from './ShareCardModal';
 import { StatsCards } from './StatsCards';
 import { YearMonths } from './YearMonths';
 import { TradingInsightsSection } from './analytics/TradingInsightsSection';
+import { EquityCurve } from './analytics/EquityCurve';
 import { DirectionPanel } from './analytics/DirectionPanel';
 import { TakeawayBanner } from './analytics/TakeawayBanner';
 import { SegmentedControl } from './ui/SegmentedControl';
@@ -103,6 +104,7 @@ export function DashboardView({
   const analyticsTrades = mode === 'month' ? monthTrades : yearTrades;
   const streakDays = useMemo(() => computeJournalingStreak(trades), [trades]);
   const direction = useMemo(() => directionSplit(analyticsTrades), [analyticsTrades]);
+  const periodLabel = mode === 'month' ? formatMonthYear(year, month) : String(year);
 
   const takeaway = useMemo(() => {
     const insights = computeTradingInsights(analyticsTrades);
@@ -254,6 +256,10 @@ export function DashboardView({
 
       {hasAnyTrades && <TakeawayBanner takeaway={takeaway} aiText={aiTakeawayText} aiPending={aiTakeawayPending} />}
 
+      {/* The one chart: running P&L for the period with the drawdown shaded under the peak. Hides
+          itself under three trading days — see equityCurve.ts. */}
+      {hasAnyTrades && <EquityCurve trades={analyticsTrades} currency={settings.currency} periodLabel={periodLabel} />}
+
       {/* The week recap goes above the calendar at full width, not in a column beside it.
           It shared an 1800px-and-up split with the calendar back when the equity curve was
           stacked in that column too. With the charts gone the column held one short strip of a
@@ -310,7 +316,7 @@ export function DashboardView({
         </Reveal>
       )}
 
-      {hasAnyTrades && <TradingInsightsSection trades={analyticsTrades} />}
+      {hasAnyTrades && <TradingInsightsSection trades={analyticsTrades} periodLabel={periodLabel} />}
 
       {showShare && (
         <ShareCardModal

@@ -159,7 +159,7 @@ export function MonthlyReportDocument({
                     <td className="p-0.5 align-top">
                       {week.trades > 0 && (
                         <div className="h-11 rounded border border-slate-300 bg-slate-50 px-1.5 py-1">
-                          <p className="text-slate-500 leading-none">{week.trades}t</p>
+                          <p className="text-slate-500 leading-none">{week.trades} trade{week.trades === 1 ? '' : 's'}</p>
                           <p className={`mt-1 font-bold tabular-nums leading-none ${tone(week.pnl)}`}>{money(week.pnl)}</p>
                         </div>
                       )}

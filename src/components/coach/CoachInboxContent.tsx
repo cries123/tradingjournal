@@ -91,7 +91,7 @@ function DayCard({
         <p className="text-sm font-semibold">{dayLabel(day.date)}</p>
         <p className={`text-sm font-semibold tabular-nums ${pnlClass(day.pnl)}`}>
           {formatCurrency(day.pnl, 'USD')}
-          <span className="text-text-secondary font-normal text-xs"> · {day.trades.length}t</span>
+          <span className="text-text-secondary font-normal text-xs"> · {day.trades.length} trade{day.trades.length === 1 ? '' : 's'}</span>
         </p>
       </div>
 

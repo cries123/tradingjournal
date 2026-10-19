@@ -4,6 +4,7 @@ import type { Trade } from '../../types';
 import { useSettings } from '../../context/useSettings';
 import { formatCurrency } from '../../utils/format';
 import { PanelShell } from './PanelShell';
+import { tradesMeta } from '../../utils/panelCopy';
 import { pnlClass } from '../../utils/pnlTone';
 import {
   executionCoverage,
@@ -40,7 +41,27 @@ function HourPanel({ data, currency }: { data: HourlyBreakdown; currency: Curren
   const maxAbs = Math.max(...data.rows.map((r) => Math.abs(r.pnl)), 1);
 
   return (
-    <PanelShell eyebrow="Timing" title="P&L by hour entered" icon={<Clock size={14} />}>
+    <PanelShell
+      eyebrow="Timing"
+      title="P&L by hour entered"
+      icon={<Clock size={14} />}
+      figure={{
+        value: formatCurrency(data.best.pnl, currency),
+        tone: data.best.pnl >= 0 ? 'profit' : 'loss',
+        caption: `Best hour · ${data.best.label}`,
+      }}
+      note={
+        /* The sentence the panel exists to produce. Suppressed when one hour is both, which
+           happens on a day with a single trading window and would read as nonsense. */
+        data.best.hour !== data.worst.hour ? (
+          <>
+            Best around <span className="text-profit-bright font-medium">{data.best.label}</span>, worst
+            around <span className="text-loss-bright font-medium">{data.worst.label}</span>, across{' '}
+            {data.covered} timed trade{data.covered === 1 ? '' : 's'}.
+          </>
+        ) : undefined
+      }
+    >
       <div className="space-y-1">
         {data.rows.map((row, i) => {
           const traded = row.trades > 0;
@@ -71,16 +92,6 @@ function HourPanel({ data, currency }: { data: HourlyBreakdown; currency: Curren
           );
         })}
       </div>
-
-      {/* The sentence the panel exists to produce. Suppressed when one hour is both, which happens
-          on a day with a single trading window and would read as nonsense. */}
-      {data.best.hour !== data.worst.hour && (
-        <p className="text-[10px] text-text-secondary mt-2.5 leading-relaxed">
-          Best around <span className="text-profit-bright font-medium">{data.best.label}</span>, worst
-          around <span className="text-loss-bright font-medium">{data.worst.label}</span>, across{' '}
-          {data.covered} timed trade{data.covered === 1 ? '' : 's'}.
-        </p>
-      )}
     </PanelShell>
   );
 }
@@ -91,7 +102,16 @@ function ExpectancyPanel({ data }: { data: ExpectancyStats }) {
   const positive = data.expectancy >= 0;
 
   return (
-    <PanelShell eyebrow="Edge" title="Expectancy in R" icon={<Crosshair size={14} />}>
+    <PanelShell
+      eyebrow="Edge"
+      title="Expectancy in R"
+      icon={<Crosshair size={14} />}
+      note={
+        positive
+          ? `Every trade is worth ${data.expectancy.toFixed(2)}R on average — the edge holds over ${data.covered} trades with a recorded risk.`
+          : `The average trade loses ${Math.abs(data.expectancy).toFixed(2)}R across ${data.covered} trades, whatever the win rate says.`
+      }
+    >
       <div className="flex items-baseline gap-2 mb-3">
         <span className={`text-2xl md:text-3xl font-semibold tabular-nums ${pnlClass(data.expectancy)}`}>
           {positive ? '+' : ''}
@@ -112,12 +132,6 @@ function ExpectancyPanel({ data }: { data: ExpectancyStats }) {
           </div>
         ))}
       </dl>
-
-      <p className="text-[10px] text-text-secondary mt-2.5 leading-relaxed">
-        {positive
-          ? `Every trade is worth ${data.expectancy.toFixed(2)}R on average — the edge holds over ${data.covered} trades with a recorded risk.`
-          : `The average trade loses ${Math.abs(data.expectancy).toFixed(2)}R across ${data.covered} trades, whatever the win rate says.`}
-      </p>
     </PanelShell>
   );
 }
@@ -129,7 +143,18 @@ function ExcursionPanel({ data, currency }: { data: ExcursionStats; currency: Cu
   const leftOnTable = data.avgMfeLosers > 0;
 
   return (
-    <PanelShell eyebrow="Excursion" title="How far trades ran" icon={<Ruler size={14} />}>
+    <PanelShell
+      eyebrow="Excursion"
+      title="How far trades ran"
+      icon={<Ruler size={14} />}
+      note={
+        stopTooTight
+          ? 'Your winners dip about as far as your losers do before working — a tighter stop would have cut them too.'
+          : leftOnTable
+            ? `Losing trades were up ${formatCurrency(data.avgMfeLosers, currency)} on average before turning. That is the exit, not the entry.`
+            : 'Adverse and favourable excursion across the trades that recorded them.'
+      }
+    >
       <dl className="grid grid-cols-2 gap-2">
         {[
           { label: 'Winners went against you', value: data.avgMaeWinners },
@@ -145,14 +170,6 @@ function ExcursionPanel({ data, currency }: { data: ExcursionStats; currency: Cu
           </div>
         ))}
       </dl>
-
-      <p className="text-[10px] text-text-secondary mt-2.5 leading-relaxed">
-        {stopTooTight
-          ? 'Your winners dip about as far as your losers do before working — a tighter stop would have cut them too.'
-          : leftOnTable
-            ? `Losing trades were up ${formatCurrency(data.avgMfeLosers, currency)} on average before turning. That is the exit, not the entry.`
-            : 'Adverse and favourable excursion across the trades that recorded them.'}
-      </p>
     </PanelShell>
   );
 }
@@ -274,9 +291,31 @@ function TagPanel({
   const maxAbs = Math.max(...rows.map((r) => Math.abs(r.pnl)), 1);
   // Something you win on most of the time and still lose money to is the finding worth surfacing.
   const trap = rows.find((r) => r.winRate >= 55 && r.pnl < 0);
+  // The row worth the most money, whichever way, leads the card.
+  const lead = rows.reduce((a, b) => (Math.abs(b.pnl) > Math.abs(a.pnl) ? b : a));
 
   return (
-    <PanelShell eyebrow={eyebrow} title={title} icon={icon ?? <Tags size={14} />}>
+    <PanelShell
+      eyebrow={eyebrow}
+      title={title}
+      icon={icon ?? <Tags size={14} />}
+      figure={{ value: formatCurrency(lead.pnl, currency), tone: lead.pnl >= 0 ? 'profit' : 'loss', caption: lead.tag }}
+      note={
+        trap ? (
+          <>
+            <span className="text-loss-bright font-medium">{trap.tag}</span> wins{' '}
+            {Math.round(trap.winRate)}% of the time and still loses money — the wins are too small for
+            the losses. Worth a hard look at that {noun}.
+          </>
+        ) : rows.length > 1 ? (
+          <>
+            <span className={lead.pnl >= 0 ? 'text-profit-bright font-medium' : 'text-loss-bright font-medium'}>{lead.tag}</span>{' '}
+            {lead.pnl >= 0 ? 'made' : 'cost'} you {formatCurrency(Math.abs(lead.pnl), currency)} across {lead.trades} trades
+            — more than any other {noun}.
+          </>
+        ) : undefined
+      }
+    >
       <div className="space-y-1.5">
         {rows.map((row, i) => (
           <div key={row.tag} className="flex items-center gap-2">
@@ -289,8 +328,8 @@ function TagPanel({
                 style={{ width: `${Math.max((Math.abs(row.pnl) / maxAbs) * 100, 3)}%`, '--i': i } as CSSProperties}
               />
             </div>
-            <span className="text-[9px] text-text-secondary w-14 shrink-0 text-right tabular-nums">
-              {row.trades}t · {Math.round(row.winRate)}%
+            <span className="text-[9px] text-text-secondary w-[5.75rem] shrink-0 text-right tabular-nums">
+              {tradesMeta(row.trades, row.winRate)}
             </span>
             <span className={`text-[10px] md:text-xs font-semibold tabular-nums w-16 shrink-0 text-right ${pnlClass(row.pnl)}`}>
               {formatCurrency(row.pnl, currency)}
@@ -298,14 +337,6 @@ function TagPanel({
           </div>
         ))}
       </div>
-
-      {trap && (
-        <p className="text-[10px] text-text-secondary mt-2.5 leading-relaxed">
-          <span className="text-loss-bright font-medium">{trap.tag}</span> wins{' '}
-          {Math.round(trap.winRate)}% of the time and still loses money — the wins are too small for
-          the losses. Worth a hard look at that {noun}.
-        </p>
-      )}
     </PanelShell>
   );
 }

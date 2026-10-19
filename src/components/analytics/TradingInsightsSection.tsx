@@ -18,6 +18,12 @@ import { Reveal } from '../motion/Reveal';
 
 interface TradingInsightsSectionProps {
   trades: Trade[];
+  /**
+   * Which period the figures describe — "September 2026", "2026". Named in the heading because
+   * the Performance screen opens on the year while this reads the month, and two break-even
+   * figures with nothing saying why they differ read as a bug.
+   */
+  periodLabel?: string;
 }
 
 function formatDayLabel(iso: string): string {
@@ -37,7 +43,7 @@ function formatDayLabel(iso: string): string {
  * Grouped, "Edge" answers whether the trading makes money per trade, "Risk" how hard the ride is
  * and whether it is getting better, and "Days" what the sessions themselves looked like.
  */
-export function TradingInsightsSection({ trades }: TradingInsightsSectionProps) {
+export function TradingInsightsSection({ trades, periodLabel }: TradingInsightsSectionProps) {
   const { settings, viewingAllJournals } = useSettings();
   const insights = useMemo(() => computeTradingInsights(trades), [trades]);
   const score = useMemo(() => (insights ? computeTradingScore(insights) : null), [insights]);
@@ -60,7 +66,10 @@ export function TradingInsightsSection({ trades }: TradingInsightsSectionProps) 
         <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium">
           Trading insights
         </p>
-        <h3 className="text-sm md:text-base font-semibold">What's working, what's not</h3>
+        <h3 className="text-sm md:text-base font-semibold">
+          What's working, what's not
+          {periodLabel && <span className="text-text-secondary font-normal"> · {periodLabel}</span>}
+        </h3>
       </div>
 
       <div className="mt-3 grid gap-3 items-start lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] xl:gap-4">
