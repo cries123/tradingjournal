@@ -1,108 +1,98 @@
-import { useMemo } from 'react';
-import { ArrowDownRight, ArrowUpRight, Lightbulb } from 'lucide-react';
-import type { Trade } from '../../types';
-import { formatCurrency } from '../../utils/format';
-import { performanceVerdict, type Finding } from '../../utils/performanceVerdict';
-import { useReveal } from '../../hooks/useReveal';
-
-type Currency = Parameters<typeof formatCurrency>[1];
+import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import type { Fmt, VerdictBand } from '../../utils/performanceScreen';
+import { Parts } from './PerformanceBreakdowns';
 
 /**
- * The three lines the Performance screen says, before the panels say them twelve ways.
+ * What the Performance screen says, before any breakdown says it: where the money goes, where it
+ * comes from, and the one change worth making.
  *
- * The biggest drain is the headline, in the largest type on the page, because it is the one
- * figure a trader should carry away. The biggest engine beside it says what to keep doing. The
- * change under them is the instruction the drain points at, when it points at one — a cap, a
- * pause, a size — rather than a fact about a ticker.
+ * The drain is the headline, in the largest type under the figures, because it is the one number a
+ * trader should carry away. The approved redesign draws the three as one band of cells divided by
+ * hairlines, like the figure strip above it, and on a phone folds them into one card: the drain, then
+ * the change with the rule simulator beside it. The engine is left off the phone — it is the first
+ * row of the breakdown it came from, one tap down.
  */
-export function PerformanceVerdict({
-  trades,
-  currency,
-  periodLabel,
-}: {
-  trades: Trade[];
-  currency: Currency;
-  periodLabel: string;
-}) {
-  const fmt = useMemo(() => (n: number) => formatCurrency(n, currency), [currency]);
-  const verdict = useMemo(() => performanceVerdict(trades, fmt), [trades, fmt]);
-  const { ref, revealProps } = useReveal();
-
-  if (!verdict || (!verdict.drain && !verdict.engine)) return null;
-
-  // A journal with nothing that lost leads with what made the money.
-  const headline: Finding = verdict.drain ?? verdict.engine!;
-  const second: Finding | null = verdict.drain ? verdict.engine : null;
-  const headlineLoss = headline.pnl < 0;
+export function PerformanceVerdict({ band, fmt, onOpenSimulator }: { band: VerdictBand; fmt: Fmt; onOpenSimulator?: () => void }) {
+  const { primary, secondary, change } = band;
+  const drain = primary.kind === 'drain';
+  const big = `${drain ? '' : '+'}${fmt(primary.pnl)}`;
+  const cells = 1 + (secondary ? 1 : 0) + (change ? 1 : 0);
+  const columns = cells === 3 ? 'grid-cols-[1.25fr_1fr_1fr]' : cells === 2 ? 'grid-cols-[1.25fr_1fr]' : 'grid-cols-1';
+  const simulate = change?.cap != null && onOpenSimulator;
 
   return (
-    <section
-      ref={ref}
-      {...revealProps}
-      aria-label="The verdict"
-      className="reveal panel-card spotlight p-4 md:p-6"
-    >
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium">
-          The verdict · {periodLabel}
-        </p>
-        <p className="text-[11px] text-text-secondary tabular-nums">
-          Net{' '}
-          <span className={`font-semibold ${verdict.net >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}>
-            {fmt(verdict.net)}
-          </span>{' '}
-          over {verdict.trades} trades
-        </p>
-      </div>
-
-      <div className="mt-3 grid gap-4 md:mt-4 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] md:gap-8">
-        <div className="min-w-0">
-          <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-text-secondary">
-            {headlineLoss ? (
-              <ArrowDownRight size={12} className="text-loss-bright" aria-hidden />
-            ) : (
-              <ArrowUpRight size={12} className="text-profit-bright" aria-hidden />
-            )}
-            {headlineLoss ? 'Where the money goes' : 'Where the money comes from'}
+    <>
+      {/* ── Desktop: three cells ── */}
+      <section
+        aria-label="The verdict"
+        className={`hidden gap-px overflow-hidden rounded-[14px] border border-white/[0.06] bg-white/[0.06] md:grid ${columns}`}
+      >
+        <div className="min-w-0 bg-bg-card px-[18px] py-4">
+          <p className="flex items-center gap-1.5 text-xs text-text-secondary">
+            {drain ? <ArrowDownRight size={12} aria-hidden /> : <ArrowUpRight size={12} aria-hidden />}
+            {drain ? 'Where the money goes' : 'Where the money comes from'}
           </p>
-          <p
-            className={`mt-1 text-4xl md:text-6xl font-extrabold tracking-tight tabular-nums leading-none ${
-              headlineLoss ? 'text-loss-bright' : 'text-profit-bright'
-            }`}
-          >
-            {headlineLoss ? '−' : '+'}
-            {fmt(Math.abs(headline.pnl))}
+          <p className={`mt-1.5 text-[34px] font-extrabold leading-[1.05] tracking-tight tabular-nums ${drain ? 'text-loss-bright' : 'text-profit-bright'}`}>
+            {big}
           </p>
-          <p className="mt-2 text-sm md:text-base text-text-primary leading-snug max-w-xl">
-            {headlineLoss ? verdict.lines.drain : verdict.lines.engine}
+          <p className="mt-2 text-[13px] leading-[1.45]">
+            {primary.sentence}
+            {primary.context && ` ${primary.context}`}
           </p>
         </div>
 
-        <div className="flex flex-col gap-3 min-w-0">
-          {second && (
-            <div>
-              <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-text-secondary">
-                <ArrowUpRight size={12} className="text-profit-bright" aria-hidden />
-                Where it comes from
-              </p>
-              <p className="mt-1 text-2xl md:text-3xl font-bold tabular-nums leading-none text-profit-bright">
-                +{fmt(second.pnl)}
-              </p>
-              <p className="mt-1.5 text-xs md:text-sm text-text-secondary leading-snug">{verdict.lines.engine}</p>
-            </div>
-          )}
+        {secondary && (
+          <div className="min-w-0 bg-bg-card px-[18px] py-4">
+            <p className="flex items-center gap-1.5 text-xs text-text-secondary">
+              <ArrowUpRight size={12} aria-hidden />
+              Where it comes from
+            </p>
+            <p className="mt-1.5 text-2xl font-bold leading-[1.05] tabular-nums text-profit-bright">+{fmt(secondary.pnl)}</p>
+            <p className="mt-2 text-[13px] leading-[1.45] text-text-secondary">{secondary.sentence}</p>
+          </div>
+        )}
 
-          {verdict.change && (
-            <div className="rounded-lg border border-accent/30 bg-accent/[0.06] px-3 py-2.5">
-              <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-accent">
-                <Lightbulb size={12} aria-hidden />
+        {change && (
+          <div className="min-w-0 bg-bg-card bg-gradient-to-b from-accent/[0.07] to-accent/[0.02] px-[18px] py-4">
+            <p className="flex items-center gap-1.5 text-xs text-accent">
+              <span aria-hidden>◆</span>
+              The one change
+            </p>
+            <p className="mt-1.5 text-2xl font-bold leading-[1.05]">{change.headline}</p>
+            <p className="mt-2 text-[13px] leading-[1.45] text-text-secondary">
+              <Parts parts={change.detail} />
+            </p>
+          </div>
+        )}
+      </section>
+
+      {/* ── Phone: one card ── */}
+      <section aria-label="The verdict" className="panel-card rounded-2xl p-4 md:hidden">
+        <p className="flex items-center gap-1.5 text-xs text-text-secondary">
+          {drain ? <ArrowDownRight size={12} aria-hidden /> : <ArrowUpRight size={12} aria-hidden />}
+          {drain ? 'Where the money goes' : 'Where the money comes from'}
+        </p>
+        <p className={`mt-1 text-[30px] font-extrabold tracking-tight tabular-nums ${drain ? 'text-loss-bright' : 'text-profit-bright'}`}>{big}</p>
+        <p className="mt-1 text-sm leading-[1.4] text-text-secondary">{primary.sentence}</p>
+        {change && (
+          <div className="mt-3.5 flex items-center gap-3 border-t border-white/[0.07] pt-3">
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-1.5 text-xs text-accent">
+                <span aria-hidden>◆</span>
                 The one change
               </p>
-              <p className="mt-1 text-xs md:text-sm text-text-primary leading-snug">{verdict.change.text}</p>
+              <p className="mt-1 text-sm font-semibold leading-[1.4]">
+                <Parts parts={change.phone} />
+              </p>
             </div>
-          )}
-        </div>
-      </div>
-    </section>
+            {simulate && (
+              <button type="button" onClick={onOpenSimulator} className="btn-primary h-9 shrink-0 px-3.5 text-[13px] font-bold focus-ring">
+                Simulate
+              </button>
+            )}
+          </div>
+        )}
+      </section>
+    </>
   );
 }

@@ -50,8 +50,15 @@ describe('the app’s screens', () => {
     'src/components/account/AccountScreen.tsx',
   ];
 
-  it('all render through PageFrame', () => {
-    const off = SCREENS.filter((f) => !readFileSync(f, 'utf8').includes('<PageFrame'));
+  /*
+   * Performance draws the approved redesign's toolbar — title, journal and period, stepper, Month /
+   * Year / All time, Filter, Export on one line — as the Overview does, and PageFrame's header is a
+   * title block with actions on the right. It still never caps its width, which the next test holds.
+   */
+  const OWN_TOOLBAR = ['src/components/PerformanceContent.tsx'];
+
+  it('all render through PageFrame, apart from the screens that draw the redesign’s toolbar', () => {
+    const off = SCREENS.filter((f) => !OWN_TOOLBAR.includes(f) && !readFileSync(f, 'utf8').includes('<PageFrame'));
     expect(off).toEqual([]);
   });
 
