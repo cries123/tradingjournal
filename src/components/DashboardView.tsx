@@ -33,6 +33,8 @@ interface DashboardViewProps {
   filterSetups: string[];
   onFiltersChange: (filters: Filters) => void;
   onDayClick: (date: string) => void;
+  /** Opens one trade from the trade log. Without it, a trade's row opens its day. */
+  onTradeClick?: (trade: Trade) => void;
   onPrevMonth: () => void;
   onNextMonth: () => void;
   /** Kept for callers; the period is stepped with the toolbar's arrows. */
@@ -94,6 +96,7 @@ export function DashboardView({
   filterSetups,
   onFiltersChange,
   onDayClick,
+  onTradeClick,
   onPrevMonth,
   onNextMonth,
   onPrevYear,
@@ -314,6 +317,7 @@ export function DashboardView({
                   ruleTrades={ruleTrades}
                   ruleDates={ruleDates}
                   onDayClick={onDayClick}
+                  onTradeClick={onTradeClick}
                   onAllTrades={onAllTrades}
                   periodName={monthName}
                 />

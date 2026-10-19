@@ -397,6 +397,16 @@ with the junction still in place can delete through it into the real `node_modul
 - Trial emails key on `trialEndsAt`, written by the webhook on a "trialing" signal. The daily
   trial-nudges run also asks Creem once per paying account whether it is a trial the webhook missed
   (`server/trialBackfill.ts`).
+- **Every plan has the 7-day free trial (October 2026)**, set on each plan's monthly Creem product.
+  `TRIAL_TIERS` in `src/config/trial.ts` lists them. Creem gives a product's trial to every new
+  subscription and a checkout cannot opt out. So one trial per person is enforced at checkout:
+  `planCheckoutTrial` (`server/checkoutTrial.ts`) sends anyone `trialEligibility` refuses to the
+  plan's no-trial copy (`CREEM_PRODUCT_*_NO_TRIAL`). Until a copy exists, that plan's checkouts all
+  get the trial, as Silver always did. `trialProducts` in the Ops report asks Creem whether all six
+  products match what the site promises. The server side shipped first. The pricing page and the
+  locked-feature cards still advertise only Silver's trial, and that front-end change is being made
+  in another session. `StartTrialButton` needs a `tier` prop, and `tier === TRIAL_TIER` checks become
+  `hasTrial(tier)`.
 - Rule-by-rule playbook results are still not in the assistant's facts.
 - The assistant prompt says nothing about general knowledge, so a plain "what does assignment mean"
   is undefined — it may answer from memory or deflect. Company research is deliberately NOT wanted:

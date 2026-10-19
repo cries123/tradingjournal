@@ -10,9 +10,9 @@ In the Creem dashboard, create one **recurring monthly** product per plan:
 
 | Plan    | Price | Env var to paste its product id into |
 | ------- | ----- | ------------------------------------ |
-| Silver  | $5    | `CREEM_PRODUCT_SILVER`               |
-| Gold    | $10   | `CREEM_PRODUCT_GOLD`                 |
-| Diamond | $25   | `CREEM_PRODUCT_DIAMOND`              |
+| Silver  | $9    | `CREEM_PRODUCT_SILVER`               |
+| Gold    | $19   | `CREEM_PRODUCT_GOLD`                 |
+| Diamond | $39   | `CREEM_PRODUCT_DIAMOND`              |
 
 The price shown on the pricing page comes from `src/config/tiers.ts`, not from
 Creem — if you change a price in Creem, change it there too or the page will lie.
@@ -78,6 +78,35 @@ audit log records every grant.
 To find who's affected: they're the users with broker-synced trades — the user
 list shows trade counts, and a user's detail modal shows their connection.
 
+## The free trial (every plan)
+
+Each plan's monthly product carries a **7-day free trial** in Creem (product →
+Trial period → 7 days → Free). The card is taken at checkout; on day 8 Creem
+charges that product's price, so the product must be priced exactly like the
+plan. `TRIAL_DAYS` in `src/config/trial.ts` is the number the site promises; the
+two must agree.
+
+Creem gives the trial to **every** new subscription of a product that has one,
+and a checkout cannot opt out. So "one trial per person" needs a second product
+per plan with the trial **off**, for anyone who has already had one:
+
+| Plan    | Price | Trial | Env var                          |
+| ------- | ----- | ----- | -------------------------------- |
+| Silver  | $9    | off   | `CREEM_PRODUCT_SILVER_NO_TRIAL`  |
+| Gold    | $19   | off   | `CREEM_PRODUCT_GOLD_NO_TRIAL`    |
+| Diamond | $39   | off   | `CREEM_PRODUCT_DIAMOND_NO_TRIAL` |
+
+Name them like the plans (buyers see the name on their receipt). Checkout asks
+the server whether the account may still have a trial (`trialEligibility`: the
+account, and the email with `+aliases` and Gmail dots collapsed) and sells the
+no-trial copy to anyone refused (`server/checkoutTrial.ts`). An unconfirmed
+email is asked to confirm rather than charged. A plan without its copy behaves
+as before: every checkout gets the trial.
+
+The admin Ops data (`trialProducts`, from `server/trialProductCheck.ts`) asks
+Creem for all six products and names anything that disagrees with the site: no
+trial, the wrong length, a paid trial, the wrong price, not monthly, or a trial
+left on a no-trial copy. `/api/payments-status` reports `repeatTrialsBlocked`.
 ## How the pieces fit
 
 - `src/config/tiers.ts` — the only place limits and prices are written down.

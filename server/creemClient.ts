@@ -79,6 +79,27 @@ export function annualBillingReady(): boolean {
   });
 }
 
+/**
+ * The monthly product with no free trial, for somebody who has already had one, or null when it
+ * has not been set up (see noTrialProductIdEnv in tiers.ts).
+ *
+ * An id that is also one of the regular products is refused rather than used: pasted into the
+ * wrong variable, it would send a returning customer to a product that still carries the trial,
+ * and the configuration would look finished while blocking nothing.
+ */
+export function noTrialProductIdForTier(tier: Tier): string | null {
+  const envName = TIER_PLANS[tier].noTrialProductIdEnv;
+  const id = envName ? process.env[envName]?.trim() || null : null;
+  if (!id) return null;
+  const regular = PAID_TIERS.some((t) => productIdForTier(t, 'month') === id || productIdForTier(t, 'year') === id);
+  return regular ? null : id;
+}
+
+/** Whether every paid plan has its no-trial copy, so nobody can take a second trial on any of them. */
+export function repeatTrialsBlocked(): boolean {
+  return PAID_TIERS.every((tier) => noTrialProductIdForTier(tier) !== null);
+}
+
 /** Which plan and interval a webhook's product id refers to. */
 export function productForId(
   productId: string | undefined | null,
@@ -88,6 +109,10 @@ export function productForId(
     for (const tier of Object.keys(TIER_PLANS) as Tier[]) {
       if (productIdForTier(tier, interval) === productId) return { tier, interval };
     }
+  }
+  // The no-trial copies are the same monthly plans, so a subscription to one is that plan.
+  for (const tier of PAID_TIERS) {
+    if (noTrialProductIdForTier(tier) === productId) return { tier, interval: 'month' };
   }
   return null;
 }
@@ -104,6 +129,24 @@ export interface CreateCheckoutArgs {
   uid: string;
   email?: string;
   successUrl: string;
+  /**
+   * False for somebody who has already had a free trial: a monthly checkout then goes to the plan's
+   * no-trial copy, when there is one. Absent means a trial may be given, which is how every
+   * checkout behaved before the copies existed.
+   */
+  trial?: boolean;
+}
+
+/**
+ * The product a new checkout should sell: the plan's own, or its no-trial copy for a returning
+ * customer. Pure, so the choice can be tested without a payment API.
+ *
+ * Yearly products carry no trial, so they are never swapped.
+ */
+export function checkoutProductId(tier: Tier, interval: BillingInterval, trial: boolean): string | null {
+  if (interval === 'year') return annualBillingReady() ? productIdForTier(tier, 'year') : null;
+  if (!trial) return noTrialProductIdForTier(tier) ?? productIdForTier(tier, 'month');
+  return productIdForTier(tier, 'month');
 }
 
 /**
@@ -121,7 +164,7 @@ export async function createCheckout(args: CreateCheckoutArgs): Promise<{ url: s
 
   const interval = args.interval ?? 'month';
   // Yearly is all-or-nothing (see annualBillingReady), so one plan's yearly id alone does not open it.
-  const productId = interval === 'year' && !annualBillingReady() ? null : productIdForTier(args.tier, interval);
+  const productId = checkoutProductId(args.tier, interval, args.trial !== false);
   if (!productId) {
     throw new CreemError(
       interval === 'year'
@@ -209,6 +252,54 @@ export async function getSubscription(
   } catch {
     throw new CreemError('Payment provider returned an unreadable response.', 502);
   }
+}
+
+/** What the trial check needs to know about a Creem product. Prices are in cents. */
+export interface CreemProductFacts {
+  price: number | null;
+  recurringInterval: string | null;
+  trialPeriodDays: number | null;
+  trialPrice: number | null;
+  status: string | null;
+}
+
+/**
+ * One product, as Creem holds it now. Read-only.
+ *
+ * For the admin check that each plan's trial is what the site promises: TRIAL_DAYS lives in this
+ * codebase and the trial lives on the Creem product, and until now nothing compared the two.
+ *
+ * The documented path is /products/{id}; the query form is what this API used for everything else
+ * here (subscriptions), so it is tried when the path form is not found.
+ */
+export async function getProductFacts(productId: string): Promise<CreemProductFacts> {
+  if (!CREEM_CONFIGURED) {
+    throw new CreemError('Payments are not configured yet.', 503);
+  }
+  const headers = { 'x-api-key': CREEM_API_KEY };
+  let res = await fetch(`${CREEM_BASE_URL}/products/${encodeURIComponent(productId)}`, { headers });
+  if (res.status === 404 || res.status === 400) {
+    res = await fetch(`${CREEM_BASE_URL}/products?product_id=${encodeURIComponent(productId)}`, { headers });
+  }
+  const text = await res.text();
+  if (!res.ok) {
+    throw new CreemError('Could not read the product.', 502, `Creem returned ${res.status}: ${text.slice(0, 300)}`);
+  }
+  let raw: Record<string, unknown>;
+  try {
+    raw = JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    throw new CreemError('Payment provider returned an unreadable response.', 502);
+  }
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  const str = (v: unknown) => (typeof v === 'string' ? v : null);
+  return {
+    price: num(raw.price),
+    recurringInterval: str(raw.recurring_interval),
+    trialPeriodDays: num(raw.trial_period_days),
+    trialPrice: num(raw.trial_price),
+    status: str(raw.status),
+  };
 }
 
 /** Shared plumbing for the authenticated Creem calls that aren't checkout. */

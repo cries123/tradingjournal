@@ -5,6 +5,7 @@ import { DashboardView } from '../components/DashboardView';
 import { DashboardSkeleton } from '../components/DashboardSkeleton';
 import { DayContent } from '../components/day/DayContent';
 import { DaySheet } from '../components/day/DaySheet';
+import { TradeSheet } from '../components/trades/TradeSheet';
 import { TradesContent } from '../components/trades/TradesContent';
 import { MobileBottomNav, MobileHeader } from '../components/MobileNav';
 import { MoreContent } from '../components/more/MoreContent';
@@ -140,6 +141,9 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   const [tradeModalDate, setTradeModalDate] = useState<string | undefined>();
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  /** The trade opened from the Overview's trade log. An id, so the sheet shows the trade as saved after an edit. */
+  const [openTradeId, setOpenTradeId] = useState<string | null>(null);
+  const openTrade = openTradeId ? (allTrades.find((t) => t.id === openTradeId) ?? null) : null;
   const [clearConfirmStage, setClearConfirmStage] = useState<0 | 1 | 2>(0);
   const [clearError, setClearError] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(() => !hasCompletedOnboarding());
@@ -336,8 +340,6 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
           {...sidebarActions}
           onSearch={() => setSearchOpen(true)}
           trades={everyTrade}
-          year={year}
-          month={month}
           hasBrokerTrades={hasBrokerTrades}
         />
       )}
@@ -597,6 +599,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                   filterSetups={filterSetups}
                   onFiltersChange={setFilters}
                   onDayClick={openDay}
+                  onTradeClick={(trade) => setOpenTradeId(trade.id)}
                   onPrevMonth={handlePrevMonth}
                   onNextMonth={handleNextMonth}
                   onMonthChange={handleMonthChange}
@@ -727,6 +730,21 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
           // assignment and the Firestore batching are all the ones already in use. The modal awaits
           // it and closes itself on success; on failure it stays open with the preview intact.
           onSave={(imported) => addTrades(imported)}
+        />
+      )}
+
+      {openTrade && (
+        <TradeSheet
+          trade={openTrade}
+          ruleTrades={activeJournalTrades}
+          covered={showTradeModal}
+          onClose={() => setOpenTradeId(null)}
+          onOpenDay={(date) => {
+            setOpenTradeId(null);
+            openDay(date);
+          }}
+          onEdit={openEditTrade}
+          onDelete={deleteTrade}
         />
       )}
 

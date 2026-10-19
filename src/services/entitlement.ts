@@ -112,8 +112,18 @@ export type PlanChoiceResult =
   | { kind: 'checkout'; url: string }
   | { kind: 'changed'; tier: Tier; message: string };
 
-/** Buys a plan, or moves an existing subscription onto it. The server decides which. */
-export async function choosePlan(tier: Tier, interval: BillingInterval = 'month'): Promise<PlanChoiceResult> {
+/**
+ * Buys a plan, or moves an existing subscription onto it. The server decides which.
+ *
+ * `trial: false` buys it without the free trial, paying from today. The server only honors it for
+ * a plan whose no-trial product exists (payments-status `noTrialProducts`); elsewhere the checkout
+ * still carries Creem's trial.
+ */
+export async function choosePlan(
+  tier: Tier,
+  interval: BillingInterval = 'month',
+  options: { trial?: boolean } = {},
+): Promise<PlanChoiceResult> {
   if (!isFirebaseConfigured()) throw new Error('Sign in to upgrade your plan.');
   const user = getFirebaseAuth().currentUser;
   if (!user) throw new Error('Sign in to upgrade your plan.');
@@ -122,7 +132,7 @@ export async function choosePlan(tier: Tier, interval: BillingInterval = 'month'
   const res = await fetch('/api/creem-checkout', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tier, interval }),
+    body: JSON.stringify({ tier, interval, ...(options.trial === false ? { trial: false } : {}) }),
   });
 
   const data = (await res.json()) as {

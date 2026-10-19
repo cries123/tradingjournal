@@ -6,8 +6,12 @@ import {
   createCheckout,
   CreemError,
   CREEM_CONFIGURED,
+  noTrialProductIdForTier,
   productIdForTier,
 } from '../../server/creemClient';
+import { planCheckoutTrial } from '../../server/checkoutTrial';
+import { trialEligibility } from '../../server/trialHandler';
+import type { TrialDecision } from '../../src/config/trial';
 import { isProtectedGrant, readEntitlement, writeEntitlement } from '../../server/entitlements';
 import { planChangeRoute } from '../../server/planChangeRoute';
 import { readCheckoutStatus } from '../../server/checkoutStatus';
@@ -81,9 +85,9 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
     };
   }
 
-  let body: { tier?: unknown; interval?: unknown };
+  let body: { tier?: unknown; interval?: unknown; trial?: unknown };
   try {
-    body = JSON.parse(event.body || '{}') as { tier?: unknown; interval?: unknown };
+    body = JSON.parse(event.body || '{}') as { tier?: unknown; interval?: unknown; trial?: unknown };
   } catch {
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON body' }) };
   }
@@ -240,6 +244,31 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
     event.headers.origin ||
     'https://trendchasers.net';
 
+  /*
+   * One free trial per person, across every plan. Creem puts the trial on every new subscription of
+   * a product that has one, so a returning customer is sent to the plan's no-trial copy instead —
+   * see planCheckoutTrial for the rule and for why a failed check still gives the trial.
+   */
+  // `trial: false` is the buyer choosing to start paying now. Only an explicit false: every client
+  // before the choice existed sends nothing, and meant the trial.
+  const wantsTrial = body.trial !== false;
+  let decision: TrialDecision | null = null;
+  if (wantsTrial) {
+    try {
+      decision = (await trialEligibility(uid, Date.now())).decision;
+    } catch (err) {
+      console.warn('[creem-checkout] trial eligibility check failed; giving the trial:', err);
+    }
+  }
+  const trialPlan = planCheckoutTrial(decision, tier, interval, noTrialProductIdForTier(tier) !== null, wantsTrial);
+  if (trialPlan.action === 'confirm-email') {
+    return {
+      statusCode: 409,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: trialPlan.message }),
+    };
+  }
+
   try {
     const checkout = await createCheckout({
       tier,
@@ -247,6 +276,7 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
       uid,
       email,
       successUrl: `${origin}/pricing?checkout=success&plan=${tier}`,
+      trial: trialPlan.trial,
     });
     return {
       statusCode: 200,

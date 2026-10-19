@@ -8,6 +8,7 @@ import { readEmailsTo, readRecentEmails, type EmailLogEntry } from './emailLog';
 import { readLatestJobRuns } from './jobRuns';
 import { isMailConfigured } from './mailer';
 import { readSyncFeed, type SyncFeedRow } from './syncFeed';
+import { readTrialProductCheck, type TrialPlanCheck } from './trialProductCheck';
 import { JOBS, type JobRun, type JobSpec } from '../src/utils/jobSchedule';
 
 /**
@@ -34,15 +35,22 @@ export interface AdminOpsReport {
   billingEvents: BillingEventRecord[];
   emails: EmailLogEntry[];
   mailConfigured: boolean;
+  /**
+   * Each plan's Creem products against what the site promises about the free trial: null when
+   * payments are not configured. See trialProductCheck.ts.
+   */
+  trialProducts: TrialPlanCheck[] | null;
   generatedAt: string;
 }
 
 export async function readOpsReport(): Promise<AdminOpsReport> {
-  const [runs, syncFeed, billingEvents, emails] = await Promise.all([
+  const [runs, syncFeed, billingEvents, emails, trialProducts] = await Promise.all([
     readLatestJobRuns(),
     readSyncFeed(),
     readRecentBillingEvents(),
     readRecentEmails(),
+    // Never fails the tab: a product Creem would not return is named as a problem inside the check.
+    readTrialProductCheck().catch(() => null),
   ]);
   return {
     jobs: JOBS.map((spec, i) => ({ spec, last: runs[i] ?? null })),
@@ -50,6 +58,7 @@ export async function readOpsReport(): Promise<AdminOpsReport> {
     billingEvents,
     emails,
     mailConfigured: isMailConfigured(),
+    trialProducts,
     generatedAt: new Date().toISOString(),
   };
 }

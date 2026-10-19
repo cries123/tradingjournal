@@ -368,6 +368,7 @@ describe('dialogs play out instead of vanishing', () => {
     'src/components/analytics/AssistantDock.tsx',
     'src/components/AnnouncementModal.tsx',
     'src/components/day/DaySheet.tsx',
+    'src/components/trades/TradeSheet.tsx',
   ];
 
   it('route every way out through the exit animation', () => {
