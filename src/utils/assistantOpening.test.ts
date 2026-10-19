@@ -134,6 +134,44 @@ describe('openingFindings', () => {
   });
 });
 
+describe('a finding as a starting point', () => {
+  /*
+   * The Assistant page leads each starting point with one number and the rest of the sentence
+   * after it — "23 pts" + "short of the win rate your payoff needs". The number is the same one the
+   * detail quotes, so the card and the dock can never disagree.
+   */
+  const only = (over: Partial<JournalFacts>) => openingFindings(facts(over))[0];
+
+  it('states a breakeven gap as a distance in points', () => {
+    const short = only({ breakeven: { winRate: 39.9, requiredWinRate: 47.2, gap: -7.3, avgWin: 412, avgLoss: 286, payoff: 1.44, sample: 400 } });
+    expect([short.figure, short.lead]).toEqual(['7.3 pts', 'short of the win rate your payoff needs']);
+    const clear = only({ breakeven: { winRate: 55, requiredWinRate: 48, gap: 7, avgWin: 300, avgLoss: 250, payoff: 1.2, sample: 100 } });
+    expect([clear.figure, clear.lead]).toEqual(['7 pts', 'clear of the win rate your payoff needs']);
+  });
+
+  it('gives the trades past the limits what they made between them, with its sign', () => {
+    // difference is simulated − actual, so the removed trades made −difference. A saving of $4,000
+    // means those trades lost $4,000; a cost of $600 means they made $600.
+    const sim = { actualPnl: 0, simulatedPnl: 0, daysChanged: 12, tradingDays: 60, tradesRemoved: 40, winnersGivenUp: 2000, lossesAvoided: 6000 };
+    const helped = only({ ruleSimulation: { ...sim, difference: 4000 } });
+    expect([helped.figure, helped.lead]).toEqual(['-$4,000', 'came from trades past your own limits']);
+    const cost = only({ ruleSimulation: { ...sim, difference: -600 } });
+    expect(cost.figure).toBe('+$600');
+  });
+
+  it('leads tilt, sizing and costs with their own numbers', () => {
+    expect(only({ tilt: { afterLossAvg: -80, afterWinAvg: 20, delta: -100, afterLossCount: 50, afterWinCount: 40 } }).figure).toBe('$100');
+    expect(only({ sizing: { ratio: 1.8, avgWinnerSize: 1000, avgLoserSize: 1800, biggestQuarterPerTrade: -300, restPerTrade: -40, sample: 200 } }).figure).toBe('1.8x');
+    expect(only({ costs: { fees: 4200, perTrade: 10.5, shareOfGross: 31, sample: 400 } }).figure).toBe('31%');
+  });
+
+  it('has no figure where the finding has no single number, and says it in words', () => {
+    const hold = only({ holdTime: { holdsLosersLonger: true } as JournalFacts['holdTime'] });
+    expect(hold.figure).toBeNull();
+    expect(hold.lead).toBe(hold.headline);
+  });
+});
+
 let seq = 0;
 const trade = (date: string, pnl: number): Trade =>
   ({ id: `t${seq++}`, date, symbol: 'SPY', pnl }) as Trade;

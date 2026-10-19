@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   appendToThread,
   EMPTY_STORE,
+  groupThreads,
   MAX_MESSAGES_PER_THREAD,
   MAX_THREADS,
   migrateLegacyThread,
@@ -10,6 +11,8 @@ import {
   pruneMessages,
   relativeAge,
   removeThread,
+  searchThreads,
+  threadSource,
   titleFor,
   upsertThread,
   type AssistantThread,
@@ -238,5 +241,124 @@ describe('relativeAge', () => {
 
   it('does not report a clock skew as a negative age', () => {
     expect(relativeAge(now + 60_000, now)).toBe('just now');
+  });
+});
+
+describe('answer sources', () => {
+  it('survive a reload, so an old answer still says which period it saw', () => {
+    const store = parseStore({
+      threads: [
+        {
+          id: 'a',
+          title: 'Why red?',
+          messages: [
+            { role: 'user', content: 'Why red?', at: 1 },
+            { role: 'assistant', content: 'Because.', at: 2, source: { period: 'September 2026', trades: 26 } },
+            { role: 'assistant', content: 'And vs the year.', at: 3, source: { period: 'September 2026', trades: 26, compare: '2026' } },
+          ],
+        },
+      ],
+      activeId: 'a',
+    });
+    expect(store.threads[0].messages[1].source).toEqual({ period: 'September 2026', trades: 26 });
+    expect(store.threads[0].messages[2].source).toEqual({ period: 'September 2026', trades: 26, compare: '2026' });
+  });
+
+  it('drop a malformed source and keep the message', () => {
+    // A bad source must never cost somebody the answer it was attached to.
+    const store = parseStore({
+      threads: [
+        {
+          id: 'a',
+          messages: [
+            { role: 'assistant', content: 'One.', at: 1, source: { period: '', trades: 3 } },
+            { role: 'assistant', content: 'Two.', at: 2, source: { period: 'May 2026', trades: -1 } },
+            { role: 'assistant', content: 'Three.', at: 3, source: 'May 2026' },
+          ],
+        },
+      ],
+    });
+    expect(store.threads[0].messages.map((m) => m.content)).toEqual(['One.', 'Two.', 'Three.']);
+    expect(store.threads[0].messages.every((m) => m.source === undefined)).toBe(true);
+  });
+
+  it('are only read from answers', () => {
+    const store = parseStore({
+      threads: [{ id: 'a', messages: [{ role: 'user', content: 'Q', at: 1, source: { period: 'May 2026', trades: 3 } }] }],
+    });
+    expect(store.threads[0].messages[0].source).toBeUndefined();
+  });
+
+  it('name the conversation after its latest answer’s period', () => {
+    const t = thread('a', {
+      messages: [
+        { ...msg('assistant', 'A'), source: { period: '2026', trades: 200 } },
+        msg('user', 'Q'),
+        { ...msg('assistant', 'B'), source: { period: 'September 2026', trades: 26 } },
+        msg('user', 'Q2'),
+      ],
+    });
+    expect(threadSource(t)).toEqual({ period: 'September 2026', trades: 26 });
+    expect(threadSource(thread('b', { messages: [msg('user', 'Q')] }))).toBeNull();
+  });
+});
+
+describe('groupThreads', () => {
+  /*
+   * Every time below is built from local calendar parts, so the groups must come out the same in
+   * any time zone — and the loop is what proves it: the machine that runs this suite is on UTC,
+   * which is how a day-boundary bug survived here once before.
+   */
+  const ZONES = ['UTC', 'America/New_York', 'Asia/Tokyo', 'Pacific/Auckland'];
+
+  it('splits Today, This week and Earlier on the reader’s own calendar day', () => {
+    const original = process.env.TZ;
+    try {
+      for (const zone of ZONES) {
+        process.env.TZ = zone;
+        const now = new Date(2026, 9, 19, 9, 0).getTime();
+        const at = (d: number, h: number) => new Date(2026, 9, d, h, 0).getTime();
+        const threads = [
+          thread('morning', { updatedAt: at(19, 0) + 30 * 60_000 }),
+          // Ten hours ago, but yesterday: not "today" at 9 a.m.
+          thread('last-night', { updatedAt: at(18, 23) }),
+          thread('friday', { updatedAt: at(16, 15) }),
+          thread('old', { updatedAt: at(11, 9) - 60_000 }),
+        ];
+        const groups = groupThreads(threads, now);
+        expect(groups.map((g) => [g.label, g.threads.map((t) => t.id)]), zone).toEqual([
+          ['Today', ['morning']],
+          ['This week', ['last-night', 'friday']],
+          ['Earlier', ['old']],
+        ]);
+      }
+    } finally {
+      process.env.TZ = original;
+    }
+  });
+
+  it('leaves out a group with nothing in it and keeps the list’s own order', () => {
+    const now = new Date(2026, 9, 19, 9, 0).getTime();
+    const groups = groupThreads([thread('b', { updatedAt: now - 1000 }), thread('a', { updatedAt: now - 5000 })], now);
+    expect(groups).toEqual([{ label: 'Today', threads: [expect.objectContaining({ id: 'b' }), expect.objectContaining({ id: 'a' })] }]);
+  });
+});
+
+describe('searchThreads', () => {
+  const threads = [
+    thread('orb', { title: 'Why is ORB losing?', messages: [msg('user', 'Why is ORB losing?')] }),
+    thread('red', { title: 'Why did September go red?', messages: [msg('assistant', 'Mostly the 4th trade of the day.')] }),
+  ];
+
+  it('finds a conversation by its title, ignoring case', () => {
+    expect(searchThreads(threads, 'orb').map((t) => t.id)).toEqual(['orb']);
+  });
+
+  it('finds one by what the answer said, which is what people remember', () => {
+    expect(searchThreads(threads, '4TH TRADE').map((t) => t.id)).toEqual(['red']);
+  });
+
+  it('returns everything for an empty search', () => {
+    expect(searchThreads(threads, '   ').map((t) => t.id)).toEqual(['orb', 'red']);
   });
 });

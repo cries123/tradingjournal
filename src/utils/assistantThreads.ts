@@ -19,11 +19,29 @@
 
 export type ThreadRole = 'user' | 'assistant';
 
+/**
+ * What an answer was worked out from: the period it was handed and how many trades were in it.
+ *
+ * Recorded when the answer lands, because by the time somebody reopens the conversation the
+ * period on screen may be a different one — and "From your journal · September 2026 · 26 trades"
+ * under an answer is only worth printing if it is the period that answer actually saw. Optional:
+ * conversations saved before this was recorded simply have no source line.
+ */
+export interface AnswerSource {
+  /** The period as the screen named it: "September 2026", "2026", "All time". */
+  period: string;
+  trades: number;
+  /** The second period, when the question was asked with Compare on. */
+  compare?: string;
+}
+
 export interface ThreadMessage {
   role: ThreadRole;
   content: string;
   /** Epoch ms. Only used for ordering and the "2 days ago" label. */
   at: number;
+  /** Assistant turns only. */
+  source?: AnswerSource;
 }
 
 export interface AssistantThread {
@@ -137,13 +155,28 @@ function isMessage(value: unknown): value is ThreadMessage {
   return (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string';
 }
 
+/** A stored source, or nothing — a malformed one is dropped, never allowed to break the thread. */
+function readSource(value: unknown): AnswerSource | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const s = value as Partial<AnswerSource>;
+  if (typeof s.period !== 'string' || !s.period.trim()) return undefined;
+  if (typeof s.trades !== 'number' || !Number.isFinite(s.trades) || s.trades < 0) return undefined;
+  return typeof s.compare === 'string' && s.compare.trim()
+    ? { period: s.period, trades: s.trades, compare: s.compare }
+    : { period: s.period, trades: s.trades };
+}
+
 function readMessages(value: unknown): ThreadMessage[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(isMessage).map((m) => ({
-    role: m.role,
-    content: m.content,
-    at: typeof m.at === 'number' && Number.isFinite(m.at) ? m.at : 0,
-  }));
+  return value.filter(isMessage).map((m) => {
+    const source = m.role === 'assistant' ? readSource(m.source) : undefined;
+    return {
+      role: m.role,
+      content: m.content,
+      at: typeof m.at === 'number' && Number.isFinite(m.at) ? m.at : 0,
+      ...(source ? { source } : {}),
+    };
+  });
 }
 
 /**
@@ -201,6 +234,61 @@ export function migrateLegacyThread(raw: unknown, id: string, now: number): Thre
     messages: pruneMessages(messages),
   };
   return { threads: [thread], activeId: id };
+}
+
+/** The period the conversation's latest answer was about, or null before it has one. */
+export function threadSource(thread: AssistantThread): AnswerSource | null {
+  for (let i = thread.messages.length - 1; i >= 0; i--) {
+    const source = thread.messages[i].source;
+    if (source) return source;
+  }
+  return null;
+}
+
+export type ThreadGroupLabel = 'Today' | 'This week' | 'Earlier';
+
+/** How far back "This week" reaches: the last seven days, not the calendar week. */
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * The conversation list in the three groups the design names: Today, This week, Earlier.
+ *
+ * Today is the reader's own calendar day, not the last 24 hours — something asked at 11 p.m.
+ * is not "today" at 9 the next morning. This week is the seven days before that, rather than the
+ * calendar week, so on a Monday it still holds Friday. Order inside each group is the list's own
+ * (most recently used first), which keeps a row from jumping while somebody reads.
+ */
+export function groupThreads(
+  threads: readonly AssistantThread[],
+  now: number,
+): { label: ThreadGroupLabel; threads: AssistantThread[] }[] {
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const today = startOfToday.getTime();
+
+  const groups: Record<ThreadGroupLabel, AssistantThread[]> = { Today: [], 'This week': [], Earlier: [] };
+  for (const t of threads) {
+    const label: ThreadGroupLabel =
+      t.updatedAt >= today ? 'Today' : now - t.updatedAt < WEEK_MS ? 'This week' : 'Earlier';
+    groups[label].push(t);
+  }
+  return (['Today', 'This week', 'Earlier'] as const)
+    .filter((label) => groups[label].length > 0)
+    .map((label) => ({ label, threads: groups[label] }));
+}
+
+/**
+ * Conversations whose title or any turn mentions the search, ignoring case.
+ *
+ * The turns as well as the title, because the title is only the opening question and what
+ * somebody remembers is usually the answer — "the one where it said ORB was losing".
+ */
+export function searchThreads(threads: readonly AssistantThread[], query: string): AssistantThread[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [...threads];
+  return threads.filter(
+    (t) => t.title.toLowerCase().includes(q) || t.messages.some((m) => m.content.toLowerCase().includes(q)),
+  );
 }
 
 /** "Just now" / "3h ago" / "Mar 4" — the age of a conversation, at list density. */

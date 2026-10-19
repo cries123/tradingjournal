@@ -305,13 +305,16 @@ describe('AssistantContent', () => {
     { scope: 'year' as const, label: '2026', trades: syncedJournal() },
   ];
 
-  it('paints the portal with an empty history', () => {
+  it('paints the three columns with an empty history', () => {
     const html = paint(createElement(AssistantContent, { periods, onBack: noop }));
 
-    expect(html).toContain('Trading assistant');
+    expect(html).toContain('>Assistant</h1>');
+    expect(html).toContain("Reviews your own trades with your journal's figures");
     expect(html).toContain('New chat');
-    expect(html).toContain('History');
+    expect(html).toContain('Search conversations');
+    expect(html).toContain('Conversations you have are saved here');
     expect(html).toContain('Questions left today');
+    expect(html).toContain('What it can see');
   });
 
   it('paints with no trades at all', () => {

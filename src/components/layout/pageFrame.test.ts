@@ -38,7 +38,6 @@ describe('the app’s screens', () => {
   const SCREENS = [
     'src/components/PerformanceContent.tsx',
     'src/components/simulator/RuleSimulatorContent.tsx',
-    'src/components/analytics/AssistantContent.tsx',
     'src/components/trackRecord/TrackRecordContent.tsx',
     'src/components/SettingsPage.tsx',
     'src/components/brokers/BrokerConnectContent.tsx',
@@ -69,6 +68,14 @@ describe('the app’s screens', () => {
       /className="max-w-[^"]*mx-auto p-4 md:p-6/.test(readFileSync(f, 'utf8')),
     );
     expect(capped).toEqual([]);
+  });
+
+  it('the Assistant, drawn to its approved design, still keeps no width of its own', () => {
+    // It has the design's own header (a title and a line beside it, like the Overview's) rather
+    // than PageFrame's, so it is not in the list above — but it must not cap its width either.
+    const source = readFileSync('src/components/analytics/AssistantContent.tsx', 'utf8');
+    expect(source).not.toMatch(/className="max-w-[^"]*mx-auto/);
+    expect(source).toContain('<h1 className="text-lg font-bold">Assistant</h1>');
   });
 
   it('are wrapped as in-app by the journal shell', () => {
