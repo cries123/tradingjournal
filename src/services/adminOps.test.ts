@@ -154,6 +154,13 @@ describe('recording a scheduled run', () => {
     expect(listCollection('jobRuns/auto-sync/history')).toHaveLength(1);
   });
 
+  it('records a 5xx answer as a failed run, with the status and what the body said', async () => {
+    const wrapped = recordedJob('sync-health', async () => ({ statusCode: 500, body: 'sync-health failed' }));
+    const result = await wrapped({} as never, {} as never);
+    expect(result.statusCode).toBe(500);
+    expect(store.get('jobRuns/sync-health')).toMatchObject({ ok: false, error: 'HTTP 500: sync-health failed', summary: null });
+  });
+
   it('records a throw as a failed run and rethrows it', async () => {
     const wrapped = recordedJob('weekly-recap', async () => {
       throw new Error('mailbox full');
