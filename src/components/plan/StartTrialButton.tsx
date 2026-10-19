@@ -23,6 +23,12 @@ interface StartTrialButtonProps {
   viaPricing?: boolean;
   /** The plan being trialled. Every paid plan carries the trial (TRIAL_TIERS); Silver where unsaid. */
   tier?: Tier;
+  /**
+   * Offer to buy the plan outright instead, paying from today. Only where the plan's no-trial
+   * product exists (canSkipTrial): elsewhere Creem puts the trial on every checkout of the plan, and
+   * a "skip the trial" link that opened a trial anyway would be a lie told at the till.
+   */
+  skipTrial?: boolean;
 }
 
 /**
@@ -44,6 +50,7 @@ export function StartTrialButton({
   showTerms = true,
   viaPricing = false,
   tier = TRIAL_TIER,
+  skipTrial = false,
 }: StartTrialButtonProps) {
   const { user } = useAuth();
   const { trialAvailable, loaded } = useEntitlement();
@@ -67,7 +74,7 @@ export function StartTrialButton({
    */
   if (loaded && !trialAvailable) return <>{fallback}</>;
 
-  const start = async () => {
+  const start = async (trial = true) => {
     if (viaPricing) {
       goToPricing();
       return;
@@ -76,7 +83,7 @@ export function StartTrialButton({
     setBusy(true);
     setError(null);
     try {
-      const result = await choosePlan(tier);
+      const result = await choosePlan(tier, 'month', trial ? {} : { trial: false });
       if (result.kind === 'checkout') {
         window.location.assign(result.url);
         return;
@@ -109,6 +116,16 @@ export function StartTrialButton({
         </p>
       )}
       {error && <p className="mt-2.5 text-xs text-red-400 text-center">{error}</p>}
+      {skipTrial && !viaPricing && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void start(false)}
+          className="mt-2 w-full text-center text-xs text-text-secondary underline-offset-4 hover:text-text-primary hover:underline disabled:opacity-60"
+        >
+          Or skip the trial and pay ${TIER_PLANS[tier].price} today
+        </button>
+      )}
     </div>
   );
 }

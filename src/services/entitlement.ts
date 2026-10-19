@@ -181,6 +181,18 @@ export interface PaymentsStatus {
   maintenanceMessage?: string;
   /** A yearly product exists for every paid plan, so the yearly toggle can sell. */
   annualReady?: boolean;
+  /**
+   * Each plan's no-trial copy. Where one is present a buyer can skip the trial and pay from today
+   * (choosePlan with trial: false); where it is not, every checkout of that plan carries the trial.
+   */
+  noTrialProducts?: { tier: Tier; name: string; envName: string | null; present: boolean }[];
+  /** Every plan has its no-trial copy, so nobody gets a second trial by buying a different plan. */
+  repeatTrialsBlocked?: boolean;
+}
+
+/** Whether a buyer can skip this plan's trial and pay from today. False until the server says so. */
+export function canSkipTrial(status: PaymentsStatus | null, tier: Tier): boolean {
+  return status?.noTrialProducts?.some((p) => p.tier === tier && p.present) === true;
 }
 
 /** Public, unauthenticated: which payment env vars the server can see. Booleans and names only. */

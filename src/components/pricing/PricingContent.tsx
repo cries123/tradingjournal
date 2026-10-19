@@ -15,6 +15,7 @@ import { useAuth } from '../../context/useAuth';
 import { useEntitlement } from '../../context/useEntitlement';
 import { hasTrial, REFUSALS, TRIAL_DAYS } from '../../config/trial';
 import {
+  canSkipTrial,
   CheckoutError,
   choosePlan,
   fetchPaymentsStatus,
@@ -230,7 +231,7 @@ export function PricingContent({
       <header className="max-w-3xl">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent mb-3">Plans</p>
         <h1 className="text-3xl md:text-5xl font-bold tracking-tight mb-4 text-balance">
-          Journalling is free. Automation is the part that costs money.
+          Journaling is free. Automation is the part that costs money.
         </h1>
         <p className="text-base md:text-lg text-text-secondary leading-relaxed">
           Log every trade by hand for nothing, forever. Paid plans exist because each connected
@@ -264,7 +265,7 @@ export function PricingContent({
         <p className="text-xs text-text-secondary">
           {yearly ? (
             <>
-              {12 - ANNUAL_MONTHS_CHARGED} months free on every plan
+              {12 - ANNUAL_MONTHS_CHARGED} months free on every plan. Yearly starts paid, with no free trial.
               {!annualLive && (
                 <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-400/15 text-amber-200">
                   Coming soon
@@ -272,7 +273,10 @@ export function PricingContent({
               )}
             </>
           ) : (
-            <>Pay monthly, cancel whenever. Yearly saves {12 - ANNUAL_MONTHS_CHARGED} months.</>
+            <>
+              Every paid plan starts with a {TRIAL_DAYS}-day free trial, one per person. Pay monthly, cancel whenever. Yearly saves{' '}
+              {12 - ANNUAL_MONTHS_CHARGED} months.
+            </>
           )}
         </p>
       </div>
@@ -465,7 +469,7 @@ export function PricingContent({
                      costs nothing — the only honest disclosure anywhere in the product, and it was
                      switched off on the page where most trials start. (No price written here: a
                      literal in this file is what pricingClaims.test.ts exists to catch.) */
-                  <StartTrialButton tier={tier} showTerms />
+                  <StartTrialButton tier={tier} showTerms skipTrial={canSkipTrial(payments, tier)} />
                 ) : (
                   <button
                     type="button"

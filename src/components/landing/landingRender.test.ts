@@ -12,7 +12,7 @@ import { LandingFaq } from './LandingFaq';
 import { chapterProgress, currentChapter } from './chapters';
 import { numberWord, ordinal, signedMoney, STORY_CAP, STORY_DAY, storyDay, storyMonth } from './landingStory';
 import { LANDING_FAQ } from '../../seo/faq';
-import { featureLines, MARKET_REPLAY_LIVE, PAID_TIERS, TIER_ORDER, TIER_PLANS } from '../../config/tiers';
+import { ANNUAL_MONTHS_CHARGED, featureLines, MARKET_REPLAY_LIVE, PAID_TIERS, TIER_ORDER, TIER_PLANS } from '../../config/tiers';
 import { hasTrial, TRIAL_DAYS } from '../../config/trial';
 
 /*
@@ -105,9 +105,17 @@ describe('the prices', () => {
   });
 
   it('badges exactly the plans that have a trial, with the trial’s real length', () => {
-    const badges = text(html).match(new RegExp(`${TRIAL_DAYS}-day free trial`, 'g')) ?? [];
+    // The badge on each card, not the sentence above them that also says it.
+    const badges = html.match(new RegExp(`<span class="absolute -top-3[^"]*">${TRIAL_DAYS}(<!-- -->)?-day free trial</span>`, 'g')) ?? [];
     expect(badges).toHaveLength(TIER_ORDER.filter(hasTrial).length);
     expect(hasTrial('free')).toBe(false);
+  });
+
+  it('says the trial is one per person, and that yearly is two months free, from the plans', () => {
+    expect(words).toContain(`Every paid plan starts with a ${TRIAL_DAYS}-day free trial, one per person`);
+    expect(words).toContain(`Yearly saves ${12 - ANNUAL_MONTHS_CHARGED} months`);
+    // Skipping the trial is not promised before the server says every plan can be bought without it.
+    expect(words).not.toContain('skip it');
   });
 
   it('does not sell market replay before it works', () => {
