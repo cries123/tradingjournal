@@ -55,8 +55,8 @@ beforeEach(() => {
 describe('TodayCard', () => {
   it('gauges each limit the trader set against today', () => {
     const html = paint(createElement(TodayCard, { trades: [trade({ date: today, pnl: -420 }), trade({ date: today, pnl: 20 })] }));
-    expect(html).toContain('2 of 3');
-    expect(html).toContain('$100.00 left');
+    expect(html).toContain('2 of 3 used');
+    expect(html).toContain('$100 left');
     expect(html).toContain('Losers in a row');
   });
 
@@ -111,10 +111,20 @@ describe('TradeLog', () => {
     expect(paint(createElement(TradeLog, { trades: day('2026-09-17', [5], { entryTime: '09:41' }), onDayClick: () => undefined }))).toContain('>Time<');
   });
 
-  it('marks a day that broke a rule', () => {
-    const html = paint(createElement(TradeLog, { trades: day('2026-09-24', [-5]), ruleDates: new Set(['2026-09-24']), onDayClick: () => undefined }));
-    expect(html).toContain('broke a rule');
-    expect(html).toContain('aria-label="Broke a rule"');
+  it('names what broke on a day that broke a rule, judged the way the rule judges it', () => {
+    // Wins between the losses, so only the trade cap breaks — four losers in a row would break the
+    // streak rule too, and the row names every rule that broke.
+    const html = paint(createElement(TradeLog, { trades: day('2026-09-24', [-5, 5, -5, 5]), ruleDates: new Set(['2026-09-24']), onDayClick: () => undefined }));
+    expect(html).toContain('4 trades past 3'); // the desktop day row
+    expect(html).toContain('Broke 1 rule · trade cap'); // the phone's chip
+    const both = paint(createElement(TradeLog, { trades: day('2026-09-25', [-5, -5, -5, -5]), ruleDates: new Set(['2026-09-25']), onDayClick: () => undefined }));
+    expect(both).toContain('Broke 2 rules · trade cap, losing streak');
+  });
+
+  it('says nothing about rules on a day the calendar did not mark', () => {
+    const html = paint(createElement(TradeLog, { trades: day('2026-09-24', [-5, -5, -5, -5]), onDayClick: () => undefined }));
+    expect(html).not.toContain('past 3');
+    expect(html).not.toContain('Broke');
   });
 
   it('draws nothing for a period with no trades', () => {

@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearCachedBrokerStatus, readCachedBrokerStatus, writeCachedBrokerStatus } from './brokerStatusCache';
+import {
+  clearCachedBrokerStatus,
+  lastBrokerSync,
+  readCachedBrokerStatus,
+  readLastBrokerSync,
+  writeCachedBrokerStatus,
+  writeLastBrokerSync,
+} from './brokerStatusCache';
 import type { BrokerStatus } from './brokerConnect';
 
 /*
@@ -32,6 +39,24 @@ describe('the broker status cache', () => {
     clearCachedBrokerStatus('u1');
     clearCachedBrokerStatus('u2');
     vi.unstubAllGlobals();
+  });
+
+  it('remembers when this browser last synced, per user, and forgets it on sign-out', () => {
+    writeLastBrokerSync('u1', 5_000);
+    expect(readLastBrokerSync('u1')).toBe(5_000);
+    expect(readLastBrokerSync('u2')).toBeNull();
+    clearCachedBrokerStatus('u1');
+    expect(readLastBrokerSync('u1')).toBeNull();
+  });
+
+  it('takes the later of its own record and the newest imported trade, and never a hand-typed one', () => {
+    const trades = [
+      { sourceId: 's1', savedAt: '2026-10-19T13:00:00.000Z' },
+      { savedAt: '2026-10-19T15:00:00.000Z' }, // typed by hand: not a sync
+    ];
+    expect(lastBrokerSync(null, trades)).toBe(Date.parse('2026-10-19T13:00:00.000Z'));
+    expect(lastBrokerSync(Date.parse('2026-10-19T14:00:00.000Z'), trades)).toBe(Date.parse('2026-10-19T14:00:00.000Z'));
+    expect(lastBrokerSync(null, [{ savedAt: '2026-10-19T15:00:00.000Z' }])).toBeNull();
   });
 
   it('gives back the last answer for the same user', () => {

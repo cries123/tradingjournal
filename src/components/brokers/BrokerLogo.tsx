@@ -1,5 +1,6 @@
 import { Landmark } from 'lucide-react';
 import { resolveBroker } from '../../utils/brokerIds';
+import { BROKER_LOGOS } from '../../utils/brokerLogos';
 
 interface BrokerLogoProps {
   broker: string;
@@ -8,38 +9,12 @@ interface BrokerLogoProps {
   compact?: boolean;
 }
 
-// Official broker logos (transparent PNGs), used to indicate a supported integration only —
-// Trend Chasers is not affiliated with, and not endorsed by, any of these brokers. Each shows as a
-// badge thumbnail of the real logo, paired with a plain-text broker name at a consistent size.
-// Every badge is the SAME fixed size (not just the same height) so the row reads as a uniform
-// grid. Source PNGs are pre-cropped tight to their actual logo content, so object-contain zooms
-// each one to fill as much of that fixed box as its aspect ratio allows, with nothing cropped off.
-//
-// Brokers without an entry here (see BROKER_REGISTRY's hasLogo: false in ../../data/brokerRegistry)
-// don't have an official logo file on hand yet, so they show a generic name badge instead — add a
-// file to public/broker-logos/ and register it here once one is available.
-const LOGOS: Record<string, { src: string; name: string }> = {
-  thinkorswim: { src: '/broker-logos/thinkorswim.png', name: 'thinkorswim' },
-  schwab: { src: '/broker-logos/schwab.png', name: 'Charles Schwab' },
-  robinhood: { src: '/broker-logos/robinhood.png', name: 'Robinhood' },
-  webull: { src: '/broker-logos/webull.png', name: 'Webull' },
-  fidelity: { src: '/broker-logos/fidelity.png', name: 'Fidelity' },
-  etrade: { src: '/broker-logos/etrade.png', name: 'E*TRADE' },
-  'interactive-brokers': { src: '/broker-logos/interactive-brokers.png', name: 'Interactive Brokers' },
-  vanguard: { src: '/broker-logos/vanguard.png', name: 'Vanguard' },
-  tastytrade: { src: '/broker-logos/tastytrade.png', name: 'tastytrade' },
-  tradestation: { src: '/broker-logos/tradestation.png', name: 'TradeStation' },
-  tradier: { src: '/broker-logos/tradier.png', name: 'Tradier' },
-  public: { src: '/broker-logos/public.png', name: 'Public' },
-  alpaca: { src: '/broker-logos/alpaca.png', name: 'Alpaca' },
-  moomoo: { src: '/broker-logos/moomoo.png', name: 'Moomoo' },
-  chase: { src: '/broker-logos/chase.png', name: 'Chase' },
-  citi: { src: '/broker-logos/citi.png', name: 'Citi' },
-  'edward-jones': { src: '/broker-logos/edward-jones.png', name: 'Edward Jones' },
-  coinbase: { src: '/broker-logos/coinbase.png', name: 'Coinbase' },
-  tiaa: { src: '/broker-logos/tiaa.png', name: 'TIAA' },
-  pnc: { src: '/broker-logos/pnc.png', name: 'PNC Wealth Management' },
-};
+// Each logo shows as a badge thumbnail of the real file (utils/brokerLogos), paired with a
+// plain-text broker name at a consistent size. Every badge is the SAME fixed size (not just the
+// same height) so the row reads as a uniform grid. Source PNGs are pre-cropped tight to their actual
+// logo content, so object-contain zooms each one to fill as much of that fixed box as its aspect
+// ratio allows, with nothing cropped off.
+const LOGOS = BROKER_LOGOS;
 
 export function BrokerLogo({ broker, className = '', compact = false }: BrokerLogoProps) {
   const resolved = resolveBroker(broker);

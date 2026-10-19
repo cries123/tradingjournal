@@ -131,44 +131,45 @@ describe('the Overview', () => {
   });
 
   it('puts the filters in the header, above everything they narrow', () => {
-    // They were under the calendar, where they read as a control for the card below them.
+    // They were under the calendar, where they read as a control for the card below them. One
+    // Filter button now, with each filter in force as a chip beside it.
     const html = dashboard(options);
-    const filter = html.indexOf('aria-label="Filter by Symbol"');
+    const filter = html.indexOf('>Filter<');
     expect(filter).toBeGreaterThan(-1);
     expect(filter).toBeLessThan(html.indexOf('Net P&L'));
-    expect(filter).toBeLessThan(html.indexOf('>Calendar<'));
+    expect(filter).toBeLessThan(html.indexOf('Calendar<small'));
   });
 
-  it('splits an options trader who never sells short into calls and puts', () => {
+  it('lays the period beside a rail of what to act on, as the approved design does', () => {
     const html = dashboard(options);
-    expect(html).toContain('Calls vs Puts');
-    expect(html).not.toContain('Long vs Short');
+    for (const card of ['Today', 'What is costing you', 'This week', 'Trade log']) {
+      expect(html, card).toContain(card);
+    }
+    // The insight grid and the direction card left the Overview in the redesign; the direction
+    // split itself is still tested in directionRows.test.ts.
+    expect(html).not.toContain('Calls vs Puts');
+    expect(html).not.toContain("What's working, what's not");
   });
 
   it('says when its figures are every journal added together', () => {
     const g = globalThis as Record<string, unknown>;
     g.__viewingAllJournals = true;
     try {
-      expect(dashboard(options)).toContain('July 2026 · All journals');
+      expect(dashboard(options)).toContain('Net P&L · All journals');
     } finally {
       g.__viewingAllJournals = false;
     }
     expect(dashboard(options)).not.toContain('All journals');
-  });
-
-  it('keeps long vs short for anyone who sold short', () => {
-    const html = dashboard([...options, trade({ side: 'short', pnl: 30 })]);
-    expect(html).toContain('Long vs Short');
   });
 });
 
 describe('the hero', () => {
   const stats = computeStats([trade({ pnl: 200 }), trade({ pnl: 200 }), trade({ pnl: -100 })]);
 
-  it('lays its five figures across the card as labelled figures', () => {
+  it('lays its five figures across the strip as labelled figures, in the approved order', () => {
     const html = paint(createElement(StatsCards, { stats }));
     const labels = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt>/g)].map((m) => m[1]);
-    expect(labels).toEqual(['Win rate', 'Profit factor', 'Avg win/loss', 'Avg/trade', 'Wins / losses']);
+    expect(labels).toEqual(['Win rate', 'Profit factor', 'Expectancy', 'Avg win / loss', 'Days']);
   });
 
   it('gives screen readers the net figure once, not the count', () => {

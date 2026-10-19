@@ -36,7 +36,10 @@ describe('account dropdown stacking', () => {
     // the panel — so it never overhangs <main> and needs no stacking context of its own there.
     const app = read('src/pages/JournalApp.tsx');
     expect(app).not.toMatch(/sticky top-0 z-40[^"]*"[^>]*>\{headerTools\}/);
-    expect(read('src/components/nav/ProfileMenu.tsx')).toMatch(/absolute bottom-full inset-x-0 z-50/);
+    expect(read('src/components/nav/ProfileMenu.tsx')).toMatch(/absolute bottom-full left-0 z-50/);
+    // And the panel itself sits above the page, so the menu — wider than the panel — paints over
+    // the content instead of under it.
+    expect(read('src/components/Sidebar.tsx')).toMatch(/<aside className="relative z-30 /);
   });
 
   it('still relies on the header, because the panel is inside a backdrop-filter', () => {

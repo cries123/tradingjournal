@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { syncStartDate } from '../../utils/syncWindow';
 import { manualSyncTradeId } from '../../utils/brokerTradeIds';
 import { describeSyncResult } from '../../utils/syncOutcomeCopy';
-import { readCachedBrokerStatus, writeCachedBrokerStatus } from '../../services/brokerStatusCache';
+import { readCachedBrokerStatus, writeCachedBrokerStatus, writeLastBrokerSync } from '../../services/brokerStatusCache';
 import { describeEvent, type JournalEvent } from '../../utils/journalEvents';
 import { SyncHistory } from './SyncHistory';
 import { CheckCircle2, ExternalLink, Link2, Loader2, RefreshCw, Unlink } from 'lucide-react';
@@ -331,6 +331,8 @@ export function BrokerConnectContent({
           syncCredits: bonus,
         });
       }
+      // The broker answered, whatever it sent: this is the moment the sidebar's "Synced" means.
+      if (user) writeLastBrokerSync(user.uid, startedAt.getTime());
 
       // See dedupeIncomingTrades for why the rules live in one place rather than here.
       const { fresh: freshTrades, unidentified: skippedUnidentified } = dedupeIncomingTrades(

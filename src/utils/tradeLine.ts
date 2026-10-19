@@ -11,6 +11,8 @@ import type { Trade } from '../types';
 export interface TradeLine {
   /** "SPY 560C", "SPY 558P", or the symbol for anything that is not an option with a strike. */
   title: string;
+  /** "SPY 28 Sep 560C" — the title with the expiry date in it, for a table with room. */
+  dated: string;
   /** "0DTE", "3DTE", or null when there is no expiry or it is more than a week out. */
   expiry: string | null;
   kind: 'call' | 'put' | 'other';
@@ -47,5 +49,11 @@ export function tradeLine(trade: Partial<Trade>): TradeLine {
   }
 
   const side = trade.side ? trade.side.charAt(0).toUpperCase() + trade.side.slice(1) : null;
-  return { title, expiry, kind, side };
+  let dated = title;
+  if (title !== symbol && trade.expiration && /^\d{4}-\d{2}-\d{2}/.test(trade.expiration)) {
+    const day = Number(trade.expiration.slice(8, 10));
+    const mon = new Date(Date.UTC(2000, Number(trade.expiration.slice(5, 7)) - 1, 15)).toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
+    dated = `${symbol} ${day} ${mon} ${title.slice(symbol.length + 1)}`;
+  }
+  return { title, dated, expiry, kind, side };
 }

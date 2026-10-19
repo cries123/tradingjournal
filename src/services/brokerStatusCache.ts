@@ -65,9 +65,57 @@ export function writeCachedBrokerStatus(uid: string, value: BrokerStatus, now = 
 /** On sign-out, so the next person on this browser starts from nothing. */
 export function clearCachedBrokerStatus(uid: string): void {
   memory.delete(uid);
+  lastSyncMemory.delete(uid);
   try {
     localStorage.removeItem(key(uid));
+    localStorage.removeItem(lastSyncKey(uid));
   } catch {
     // Nothing to clear, or nowhere to clear it from.
   }
+}
+
+/**
+ * When this browser last ran a sync that the server answered, for the broker card's "Synced 2 h ago".
+ *
+ * Only half the answer: a sync on another device, or the Diamond morning import, never touches this
+ * browser. The card takes the later of this and the newest imported trade's save time
+ * (lastBrokerSync), so it is never later than the truth — at worst it is a sync behind.
+ */
+const lastSyncMemory = new Map<string, number>();
+function lastSyncKey(uid: string): string {
+  return `${KEY}:last-sync:${uid}`;
+}
+
+export function writeLastBrokerSync(uid: string, at: number): void {
+  lastSyncMemory.set(uid, at);
+  try {
+    localStorage.setItem(lastSyncKey(uid), String(at));
+  } catch {
+    // The in-memory copy still covers this session.
+  }
+}
+
+export function readLastBrokerSync(uid: string): number | null {
+  const inMemory = lastSyncMemory.get(uid);
+  if (inMemory != null) return inMemory;
+  try {
+    const raw = Number(localStorage.getItem(lastSyncKey(uid)));
+    return Number.isFinite(raw) && raw > 0 ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The latest sign of a sync: this browser's own record, or the newest save time on a trade that
+ * came from a broker. Null when neither says anything.
+ */
+export function lastBrokerSync(recorded: number | null, trades: readonly { sourceId?: string; savedAt?: string }[]): number | null {
+  let latest = recorded ?? 0;
+  for (const t of trades) {
+    if (!t.sourceId || !t.savedAt) continue;
+    const at = Date.parse(t.savedAt);
+    if (Number.isFinite(at) && at > latest) latest = at;
+  }
+  return latest > 0 ? latest : null;
 }

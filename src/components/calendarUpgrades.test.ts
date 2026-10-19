@@ -41,9 +41,16 @@ describe('a day that broke a rule', () => {
     expect(kept).not.toContain('Broke one of your rules');
   });
 
-  it('keeps the mark off a collapsed row, where there is no room for it', () => {
-    const html = paint(createElement(DashboardDayCell, { dayNumber: 6, summary: summary(), ruleBroken: true, compact: true }));
-    expect(html).not.toContain('Broke one of your rules');
+  it('marks it on the phone too, as a dot that fits a 50px cell', () => {
+    const html = paint(createElement(DashboardDayCell, { dayNumber: 6, summary: summary(), ruleBroken: true, size: 'phone' }));
+    expect(html).toContain('Broke one of your rules');
+    expect(html).toContain('bg-amber-400');
+  });
+
+  it('prints whole dollars on the phone, where the cents do not fit', () => {
+    const html = text(paint(createElement(DashboardDayCell, { dayNumber: 6, summary: summary(), size: 'phone' })));
+    expect(html).toContain('-$742');
+    expect(html).not.toContain('-$742.00');
   });
 });
 

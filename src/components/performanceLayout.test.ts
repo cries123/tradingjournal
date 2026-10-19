@@ -228,8 +228,8 @@ describe('the Overview', () => {
       ),
     );
 
-  it('names the period beside the insights heading', () => {
-    expect(text(overview(journal()))).toContain("What's working, what's not · August 2026");
+  it('names the period and the journal in the toolbar', () => {
+    expect(text(overview(journal()))).toMatch(/· August 2026/);
   });
 
   // The equity curve was built, shrunk to a strip, and then removed at Jay's request: it took

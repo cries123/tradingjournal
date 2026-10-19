@@ -194,7 +194,7 @@ describe('Sidebar', () => {
   it('paints the places to look, the journals and the broker, and nothing that used to scroll', () => {
     const html = renderToString(sidebar('dashboard'));
 
-    for (const label of ['Overview', 'Performance', 'Rule simulator', 'Assistant', 'Track record', 'Journals', 'Connect a broker']) {
+    for (const label of ['Overview', 'Performance', 'Rule simulator', 'Assistant', 'Track record', 'JOURNALS', 'BROKER', 'Connect a broker']) {
       expect(html).toContain(label);
     }
     /* The three that moved into Support, the two that moved out of the nav, and the leaderboard,
@@ -241,9 +241,14 @@ describe('Sidebar', () => {
     }
   });
 
-  it('opens its account menu upward and inside the panel, which clips anything past its edge', () => {
-    const menu = readFileSync('src/components/nav/ProfileMenu.tsx', 'utf8');
-    expect(menu).toMatch(/absolute bottom-full inset-x-0/);
+  it('opens its account menu upward, over the page, from a panel that does not clip it', () => {
+    // The menu is wider than the 224px panel, as the approved design draws it. That only works if
+    // the panel sits above the page and lets its children out: an overflow-hidden here cut the
+    // menu off at the panel's edge.
+    expect(readFileSync('src/components/nav/ProfileMenu.tsx', 'utf8')).toMatch(/absolute bottom-full left-0 z-50/);
+    const aside = renderToString(sidebar('dashboard')).match(/<aside class="([^"]*)"/)?.[1] ?? '';
+    expect(aside).toMatch(/\bz-30\b/);
+    expect(aside).not.toMatch(/\boverflow-hidden\b/);
   });
 });
 
@@ -257,19 +262,17 @@ describe('MoreContent', () => {
         month: 7,
         hasBrokerTrades: true,
         onConnectBroker: noop,
-        onTrades: noop,
         onSimulator: noop,
         onTrackRecord: noop,
         onReport: noop,
         onCoach: noop,
         onSettings: noop,
-        onAccount: noop,
         onSubscription: noop,
         onOrderHistory: noop,
         onSupport: noop,
       }),
     );
-    for (const label of ['More', '@chelo618', 'Sync', 'Primary journal', 'All trades', 'Rule simulator', 'Track record', 'Monthly report', 'Settings', 'Subscription', 'Support', 'Help center', "What's new"]) {
+    for (const label of ['More', '@chelo618', 'Sync', 'Primary journal', 'Rule simulator', 'Track record', 'Monthly report', 'Settings', 'Subscription', 'Emails', 'Export & backup', 'Support', 'Help center', "What's new"]) {
       expect(html, label).toContain(label);
     }
     expect(html).toContain('2 new');
@@ -558,9 +561,10 @@ describe('StatsCards', () => {
     expect(allWinners.avgRR).toBe(293.5);
 
     const html = paint(createElement(StatsCards, { stats: allWinners }));
-    expect(html).toContain('Avg win/loss');
-    expect(html).not.toContain('293.50');
-    expect(html).toContain('—');
+    expect(html).toContain('Avg win / loss');
+    // The payoff is a ratio, and with no loss there is none: a dash, never the dollar fallback.
+    expect(html).toContain('payoff —');
+    expect(html).not.toMatch(/293\.50?×/);
   });
 
   it('shows the ratio once both sides exist', () => {
@@ -575,9 +579,9 @@ describe('StatsCards', () => {
     expect(mixed.profitFactor).toBe(4);
 
     const html = paint(createElement(StatsCards, { stats: mixed }));
-    expect(html).toContain('Avg win/loss');
-    expect(html).toContain('2.00');
-    expect(html).not.toContain('—');
+    expect(html).toContain('Avg win / loss');
+    expect(html).toContain('payoff 2.00×');
+    expect(html).not.toContain('payoff —');
   });
 
   it('paints an empty journal without dividing by zero', () => {

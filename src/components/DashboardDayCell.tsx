@@ -1,18 +1,12 @@
-import { AlertTriangle } from 'lucide-react';
 import type { DailySummary } from '../types';
 import { useSettings } from '../context/useSettings';
-import { formatCurrency, formatCurrencyCompact } from '../utils/format';
+import { formatCurrency } from '../utils/format';
 
 interface DashboardDayCellProps {
   dayNumber: number | null;
   summary: DailySummary | null;
   onClick?: () => void;
-  /** 0–1 relative magnitude of this day's P&L vs the month's biggest day. */
-  intensity?: number;
   isToday?: boolean;
-  /** Shrink to a slim row. Set for whole weeks with no trades, so a month that starts mid-week
-   *  doesn't spend two full-height rows of the page saying nothing. */
-  compact?: boolean;
   /** This day just gained its first trade — a sync or an import landed on it. It pops in. */
   fresh?: boolean;
   /**
@@ -20,102 +14,106 @@ interface DashboardDayCellProps {
    * loss limit. A month's discipline should read off the grid, not only off the breach list.
    */
   ruleBroken?: boolean;
+  /** The phone's smaller cell: whole dollars, and a dot for a broken rule. */
+  size?: 'desktop' | 'phone';
 }
 
-const cellShell =
-  'rounded-sm md:rounded-lg text-left transition-all duration-200 ease-out motion-reduce:transition-none flex flex-col bg-bg-card overflow-hidden motion-safe:hover:scale-[1.03] motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.98]';
+/** "−$591", "+$454" — what fits a 50px phone cell; the cents are on the day itself. */
+function wholeDollars(n: number, currency: Parameters<typeof formatCurrency>[1]): string {
+  const text = formatCurrency(Math.round(n), currency).replace(/\.00$/, '');
+  return n > 0 ? `+${text}` : text;
+}
 
-const FULL_HEIGHT = 'aspect-square md:aspect-auto md:h-[108px]';
-const COMPACT_HEIGHT = 'h-7 md:h-11';
-
+/**
+ * One day of the calendar.
+ *
+ * Drawn flat — a tint and a border in the day's colour, the figure, the count — rather than the
+ * heat-map gradient it had, which made a $40 day and a $4,000 day hard to tell apart from the
+ * colour alone while the figure in it said exactly that. Amber marks a broken rule, the one colour
+ * on the grid that is neither win nor loss, so a broken rule on a green day still reads as one.
+ */
 export function DashboardDayCell({
   dayNumber,
   summary,
   onClick,
-  intensity = 0,
   isToday = false,
-  compact = false,
   fresh = false,
   ruleBroken = false,
+  size = 'desktop',
 }: DashboardDayCellProps) {
   const { settings } = useSettings();
-  const heightClass = compact ? COMPACT_HEIGHT : FULL_HEIGHT;
+  const phone = size === 'phone';
 
   if (dayNumber === null) {
-    return <div className={`${cellShell} ${heightClass} bg-bg-card/40 border border-transparent`} />;
+    return <div className={phone ? 'h-[50px]' : 'h-16'} aria-hidden />;
   }
 
-  const hasTrades = summary && summary.tradeCount > 0;
-  const isProfit = hasTrades && summary.totalPnl >= 0;
-  const isLoss = hasTrades && summary.totalPnl < 0;
+  const hasTrades = Boolean(summary && summary.tradeCount > 0);
+  const net = summary?.totalPnl ?? 0;
+  const tint = !hasTrades
+    ? phone
+      ? 'bg-[#0e0e0e] border-white/[0.06]'
+      : 'bg-[#0d0d0d] border-white/[0.06]'
+    : net >= 0
+      ? 'bg-profit-bright/10 border-profit-bright/40'
+      : 'bg-loss-bright/10 border-loss-bright/40';
+  const today = isToday ? (phone ? 'shadow-[inset_0_0_0_1.5px_var(--color-accent)]' : 'outline outline-[1.5px] -outline-offset-[1.5px] outline-accent') : '';
+  const mark = ruleBroken && (
+    <span className="sr-only" key="mark">
+      Broke one of your rules
+    </span>
+  );
 
-  const borderClass = isProfit
-    ? 'border-profit-bright/50 ring-1 ring-profit-bright/15 shadow-sm shadow-profit-bright/10'
-    : isLoss
-      ? 'border-loss-bright/50 ring-1 ring-loss-bright/15 shadow-sm shadow-loss-bright/10'
-      : 'border-border/40';
-
-  // Heat-map tint: bigger days glow harder. Reads the live theme accent via the
-  // --color-profit-bright-rgb custom property (set in index.css / kept in sync by
-  // SettingsContext) so the heat-map recolors along with everything else.
-  const alpha = hasTrades ? 0.06 + intensity * 0.22 : 0;
-  const heatStyle = isProfit
-    ? { background: `linear-gradient(160deg, rgba(var(--color-profit-bright-rgb), ${alpha}), rgba(var(--color-profit-bright-rgb), ${alpha * 0.25}))` }
-    : isLoss
-      ? { background: `linear-gradient(160deg, rgba(248, 113, 113, ${alpha}), rgba(248, 113, 113, ${alpha * 0.25}))` }
-      : undefined;
+  if (phone) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`relative flex h-[50px] flex-col justify-between rounded-[10px] border px-[5px] pt-[5px] pb-1 text-left text-[11px] focus-ring ${tint} ${today} ${
+          hasTrades ? 'text-text-secondary' : 'text-text-secondary/70'
+        } ${fresh ? 'animate-cell-pop' : ''}`}
+      >
+        <span className="leading-none">{dayNumber}</span>
+        {ruleBroken && <span className="absolute right-[5px] top-[5px] h-1.5 w-1.5 rounded-full bg-amber-400 text-amber-300" title="Broke one of your rules" aria-hidden />}
+        {mark}
+        {hasTrades && (
+          <span className={`text-right text-[11px] font-bold leading-none tracking-tight tabular-nums ${net >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}>
+            {wholeDollars(net, settings.currency)}
+          </span>
+        )}
+      </button>
+    );
+  }
 
   return (
     <button
       type="button"
       onClick={onClick}
-      style={heatStyle}
-      className={`${cellShell} ${heightClass} p-0.5 md:p-2 border ${borderClass} ${
-        isToday ? 'day-today' : ''
-      } ${fresh ? 'animate-cell-pop' : ''} hover:bg-bg-tertiary cursor-pointer group focus-ring`}
+      className={`flex h-16 flex-col justify-between rounded-[9px] border px-2 py-1.5 text-left text-[11px] transition-colors hover:brightness-125 focus-ring ${tint} ${today} ${
+        hasTrades ? 'text-text-secondary' : 'text-text-secondary/60'
+      } ${fresh ? 'animate-cell-pop' : ''}`}
     >
-      <span className="flex items-start justify-between gap-1">
-        <span
-          className={`text-[9px] md:text-xs leading-none ${
-            isToday ? 'text-accent font-semibold' : 'text-text-secondary'
-          }`}
-        >
-          {dayNumber}
+      <span className="leading-none">{dayNumber}</span>
+      {hasTrades && (
+        <span className="min-w-0">
+          <span className={`block truncate text-[13px] font-bold leading-tight tabular-nums ${net >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}>
+            {formatCurrency(net, settings.currency)}
+          </span>
+          <span className="flex items-center gap-1 text-[10px] text-text-secondary">
+            {summary!.tradeCount} {summary!.tradeCount === 1 ? 'trade' : 'trades'}
+            {ruleBroken && (
+              <span
+                className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-400/20 text-[9px] font-bold text-amber-300"
+                title="Broke one of your rules"
+                aria-hidden
+              >
+                !
+              </span>
+            )}
+          </span>
         </span>
-        {ruleBroken && !compact && (
-          /* Amber, like the rule banner: the one colour on the grid that is neither win nor loss,
-             so a broken rule on a green day still reads as a broken rule. */
-          <span
-            className="grid h-3 w-3 md:h-4 md:w-4 shrink-0 place-items-center rounded-full bg-amber-400/20 text-amber-300"
-            title="Broke one of your rules"
-            aria-label="Broke one of your rules"
-          >
-            <AlertTriangle size={9} className="md:hidden" aria-hidden />
-            <AlertTriangle size={11} className="hidden md:block" aria-hidden />
-          </span>
-        )}
-      </span>
-      {hasTrades && !compact ? (
-        <div className="mt-auto min-w-0 w-full">
-          <span
-            className={`text-[9px] md:text-sm font-bold leading-tight block truncate ${
-              isProfit ? 'text-profit-bright' : 'text-loss-bright'
-            }`}
-          >
-            <span className="md:hidden">{formatCurrencyCompact(summary.totalPnl, settings.currency)}</span>
-            <span className="hidden md:inline">{formatCurrency(summary.totalPnl, settings.currency)}</span>
-          </span>
-          <span className="hidden md:block text-[10px] text-text-secondary mt-0.5 truncate">
-            {summary.tradeCount} {summary.tradeCount === 1 ? 'trade' : 'trades'}
-          </span>
-        </div>
-      ) : (
-        !compact && (
-          <span className="mt-auto hidden md:block text-[10px] text-text-secondary/0 group-hover:text-text-secondary transition-colors">
-            + import
-          </span>
-        )
       )}
+      {mark}
     </button>
   );
 }

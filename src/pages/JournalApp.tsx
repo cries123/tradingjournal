@@ -485,7 +485,6 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 onReport={() => openView('report')}
                 onCoach={sidebarActions.onCoach}
                 onSettings={sidebarActions.onSettings}
-                onAccount={sidebarActions.onAccount}
                 onSubscription={sidebarActions.onSubscription}
                 onOrderHistory={sidebarActions.onOrderHistory}
                 onSupport={sidebarActions.onSupport}

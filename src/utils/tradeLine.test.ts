@@ -21,7 +21,12 @@ describe('tradeLine', () => {
   });
 
   it('shows shares by symbol alone', () => {
-    expect(tradeLine({ symbol: 'CVX', assetType: 'stock', side: 'long' })).toEqual({ title: 'CVX', expiry: null, kind: 'other', side: 'Long' });
+    expect(tradeLine({ symbol: 'CVX', assetType: 'stock', side: 'long' })).toEqual({ title: 'CVX', dated: 'CVX', expiry: null, kind: 'other', side: 'Long' });
+  });
+
+  it('puts the expiry date in the long form', () => {
+    expect(tradeLine({ symbol: 'SPY', optionType: 'call', strike: 560, expiration: '2026-09-28' }).dated).toBe('SPY 28 Sep 560C');
+    expect(tradeLine({ symbol: 'SPY', optionType: 'put', strike: 560 }).dated).toBe('SPY 560P');
   });
 
   it('does not invent a strike for an option that has none', () => {

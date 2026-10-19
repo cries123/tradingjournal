@@ -156,45 +156,36 @@ export function Sidebar({
   const [opened] = useState(() => new Date());
   const shownYear = year ?? opened.getFullYear();
   const shownMonth = month ?? opened.getMonth();
-  // ⌘ on a Mac, Ctrl everywhere else — the hint should name the key the reader will press.
-  const [mac] = useState(() => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.userAgent));
-
   return (
-    <aside className="flex flex-col w-56 shrink-0 sticky top-0 h-dvh bg-bg-secondary/80 backdrop-blur-xl border-r border-border/60 overflow-hidden">
-      {/* md, not lg: at 224px wide the large mark forced the wordmark to wrap. */}
-      <div className="px-4 py-3 border-b border-border/60 shrink-0">
+    /* z-30, and no overflow clipping: the profile menu opens upward from the foot of the panel and
+       wider than it, over the page, so the panel has to sit above the page and let it out. Its own
+       scroll area still clips, so a short window scrolls the middle rather than spilling. */
+    <aside className="relative z-30 flex flex-col w-56 shrink-0 sticky top-0 h-dvh gap-0.5 px-3.5 py-[18px] bg-bg-primary border-r border-white/[0.06]">
+      <div className="flex items-center justify-between gap-2 px-2 pb-[18px] pt-1 shrink-0">
         {onHome ? (
-          <button
-            type="button"
-            onClick={onHome}
-            className="text-left hover:opacity-90 transition-opacity focus-ring rounded"
-            title="Back to home"
-          >
-            <BrandLogo size="md" variant="compact" />
+          <button type="button" onClick={onHome} className="text-left hover:opacity-90 transition-opacity focus-ring rounded" title="Back to home">
+            <BrandLogo size="sm" variant="compact" />
           </button>
         ) : (
-          <BrandLogo size="md" variant="compact" />
+          <BrandLogo size="sm" variant="compact" />
+        )}
+        {/* Search stays one click away. The approved design had no search on desktop; dropping a
+            working feature to match a drawing is the one change not made. Ctrl/⌘K also opens it. */}
+        {onSearch && (
+          <button
+            type="button"
+            onClick={onSearch}
+            aria-label="Search your journal"
+            title="Search (Ctrl K / ⌘K)"
+            className="shrink-0 rounded-lg p-1.5 text-text-secondary hover:bg-bg-tertiary/60 hover:text-text-primary transition-colors focus-ring"
+          >
+            <Search size={16} />
+          </button>
         )}
       </div>
 
-      {/* Still scrollable — a 600px-tall window will always be able to run out of room — but
-          without the drawn rail. See .no-scrollbar in index.css. */}
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain no-scrollbar">
-        {onSearch && (
-          <div className="px-2.5 pt-3">
-            <button
-              type="button"
-              onClick={onSearch}
-              className="w-full flex items-center gap-2 rounded-lg border border-border/70 bg-bg-tertiary/40 px-3 py-1.5 text-[13px] text-text-secondary hover:text-text-primary hover:border-border transition-colors focus-ring"
-            >
-              <Search size={14} aria-hidden />
-              <span className="flex-1 text-left">Search</span>
-              <kbd className="rounded border border-border px-1 text-[10px] font-sans text-text-secondary">{mac ? '⌘K' : 'Ctrl K'}</kbd>
-            </button>
-          </div>
-        )}
-
-        <nav className="px-2.5 pt-3 space-y-0.5" aria-label="Journal">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain no-scrollbar flex flex-col gap-0.5">
+        <nav className="space-y-0.5" aria-label="Journal">
           <NavItem active={appView === 'dashboard' || appView === 'day'} onClick={onDashboard} icon={<LayoutDashboard size={16} />} label="Overview" />
           {onTrades && <NavItem active={appView === 'trades'} onClick={onTrades} icon={<List size={16} />} label="Trades" />}
           <NavItem active={appView === 'performance'} onClick={onPerformance} icon={<Gauge size={16} />} label="Performance" />
@@ -217,20 +208,20 @@ export function Sidebar({
           )}
         </nav>
 
-        <div className="px-2.5 pt-5">
-          <JournalList trades={trades} year={shownYear} month={shownMonth} />
-        </div>
+        <JournalList trades={trades} year={shownYear} month={shownMonth} />
 
-        <div className="px-2.5 pt-5 pb-3">
-          <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-text-secondary/60">Broker</p>
-          <BrokerCard hasBrokerTrades={hasBrokerTrades} onConnectBroker={onConnectBroker} />
-        </div>
+        <p className="pl-3 pt-4 pb-1.5 text-[10px] tracking-[0.12em] text-text-secondary/60">BROKER</p>
+        <BrokerCard hasBrokerTrades={hasBrokerTrades} trades={trades} onConnectBroker={onConnectBroker} />
       </div>
 
-      <div className="p-3 border-t border-border/60 shrink-0 space-y-2.5">
-        <PlanNotice />
+      <div className="shrink-0 pt-3">
+        <PlanNotice className="mb-2.5" />
 
-        <button type="button" onClick={onAddTrade} className="w-full py-2.5 btn-primary text-sm font-semibold">
+        <button
+          type="button"
+          onClick={onAddTrade}
+          className="w-full rounded-full bg-accent py-[11px] text-center text-[13px] font-bold text-bg-primary hover:opacity-90 transition-opacity focus-ring"
+        >
           + Log trade
         </button>
 
@@ -249,11 +240,11 @@ export function Sidebar({
         )}
 
         {firebaseEnabled && !loading && !user && (
-          <p className="text-[10px] text-text-secondary px-1">Sign in to sync across devices</p>
+          <p className="mt-2.5 text-[10px] text-text-secondary px-1">Sign in to sync across devices</p>
         )}
 
         {!firebaseEnabled && (
-          <p className="text-[10px] text-text-secondary px-1 leading-relaxed">Trades saved locally in this browser</p>
+          <p className="mt-2.5 text-[10px] text-text-secondary px-1 leading-relaxed">Trades saved locally in this browser</p>
         )}
       </div>
     </aside>
