@@ -1,4 +1,4 @@
-import { AlertTriangle, Bug, FileText, LayoutDashboard, LifeBuoy, Users, Wallet, type LucideIcon } from 'lucide-react';
+import { Activity, AlertTriangle, Bug, FileText, LayoutDashboard, LifeBuoy, Users, Wallet, type LucideIcon } from 'lucide-react';
 import { ADMIN_TABS, type AdminTab } from './adminTabs';
 
 interface AdminTabBarProps {
@@ -22,6 +22,7 @@ const ICONS: Record<AdminTab, LucideIcon> = {
   requests: Bug,
   errors: AlertTriangle,
   costs: Wallet,
+  ops: Activity,
   content: FileText,
 };
 

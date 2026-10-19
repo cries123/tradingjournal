@@ -1,4 +1,5 @@
 import { schedule, type Handler } from '@netlify/functions';
+import { recordedJob } from '../../server/jobRuns';
 import { getAdminAuth, getAdminFirestore } from '../../server/firebaseAdmin';
 import { readEntitlement, writeEntitlement, type Entitlement } from '../../server/entitlements';
 import { backfillTrialMarkers } from '../../server/trialBackfill';
@@ -238,4 +239,4 @@ const nudgeHandler: Handler = async () => {
 };
 
 // 15:00 UTC — late morning US Eastern, when somebody is more likely to act on it than at dawn.
-export const handler = schedule('0 15 * * *', nudgeHandler);
+export const handler = schedule('0 15 * * *', recordedJob('trial-nudges', nudgeHandler));

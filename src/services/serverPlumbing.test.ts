@@ -266,9 +266,10 @@ describe('a paused subscription', () => {
    * pause automatically, so that is a written promise the product breaks by design.
    */
   it('is not told it will never be billed again', () => {
-    const webhook = codeOnly(readFileSync('netlify/functions/creem-webhook.ts', 'utf8'));
-    expect(webhook).toMatch(/includes\('paused'\)\) return;/);
-    expect(webhook).toContain('tellThem(parsed, payload.eventType)');
+    // The apply moved out of the function into server/creemApply.ts so the Ops tab can replay it.
+    const apply = codeOnly(readFileSync('server/creemApply.ts', 'utf8'));
+    expect(apply).toMatch(/includes\('paused'\)\) return;/);
+    expect(apply).toContain('tellThem(parsed, payload.eventType)');
   });
 
   it('is not cancelled by being resumed', () => {

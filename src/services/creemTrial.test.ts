@@ -168,7 +168,9 @@ describe('the plumbing vitest cannot drive', () => {
    * being pinned is not a crash — it is a wire that was never connected, which is the exact failure
    * the whole of this change is about.
    */
-  const WEBHOOK = read('netlify/functions/creem-webhook.ts');
+  // The apply lives in server/creemApply.ts now, so the Ops tab can replay an event; the webhook
+  // function only verifies, dedupes and records.
+  const WEBHOOK = read('server/creemApply.ts');
   const JOB = read('netlify/functions/trial-nudges.ts');
 
   it('has the webhook writing the marker', () => {

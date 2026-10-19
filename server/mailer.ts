@@ -1,4 +1,5 @@
 import { logServerError } from './errorReports';
+import { logEmail } from './emailLog';
 
 /**
  * Outbound email, with one provider behind a thin interface.
@@ -51,6 +52,22 @@ function looksLikeEmail(value: string): boolean {
 }
 
 export async function sendEmail(message: OutboundEmail): Promise<SendOutcome> {
+  const outcome = await deliver(message);
+  // Every attempt, sent or not, so the admin panel can answer "did it go out, and if not why".
+  // Logged after the attempt rather than around it: the log is a note about the send, not a gate.
+  await logEmail({
+    to: message.to.trim().toLowerCase(),
+    subject: message.subject,
+    tag: message.tag ?? null,
+    at: new Date().toISOString(),
+    sent: outcome.sent,
+    reason: outcome.sent ? null : outcome.reason,
+    providerId: outcome.sent ? outcome.id : null,
+  });
+  return outcome;
+}
+
+async function deliver(message: OutboundEmail): Promise<SendOutcome> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     // Not an error. The product is designed to work with no mail provider at all — the in-app

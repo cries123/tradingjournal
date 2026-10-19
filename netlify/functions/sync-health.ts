@@ -1,4 +1,5 @@
 import { schedule, type Handler } from '@netlify/functions';
+import { recordedJob } from '../../server/jobRuns';
 import { getAdminAuth, getAdminFirestore } from '../../server/firebaseAdmin';
 import { logServerError } from '../../server/errorReports';
 import { readJournalEvents } from '../../server/journalEvents';
@@ -67,4 +68,4 @@ const syncHealthHandler: Handler = async () => {
 };
 
 // Two hours after auto-sync's '0 11 * * 2-6', on the same days.
-export const handler = schedule('0 13 * * 2-6', syncHealthHandler);
+export const handler = schedule('0 13 * * 2-6', recordedJob('sync-health', syncHealthHandler));

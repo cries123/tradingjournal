@@ -20,7 +20,12 @@ const source = readFileSync(join(process.cwd(), 'src/pages/AdminPage.tsx'), 'utf
  * so swallowing the failure here would leave the modal showing a note the server rejected. Adding
  * a name to this set is a decision about where the failure gets shown — not a way past the check.
  */
-const REJECTS_BY_CONTRACT = new Set(['handleUserNoteSave']);
+const REJECTS_BY_CONTRACT = new Set([
+  'handleUserNoteSave',
+  // Returns the server's sentence to the billing-events panel, which awaits it and shows the
+  // failure on the row that asked. Swallowing here would leave the row saying nothing.
+  'handleReplayBillingEvent',
+]);
 
 describe('AdminPage failure handling', () => {
   it('has no await-with-cleanup that lacks a failure path', () => {

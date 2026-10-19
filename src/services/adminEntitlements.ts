@@ -22,6 +22,9 @@ export interface AdminEntitlementView extends AccessRecord {
   trialEndsAt?: string | null;
   /** When this account started its one free trial. Set once by the webhook, never cleared. */
   trialStartedAt?: string | null;
+  /** Creem's ids, so the user card can link straight to the customer and the subscription. */
+  creemCustomerId?: string | null;
+  creemSubscriptionId?: string | null;
 }
 
 /**
@@ -92,6 +95,8 @@ function readEntitlementDoc(data: Partial<AdminEntitlementView>): AdminEntitleme
     comp: readComp(data.comp),
     trialEndsAt: typeof data.trialEndsAt === 'string' ? data.trialEndsAt : null,
     trialStartedAt: typeof data.trialStartedAt === 'string' ? data.trialStartedAt : null,
+    creemCustomerId: typeof data.creemCustomerId === 'string' ? data.creemCustomerId : null,
+    creemSubscriptionId: typeof data.creemSubscriptionId === 'string' ? data.creemSubscriptionId : null,
   };
 }
 

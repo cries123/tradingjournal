@@ -11,6 +11,7 @@ export type AdminTab =
   | 'requests'
   | 'errors'
   | 'costs'
+  | 'ops'
   | 'content';
 
 export const ADMIN_TABS: { id: AdminTab; label: string }[] = [
@@ -22,5 +23,8 @@ export const ADMIN_TABS: { id: AdminTab; label: string }[] = [
   { id: 'requests', label: 'Bug reports' },
   { id: 'errors', label: 'Errors' },
   { id: 'costs', label: 'Costs' },
+  // What the server did with nobody watching: scheduled runs, every sync, every email, every
+  // billing webhook. Before this tab those were found by a customer writing in.
+  { id: 'ops', label: 'Ops' },
   { id: 'content', label: 'Content' },
 ];

@@ -118,6 +118,13 @@ import {
   type AdminEntitlementView,
 } from '../services/adminEntitlements';
 import { TIER_PLANS, type Tier } from '../config/tiers';
+import { JobRunsPanel } from '../components/admin/JobRunsPanel';
+import { SyncFeedPanel } from '../components/admin/SyncFeedPanel';
+import { BillingEventsPanel } from '../components/admin/BillingEventsPanel';
+import { EmailLogPanel } from '../components/admin/EmailLogPanel';
+import { fetchAdminOps, replayBillingEvent, type AdminOpsResult } from '../services/adminOps';
+import { matchesPlanFilter, PLAN_FILTERS, type PlanFilter } from '../utils/adminUserFilters';
+import { jobState } from '../utils/jobSchedule';
 
 /**
  * One colour per paid plan, so the ladder is legible at a glance rather than read word by word.
@@ -224,6 +231,8 @@ type AdminState =
       entitlements: Map<string, AdminEntitlementView> | null;
       auditLog: AdminAuditEntry[];
       healthHistory: AdminHealthSnapshot[];
+      /** The Ops tab's records. Null while loading; a result with an error when the read failed. */
+      ops: AdminOpsResult | null;
     };
 
 const STATUS_LABELS: Record<BugReportStatus, string> = {
@@ -798,6 +807,7 @@ export function AdminPage({ onHome }: AdminPageProps) {
         entitlements: null,
         auditLog: auditResult.status === 'fulfilled' ? auditResult.value : [],
         healthHistory: [],
+        ops: null,
       });
 
       /*
@@ -870,8 +880,17 @@ export function AdminPage({ onHome }: AdminPageProps) {
         });
       });
 
-      // Awaited only so the catch below still covers both groups; neither card waits on the other.
-      await Promise.allSettled([funnelDone, rest]);
+      // The Ops records: four Firestore reads behind one function, its own group so a slow one
+      // delays the Ops tab and nothing else.
+      const opsDone = withTimeout(fetchAdminOps(), 'ops records')
+        .catch((err: unknown): AdminOpsResult => ({ report: null, error: describeAdminActionError(err) }))
+        .then((ops) => {
+          if (!isCurrent()) return;
+          setState((prev) => (prev.phase !== 'ready' ? prev : { ...prev, ops }));
+        });
+
+      // Awaited only so the catch below still covers every group; no card waits on another.
+      await Promise.allSettled([funnelDone, rest, opsDone]);
     } catch {
       if (!isCurrent()) return;
       setState({
@@ -898,6 +917,7 @@ export function AdminPage({ onHome }: AdminPageProps) {
         entitlements: new Map(),
         auditLog: [],
         healthHistory: [],
+        ops: { report: null, error: 'The admin panel could not load.' },
       });
     }
   }, [firebaseEnabled, loading, user, username]);
@@ -1186,6 +1206,38 @@ export function AdminPage({ onHome }: AdminPageProps) {
 
   const canOpenUserByUid = useCallback((uid: string) => userByUid.has(uid), [userByUid]);
 
+  /* The Ops tab names people by uid (syncs, webhooks) or by address (emails); both resolve
+     through the loaded user list, and an unknown one is shown as it came. */
+  const labelForUid = useCallback(
+    (uid: string) => {
+      const found = userByUid.get(uid);
+      return found ? (found.username ? `@${found.username}` : found.email) : `${uid.slice(0, 8)}…`;
+    },
+    [userByUid],
+  );
+  const uidByEmail = useMemo(
+    () => new Map((ready?.users ?? []).map((u) => [u.email.toLowerCase(), u.uid])),
+    [ready?.users],
+  );
+  const uidForEmail = useCallback((email: string) => uidByEmail.get(email.toLowerCase()) ?? null, [uidByEmail]);
+
+  const reloadOps = useCallback(async () => {
+    const ops = await fetchAdminOps();
+    setState((prev) => (prev.phase !== 'ready' ? prev : { ...prev, ops }));
+  }, []);
+
+  /** Replays a stored Creem event, then re-reads the log so the row shows its new outcome. */
+  const handleReplayBillingEvent = useCallback(
+    async (eventId: string) => {
+      const { message } = await replayBillingEvent(eventId);
+      void reloadOps();
+      return message;
+    },
+    [reloadOps],
+  );
+
+  const [planFilter, setPlanFilter] = useState<PlanFilter>('all');
+
   /*
    * Who actually has a brokerage linked, keyed by uid.
    *
@@ -1225,8 +1277,13 @@ export function AdminPage({ onHome }: AdminPageProps) {
     const scoped = brokerOnly
       ? matched.filter((u) => brokerByUid.get(u.uid)?.connected)
       : matched;
-    return sortUsers(scoped, userSort);
-  }, [ready, userSearch, userSort, brokerOnly, brokerByUid]);
+    // Plans are null until loaded; until then the chips are disabled and nothing is filtered out.
+    const byPlan =
+      planFilter === 'all' || !ready.entitlements
+        ? scoped
+        : scoped.filter((u) => matchesPlanFilter(planFilter, u, ready.entitlements!.get(u.uid) ?? null, now));
+    return sortUsers(byPlan, userSort);
+  }, [ready, userSearch, userSort, brokerOnly, brokerByUid, planFilter, now]);
 
   const connectedCount = useMemo(
     () => (ready?.users ?? []).filter((u) => brokerByUid.get(u.uid)?.connected).length,
@@ -1646,6 +1703,30 @@ export function AdminPage({ onHome }: AdminPageProps) {
                                 : 'Not set up'}
                       </span>
                     </div>
+                    {/* The two the Ops records answer: is mail configured, and did every scheduled
+                        job run when it should have. Both read "Checking…" until that call lands. */}
+                    <div className="flex items-center gap-2 rounded-lg bg-bg-tertiary/30 border border-border/40 px-3 py-2">
+                      <HealthDot ok={ready.ops?.report ? ready.ops.report.mailConfigured : true} />
+                      <span>Mail</span>
+                      <span className="text-text-secondary text-xs ml-auto">
+                        {ready.ops?.report ? (ready.ops.report.mailConfigured ? 'Ready' : 'Not set up') : ready.ops ? 'Unknown' : 'Checking…'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 rounded-lg bg-bg-tertiary/30 border border-border/40 px-3 py-2">
+                      <HealthDot ok={!ready.ops?.report || ready.ops.report.jobs.every((j) => !['late', 'failed'].includes(jobState(j.spec, j.last, now)))} />
+                      <span>Scheduled jobs</span>
+                      <span className="text-text-secondary text-xs ml-auto">
+                        {ready.ops?.report
+                          ? (() => {
+                              const bad = ready.ops.report.jobs.filter((j) => ['late', 'failed'].includes(jobState(j.spec, j.last, now))).length;
+                              const never = ready.ops.report.jobs.filter((j) => jobState(j.spec, j.last, now) === 'never').length;
+                              return bad > 0 ? `${bad} late or failed` : never === ready.ops.report.jobs.length ? 'No runs yet' : 'On time';
+                            })()
+                          : ready.ops
+                            ? 'Unknown'
+                            : 'Checking…'}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Which host the key is being sent to. A present key says nothing about the
@@ -2024,6 +2105,26 @@ export function AdminPage({ onHome }: AdminPageProps) {
                       <Link2 size={13} aria-hidden />
                       Broker connected
                     </button>
+                    {/* One chip per plan, plus the two questions a plan alone cannot answer. Disabled
+                        until the plans have loaded, rather than filtering against an empty map. */}
+                    <div role="group" aria-label="Filter by plan" className="flex flex-wrap items-center gap-1">
+                      {PLAN_FILTERS.map((f) => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          disabled={!ready.entitlements}
+                          onClick={() => setPlanFilter(f.id)}
+                          aria-pressed={planFilter === f.id}
+                          className={`rounded-lg border px-2 py-1 text-[11px] transition-colors disabled:opacity-50 ${
+                            planFilter === f.id
+                              ? 'border-accent/50 bg-accent/15 text-accent'
+                              : 'border-border/60 text-text-secondary hover:text-text-primary hover:border-border'
+                          }`}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
                     <div className="relative">
                       <Search
                         size={14}
@@ -2060,7 +2161,9 @@ export function AdminPage({ onHome }: AdminPageProps) {
                       ? 'No users loaded.'
                       : brokerOnly
                         ? 'Nobody has a brokerage linked yet.'
-                        : 'No users match this search.'}
+                        : planFilter !== 'all'
+                          ? `Nobody matches “${PLAN_FILTERS.find((f) => f.id === planFilter)?.label ?? planFilter}”.`
+                          : 'No users match this search.'}
                   </p>
                 ) : (
                   <ul className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
@@ -2205,6 +2308,53 @@ export function AdminPage({ onHome }: AdminPageProps) {
                 {/* Under the month table, which gives totals. This one gives the direction, which a
                     total cannot: two flat months can be stable or half of everyone leaving. */}
                 <MrrMovementPanel rows={movement} />
+              </div>
+            )}
+
+            {tab === 'ops' && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-base font-semibold mb-1">Operations</h2>
+                  <p className="text-xs text-text-secondary">
+                    What the server did with nobody watching: the scheduled jobs, every sync, every billing webhook
+                    and every email. Each record starts from the release that added it.
+                  </p>
+                </div>
+                {!ready.ops && <p className="text-xs text-text-secondary">Loading the records…</p>}
+                {ready.ops?.error && !ready.ops.report && (
+                  <p className="text-sm text-amber-300 rounded-lg border border-amber-400/30 bg-amber-400/5 px-3 py-2">
+                    Could not load the Ops records: {ready.ops.error}
+                  </p>
+                )}
+                {ready.ops?.report && (
+                  <>
+                    <JobRunsPanel jobs={ready.ops.report.jobs} now={now} />
+                    <SyncFeedPanel
+                      rows={ready.ops.report.syncFeed}
+                      now={now}
+                      labelFor={labelForUid}
+                      onOpenUser={openUserByUid}
+                      canOpenUser={canOpenUserByUid}
+                    />
+                    <BillingEventsPanel
+                      events={ready.ops.report.billingEvents}
+                      now={now}
+                      labelFor={labelForUid}
+                      onReplay={handleReplayBillingEvent}
+                      onOpenUser={openUserByUid}
+                      canOpenUser={canOpenUserByUid}
+                    />
+                    <EmailLogPanel
+                      emails={ready.ops.report.emails}
+                      now={now}
+                      mailConfigured={ready.ops.report.mailConfigured}
+                      uidFor={uidForEmail}
+                      labelFor={labelForUid}
+                      onOpenUser={openUserByUid}
+                      canOpenUser={canOpenUserByUid}
+                    />
+                  </>
+                )}
               </div>
             )}
 

@@ -1,4 +1,5 @@
 import { schedule, type Handler } from '@netlify/functions';
+import { recordedJob } from '../../server/jobRuns';
 import type { Trade } from '../../src/types';
 import { computeWeeklyRecap } from '../../src/utils/insights';
 import { getAdminAuth, getAdminFirestore } from '../../server/firebaseAdmin';
@@ -286,4 +287,4 @@ const recapHandler: Handler = async () => {
 
 // Sunday 14:00 UTC — mid-morning US Eastern, after the week has closed and before anyone is
 // thinking about Monday. Netlify evaluates cron in UTC.
-export const handler = schedule('0 14 * * 0', recapHandler);
+export const handler = schedule('0 14 * * 0', recordedJob('weekly-recap', recapHandler));

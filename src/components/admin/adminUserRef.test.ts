@@ -76,6 +76,9 @@ describe('the panels that name someone', () => {
     'src/components/admin/CostsPanel.tsx',
     'src/components/admin/MoneyAtRiskPanel.tsx',
     'src/components/admin/DormantSubscribersPanel.tsx',
+    'src/components/admin/SyncFeedPanel.tsx',
+    'src/components/admin/BillingEventsPanel.tsx',
+    'src/components/admin/EmailLogPanel.tsx',
   ];
 
   it('all route their name through it', () => {

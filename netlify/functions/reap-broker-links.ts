@@ -1,4 +1,5 @@
 import { schedule, type Handler } from '@netlify/functions';
+import { recordedJob } from '../../server/jobRuns';
 import { getAdminAuth, getAdminFirestore } from '../../server/firebaseAdmin';
 import { readEntitlement } from '../../server/entitlements';
 import { resetBrokerLink } from '../../server/adminAccountActions';
@@ -144,4 +145,4 @@ const reapHandler: Handler = async () => {
 
 // 09:00 UTC daily — early morning US Eastern, well away from market hours, so a link that goes
 // never goes in the middle of somebody's session. Netlify evaluates cron in UTC.
-export const handler = schedule('0 9 * * *', reapHandler);
+export const handler = schedule('0 9 * * *', recordedJob('reap-broker-links', reapHandler));

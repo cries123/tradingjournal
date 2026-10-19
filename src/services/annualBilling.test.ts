@@ -111,7 +111,8 @@ describe('a webhook for a yearly product', () => {
   });
 
   it('is written onto the entitlement only when the event said', () => {
-    const src = readFileSync('netlify/functions/creem-webhook.ts', 'utf8');
+    // The apply moved out of the function into server/creemApply.ts so the Ops tab can replay it.
+    const src = readFileSync('server/creemApply.ts', 'utf8');
     expect(src).toContain('...(parsed.interval ? { billingInterval: parsed.interval } : {})');
   });
 });

@@ -1,4 +1,5 @@
 import { getAdminFirestore } from './firebaseAdmin';
+import { writeSyncFeed } from './syncFeed';
 import type { JournalEvent } from '../src/utils/journalEvents';
 
 /**
@@ -40,13 +41,19 @@ export const MAX_EVENTS_PER_USER = 200;
  * synced".
  */
 export async function recordJournalEvent(uid: string, event: JournalEvent): Promise<string | null> {
+  let id: string | null = null;
   try {
     const ref = await getAdminFirestore().collection(`${JOURNAL_EVENTS}/${uid}/events`).add(event);
-    return ref.id;
+    id = ref.id;
   } catch (err) {
     console.error(`[journal-events] could not record a ${event.type} for ${uid}:`, err);
-    return null;
   }
+  // Mirrored into the cross-user feed, so the admin can see every sync at once — see syncFeed.ts.
+  // After the user's own row, and with its id, so the feed can point back at it.
+  if (event.type === 'sync' && event.sync) {
+    await writeSyncFeed({ uid, at: event.at, sync: event.sync, eventId: id });
+  }
+  return id;
 }
 
 /**

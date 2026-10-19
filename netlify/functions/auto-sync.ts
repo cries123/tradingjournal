@@ -1,4 +1,5 @@
 import { schedule, type Handler } from '@netlify/functions';
+import { recordedJob } from '../../server/jobRuns';
 import { FieldPath } from 'firebase-admin/firestore';
 import type { Trade } from '../../src/types';
 import { getAdminFirestore } from '../../server/firebaseAdmin';
@@ -274,4 +275,4 @@ const autoSyncHandler: Handler = async () => {
   }
 };
 
-export const handler = schedule('0 11 * * 2-6', autoSyncHandler);
+export const handler = schedule('0 11 * * 2-6', recordedJob('auto-sync', autoSyncHandler));

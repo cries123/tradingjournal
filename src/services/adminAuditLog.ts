@@ -47,7 +47,9 @@ export type AdminAuditAction =
   | 'help-article.unpublished'
   | 'help-article.deleted'
   | 'announcement.published'
-  | 'checkout.toggled';
+  | 'checkout.toggled'
+  /** Logged by the server: a stored Creem event run through the entitlement logic again. */
+  | 'billing.event-replayed';
 
 export interface AdminAuditEntry {
   id: string;
@@ -63,7 +65,8 @@ export interface AdminAuditEntry {
     | 'error-event'
     | 'help-article'
     | 'announcement'
-    | 'checkout';
+    | 'checkout'
+    | 'billing-event';
   targetId: string;
   targetLabel: string;
   detail: string;
@@ -81,6 +84,7 @@ export const AUDIT_ACTION_LABELS: Record<AdminAuditAction, string> = {
   'user.sync-history-deleted': 'Deleted sync history rows for',
   'announcement.published': 'Updated the site announcement',
   'checkout.toggled': 'Changed plan checkout availability',
+  'billing.event-replayed': 'Replayed billing event',
   'user.tier-granted': 'Granted a plan to',
   'user.tier-grant-cleared': 'Removed the granted plan from',
   'user.access-extended': 'Extended access for',

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BadgeCheck, CalendarPlus, Gift } from 'lucide-react';
+import { BadgeCheck, CalendarPlus, Copy, ExternalLink, Gift } from 'lucide-react';
 import { PAID_TIERS, TIER_ORDER, TIER_PLANS, type Tier } from '../../config/tiers';
 import {
   compIsLive,
@@ -27,6 +27,32 @@ interface AdminUserPlanSectionProps {
   onDone: (message: string) => void;
   onError: (message: string) => void;
   onAudit: (action: PlanAudit, detail: string) => void;
+}
+
+/** A Creem id with a copy button: the dashboard search wants it pasted, not typed. */
+function CopyId({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // No clipboard (an insecure context, or a browser that asks): the id is on screen to select.
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={() => void copy()}
+      title={`Copy the ${label} id`}
+      className="inline-flex items-center gap-1 rounded px-1 font-mono text-[10px] hover:text-text-primary focus-ring"
+    >
+      <Copy size={10} aria-hidden />
+      {label} {value}
+      {copied && <span className="text-accent font-sans">copied</span>}
+    </button>
+  );
 }
 
 function day(iso: string): string {
@@ -211,6 +237,25 @@ export function AdminUserPlanSection({ uid, onDone, onError, onAudit }: AdminUse
         )}
         <span>{loading ? 'Checking…' : describe(record, now)}</span>
       </p>
+
+      {/* Creem's own ids, one click from a refund or a plan check in its dashboard. Creem has no
+          deep link by id that this app can rely on, so the id is copied and the customers page
+          opened — two actions, but no search. */}
+      {(record?.creemCustomerId || record?.creemSubscriptionId) && (
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-text-secondary">
+          <a
+            href="https://www.creem.io/dashboard/customers"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-accent hover:underline focus-ring rounded"
+          >
+            <ExternalLink size={11} aria-hidden />
+            Open in Creem
+          </a>
+          {record?.creemCustomerId && <CopyId label="customer" value={record.creemCustomerId} />}
+          {record?.creemSubscriptionId && <CopyId label="subscription" value={record.creemSubscriptionId} />}
+        </p>
+      )}
 
       {liveComp && (
         <p className="text-sm text-accent flex items-start gap-2">

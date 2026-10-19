@@ -6,6 +6,7 @@ import { AdminUserUsageSection } from './AdminUserUsageSection';
 import { AdminUserEmailComposer } from './AdminUserEmailComposer';
 import { AdminUserHistorySection } from './AdminUserHistorySection';
 import { AdminJournalEventsSection } from './AdminJournalEventsSection';
+import { AdminUserEmailLogSection } from './AdminUserEmailLogSection';
 import { AdminViewJournalSection } from './AdminViewJournalSection';
 import type { AdminUserSummary } from '../../services/admin';
 import { AUDIT_ACTION_LABELS, logAdminAction } from '../../services/adminAuditLog';
@@ -75,6 +76,9 @@ export function AdminUserDetailModal({
   onUserDeleted,
 }: AdminUserDetailModalProps) {
   useEscapeToClose(onClose);
+  // Read once when the card opens: the "x min ago" labels do not need to tick, and a render must
+  // not read the clock.
+  const [now] = useState(() => Date.now());
   const [emailDraft, setEmailDraft] = useState(user.email);
   const [passwordDraft, setPasswordDraft] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -384,6 +388,8 @@ export function AdminUserDetailModal({
           />
 
           <AdminJournalEventsSection uid={user.uid} />
+
+          <AdminUserEmailLogSection email={user.email} now={now} />
 
           <AdminUserPlanSection
             uid={user.uid}

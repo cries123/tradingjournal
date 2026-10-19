@@ -261,6 +261,26 @@ The CLI compiles the rules first and refuses to release a file that does not com
 `storage.rules` grants each user their own `shareCardBackgrounds/{uid}/` folder. A deny-all version
 was sent to him by mistake once — if share-card uploads break, that is why.
 
+## The Ops tab — what the server records about itself
+
+Four server-only collections, read back by `/api/admin-ops` (`server/adminOpsHandler.ts`). None
+appears in a security rule, so none needs a rules deploy. Each starts empty on the release that
+added it and the panel says so.
+
+- **`jobRuns/{job}`** — the latest run of each scheduled function (`history/` behind it), written
+  by `recordedJob()` in `server/jobRuns.ts`, which wraps all six `schedule()` handlers. The
+  allowance that makes a run "late" is per job in `src/utils/jobSchedule.ts`.
+- **`syncFeed`** — every sync row, across users, mirrored by `recordJournalEvent` beside the user's
+  own `journalEvents/{uid}/events` row. A top-level copy because a cross-user read of the
+  subcollection needs a collection-group index deployed by hand.
+- **`emailLog`** — every `sendEmail` attempt, sent or not, written by the mailer itself. Per-user
+  reads filter on `to` with no orderBy (sorted in memory), so no composite index.
+- **`creemEvents/{id}`** — the webhook's seen-marker now carries the event type, uid, outcome and
+  the raw payload. A marker whose outcome is `failed` is NOT a duplicate (the marker used to be
+  deleted on failure, which deleted the only record of it). The apply lives in
+  `server/creemApply.ts`; **Replay** on the Ops tab runs it again with `notify: false`, so no
+  customer email is re-sent, and audits as `billing.event-replayed`.
+
 ## Errors
 
 Client errors land in the admin panel through `src/services/errorFingerprint.ts` (pure: fingerprint

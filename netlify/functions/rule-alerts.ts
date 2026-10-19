@@ -1,4 +1,5 @@
 import { schedule, type Handler } from '@netlify/functions';
+import { recordedJob } from '../../server/jobRuns';
 import type { Trade } from '../../src/types';
 import { DEFAULT_TRADING_RULES, type TradingRules } from '../../src/types/strategy';
 import { tierHas } from '../../src/config/tiers';
@@ -167,4 +168,4 @@ const alertHandler: Handler = async () => {
 
 /* 12:00 UTC, Tuesday to Saturday — after the automatic import at 11:00 has put the previous day's
    fills in the journal, so the breach is computed from a complete day rather than half of one. */
-export const handler = schedule('0 12 * * 2-6', alertHandler);
+export const handler = schedule('0 12 * * 2-6', recordedJob('rule-alerts', alertHandler));
