@@ -81,8 +81,16 @@ export interface JournalFacts {
   direction: DirectionFacts | null;
   weekdays: WeekdayFact[] | null;
   fees: { total: number; trades: number } | null;
-  /** Breaches of the trader's OWN configured limits — their rules, not ours. */
+  /** Breaches of the trader's OWN configured limits — their rules, not ours. The first ten only. */
   ruleBreaches: { date: string; type: string; message: string }[] | null;
+  /**
+   * How many breaches there were in all.
+   *
+   * ruleBreaches stops at ten, and the "I broke my rules N×" suggestion used to count that list, so
+   * a month with fourteen read "10×" under an answer that said fourteen. Optional only so facts
+   * built by hand in tests still type-check; buildJournalFacts always sets it.
+   */
+  ruleBreachCount?: number;
   /**
    * The trader's own words on their trades, when they've opted in.
    *
@@ -210,6 +218,13 @@ function pct(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
+/**
+ * How many rule breaches the model is shown. Examples are what it needs to describe a pattern, and a
+ * month of an overtrader's breaches is a long list in a prompt paid for per token. The total travels
+ * beside it as ruleBreachCount, so nothing that counts them has to count this list.
+ */
+const MAX_BREACHES_SENT = 10;
+
 export function buildJournalFacts(
   trades: Trade[],
   period: string,
@@ -233,6 +248,7 @@ export function buildJournalFacts(
 
   /* Only when they have actually set a limit. Simulating rules nobody chose would put a
      hypothetical in front of the model and invite it to recommend one. */
+  const breaches = options.rules?.enabled ? checkRuleViolations(trades, options.rules) : [];
   /* Needs more than one month to be a trend; a single bucket is just this period again. */
   const trend = options.history ? monthlyTrend(options.history) : [];
 
@@ -336,12 +352,8 @@ export function buildJournalFacts(
     direction: computeDirectionSplit(trades),
     weekdays: computeWeekdaySplit(trades),
     fees: computeFees(trades),
-    ruleBreaches: options.rules?.enabled
-      ? (() => {
-          const breaches = checkRuleViolations(trades, options.rules!);
-          return breaches.length > 0 ? breaches.slice(0, 10) : null;
-        })()
-      : null,
+    ruleBreaches: breaches.length > 0 ? breaches.slice(0, MAX_BREACHES_SENT) : null,
+    ruleBreachCount: breaches.length,
     notes: selectedNotes.length > 0 ? selectedNotes : null,
 
     breakeven: breakeven
@@ -448,7 +460,7 @@ export function suggestedQuestions(facts: JournalFacts): SuggestedQuestion[] {
   if (facts.ruleBreaches && facts.ruleBreaches.length > 0) {
     out.push({
       id: 'rules',
-      label: `I broke my rules ${facts.ruleBreaches.length}×`,
+      label: `I broke my rules ${facts.ruleBreachCount ?? facts.ruleBreaches.length}×`,
       question:
         'I broke my own risk limits on some days this period. What happened on those days compared with the days I stayed inside them?',
     });

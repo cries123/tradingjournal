@@ -69,7 +69,7 @@ WHAT THE FIELDS MEAN
   gradingInverted true means their best-graded trades made less than their worst-graded ones.
   Say so directly; it is the most useful thing a journal can tell someone.
 - checklist: P&L on trades that met their own checklist threshold vs trades that didn't.
-- ruleBreaches: days the trader broke limits THEY set. Refer to them as their own rules.
+- ruleBreaches: days the trader broke limits THEY set. Refer to them as their own rules. It lists the first ten only; ruleBreachCount is how many there were in all.
 - weekdays: sorted worst first. Only comment if the spread is large relative to the trade counts.
 - fees: total commissions. Worth mentioning when it's large next to netPnl.
 - notes: the trader's own words on their biggest trades, when they've shared them. Quote them back
