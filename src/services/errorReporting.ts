@@ -1,5 +1,5 @@
 import { BUILD_SHA } from '../config/build';
-import { noteFirestoreFailure } from '../lib/firestoreLatch';
+import { installFirestoreRecovery, noteFirestoreFailure } from '../lib/firestoreLatch';
 import {
   normalizeError,
   safePath,
@@ -152,6 +152,12 @@ export function installGlobalErrorReporting(): void {
     // A latched Firestore client only ever announces itself here; the journal is listening.
     noteFirestoreFailure(event.reason);
     reportErrorSilently(event.reason, 'promise');
+  });
+
+  // And when the latch fires with the app out of sight, the page reloads itself — recorded under
+  // its own scope so the admin feed shows how often it still happens.
+  installFirestoreRecovery(() => {
+    reportErrorSilently(new Error('Reloaded a latched Firestore client in the background'), 'window', 'firestore-latch-reload');
   });
 }
 

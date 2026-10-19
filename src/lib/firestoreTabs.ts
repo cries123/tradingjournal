@@ -1,28 +1,22 @@
 /**
- * Which kind of on-device cache Firestore gets in this browser.
+ * Which kind of local cache Firestore gets in this browser.
  *
- * The multi-tab manager lets several tabs share one IndexedDB cache by electing a "primary" tab
- * that owns the queue of unsent writes, and it keeps that election alive with a heartbeat on a
- * timer. iOS freezes a backgrounded tab's timers outright, and Safari on a Mac throttles them hard,
- * so the heartbeat stops while the tab still believes it is primary. Another tab — or the same page
- * restored from the back/forward cache — sees the lease lapse and takes over. Now two clients
- * process the same write queue: one deletes a save the server just confirmed, the other goes to
- * delete it too and finds nothing.
+ * The on-disk cache (IndexedDB) is what makes the journal cheap: the first load pays for the
+ * documents once and later loads read from the phone. Safari breaks it. iOS ends an IndexedDB
+ * transaction when the app is backgrounded or the phone locks, and Firestore cannot carry on
+ * after that: the admin errors on iPhones read "Attempt to get records from database without an
+ * in-progress transaction" (Safari's own wording), then "INTERNAL ASSERTION FAILED (ID: 90f9)"
+ * (the SDK finding the write it was tracking gone), then "(ID: b815)" on everything after — the
+ * tab's client is finished until a reload, and the journal silently stops saving.
  *
- * That is exactly what the admin errors showed, all from iPhones: "INTERNAL ASSERTION FAILED
- * (ID: b7de)" is the SDK finding zero rows where it expected the confirmed batch, and "(ID: 90f9)"
- * is the same for a rejected one. After either, Firestore refuses all further work in that tab
- * ("(ID: b815)"), so the journal silently stops saving until a reload.
- *
- * The single-tab manager has no shared election: the first tab owns the cache outright, and a
- * second tab cannot get it, at which point the SDK falls back to an in-memory cache for that tab
- * (FAILED_PRECONDITION is on its list of errors it falls back from). The cost is that a second
- * Safari tab reads the journal from the server instead of from disk. Two tabs of the journal on a
- * phone is rare; a journal that stops saving is not, so WebKit browsers take that trade. Chrome,
- * Edge and Firefox keep the shared cache, which is where the pinned-tab-plus-a-second-tab habit
- * the multi-tab manager was chosen for actually lives.
+ * The first attempt at this (a single-tab manager, so no lease to lose) did not help: the
+ * errors kept arriving on the build that carried it. So WebKit gets no on-disk cache at all. An
+ * in-memory cache has nothing for Safari to break. The cost is that every open of the app on an
+ * iPhone reads the journal from the server rather than from the phone — a few hundred reads for
+ * a few hundred trades — and that a trade logged with no signal and the app then closed is not
+ * kept until it can send. Chrome, Edge, Firefox and Android keep the on-disk cache.
  */
-export type TabManagerKind = 'single' | 'multi';
+export type CacheKind = 'memory' | 'persistent';
 
 /** Every browser on iOS and iPadOS is WebKit underneath, whatever its name says. */
 function isAppleMobile(userAgent: string, maxTouchPoints: number): boolean {
@@ -37,6 +31,6 @@ function isDesktopSafari(userAgent: string): boolean {
   return /Safari\//.test(userAgent) && !/Chrome\/|Chromium\/|Edg\/|OPR\/|Firefox\//.test(userAgent);
 }
 
-export function tabManagerFor(userAgent: string, maxTouchPoints: number): TabManagerKind {
-  return isAppleMobile(userAgent, maxTouchPoints) || isDesktopSafari(userAgent) ? 'single' : 'multi';
+export function cacheKindFor(userAgent: string, maxTouchPoints: number): CacheKind {
+  return isAppleMobile(userAgent, maxTouchPoints) || isDesktopSafari(userAgent) ? 'memory' : 'persistent';
 }

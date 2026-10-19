@@ -2,13 +2,13 @@ import {
   getFirestore,
   initializeFirestore,
   persistentLocalCache,
+  memoryLocalCache,
   persistentMultipleTabManager,
-  persistentSingleTabManager,
   type Firestore,
 } from 'firebase/firestore';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
 import { getFirebaseApp } from './firebaseAuth';
-import { tabManagerFor } from './firestoreTabs';
+import { cacheKindFor } from './firestoreTabs';
 
 /*
  * The app and sign-in live in firebaseAuth.ts, which the public pages import on their own so they do
@@ -39,7 +39,10 @@ let storage: FirebaseStorage | null = null;
  *
  * The multi-tab manager matters because traders keep the journal open in a pinned tab and open a
  * second one — without it the second tab can't share the cache and falls back to server reads.
- * Except on iPhones, iPads and Safari, where it broke the write queue; see firestoreTabs.ts.
+ *
+ * Except on iPhones, iPads and Safari, which get an in-memory cache and no disk at all: Safari
+ * ends the on-disk cache's transaction when the app is backgrounded, and Firestore cannot carry
+ * on after that. See firestoreTabs.ts for the errors and the trade-off.
  */
 export function getFirebaseDb(): Firestore {
   if (db) return db;
@@ -48,11 +51,12 @@ export function getFirebaseDb(): Firestore {
   try {
     // Read loosely: the server's TypeScript config types navigator without maxTouchPoints.
     const touchPoints = (navigator as { maxTouchPoints?: number }).maxTouchPoints ?? 0;
-    const kind = tabManagerFor(navigator.userAgent, touchPoints);
+    const kind = cacheKindFor(navigator.userAgent, touchPoints);
     db = initializeFirestore(firebaseApp, {
-      localCache: persistentLocalCache({
-        tabManager: kind === 'single' ? persistentSingleTabManager({}) : persistentMultipleTabManager(),
-      }),
+      localCache:
+        kind === 'memory'
+          ? memoryLocalCache()
+          : persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
     });
   } catch {
     // Private browsing, a browser without IndexedDB, or initializeFirestore already having run.
