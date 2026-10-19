@@ -110,8 +110,9 @@ vi.mock('../context/useEntitlement', () => ({
 import { Sidebar } from './Sidebar';
 import { SupportDashboard } from './support/SupportDashboard';
 import { AssistantContent } from './analytics/AssistantContent';
-import { BrokerInsightSection } from './analytics/BrokerInsightSection';
-import { ExecutionPrompts, ExecutionSection } from './analytics/ExecutionSection';
+import { PerformanceBreakdowns } from './analytics/PerformanceBreakdowns';
+import { buildBreakdowns } from '../utils/performanceBreakdowns';
+import { formatCurrency } from '../utils/format';
 import { TradingInsightsSection } from './analytics/TradingInsightsSection';
 import { PerformanceContent } from './PerformanceContent';
 import { DiamondSection } from './settings/DiamondSection';
@@ -325,60 +326,69 @@ describe('AssistantContent', () => {
   });
 });
 
-describe('BrokerInsightSection', () => {
-  it('draws real panels for a journal with nothing hand-entered in it', () => {
-    const html = paint(createElement(BrokerInsightSection, { trades: syncedJournal() }));
+describe('PerformanceBreakdowns', () => {
+  const fmt = (n: number) => formatCurrency(n, 'USD');
+  const period = { noun: '2026', during: 'in 2026' };
+  const breakdowns = (trades: Trade[]) =>
+    createElement(PerformanceBreakdowns, { set: buildBreakdowns(trades, fmt, period), fmt, onPhoneOpen: noop });
+  /** The desktop's list of names, on its own. */
+  const listed = (html: string) => html.slice(html.indexOf('aria-label="Breakdowns"'), html.indexOf('</nav>'));
+
+  it('draws real breakdowns for a journal with nothing hand-entered in it', () => {
+    const html = listed(paint(breakdowns(syncedJournal())));
 
     // The whole point of the rebuild: this is a Schwab-shaped journal and the page is full.
-    expect(html).toContain('The win rate you need');
-    expect(html).toContain('Where the money goes');
-    expect(html).toContain('The trade after a loss');
-    expect(html).toContain('How the day unfolds');
-    expect(html).toContain('Time left when you opened');
-    expect(html).toContain('What trading cost you');
+    for (const name of ['Trade of the day', 'Position size', 'After a loss', 'Expiry', 'Fees', 'Symbols', 'Calls, puts, shares']) {
+      expect(html).toContain(`>${name}<`);
+    }
+    // The edge has a card of its own beside the chosen breakdown.
+    expect(paint(breakdowns(syncedJournal()))).toContain('points');
   });
 
-  it('draws nothing rather than throwing on an empty journal', () => {
-    expect(renderToString(createElement(BrokerInsightSection, { trades: [] }))).not.toContain(
-      'The win rate you need',
-    );
+  it('draws no breakdown rather than throwing on an empty journal', () => {
+    const html = renderToString(breakdowns([]));
+    expect(html).not.toContain('Trade of the day');
+    expect(html).not.toContain('Edge');
   });
 
   it('survives a journal of one trade', () => {
-    expect(() =>
-      renderToString(createElement(BrokerInsightSection, { trades: [trade({ pnl: 10 })] })),
-    ).not.toThrow();
+    expect(() => renderToString(breakdowns([trade({ pnl: 10 })]))).not.toThrow();
   });
 
   it('survives a journal with no losing trade in it', () => {
     const allWinners = Array.from({ length: 20 }, () =>
       trade({ pnl: 25, quantity: 1, tradePrice: 10, assetType: 'stock' }),
     );
-    expect(() =>
-      renderToString(createElement(BrokerInsightSection, { trades: allWinners })),
-    ).not.toThrow();
+    expect(() => renderToString(breakdowns(allWinners))).not.toThrow();
   });
 });
 
-describe('ExecutionSection and its prompts', () => {
-  it('names the fields a broker import cannot supply', () => {
-    const html = paint(createElement(ExecutionPrompts, { trades: syncedJournal() }));
+describe('what the journal needs recorded', () => {
+  const fmt = (n: number) => formatCurrency(n, 'USD');
+  const period = { noun: '2026', during: 'in 2026' };
+  const set = (trades: Trade[]) => buildBreakdowns(trades, fmt, period);
 
-    expect(html).toContain('P&L by hour entered');
-    expect(html).toContain('Which setups make money');
-    expect(html).toContain('Expectancy in R');
+  it('names the fields a broker import cannot supply, with why each is empty', () => {
+    const html = paint(createElement(PerformanceBreakdowns, { set: set(syncedJournal()), fmt, onPhoneOpen: noop }));
+
+    expect(html).toContain('Needs your input');
+    expect(html).toContain('Hour of day');
+    expect(html).toContain('needs entry times');
+    expect(html).toContain('Setups');
+    expect(html).toContain('tag 3 trades');
+    expect(html).toContain('R multiples');
+    expect(html).toContain('needs your risk');
   });
 
-  it('stops naming a field once it is being recorded', () => {
+  it('stops naming a field once it is being recorded, and draws the breakdown instead', () => {
     const tagged = syncedJournal().map((t) => ({ ...t, setup: 'ORB' }));
-    expect(renderToString(createElement(ExecutionPrompts, { trades: tagged }))).not.toContain(
-      'Which setups make money',
-    );
+    const s = set(tagged);
+    expect(s.missing.map((m) => m.title)).not.toContain('Setups');
+    expect(s.list.map((b) => b.title)).toContain('Setups');
   });
 
-  it('still draws the ticker panel, which needs nothing', () => {
-    const html = paint(createElement(ExecutionSection, { trades: syncedJournal() }));
-    expect(html).toContain('Which tickers make money');
+  it('still draws the ticker breakdown, which needs nothing', () => {
+    expect(set(syncedJournal()).list.map((b) => b.title)).toContain('Symbols');
   });
 });
 
@@ -404,7 +414,7 @@ describe('TradingInsightsSection', () => {
 });
 
 describe('PerformanceContent', () => {
-  it('paints both halves, with the broker half first', () => {
+  it('paints the figures, the verdict and the breakdowns, in that order, with what is missing last', () => {
     const html = paint(
       createElement(PerformanceContent, {
         trades: syncedJournal(),
@@ -414,16 +424,27 @@ describe('PerformanceContent', () => {
       }),
     );
 
-    expect(html.indexOf('What you traded')).toBeGreaterThan(-1);
-    expect(html.indexOf('What you traded')).toBeLessThan(html.indexOf('What you recorded'));
-    expect(html).toContain('The win rate you need');
+    const figures = html.indexOf('Profit factor');
+    const verdict = html.indexOf('aria-label="The verdict"');
+    const list = html.indexOf('Breakdowns · biggest first');
+    const missing = html.indexOf('Needs your input');
+    expect(figures).toBeGreaterThan(-1);
+    expect(figures).toBeLessThan(verdict);
+    expect(verdict).toBeLessThan(list);
+    expect(list).toBeLessThan(missing);
+    expect(html).toContain('Edge');
   });
 
-  it('says so plainly when there is nothing to analyse', () => {
+  it('survives a journal of one trade, which no breakdown can say anything about', () => {
+    const html = paint(createElement(PerformanceContent, { trades: [trade({ pnl: 10 })], year: 2026, month: 7, onBack: noop }));
+    expect(html).toContain('Not enough trades in 2026 to break down yet');
+  });
+
+  it('says so plainly when there is nothing to analyze', () => {
     const html = renderToString(
       createElement(PerformanceContent, { trades: [], year: 2026, month: 7, onBack: noop }),
     );
-    expect(html).toContain('Nothing to analyse yet');
+    expect(html).toContain('Nothing to analyze yet');
   });
 });
 

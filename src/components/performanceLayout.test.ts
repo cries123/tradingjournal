@@ -4,9 +4,11 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Trade } from '../types';
 
 /*
- * The Performance screen's second pass: a verdict at the top, panels ranked and sized by money,
- * every card leading with its figure, the finding first on a phone, and the period named on the
- * Overview. Plus the two copy bugs: "293t · 42%" and a tilt sentence that contradicted its figures.
+ * The Performance screen as the approved redesign draws it: six figures, a verdict band (where the
+ * money goes, where it comes from, the one change), then the breakdowns ranked by money down the left
+ * with the biggest drawn at full size beside them. On a phone the breakdowns are rows that open as
+ * pages. Plus the copy bugs this screen has had before: "293t · 42%", and a tilt sentence that
+ * contradicted its own figures.
  */
 
 vi.mock('../lib/firebase', () => ({
@@ -59,15 +61,18 @@ vi.mock('../context/useSettings', () => ({
 vi.mock('../context/useEntitlement', () => ({
   useEntitlement: () => ({ tier: 'diamond', has: () => true, loaded: true, loading: false, limits: {}, usage: {} }),
 }));
+// Static markup never counts up; the figure is asserted at its final value.
+vi.mock('./motion/CountUp', () => ({
+  CountUp: ({ value, format }: { value: number; format: (n: number) => string }) => format(value),
+}));
 
 const { PerformanceContent } = await import('./PerformanceContent');
 const { DashboardView } = await import('./DashboardView');
-const { TiltPanel } = await import('./analytics/BrokerInsightSection');
 const { PanelShell } = await import('./analytics/PanelShell');
 const { InAppProvider } = await import('./layout/PageFrame');
 
 const paint = (el: Parameters<typeof renderToString>[0]) =>
-  renderToString(el).replace(/<!-- -->/g, '').replace(/&amp;/g, '&').replace(/&#x27;/g, "'");
+  renderToString(el).replace(/<!-- -->/g, '').replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/⁠/g, '');
 const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 const noop = () => undefined;
 
@@ -107,55 +112,115 @@ function journal(): Trade[] {
   return trades;
 }
 
-const perf = () =>
-  paint(createElement(InAppProvider, null, createElement(PerformanceContent, { trades: journal(), year: 2026, month: 7, onBack: noop })));
+const perf = (extra: Record<string, unknown> = {}) =>
+  paint(createElement(InAppProvider, null, createElement(PerformanceContent, { trades: journal(), year: 2026, month: 7, onBack: noop, ...extra })));
+
+/** The desktop's breakdown list, on its own — the phone draws the same names again further down. */
+const desktopList = (html: string) => html.slice(html.indexOf('aria-label="Breakdowns"'), html.indexOf('</nav>'));
 
 describe('the Performance screen', () => {
-  it('opens with the verdict: the drain, the engine and the one change, with the period named', () => {
+  it('opens with the verdict: the drain, the engine and the one change', () => {
     const words = text(perf());
-    expect(words).toContain('The verdict · 2026');
     expect(words).toContain('Where the money goes');
-    expect(words).toContain('Your 4th+ trades of the day cost you $4,320.00 across 48 trades.');
+    expect(words).toContain('-$4,320.00');
+    expect(words).toContain('Your 4th and later trades of the day, across 48 trades. Everything before them made money.');
     expect(words).toContain('Where it comes from');
-    expect(words).toContain('Your 1st trade of the day made you $1,740.00 across 16 trades.');
+    expect(words).toContain('Your 1st trade of the day, across 16 trades — the best spot in your day.');
     expect(words).toContain('The one change');
-    expect(words).toContain('Stop after your third trade of the day.');
+    expect(words).toContain('Stop after three');
+    // The rule simulator's own figure for a three-trade cap: 1st + 2nd + 3rd = 1,740 − 240 + 540.
+    expect(words).toContain('The trades before your fourth made +$2,040.00');
   });
 
-  it('names the period on every section heading, so the Overview and this screen can disagree honestly', () => {
+  it('names the journal, the period and the count in the toolbar, so this screen and the Overview can disagree honestly', () => {
     const words = text(perf());
-    expect(words).toContain('What you traded · 2026 · 88 trades');
-    expect(words).toContain('What you recorded · 2026');
+    expect(words).toContain('Schwab · 2026 · 88 trades');
+    // And on a phone, beside the net, where the toolbar has scrolled away.
+    expect(words).toContain('Net P&L · 2026');
   });
 
-  it('puts the panel worth the most money first, full width and featured, with the rest ranked behind it', () => {
-    const html = perf();
-    const featured = html.indexOf('data-featured="true"');
-    expect(featured).toBeGreaterThan(-1);
-    // The featured card is the sequence panel — the $4,320 finding — not the edge panel that led before.
-    const featuredCard = html.slice(featured, html.indexOf('</div>', html.indexOf('</h3>', featured)));
-    expect(featuredCard).toContain('Rhythm');
-    expect(html.indexOf('data-featured="true"')).toBeLessThan(html.indexOf('class="panel-grid"'));
-    // Exactly one featured card.
-    expect(html.split('data-featured="true"').length - 1).toBe(1);
+  it('draws the six figures the design names, with what each one means', () => {
+    const words = text(perf());
+    for (const label of ['Net P&L', 'Win rate', 'Profit factor', 'Expectancy', 'Max drawdown', 'Fees']) {
+      expect(words).toContain(label);
+    }
+    expect(words).toContain('-$2,280.00');
+    expect(words).toContain('under 1.0 — losing');
+    expect(words).toContain('need 48% at your payoff');
+    // Twelve losing SPY days before the CVX wins: the account never rose above where it started.
+    expect(words).toContain('Max drawdown -$3,480 from where the period began');
   });
 
-  it('leads every card with its figure', () => {
+  it('ranks the breakdowns by money, with the biggest chosen and drawn at full size', () => {
     const html = perf();
-    // The sequence card's header carries its biggest row as the figure.
-    expect(text(html)).toContain('4th+ trades of the day -$4,320.00');
-    expect(text(html)).toContain('In fees');
+    const list = desktopList(html);
+    const order = ['Trade of the day', 'Symbols', 'Trades per day', 'Calls, puts, shares'].map((t) => list.indexOf(`>${t}<`));
+    expect(order.every((i) => i > -1)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    // Exactly one is chosen, and it is the first.
+    expect(list.split('aria-current="true"').length - 1).toBe(1);
+    expect(list.indexOf('aria-current="true"')).toBeLessThan(list.indexOf('>Trade of the day<'));
+    // Its card is the one on screen: the lead sentence and the table.
+    const words = text(html);
+    expect(words).toContain('Your 4th and later trades cost you $4,320.00 across 48 trades. Your 1st trade is the best one at $108.75 a trade.');
+    expect(words).toContain('How this is counted');
+  });
+
+  it('leads every breakdown in the list with its figure', () => {
+    const words = text(desktopList(perf()));
+    expect(words).toContain('Trade of the day -$4,320');
+    expect(words).toContain('Symbols -$3,480');
+    expect(words).toMatch(/Fees \$87/);
+  });
+
+  it('names what the broker did not send at the bottom of the list, rather than drawing empty cards', () => {
+    const words = text(desktopList(perf()));
+    expect(words).toContain('Needs your input');
+    expect(words).toContain('Hour of day needs entry times');
+    expect(words).toContain('R multiples needs your risk');
+    expect(words).toContain('Discipline tick a checklist');
+    expect(words.indexOf('Needs your input')).toBeGreaterThan(words.indexOf('Trade of the day'));
+  });
+
+  it('offers the rule simulator where a cap would have helped, with the simulator’s figure, and only with somewhere to go', () => {
+    const withSim = text(perf({ onOpenSimulator: noop }));
+    expect(withSim).toContain('Test it in the rule simulator');
+    expect(withSim).toContain('A 3-trade daily cap would have turned');
+    expect(withSim).toContain('+$2,040.00 instead of -$2,280.00');
+    expect(withSim).toContain('Simulate →');
+    const without = text(perf());
+    expect(without).toContain('Test it in the rule simulator');
+    expect(without).not.toContain('Simulate');
   });
 
   it('writes trade counts as words, never as "293t"', () => {
     const html = perf();
     expect(html).not.toMatch(/\d+t · /);
-    expect(text(html)).toContain('48 trades · 0% win');
+    expect(text(html)).toContain('Trades');
     expect(html).not.toContain('/t<');
-    expect(text(html)).toContain('/trade');
+    expect(text(html)).toContain('Avg / trade');
   });
 
-  it('on a phone leads with the finding and keeps the numbers behind a tap', () => {
+  it('draws no back link: Performance is a sidebar and bottom-bar destination', () => {
+    expect(text(perf())).not.toContain('Back to dashboard');
+  });
+
+  it('on a phone keeps the same list as rows with their figures, and the verdict as one card', () => {
+    const html = perf({ onOpenSimulator: noop });
+    const phone = html.slice(html.lastIndexOf('Breakdowns · biggest first'));
+    expect(text(phone)).toContain('Trade of the day -$4,320');
+    // The phone card's change, with the simulator beside it.
+    expect(text(html)).toContain('Stop after three — the trades before your fourth made +$2,040.00');
+    expect(html).toMatch(/>Simulate</);
+  });
+
+  it('says so plainly when the period is empty, and keeps the controls to change it', () => {
+    const html = paint(createElement(InAppProvider, null, createElement(PerformanceContent, { trades: journal(), year: 2025, month: 7, onBack: noop })));
+    expect(text(html)).toContain('No trades in 2025. Try a wider period.');
+    expect(html).toContain('aria-label="Period"');
+  });
+
+  it('a panel card on the landing page still leads with the finding on a phone and keeps the numbers behind a tap', () => {
     const html = paint(
       createElement(PanelShell, {
         eyebrow: 'Rhythm',
@@ -174,29 +239,6 @@ describe('the Performance screen', () => {
     const plain = paint(createElement(PanelShell, { eyebrow: 'X', title: 'Y', icon: null, children: 'numbers' }));
     expect(plain).not.toContain('Show the numbers');
     expect(plain).not.toContain('hidden md:flex');
-  });
-});
-
-describe('the trade after a loss', () => {
-  const panel = (afterLossAvg: number, afterWinAvg: number) =>
-    text(
-      paint(
-        createElement(TiltPanel, {
-          data: { afterLossAvg, afterLossCount: 164, afterWinAvg, afterWinCount: 127, delta: afterLossAvg - afterWinAvg },
-          currency: 'USD',
-        }),
-      ),
-    );
-
-  it('no longer says "the same" over a gap of $36', () => {
-    const words = panel(2.34, -34.03);
-    expect(words).not.toContain('You trade the same');
-    expect(words).toContain('The trade after a loss is worth $36.37 more than the one after a win');
-  });
-
-  it('says "about the same" only when the gap is small next to the figures', () => {
-    expect(panel(-50.16, -46.18)).toContain('You trade about the same after a loss as after a win');
-    expect(panel(-80, -20)).toContain('cost of trading angry');
   });
 });
 
