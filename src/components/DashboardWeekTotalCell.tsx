@@ -49,9 +49,18 @@ export function DashboardWeekTotalCell({ summary, compact = false, share = 0 }: 
         isProfit ? 'border-profit-bright/30' : 'border-loss-bright/30'
       }`}
     >
-      <span className={`block truncate font-bold leading-tight tabular-nums text-[10px] md:text-lg ${tone}`}>
+      {/* Three widths, three forms. A phone always gets the short form. From xl to 2xl the Overview
+          gives a column to the rail beside the calendar and this cell is about 75px of text, where
+          "-$1,174.66" at full size ran out of room and printed as "-$1,17…" — so there a four-figure
+          week is "-$1.2k", and anything smaller still gets its cents. */}
+      <span className={`block truncate font-bold leading-tight tabular-nums text-[10px] md:text-lg xl:text-base 2xl:text-lg ${tone}`}>
         <span className="md:hidden">{formatCurrencyCompact(summary.totalPnl, settings.currency)}</span>
-        <span className="hidden md:inline">{formatCurrency(summary.totalPnl, settings.currency)}</span>
+        <span className="hidden md:inline xl:hidden 2xl:inline">{formatCurrency(summary.totalPnl, settings.currency)}</span>
+        <span className="hidden xl:inline 2xl:hidden">
+          {Math.abs(summary.totalPnl) >= 1000
+            ? formatCurrencyCompact(summary.totalPnl, settings.currency)
+            : formatCurrency(summary.totalPnl, settings.currency)}
+        </span>
       </span>
       <span className="hidden md:block text-[10px] text-text-secondary mt-0.5 truncate">
         {summary.tradeCount} {summary.tradeCount === 1 ? 'trade' : 'trades'}

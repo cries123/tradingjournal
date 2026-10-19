@@ -217,6 +217,31 @@ export function performanceVerdict(trades: Trade[], fmt: (n: number) => string):
 }
 
 /**
+ * The Overview's "What is costing you": the biggest losses in the period, one per kind, then the
+ * biggest earner.
+ *
+ * The same findings and the same threshold as the verdict, so the Overview and the Performance
+ * screen cannot name different leaks for the same month. One per dimension because the dimensions
+ * overlap — most 0DTE trades are SPY trades — and three rows that are one leak seen three ways would
+ * crowd out the second leak. The earner is there so the card is a picture of the month rather than
+ * a list of complaints; it comes last.
+ */
+export function overviewFindings(trades: Trade[], losses = 3): Finding[] {
+  if (trades.length < MIN_SAMPLE) return [];
+  const threshold = minImpact(trades);
+  const findings = collectFindings(trades).filter((f) => f.impact >= threshold);
+  const bestPerDimension = (sign: 1 | -1) => {
+    const seen = new Set<Dimension>();
+    return findings
+      .filter((f) => Math.sign(f.pnl) === sign)
+      .sort((a, b) => b.impact - a.impact)
+      .filter((f) => (seen.has(f.dimension) ? false : (seen.add(f.dimension), true)));
+  };
+  const engine = bestPerDimension(1)[0];
+  return [...bestPerDimension(-1).slice(0, losses), ...(engine ? [engine] : [])];
+}
+
+/**
  * The dollar impact a panel represents, for ordering the panels the same way the verdict is: the
  * one worth the most money first, drawn largest.
  */

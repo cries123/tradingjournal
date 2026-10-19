@@ -128,13 +128,17 @@ export function DashboardCalendar({
               </span>
             )}
           </span>
-          <MonthPicker
-            year={year}
-            month={month}
-            onPrev={onPrevMonth}
-            onNext={onNextMonth}
-            onChange={onMonthChange}
-          />
+          {/* From md up only: a phone steps the period in the Overview's toolbar, which every tab
+              shares, and a second picker two inches below it was the same control twice. */}
+          <div className="hidden md:block">
+            <MonthPicker
+              year={year}
+              month={month}
+              onPrev={onPrevMonth}
+              onNext={onNextMonth}
+              onChange={onMonthChange}
+            />
+          </div>
         </div>
       </div>
 

@@ -561,6 +561,11 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                   onLoadSample={loadSampleData}
                   onClearSample={clearSampleData}
                   ruleDates={ruleDates}
+                  /* The active journal, unfiltered: a limit is set for one account, and a symbol
+                     filter must not hide the trade that broke it. */
+                  ruleTrades={activeJournalTrades}
+                  onSetRules={() => openView('settings')}
+                  onOpenPerformance={() => openView('performance')}
                 />
               </>
             )}

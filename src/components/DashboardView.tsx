@@ -1,17 +1,20 @@
 import { useMemo, useState } from 'react';
-import { Calendar, FileText, Grid3X3, LayoutDashboard, RefreshCw, Share2 } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, FileText, Grid3X3, RefreshCw, Share2 } from 'lucide-react';
 import type { Filters, Trade } from '../types';
 import { computeStats, getMonthTrades, getYearTrades } from '../utils/stats';
 import { formatCurrency, formatMonthYear } from '../utils/format';
 import { computeJournalingStreak, computeTradingInsights } from '../utils/insights';
 import { computeTakeaway } from '../utils/takeaway';
 import { useSettings } from '../context/useSettings';
-import { AccountSwitcher } from './AccountSwitcher';
+import { PhoneJournalSelect } from './overview/PhoneJournalSelect';
 import { useAiTakeaway } from '../hooks/useAiTakeaway';
 import { SiteAnnouncement } from './SiteAnnouncement';
 import { DuplicateTradesBanner } from './DuplicateTradesBanner';
-import { WeeklyRecapCard } from './WeeklyRecapCard';
 import { DashboardCalendar } from './DashboardCalendar';
+import { TodayCard } from './overview/TodayCard';
+import { CostingCard } from './overview/CostingCard';
+import { ThisWeekCard } from './overview/ThisWeekCard';
+import { TradeLog } from './overview/TradeLog';
 import { EmptyDashboard } from './EmptyDashboard';
 import { FiltersBar } from './FiltersBar';
 import { ShareCardModal } from './ShareCardModal';
@@ -60,7 +63,16 @@ interface DashboardViewProps {
   onOpenReport?: () => void;
   /** Days on which one of the trader's rules was broken, judged on the active journal alone. */
   ruleDates?: ReadonlySet<string>;
+  /** The active journal's trades, unfiltered — what Today is judged against, like the rule banner. */
+  ruleTrades?: Trade[];
+  /** Opens Settings, where the rules are set. */
+  onSetRules?: () => void;
+  onOpenPerformance?: () => void;
+  /** Opens the full trade list. */
+  onAllTrades?: () => void;
 }
+
+type PhoneTab = 'calendar' | 'trades' | 'insights';
 
 export function DashboardView({
   trades,
@@ -90,10 +102,17 @@ export function DashboardView({
   hasBrokerTrades = false,
   onOpenReport,
   ruleDates,
+  ruleTrades,
+  onSetRules,
+  onOpenPerformance,
+  onAllTrades,
 }: DashboardViewProps) {
   const { settings, viewingAllJournals } = useSettings();
   const [mode, setMode] = useState<DashboardMode>('month');
   const [showShare, setShowShare] = useState(false);
+  const [phoneTab, setPhoneTab] = useState<PhoneTab>('calendar');
+  /** Hidden on a phone unless its tab is the one open; always shown from md up. */
+  const onTab = (tab: PhoneTab) => (phoneTab === tab ? '' : 'max-md:hidden');
 
   const monthTrades = useMemo(() => getMonthTrades(trades, year, month), [trades, year, month]);
   const yearTrades = useMemo(() => getYearTrades(trades, year), [trades, year]);
@@ -129,8 +148,40 @@ export function DashboardView({
     settings.tradingRules,
   );
 
+  const journalName = viewingAllJournals
+    ? 'All journals'
+    : (settings.accounts.find((a) => a.id === settings.activeAccountId)?.name ?? 'Journal');
+  const periodHasTrades = mode === 'month' ? monthTrades.length > 0 : yearTrades.length > 0;
+  const stepBack = mode === 'month' ? onPrevMonth : onPrevYear;
+  const stepForward = mode === 'month' ? onNextMonth : onNextYear;
+
+  const calendar =
+    mode === 'month' ? (
+      <DashboardCalendar
+        year={year}
+        month={month}
+        trades={trades}
+        onDayClick={onDayClick}
+        onPrevMonth={onPrevMonth}
+        onNextMonth={onNextMonth}
+        onMonthChange={onMonthChange}
+        ruleDates={ruleDates}
+      />
+    ) : (
+      <YearMonths
+        trades={trades}
+        year={year}
+        onPrevYear={onPrevYear}
+        onNextYear={onNextYear}
+        onSelectMonth={(m) => {
+          onSelectMonth(m);
+          setMode('month');
+        }}
+      />
+    );
+
   return (
-    <div className="flex flex-col gap-2 md:gap-3 pb-2">
+    <div className="flex flex-col gap-3 pb-2">
       {/* Above everything else: if the numbers below are inflated by a double import, that's the
           first thing the trader needs to know — before they read a single stat. */}
       {everyTrade && onRemoveTrades && (
@@ -139,24 +190,33 @@ export function DashboardView({
 
       <SiteAnnouncement onConnectBroker={onConnectBroker} />
 
-      {/* Phone only. On desktop the sidebar already carries the journal switcher, and rendering
-          both put the same control on screen twice, a few hundred pixels apart. */}
-      <div className="md:hidden">
-        <AccountSwitcher />
-      </div>
+      {/* Phone only. On desktop the sidebar carries the journals, each with its month. */}
+      <PhoneJournalSelect />
 
       {/*
-        The screen's header, in the shape every other screen's has — icon and title, then its
-        controls. The filters live here now: they narrow everything below them, the hero included,
-        and sitting under the calendar they read as a control for the Long vs Short card they
-        happened to be above.
+        The screen's toolbar: what you are looking at, then the controls that change it. The filters
+        live here because they narrow everything below them, the strip included. Sync and the report
+        are desktop-only here — on a phone they are on More and on the Insights tab, and five buttons
+        across a 390px screen wrapped to three rows.
       */}
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2 shrink-0 px-0.5">
-        <div className="hidden md:flex items-center gap-3 mr-2">
-          <span className="p-2 rounded-lg bg-accent/10 text-accent shrink-0">
-            <LayoutDashboard size={20} aria-hidden />
-          </span>
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight">Overview</h1>
+        <div className="hidden md:block mr-1 min-w-0">
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight leading-tight">Overview</h1>
+          <p className="text-xs text-text-secondary truncate">
+            {journalName} · {periodLabel}
+          </p>
+        </div>
+
+        {/* A phone has no calendar header on the Trades and Insights tabs, so the period is
+            stepped here — the one control every tab needs. */}
+        <div className="md:hidden flex items-center rounded-xl border border-border bg-bg-tertiary/60">
+          <button type="button" onClick={stepBack} aria-label={mode === 'month' ? 'Previous month' : 'Previous year'} className="p-2 text-text-secondary focus-ring rounded-l-xl">
+            <ChevronLeft size={16} />
+          </button>
+          <span className="px-1 text-sm font-semibold tabular-nums whitespace-nowrap">{periodLabel}</span>
+          <button type="button" onClick={stepForward} aria-label={mode === 'month' ? 'Next month' : 'Next year'} className="p-2 text-text-secondary focus-ring rounded-r-xl">
+            <ChevronRight size={16} />
+          </button>
         </div>
 
         <SegmentedControl
@@ -173,44 +233,46 @@ export function DashboardView({
           <FiltersBar filters={filters} symbols={filterSymbols} setups={filterSetups} onChange={onFiltersChange} />
         )}
 
-        {/* Syncing is something you do, not something that happens to you: the broker is only ever
-            contacted when the trader presses Sync on the Connect Broker screen. So this is a plain
-            shortcut to that screen, not a status line about a background job — there is no
-            background job. */}
-        {hasBrokerTrades && onSyncBroker && (
-          <button
-            type="button"
-            onClick={onSyncBroker}
-            className="ml-auto flex items-center gap-1.5 text-[11px] text-text-secondary hover:text-accent transition-colors focus-ring rounded shrink-0"
-          >
-            <RefreshCw size={11} />
-            Sync broker
-          </button>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          {/* Syncing is something you do, not something that happens to you: the broker is only
+              ever contacted when the trader presses Sync on the broker screen. So this is a plain
+              shortcut to that screen, not a status line about a background job. */}
+          {hasBrokerTrades && onSyncBroker && (
+            <button
+              type="button"
+              onClick={onSyncBroker}
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border/60 text-text-secondary hover:text-text-primary hover:border-accent/30 transition-colors focus-ring"
+            >
+              <RefreshCw size={13} />
+              Sync
+            </button>
+          )}
 
-        {/* Beside Share, and only for a month with trades in it: the report is of one month. On a
-            plan without it the screen it opens explains the plan that has it. */}
-        {onOpenReport && mode === 'month' && monthTrades.length > 0 && (
-          <button
-            type="button"
-            onClick={onOpenReport}
-            className={`${hasBrokerTrades && onSyncBroker ? '' : 'ml-auto '}flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border/60 text-text-secondary hover:text-text-primary hover:border-accent/30 transition-colors focus-ring`}
-          >
-            <FileText size={14} />
-            Monthly report
-          </button>
-        )}
+          {/* Only for a month with trades in it: the report is of one month. On a plan without it
+              the screen it opens explains the plan that has it. */}
+          {onOpenReport && mode === 'month' && monthTrades.length > 0 && (
+            <button
+              type="button"
+              onClick={onOpenReport}
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border/60 text-text-secondary hover:text-text-primary hover:border-accent/30 transition-colors focus-ring"
+            >
+              <FileText size={14} />
+              Monthly report
+            </button>
+          )}
 
-        {(mode === 'month' ? monthTrades.length > 0 : yearTrades.length > 0) && (
-          <button
-            type="button"
-            onClick={() => setShowShare(true)}
-            className={`${(hasBrokerTrades && onSyncBroker) || (onOpenReport && mode === 'month' && monthTrades.length > 0) ? '' : 'ml-auto '}flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border/60 text-text-secondary hover:text-text-primary hover:border-accent/30 transition-colors focus-ring`}
-          >
-            <Share2 size={14} />
-            {mode === 'month' ? 'Share month' : 'Share year'}
-          </button>
-        )}
+          {periodHasTrades && (
+            <button
+              type="button"
+              onClick={() => setShowShare(true)}
+              aria-label={mode === 'month' ? 'Share month' : 'Share year'}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border/60 text-text-secondary hover:text-text-primary hover:border-accent/30 transition-colors focus-ring"
+            >
+              <Share2 size={14} />
+              <span className="hidden md:inline">{mode === 'month' ? 'Share month' : 'Share year'}</span>
+            </button>
+          )}
+        </div>
       </header>
 
       {!hasAnyTrades && (
@@ -244,9 +306,7 @@ export function DashboardView({
           stats={mode === 'month' ? stats : yearStats}
           // Says so when the figures are every journal added together, so a combined month is
           // never mistaken for the active journal's.
-          periodLabel={`${mode === 'month' ? formatMonthYear(year, month) : String(year)}${
-            viewingAllJournals ? ' · All journals' : ''
-          }`}
+          periodLabel={`${periodLabel}${viewingAllJournals ? ' · All journals' : ''}`}
           streakDays={streakDays}
           goalPnl={mode === 'month' ? settings.monthlyGoalPnl : 0}
           showBenchmark={mode === 'month'}
@@ -255,63 +315,93 @@ export function DashboardView({
 
       {hasAnyTrades && <TakeawayBanner takeaway={takeaway} aiText={aiTakeawayText} aiPending={aiTakeawayPending} />}
 
-      {/* The week recap goes above the calendar at full width, not in a column beside it.
-          It shared an 1800px-and-up split with the calendar back when the equity curve was
-          stacked in that column too. With the charts gone the column held one short strip of a
-          card, so on a wide screen the split handed ~620px to a single line of text and left the
-          rest blank — and computeWeeklyRecap returns null on any week with no trades yet, which
-          rendered the column empty and pinned the calendar to the left edge with a third of the
-          screen dead beside it. Stacking costs one short row and the calendar gets every pixel,
-          which it wants: its day cells start truncating dollar amounts under about 950px. */}
-      {hasAnyTrades && <WeeklyRecapCard trades={trades} />}
+      {!hasAnyTrades ? (
+        calendar
+      ) : (
+        /*
+          Two columns from xl up: the period itself (the calendar and its trades) and a rail of what
+          to act on (today against your limits, what is costing you, this week).
 
-      <div className="grid gap-2 md:gap-3">
-        <div className="min-w-0">
-        {mode === 'month' ? (
-          <DashboardCalendar
-            year={year}
-            month={month}
-            trades={trades}
-            onDayClick={onDayClick}
-            onPrevMonth={onPrevMonth}
-            onNextMonth={onNextMonth}
-            onMonthChange={onMonthChange}
-            ruleDates={ruleDates}
-          />
-        ) : (
-          <YearMonths
-            trades={trades}
-            year={year}
-            onPrevYear={onPrevYear}
-            onNextYear={onNextYear}
-            onSelectMonth={(m) => {
-              onSelectMonth(m);
-              setMode('month');
-            }}
-          />
-        )}
+          Below xl the two columns dissolve (`contents`) and `order` decides the single column: Today
+          first, because it is the one card about the next decision, then the tab bar on a phone,
+          then the period. On a phone only the open tab's cards are shown; on a tablet everything is,
+          in the same order.
+        */
+        <div className="flex flex-col gap-3 xl:grid xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
+          <div className="contents xl:flex xl:flex-col xl:gap-3 xl:min-w-0">
+            <div className={`min-w-0 max-xl:order-3 ${onTab('calendar')}`}>{calendar}</div>
+
+            {mode === 'month' && (
+              <div className={`min-w-0 max-xl:order-4 ${onTab('trades')}`}>
+                <TradeLog trades={monthTrades} ruleDates={ruleDates} onDayClick={onDayClick} onAllTrades={onAllTrades} />
+              </div>
+            )}
+
+          </div>
+
+          <aside className="contents xl:flex xl:flex-col xl:gap-3 xl:sticky xl:top-4">
+            <div className="max-xl:order-1">
+              <TodayCard trades={ruleTrades ?? trades} onSetRules={onSetRules} />
+            </div>
+            <div className={`max-xl:order-5 ${onTab('insights')}`}>
+              <CostingCard trades={analyticsTrades} periodLabel={periodLabel} onOpenPerformance={onOpenPerformance} />
+            </div>
+            <div className={`max-xl:order-6 ${onTab('insights')}`}>
+              <ThisWeekCard trades={trades} onDayClick={onDayClick} />
+            </div>
+            {onOpenReport && mode === 'month' && monthTrades.length > 0 && (
+              <button
+                type="button"
+                onClick={onOpenReport}
+                className={`md:hidden max-xl:order-6 panel-card w-full flex items-center justify-between p-4 text-left focus-ring ${onTab('insights')}`}
+              >
+                <span>
+                  <span className="block text-[15px] font-semibold">{formatMonthYear(year, month)} report</span>
+                  <span className="block text-[13px] text-text-secondary">One page, to print or send</span>
+                </span>
+                <ChevronRight size={18} className="text-text-secondary" aria-hidden />
+              </button>
+            )}
+          </aside>
+
+          {/* The phone's tabs. Three, because a phone shows one of these at a time and a scroll
+              past the calendar to reach the trades was the complaint. */}
+          <div role="tablist" aria-label="Overview" className="md:hidden max-xl:order-2 grid grid-cols-3 rounded-xl border border-border bg-bg-tertiary/60 p-1">
+            {(['calendar', 'trades', 'insights'] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                aria-selected={phoneTab === tab}
+                onClick={() => setPhoneTab(tab)}
+                className={`rounded-lg py-2 text-sm font-medium transition-colors focus-ring ${
+                  phoneTab === tab ? 'bg-bg-secondary text-text-primary shadow-sm' : 'text-text-secondary'
+                }`}
+              >
+                {tab === 'calendar' ? 'Calendar' : tab === 'trades' ? 'Trades' : 'Insights'}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
-
-      {/* Direction on its own row now that Gross Daily P&L, which was the other half of it, has
-          gone with the rest of the charts. Full width rather than a half-width card stranded
-          beside an empty column. Calls vs puts for a trader who never sells short — see
-          directionSplit. */}
-      {hasAnyTrades && (
-        <Reveal className="panel-card spotlight p-3 md:p-4 flex flex-col min-h-[160px]">
-          <div className="mb-1.5 md:mb-3 shrink-0">
-            <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">
-              Direction
-            </p>
-            <h3 className="text-[10px] md:text-sm font-semibold text-text-primary">{direction.title}</h3>
-          </div>
-          <div className="flex-1 min-h-[80px]">
-            <DirectionPanel groups={direction.groups} currency={settings.currency} />
-          </div>
-        </Reveal>
       )}
 
-      {hasAnyTrades && <TradingInsightsSection trades={analyticsTrades} periodLabel={periodLabel} />}
+      {/* Direction and the deeper breakdowns, under the period they describe, at full width: the
+          insight grid lays out four figures a row and was built for the whole width, not the
+          column beside the rail. On a phone, the end of the Insights tab. */}
+      {hasAnyTrades && (
+        <div className={`min-w-0 flex flex-col gap-3 ${onTab('insights')}`}>
+          <Reveal className="panel-card spotlight p-3 md:p-4 flex flex-col min-h-[160px]">
+            <div className="mb-1.5 md:mb-3 shrink-0">
+              <p className="text-[10px] uppercase tracking-widest text-accent/80 font-medium mb-0.5">Direction</p>
+              <h3 className="text-sm font-semibold text-text-primary">{direction.title}</h3>
+            </div>
+            <div className="flex-1 min-h-[80px]">
+              <DirectionPanel groups={direction.groups} currency={settings.currency} />
+            </div>
+          </Reveal>
+          <TradingInsightsSection trades={analyticsTrades} periodLabel={periodLabel} />
+        </div>
+      )}
 
       {showShare && (
         <ShareCardModal

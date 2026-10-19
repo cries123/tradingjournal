@@ -67,30 +67,37 @@ export function StatsCards({
   }, [sign]);
 
   return (
-    <div className={`hero-card ${!isProfit && hasTrades ? 'hero-loss' : ''} shrink-0 p-3 md:p-5`}>
+    <div className={`hero-card ${!isProfit && hasTrades ? 'hero-loss' : ''} shrink-0`}>
       {flip > 0 && <span key={flip} className="hero-flip" aria-hidden />}
-      <div className="relative flex flex-col md:flex-row md:items-center gap-3 md:gap-8">
-        <div className="min-w-0 shrink-0">
-          <p className="text-[9px] md:text-[11px] uppercase tracking-[0.2em] text-text-secondary font-semibold">
+      {/*
+        One strip of six cells: the net and the five figures that explain it, divided by hairlines.
+
+        It was a card with the net on the left and the figures floating to its right, which on a
+        wide screen left the middle of the most-looked-at card blank and on a phone stacked into a
+        tall block. As cells of equal weight the strip reads left to right like a statement line. On
+        a phone the net takes the full width and the three figures that answer "am I winning" sit
+        under it; the other two are on the Insights tab and in Performance.
+      */}
+      <div className="relative grid grid-cols-3 md:grid-cols-[minmax(0,1.6fr)_repeat(5,minmax(0,1fr))]">
+        <div className="col-span-3 md:col-span-1 min-w-0 px-4 pt-4 pb-3 md:p-5">
+          <p className="text-[12px] text-text-secondary">
             Net P&L{periodLabel ? ` · ${periodLabel}` : ''}
           </p>
-          <div className="flex items-end gap-3 mt-0.5 md:mt-1">
-            {/* Counts up from zero when the Overview opens, and rolls to the new total when the
-                month, the view or a filter changes. tabular-nums so the digits do not jitter
-                sideways as they turn over. */}
-            <span
-              className={`text-3xl md:text-5xl font-extrabold tracking-tight leading-none tabular-nums ${
-                hasTrades ? (isProfit ? 'hero-value-profit' : 'hero-value-loss') : 'text-text-secondary'
-              }`}
-            >
-              {hasTrades ? <CountUp value={stats.netPnl} format={fmt} from={0} /> : '—'}
-            </span>
-          </div>
-          <p className="text-[10px] md:text-xs text-text-secondary mt-1.5 md:mt-2">
+          {/* Counts up from zero when the Overview opens, and rolls to the new total when the
+              month, the view or a filter changes. tabular-nums so the digits do not jitter
+              sideways as they turn over. */}
+          <span
+            className={`mt-1 block text-4xl md:text-[34px] font-extrabold tracking-tight leading-none tabular-nums ${
+              hasTrades ? (isProfit ? 'hero-value-profit' : 'hero-value-loss') : 'text-text-secondary'
+            }`}
+          >
+            {hasTrades ? <CountUp value={stats.netPnl} format={fmt} from={0} /> : '—'}
+          </span>
+          <p className="text-[12px] text-text-secondary mt-2">
             {hasTrades
               ? `${stats.totalTrades} trade${stats.totalTrades === 1 ? '' : 's'} · ${stats.tradingDays} day${
                   stats.tradingDays === 1 ? '' : 's'
-                } · avg ${fmt(stats.avgProfitPerDay)}/day`
+                } · ${fmt(stats.avgProfitPerDay)} a day`
               : 'No trades yet this period — import or log your first session'}
           </p>
           {hasTrades && (streakDays >= 2 || canCompare) && (
@@ -106,16 +113,8 @@ export function StatsCards({
           )}
         </div>
 
-        {/*
-          The figures across the card rather than as a cluster of chips in its right-hand corner.
-
-          On a wide screen the chips sat at the far right with ~900px of empty card between them
-          and the net figure — the middle of the most-looked-at card on the page was blank. Spread
-          as labelled figures they fill it, and each one is big enough to read at a glance. On a
-          phone they stay the compact two-column list they were.
-        */}
         {hasTrades && (
-          <dl className="grid grid-cols-2 gap-x-3 gap-y-1 md:flex-1 md:grid-cols-3 md:gap-x-6 md:gap-y-4 xl:grid-cols-5 xl:gap-x-0">
+          <dl className="contents">
             <HeroMetric
               label="Win rate"
               value={`${winPct.toFixed(0)}%`}
@@ -131,6 +130,7 @@ export function StatsCards({
               label="Profit factor"
               value={stats.profitFactor >= 99 ? '∞' : stats.profitFactor.toFixed(2)}
               tone={tone(stats.profitFactor >= 1)}
+              hint={stats.profitFactor >= 99 ? 'no losers' : stats.profitFactor >= 1 ? 'making money' : 'losing money'}
             />
             {/*
               An em dash rather than a number when there is no loss to divide by.
@@ -140,11 +140,12 @@ export function StatsCards({
               ratio. The reasoning was already written against the breakeven hint above; the chip
               it comes from was still printing the number.
             */}
-            <HeroMetric label="Avg win/loss" value={hasBothSides ? stats.avgRR.toFixed(2) : '—'} />
+            <HeroMetric label="Avg win/loss" value={hasBothSides ? stats.avgRR.toFixed(2) : '—'} hint="payoff" phoneHidden />
             <HeroMetric
               label="Avg/trade"
               value={fmt(stats.avgProfitPerTrade)}
               tone={tone(stats.avgProfitPerTrade >= 0)}
+              hint="per trade"
             />
             <HeroMetric
               label="Wins / losses"
@@ -153,29 +154,14 @@ export function StatsCards({
                   {stats.winningTrades}W <span className="text-loss-bright">{stats.losingTrades}L</span>
                 </>
               }
+              phoneHidden
             />
           </dl>
         )}
       </div>
 
-      {hasTrades && (
-        <div className="relative mt-2.5 md:mt-4 h-1 rounded-full bg-bg-primary/80 overflow-hidden">
-          {/* One bar that grows in from the left as the card arrives, not two that pop. */}
-          <div className="bar-in flex h-full w-full">
-            <div
-              className="chart-bar-h h-full rounded-full bg-gradient-to-r from-profit-bright to-accent"
-              style={{ width: `${winPct}%` }}
-            />
-            <div
-              className="chart-bar-h h-full bg-gradient-to-r from-loss-bright/60 to-loss-bright/90"
-              style={{ width: `${100 - winPct}%` }}
-            />
-          </div>
-        </div>
-      )}
-
       {goalPnl > 0 && (
-        <div className="relative mt-3 flex items-center gap-2.5">
+        <div className="relative mx-4 mb-4 md:mx-5 flex items-center gap-2.5">
           <Target size={13} className="text-accent shrink-0" />
           <div className="flex-1 h-1.5 rounded-full bg-bg-primary/80 overflow-hidden">
             <div
@@ -202,9 +188,9 @@ export function StatsCards({
 }
 
 /**
- * One labelled figure in the hero. On a phone, label and value on one line like the chips they
- * replaced; from md up, a small caps label over a figure big enough to read across the room. On a
- * wide screen they sit in one row, divided by hairlines.
+ * One cell of the strip: a label, the figure, and a few words saying what the figure means. On a
+ * phone the cells sit three across under the net, divided by hairlines; from md up they continue
+ * the strip to the right of it.
  */
 function HeroMetric({
   label,
@@ -212,26 +198,29 @@ function HeroMetric({
   tone,
   hint,
   title,
+  phoneHidden = false,
 }: {
   label: string;
   value: ReactNode;
   tone?: string;
   hint?: string;
   title?: string;
+  /** Left off the phone's three-across row; the Insights tab and Performance carry it there. */
+  phoneHidden?: boolean;
 }) {
   return (
     <div
       title={title}
-      className="flex items-baseline gap-1 min-w-0 md:flex-col md:items-start md:gap-0.5 xl:border-l xl:border-border/40 xl:px-6"
+      className={`min-w-0 flex flex-col justify-between gap-1 border-t border-white/5 px-3 py-3 md:border-t-0 md:border-l md:px-4 md:py-5 [&:nth-child(n+2)]:border-l ${
+        phoneHidden ? 'max-md:hidden' : ''
+      }`}
     >
-      <dt className="text-[11px] md:text-[10px] md:uppercase md:tracking-[0.15em] text-text-secondary font-semibold whitespace-nowrap">
-        {label}
-      </dt>
-      <dd className={`text-[11px] md:text-xl font-bold tabular-nums leading-tight whitespace-nowrap ${tone ?? 'text-text-primary'}`}>
-        {value}
-        {hint && (
-          <span className="ml-1.5 text-[10px] md:text-[11px] font-medium text-text-secondary">{hint}</span>
-        )}
+      <dt className="text-[11px] md:text-[12px] text-text-secondary whitespace-nowrap">{label}</dt>
+      <dd>
+        <span className={`block text-lg md:text-2xl font-bold tabular-nums leading-tight whitespace-nowrap ${tone ?? 'text-text-primary'}`}>
+          {value}
+        </span>
+        {hint && <span className="block mt-0.5 text-[11px] text-text-secondary truncate">{hint}</span>}
       </dd>
     </div>
   );

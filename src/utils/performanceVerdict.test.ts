@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Trade } from '../types';
 import { brokerCoverage } from './brokerAnalytics';
-import { collectFindings, panelImpact, performanceVerdict } from './performanceVerdict';
+import { collectFindings, overviewFindings, panelImpact, performanceVerdict } from './performanceVerdict';
 
 /*
  * The verdict: the biggest drain, the biggest engine and the one change, ranked by dollars.
@@ -55,6 +55,32 @@ function jaysJournal(): Trade[] {
   }
   return trades;
 }
+
+describe("the Overview's findings", () => {
+  it('leads with the same drain the verdict names, so the two screens never disagree', () => {
+    const journal = jaysJournal();
+    const rows = overviewFindings(journal);
+    expect(rows[0]).toEqual(performanceVerdict(journal, fmt)!.drain);
+  });
+
+  it('takes one loss per kind, so one leak seen three ways does not fill the card', () => {
+    const losses = overviewFindings(jaysJournal()).filter((f) => f.pnl < 0);
+    expect(losses.length).toBeGreaterThan(1);
+    expect(new Set(losses.map((f) => f.dimension)).size).toBe(losses.length);
+    // Ranked by dollars, biggest first.
+    expect(losses.map((f) => f.impact)).toEqual([...losses.map((f) => f.impact)].sort((a, b) => b - a));
+  });
+
+  it('ends with what made the most, after the losses', () => {
+    const rows = overviewFindings(jaysJournal());
+    expect(rows.at(-1)!.pnl).toBeGreaterThan(0);
+    expect(rows.filter((f) => f.pnl > 0)).toHaveLength(1);
+  });
+
+  it('says nothing about a period too small to rank', () => {
+    expect(overviewFindings(jaysJournal().slice(0, 4))).toEqual([]);
+  });
+});
 
 describe('the verdict', () => {
   it('leads with the group that cost the most, names what made the most, and says the change', () => {
