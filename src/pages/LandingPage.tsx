@@ -30,8 +30,7 @@ import { LazyOnView } from '../components/landing/LazyOnView';
 import { LandingFaq } from '../components/landing/LandingFaq';
 import { trackSpotlight } from '../utils/spotlight';
 import { lowestTierWith, TIER_PLANS, type Feature } from '../config/tiers';
-import { BrokerLogo } from '../components/brokers/BrokerLogo';
-import { brokerIdFromName } from '../utils/brokerIds';
+import { BrokerGrid } from '../components/landing/BrokerGrid';
 import { COMING_SOON_BROKERS, SUPPORTED_BROKERS } from '../data/brokers';
 import { BROKER_COUNT_PHRASE, SHORT_BROKER_EXAMPLES } from '../data/brokerCopy';
 import { GUIDE_ARTICLES } from '../seo/guides';
@@ -100,9 +99,6 @@ const EVERYDAY: { icon: LucideIcon; title: string; body: string }[] = [
     body: 'One-click backup puts your entire journal in a file you keep. Export trades to CSV whenever you like.',
   },
 ];
-
-/* How many broker logos fit in the bento card before it starts to look like a directory. */
-const BROKERS_SHOWN = 8;
 
 /**
  * The public home page.
@@ -314,15 +310,8 @@ export function LandingPage({
                 Link {BROKER_COUNT_PHRASE} through SnapTrade, then press Sync and your round-trip
                 trades land on the calendar. Your broker is only contacted when you ask.
               </p>
-              <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {brokers.supported.slice(0, BROKERS_SHOWN).map((b) => (
-                  <div
-                    key={b.name}
-                    className="rounded-2xl bg-black/60 border border-white/5 px-3 py-2.5 flex items-center min-w-0"
-                  >
-                    <BrokerLogo broker={brokerIdFromName(b.name)} compact />
-                  </div>
-                ))}
+              <div className="mt-8">
+                <BrokerGrid names={brokers.supported.map((b) => b.name)} />
               </div>
               {/* #security stays on the page: the footer's Security link and the in-page scroll
                   handler both target it. */}
