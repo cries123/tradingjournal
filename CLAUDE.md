@@ -178,11 +178,27 @@ was deleted. The rules now, in `server/snaptradeCredentials.ts` (tested against 
 
 ## The screens, and the pieces they share
 
-Sidebar destinations: Overview, Performance, Rule simulator, Assistant, Track record, plus Connect
-broker, Settings, Support. `report` (the monthly report) is reached from the Overview, not the
+The October 2026 redesign drew every customer screen to mockups Jay approved. Where a screen
+differs from its mockup, the commit that built it says what was left out and why. Usually the
+mockup shows a control with no feature behind it, or something that would cost a trader data.
+
+Sidebar destinations: Overview, Trades, Performance, Rule simulator, Assistant, Track record,
+Coaching. Below them come the journals, the broker card and "+ Log trade". Settings, Subscription,
+Support and the rest live in the profile menu at the bottom (`components/nav/ProfileMenu.tsx`). On a
+phone the bottom bar is Overview · Performance · + · Ask · More, and More (`more/MoreContent.tsx`)
+holds everything the sidebar and the profile menu hold. `bottomNavFit.test.ts` keeps the + circle
+inside the bar. A day opens as a page on desktop (`appView === 'day'`) and as a bottom sheet on a
+phone (`day/DaySheet.tsx`). `report` (the monthly report) is reached from the Overview, not the
 sidebar. Every screen is wrapped in `PageFrame` (`src/components/layout/PageFrame.tsx`) — full
 width in the app, a centred column on the public site. `sidebarDestination` hides its back link on
 desktop, where the sidebar already goes there.
+
+**Day notes are saved only through `useDayNote`** (`utils/dayNoteSave.ts` holds the rules). It
+never writes a note that did not load, because a failed load is not an empty note: the old drawer
+saved an empty box over the real note, and `saveDayNote` turns that into a delete. It never
+re-saves an unchanged note either. Don't add fields to the day note document. `saveDayNote` is a
+full `setDoc`, so any older copy of the app still open would erase them. That is why the mockup's
+"plan before the open" box and mood tags were not built.
 
 Shared pieces, so none of these get rebuilt:
 
@@ -191,9 +207,10 @@ Shared pieces, so none of these get rebuilt:
   (`hooks/`). Figures count up and roll on change; cards rise in when first scrolled into view;
   every dialog plays out before it unmounts, via `useAnimatedClose` — a close wired straight to the
   prop skips the animation, which is the bug Escape had on the day drawer.
-- **`.panel-grid`** in `index.css` lays the Performance panels out so rows end level and a short
-  last row splits into halves rather than leaving one card 1,600px wide. It works for any card
-  count; `dist/pv-gridcheck.mjs` checks 1–10 at three widths.
+- **`.panel-grid`** in `index.css` makes the rows of a card grid end level, and splits a short last
+  row into halves rather than leaving one card 1,600px wide. It works for any card count. Since
+  the redesign, Performance lists its breakdowns biggest first instead of in a grid, so nothing
+  uses the class now. It is kept for the next grid whose card count varies from journal to journal.
 - **`.spotlight`** + `trackSpotlight` (`utils/spotlight.ts`): one pointer listener on the shell
   lights whichever card is under the cursor. `--spot-rgb` is brand green on the landing page and the
   theme accent in the app.

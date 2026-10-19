@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -191,6 +192,14 @@ describe('the Performance screen', () => {
     const without = text(perf());
     expect(without).toContain('Test it in the rule simulator');
     expect(without).not.toContain('Simulate');
+  });
+
+  it('is handed the simulator by the app, so the real screen has the button the test above draws', () => {
+    // The button hides itself without somewhere to go, so a missing prop is silent: the screen
+    // merely loses its one call to action. That is how the rebuild first arrived in the app.
+    const app = readFileSync('src/pages/JournalApp.tsx', 'utf8');
+    const performance = app.slice(app.indexOf('<PerformanceContent'), app.indexOf('/>', app.indexOf('<PerformanceContent')));
+    expect(performance).toContain("onOpenSimulator={() => openView('simulator')}");
   });
 
   it('writes trade counts as words, never as "293t"', () => {

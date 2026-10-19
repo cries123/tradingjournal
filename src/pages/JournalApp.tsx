@@ -411,6 +411,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                   year={year}
                   month={month}
                   onBack={goBackView}
+                  onOpenSimulator={() => openView('simulator')}
                 />
               </LockedFeature>
             ) : appView === 'simulator' ? (
