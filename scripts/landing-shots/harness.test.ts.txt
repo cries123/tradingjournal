@@ -1,0 +1,409 @@
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createElement, type ReactElement } from 'react';
+import { renderToString } from 'react-dom/server';
+import { expect, it, vi } from 'vitest';
+import type { Trade } from '../types';
+
+/*
+ * TEMPORARY harness, not a test: the real redesigned screens, painted with the landing page's sample
+ * journal (demoJournal, June 2026), for the landing page's screenshots. Lives in scripts/landing-shots
+ * as .txt so neither vitest nor tsc picks it up; render.ps1 copies it into src/components only to run.
+ */
+
+const store = vi.hoisted(() => ({
+  threads: [] as { id: string; title: string; createdAt: number; updatedAt: number; messages: unknown[] }[],
+  activeId: null as string | null,
+}));
+/** PerformanceContent opens on the year; the shots want June, so its first paint is the month. */
+const force = vi.hoisted(() => ({ monthScope: false }));
+
+vi.mock('react', async (importOriginal) => {
+  const real = await importOriginal<typeof import('react')>();
+  const useState = ((init: unknown) => real.useState(force.monthScope && init === 'year' ? 'month' : init)) as typeof real.useState;
+  return { ...real, useState, default: { ...real, useState } };
+});
+
+vi.mock('../lib/firebase', () => ({
+  isFirebaseConfigured: () => false,
+  getFirebaseAuth: () => ({ currentUser: null }),
+  getFirebaseDb: () => ({}),
+  getFirebaseStorage: () => ({}),
+}));
+vi.mock('../lib/firebaseAuth', () => ({
+  isFirebaseConfigured: () => false,
+  getFirebaseAuth: () => ({ currentUser: null }),
+  getFirebaseApp: () => ({}),
+}));
+vi.mock('../services/admin', () => ({ isCurrentUserAdmin: async () => false }));
+vi.mock('../hooks/useSupportUnread', () => ({ useSupportUnread: () => 0 }));
+vi.mock('../hooks/useCoachingCount', () => ({ useCoachingCount: () => 0 }));
+vi.mock('../hooks/useAiTakeaway', () => ({ useAiTakeaway: () => ({ text: null, pending: false }) }));
+vi.mock('../context/useAuth', () => ({
+  useAuth: () => ({
+    user: { uid: 'u1', email: 'trader@example.com', emailVerified: true, metadata: {}, providerData: [] },
+    username: 'sample',
+    loading: false,
+    firebaseEnabled: true,
+    needsUsername: false,
+    profileLoading: false,
+    logout: async () => undefined,
+  }),
+}));
+vi.mock('../context/useSettings', () => ({
+  useSettings: () => ({
+    settings: {
+      currency: 'USD',
+      defaultSymbol: 'SPY',
+      themeAccent: 'lime',
+      setupTags: [],
+      accounts: [{ id: 'default', name: 'Primary journal' }],
+      activeAccountId: 'default',
+      viewAllJournals: false,
+      strategies: [],
+      tradingRules: { enabled: true, maxTradesPerDay: 3, maxDailyLoss: 500, maxConsecutiveLosses: 3 },
+      monthlyGoalPnl: 0,
+      accountSize: 0,
+      trackRecordJournals: null,
+      ruleAlertsEnabled: true,
+    },
+    saveState: { status: 'idle', at: 0 },
+    journalLimit: 5,
+    canAddJournal: true,
+    viewingAllJournals: false,
+    canViewAllJournals: true,
+    updateSettings: () => undefined,
+    setActiveAccount: () => undefined,
+    setViewAllJournals: () => undefined,
+    addAccount: () => true,
+  }),
+}));
+vi.mock('../context/useEntitlement', () => ({
+  useEntitlement: () => ({
+    tier: 'gold',
+    subscribedTier: 'gold',
+    status: 'active',
+    source: 'purchase',
+    has: () => true,
+    loaded: true,
+    loading: false,
+    onTrial: false,
+    marketReplayLive: false,
+    currentPeriodEnd: '2026-07-14T00:00:00.000Z',
+    limits: { aiMessagesPerDay: 15, syncsPerDay: 10, brokerConnections: 10 },
+    usage: { aiMessagesUsed: 2, aiMessagesRemaining: 13, syncsUsed: 1, syncsRemaining: 9, aiCredits: 0, syncCredits: 0 },
+    refresh: async () => undefined,
+    noteUsage: () => undefined,
+  }),
+}));
+vi.mock('../hooks/useAssistantThreads', () => ({
+  useAssistantThreads: () => {
+    const active = store.threads.find((t) => t.id === store.activeId) ?? null;
+    const noop = () => undefined;
+    return {
+      threads: store.threads,
+      activeId: store.activeId,
+      active,
+      messages: active?.messages ?? [],
+      append: noop,
+      rollbackTo: noop,
+      startNew: noop,
+      selectThread: noop,
+      deleteThread: noop,
+      clearAll: noop,
+    };
+  },
+}));
+// The day's note as it reads once loaded, with nothing written yet — not the first paint's "Loading your note…".
+vi.mock('../hooks/useDayNote', () => ({
+  useDayNote: () => ({
+    status: 'ready',
+    saveStatus: 'idle',
+    draft: '',
+    setDraft: () => undefined,
+    discipline: null,
+    setDiscipline: () => undefined,
+    save: () => undefined,
+    retry: () => undefined,
+  }),
+}));
+// Static HTML never counts up, so the figure is painted at its final value.
+vi.mock('./motion/CountUp', () => ({
+  CountUp: ({ value, format }: { value: number; format?: (n: number) => string }) =>
+    format ? format(value) : String(Math.round(value)),
+}));
+
+/* The screens are read on the last trading day of the sample month, so "today", "this month" and the
+   calendar's today mark all fall inside June rather than on whatever day the harness runs. */
+vi.useFakeTimers({ toFake: ['Date'] });
+vi.setSystemTime(new Date(2026, 5, 30, 16, 30, 0));
+
+const { Sidebar } = await import('./Sidebar');
+const { MobileHeader, MobileBottomNav } = await import('./MobileNav');
+const { AccountMenu } = await import('./account/AccountMenu');
+const { DayContent } = await import('./day/DayContent');
+const { DaySheet } = await import('./day/DaySheet');
+const { TradesContent } = await import('./trades/TradesContent');
+const { PerformanceContent } = await import('./PerformanceContent');
+const { DashboardView } = await import('./DashboardView');
+const { InAppProvider } = await import('./layout/PageFrame');
+const { AssistantContent } = await import('./analytics/AssistantContent');
+const { demoJournal, demoInsights } = await import('./landing/landingDemo');
+const { checkRuleViolations, tradesByDay } = await import('../utils/tradingRules');
+const { formatCurrency } = await import('../utils/format');
+
+const RULES = { enabled: true, maxTradesPerDay: 3, maxDailyLoss: 500, maxConsecutiveLosses: 3 };
+
+function lcg(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return s / 0x100000000;
+  };
+}
+
+/**
+ * The sample journal with what a broker import of a 0DTE SPY option carries. P&L is untouched; the
+ * fills are built from it: options P&L is whole dollars per contract before fees, so the exit is the
+ * entry plus the P&L per contract rounded up to a cent, and the remainder is the round trip's fees
+ * (about $1.30–$2.30 a contract).
+ */
+function enrich(raw: Trade[]): Trade[] {
+  const rand = lcg(7177);
+  const sizes = [1, 1, 2, 2, 2, 3, 3, 4, 5];
+  let day = -1;
+  let last = '';
+  return raw.map((t, i) => {
+    if (t.date !== last) {
+      day += 1;
+      last = t.date;
+    }
+    const quantity = sizes[Math.floor(rand() * sizes.length)];
+    const optionType = i % 2 === 0 ? 'call' : 'put';
+    const spot = 652 + Math.round(6 * Math.sin(day / 2.3));
+    const strike = optionType === 'call' ? spot + 1 + Math.floor(rand() * 2) : spot - 1 - Math.floor(rand() * 2);
+    const perContractCents = Math.ceil((t.pnl + 1.3 * quantity) / quantity);
+    const grossPnl = perContractCents * quantity;
+    const fees = Math.round((grossPnl - t.pnl) * 100) / 100;
+    const diff = perContractCents / 100;
+    let tradePrice = Math.round((0.9 + rand() * 1.6) * 100) / 100;
+    if (tradePrice + diff < 0.08) tradePrice = Math.round((0.08 - diff + rand() * 0.35) * 100) / 100;
+    const exitPrice = Math.round((tradePrice + diff) * 100) / 100;
+    expect(Math.abs(grossPnl - fees - t.pnl)).toBeLessThan(1e-6);
+    expect(Math.abs((exitPrice - tradePrice) * quantity * 100 - grossPnl)).toBeLessThan(1e-6);
+    return {
+      ...t,
+      side: 'long',
+      quantity,
+      assetType: 'option',
+      optionType,
+      strike,
+      expiration: t.date,
+      openDate: t.date,
+      tradePrice,
+      exitPrice,
+      grossPnl,
+      fees,
+      accountId: 'default',
+      sourceId: `demo:${t.id}`,
+    } as Trade;
+  });
+}
+
+const css = readFileSync(`${process.env.PREVIEW_CSS_DIR}/${process.env.PREVIEW_CSS}`, 'utf8');
+const override = `
+  .reveal[data-revealed='false'] { opacity: 1 !important; transform: none !important; }
+  .bar-in { animation: none !important; }
+  .animate-page-in, .animate-fade-up, .animate-msg-in { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .draw-line, .equity-line { animation: none !important; stroke-dashoffset: 0 !important; }
+`;
+const OUT = process.env.PREVIEW_OUT!;
+mkdirSync(OUT, { recursive: true });
+
+const noop = () => undefined;
+// The same font request as index.html, so the shots are set in Figtree like the live app.
+const fonts =
+  '<link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />';
+/** `routeApp`: the app's one-screen root. Left off for a phone page drawn at its full length. */
+const html = (body: string, routeApp = true) =>
+  `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${fonts}<style>${css}${override}</style></head><body><div id="root"${routeApp ? ' class="route-app"' : ''}>${body}</div></body></html>`;
+
+const actions = {
+  onDashboard: noop, onAddTrade: noop, onConnectBroker: noop, onPerformance: noop, onSimulator: noop,
+  onTrackRecord: noop, onAssistant: noop, onSettings: noop, onSupport: noop, onCoach: noop,
+};
+
+let JOURNAL: Trade[] = [];
+function desktop(view: string, screen: ReactElement): string {
+  const sidebar = renderToString(createElement(Sidebar, { appView: view as never, onHome: noop, ...actions, onTrades: noop, onSearch: noop, onAccount: noop, onSubscription: noop, onOrderHistory: noop, trades: JOURNAL, year: 2026, month: 5, hasBrokerTrades: true }));
+  const body = renderToString(createElement(InAppProvider, null, screen));
+  return html(`<div class="app-spotlight flex w-full bg-bg-primary dashboard-bg min-h-dvh">${sidebar}<div class="relative flex-1 flex flex-col min-w-0 w-full"><main class="flex-1 p-2 md:p-5 overflow-visible"><div class="max-w-[1680px] mx-auto w-full pb-6 md:pb-10">${body}</div></main></div></div>`);
+}
+
+/** The phone shell. `fixed`: one screen tall with <main> scrolling, as the app is; otherwise the page runs its full length. */
+function phone(view: string, screen: ReactElement, fixed: boolean, after = ''): string {
+  const header = renderToString(createElement(MobileHeader, { onHome: noop, account: createElement(AccountMenu, { onAccount: noop, onSubscription: noop, onOrderHistory: noop }) }));
+  const nav = renderToString(createElement(MobileBottomNav, { appView: view as never, onMore: noop, onAddTrade: noop, onDashboard: noop, onPerformance: noop, onAssistant: noop, assistantOpen: false }));
+  const body = renderToString(createElement(InAppProvider, null, screen));
+  const page = fixed
+    ? `<div class="app-spotlight flex w-full bg-bg-primary dashboard-bg flex-col overflow-hidden" style="height:100dvh"><div id="shot-header">${header}</div><main class="flex-1 p-2 min-h-0 overflow-y-auto"><div class="max-w-[1680px] mx-auto w-full pb-6">${body}</div></main>${nav}</div>`
+    : `<div class="app-spotlight flex w-full bg-bg-primary dashboard-bg flex-col"><div id="shot-header">${header}</div><main class="flex-1 p-2"><div class="max-w-[1680px] mx-auto w-full pb-6">${body}</div></main>${nav}</div>`;
+  return html(page + after, fixed);
+}
+
+it('writes the landing page shots', () => {
+  // Through June 30 only: the screens are read on June 30, so July's sample days have not happened yet.
+  const journal = enrich(demoJournal()).filter((t) => t.date <= '2026-06-30');
+  JOURNAL = journal;
+  const june = journal.filter((t) => t.date.startsWith('2026-06'));
+  expect(june.length).toBe(journal.length);
+
+  const CAP = RULES.maxTradesPerDay;
+  const day26All = journal.filter((t) => t.date === '2026-06-26').sort((a, b) => a.id.localeCompare(b.id));
+  expect(day26All.map((t) => t.pnl)).toEqual([114.78, 9.43, 27.88, -31.79, -162.16, -160.72, -147.22, -137.97]);
+
+  // The note on the trade the Trades shot opens, the first past the cap: the day was +$152.09 after
+  // three, and every trade from the 4th on lost, closing the day red.
+  const PICKED = 'demo-2026-06-26-03';
+  const NOTE = 'Up $152 after three. Took a fourth and kept going. All five after the third lost and gave it all back.';
+  expect(Math.round(day26All.slice(0, 3).reduce((s, t) => s + t.pnl, 0))).toBe(152);
+  expect(day26All.slice(3).every((t) => t.pnl < 0)).toBe(true);
+  expect(day26All.reduce((s, t) => s + t.pnl, 0)).toBeLessThan(0);
+  const trades = journal.map((t) => (t.id === PICKED ? { ...t, notes: NOTE } : t));
+
+  const ruleDates = new Set(checkRuleViolations(trades, RULES).map((v) => v.date));
+
+  /* ── The figures the Ask answers quote, worked out from the day list at the cap ── */
+  const ins = demoInsights(june);
+  const days = [...tradesByDay(june).entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const dayNet = (l: Trade[]) => l.reduce((s, t) => s + t.pnl, 0);
+  const net = r2(june.reduce((s, t) => s + t.pnl, 0));
+  const firstN = days.reduce((s, [, l]) => s + Math.min(CAP, l.length), 0);
+  const afterN = june.length - firstN;
+  const firstPnl = r2(days.reduce((s, [, l]) => s + dayNet(l.slice(0, CAP)), 0));
+  const afterPnl = r2(days.reduce((s, [, l]) => s + dayNet(l.slice(CAP)), 0));
+  const over = days.filter(([, l]) => l.length > CAP);
+  const within = days.filter(([, l]) => l.length <= CAP);
+  const withinPnl = r2(within.reduce((s, [, l]) => s + dayNet(l), 0));
+  const red = days.filter(([, l]) => dayNet(l) < 0);
+  const heavy = days.filter(([, l]) => l.length >= 8);
+  expect(net).toBe(-1823.64);
+  expect(r2(firstPnl + afterPnl)).toBe(net);
+  // To the cent what the Performance screen's verdict says about the same split.
+  expect(firstPnl).toBe(2413.25);
+  expect(afterPnl).toBe(-4236.89);
+  expect(afterN).toBe(70);
+  expect(red.map(([d]) => d)).toEqual(heavy.map(([d]) => d));
+  expect(red.every(([, l]) => l.length > CAP)).toBe(true);
+  expect(r2(heavy.reduce((s, [, l]) => s + dayNet(l), 0))).toBe(ins.heavyPnl);
+  const day26 = days.find(([d]) => d === '2026-06-26')![1];
+  expect(day26.map((t) => t.id)).toEqual(day26All.map((t) => t.id));
+  const kept26 = r2(dayNet(day26.slice(0, CAP)));
+  const after26 = r2(dayNet(day26.slice(CAP)));
+  const net26 = r2(dayNet(day26));
+  expect(kept26).toBe(152.09);
+  expect(net26).toBe(-487.77);
+  // The other two rules, judged as the Day page judges them.
+  let run = 0;
+  let longest = 0;
+  for (const t of day26) {
+    run = t.pnl < 0 ? run + 1 : 0;
+    longest = Math.max(longest, run);
+  }
+  expect(longest).toBe(5);
+  const low26 = Math.min(...day26.map((_, i) => dayNet(day26.slice(0, i + 1))));
+  expect(r2(low26)).toBe(-487.77);
+  expect(low26).toBeGreaterThan(-RULES.maxDailyLoss);
+
+  const sgn = (n: number) => `${n > 0 ? '+' : ''}${formatCurrency(n)}`;
+  const redList = red.map(([d]) => Number(d.slice(8)));
+  const redWords = `Jun ${redList.slice(0, -1).join(', ')} and ${redList.at(-1)}`;
+  const q1 = 'Why did June go red?';
+  const a1 = [
+    '**The trades after your third of the day.**',
+    '',
+    `June closed at ${formatCurrency(net)} over ${june.length} trades. Split by where each trade fell in its day:`,
+    '',
+    '| Trades | Count | Net |',
+    '|---|---|---|',
+    `| 1st to 3rd | ${firstN} | ${sgn(firstPnl)} |`,
+    `| 4th and later | ${afterN} | ${sgn(afterPnl)} |`,
+    '',
+    `- You went past your ${CAP}-trade cap on ${over.length} of ${days.length} days.`,
+    `- Every red day was one of them, each with eight trades or more: ${redWords}. Together they lost ${formatCurrency(ins.heavyPnl)}.`,
+    `- The ${within.length} days you stopped at three or fewer made ${sgn(withinPnl)}.`,
+  ].join('\n');
+  const q2 = 'What happened on June 26?';
+  const a2 = [
+    '**Every trade after your third lost.**',
+    '',
+    `The first three made ${sgn(kept26)}. The ${['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'][day26.length - CAP]} after them all lost, ${formatCurrency(after26)} between them, and the day closed at ${formatCurrency(net26)}.`,
+    '',
+    `- Past your ${CAP}-trade cap from the ${CAP + 1}th trade.`,
+    `- Five losers in a row from the ${CAP + 1}th trade. Your limit is three.`,
+    `- Inside your ${formatCurrency(-RULES.maxDailyLoss).replace(/\.00$/, '')} daily stop, but only just.`,
+  ].join('\n');
+  writeFileSync(
+    `${OUT}/figures.json`,
+    JSON.stringify({ net, trades: june.length, days: days.length, firstN, afterN, firstPnl, afterPnl, overDays: over.length, withinDays: within.length, withinPnl, heavyPnl: ins.heavyPnl, over: over.map(([d, l]) => [d, l.length, r2(dayNet(l))]), red: red.map(([d]) => d), kept26, after26, net26, ruleDates: [...ruleDates].sort(), note: NOTE, q1, a1, q2, a2 }, null, 2),
+  );
+
+  const now = Date.now();
+  const source = { period: 'June 2026', trades: june.length };
+  store.threads = [
+    {
+      id: 'june', title: q1, createdAt: now - 40 * 60_000, updatedAt: now - 30 * 60_000,
+      messages: [
+        { role: 'user', content: q1, at: now - 40 * 60_000 },
+        { role: 'assistant', content: a1, at: now - 40 * 60_000, source },
+        { role: 'user', content: q2, at: now - 30 * 60_000 },
+        { role: 'assistant', content: a2, at: now - 30 * 60_000, source },
+      ],
+    },
+  ];
+  store.activeId = 'june';
+
+  const periods = [
+    { scope: 'month' as const, label: 'June 2026', trades: june },
+    { scope: 'year' as const, label: '2026', trades },
+    { scope: 'all' as const, label: 'All time', trades },
+  ];
+
+  const overview = () =>
+    createElement(DashboardView, {
+      trades, hasAnyTrades: true, year: 2026, month: 5,
+      filters: { symbol: '', setup: '', side: '', tag: '' }, filterSymbols: ['SPY'], filterSetups: [],
+      onFiltersChange: noop, onDayClick: noop, onPrevMonth: noop, onNextMonth: noop, onMonthChange: noop,
+      onPrevYear: noop, onNextYear: noop, onSelectMonth: noop, onAddTrade: noop, onConnectBroker: noop,
+      hasBrokerTrades: true, onSyncBroker: noop, onOpenReport: noop,
+      ruleTrades: trades, ruleDates, onSetRules: noop, onOpenPerformance: noop, onAllTrades: noop,
+    });
+  const performance = () => createElement(PerformanceContent, { trades, year: 2026, month: 5, onBack: noop, onOpenSimulator: noop });
+  const ask = () => createElement(AssistantContent, { periods, rules: RULES, onBack: noop });
+  const dayProps = {
+    date: '2026-06-26', trades, ruleTrades: trades, ruleDates, onOpenDay: noop, onEdit: noop, onDelete: noop,
+    onAddTrade: noop, onImportCsv: noop, onOpenSimulator: noop, onOpenSettings: noop,
+  };
+
+  writeFileSync(`${OUT}/d-overview.html`, desktop('dashboard', overview()));
+  force.monthScope = true;
+  writeFileSync(`${OUT}/d-performance.html`, desktop('performance', performance()));
+  writeFileSync(`${OUT}/p-performance.html`, phone('performance', performance(), false));
+  force.monthScope = false;
+  writeFileSync(`${OUT}/d-ask.html`, desktop('assistant', ask()));
+  writeFileSync(`${OUT}/p-ask.html`, phone('assistant', ask(), true));
+  writeFileSync(`${OUT}/d-day.html`, desktop('day', createElement(DayContent, { ...dayProps, layout: 'page', onBack: noop })));
+  // The Trades page opens on the newest day's first trade; handed the 26th from its 4th trade on,
+  // that is the 4th. The panel reads the trade's place in its day from ruleTrades, the whole journal.
+  const fromPicked = trades.filter((t) => t.date === '2026-06-26' && t.id >= PICKED);
+  writeFileSync(
+    `${OUT}/d-trades.html`,
+    desktop('trades', createElement(TradesContent, {
+      trades: fromPicked, ruleTrades: trades, ruleDates, year: 2026, month: 5, onPrevMonth: noop, onNextMonth: noop, onPrevYear: noop,
+      onNextYear: noop, onOpenDay: noop, onEdit: noop, onDelete: noop, onImportCsv: noop, onExport: noop,
+    })),
+  );
+  writeFileSync(`${OUT}/p-overview.html`, phone('dashboard', overview(), false));
+  const sheet = renderToString(createElement(DaySheet, { ...dayProps, onClose: noop }));
+  writeFileSync(`${OUT}/p-day.html`, phone('dashboard', overview(), true, sheet));
+});

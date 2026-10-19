@@ -1,58 +1,196 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { DashboardPreview } from './DashboardPreview';
-import { AssistantDemo } from './AssistantDemo';
+import { HeroStage } from './HeroStage';
+import { DayStory } from './DayStory';
+import { PricingLadder } from './PricingLadder';
+import { FeatureBento } from './FeatureBento';
+import { PhoneFan } from './PhoneFan';
 import { BrokerMarquee } from './BrokerMarquee';
-import { BrokerGrid } from './BrokerGrid';
 import { LandingFaq } from './LandingFaq';
+import { chapterProgress, currentChapter } from './chapters';
+import { numberWord, ordinal, signedMoney, STORY_CAP, STORY_DAY, storyDay, storyMonth } from './landingStory';
 import { LANDING_FAQ } from '../../seo/faq';
-import { SUPPORTED_BROKERS } from '../../data/brokers';
-import { resolveBroker } from '../../utils/brokerIds';
-import { demoInsights, demoJournal } from './landingDemo';
+import { featureLines, MARKET_REPLAY_LIVE, PAID_TIERS, TIER_ORDER, TIER_PLANS } from '../../config/tiers';
+import { hasTrial, TRIAL_DAYS } from '../../config/trial';
 
 /*
  * First paint of the landing page's moving parts. Effects do not run under renderToString, so this
- * is exactly what the prerendered snapshot and a visitor without JavaScript get — which has to be a
- * sensible page on its own, not the first frame of an animation.
+ * is exactly what a visitor without JavaScript gets — which has to be a sensible page on its own, not
+ * the first frame of an animation.
  */
 
-const text = (html: string) => html.replace(/<!-- -->/g, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+const text = (html: string) =>
+  html
+    .replace(/<!-- -->/g, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&#x27;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ');
+const noop = () => undefined;
+const june = storyMonth();
+const day = storyDay();
 
-describe('the hero preview', () => {
-  it('starts from a filled month with the sync still to come, never from an empty calendar', () => {
-    const html = renderToString(createElement(DashboardPreview));
-    const words = text(html);
-    expect(words).toContain('Live preview');
-    expect(words).toContain('sample journal');
-    // Most of the month is there on first paint …
-    expect((html.match(/text-profit-bright|text-loss-bright/g) ?? []).length).toBeGreaterThan(15);
-    // … and nothing has popped in yet.
-    expect(html).not.toContain('animate-cell-pop');
+describe('the hero', () => {
+  const html = renderToString(createElement(HeroStage));
+  const words = text(html);
+
+  it('shows the sample month and what the cap would have made of it, and says it is a sample', () => {
+    expect(words).toContain('Sample journal · June 2026');
+    expect(words).toContain(signedMoney(june.net));
+    expect(words).toContain(signedMoney(june.cappedNet));
+    expect(words).toContain(`Stopped at ${STORY_CAP} a day`);
   });
 
-  it('shows two weeks in the phone version', () => {
-    const html = renderToString(createElement(DashboardPreview, { variant: 'compact' }));
-    // 7 weekday labels + 14 cells.
-    expect((html.match(/h-9 rounded-md/g) ?? []).length).toBe(14);
+  it('puts a dot on every day past the cap, and taps exactly the day the phone opens', () => {
+    expect(html.match(/class="hero-dot /g)).toHaveLength(june.capDays);
+    expect(html.match(/hero-tap/g)).toHaveLength(1);
+    expect(STORY_DAY).toBe(day.date);
   });
 
-  it('says it is a sample everywhere it shows figures', () => {
-    const preview = text(renderToString(createElement(DashboardPreview)));
-    const answer = text(renderToString(createElement(AssistantDemo)));
-    expect(preview).toContain('sample journal');
-    expect(answer).toContain('sample journal');
+  it('opens the phone on that day, with the rule it broke said the way the app says it', () => {
+    expect(words).toContain(`Max ${STORY_CAP} trades a day. Took ${day.trades.length}. Past it from the ${ordinal(STORY_CAP + 1)} trade.`);
+    expect(words).toContain(signedMoney(day.total));
+    expect(words).toContain(signedMoney(day.atCap));
+  });
+
+  it('is a picture with words for a screen reader, not a pile of numbers', () => {
+    expect(html).toMatch(/role="img" aria-label="The Overview of a sample journal for June 2026/);
+  });
+
+  it('is a real phone: island, status icons and the home bar', () => {
+    expect(html).toContain('iphone-island');
+    expect(html).toContain('iphone-battery');
+    expect(html).toContain('iphone-screen');
   });
 });
 
-describe('the assistant example', () => {
-  it('gives screen readers the whole answer at once, with the sample figures in it', () => {
-    const html = renderToString(createElement(AssistantDemo));
-    const d = demoInsights(demoJournal());
-    expect(html).toContain('sr-only');
-    expect(text(html)).toContain(`${d.heavyDays} days`);
-    expect(text(html)).toContain(d.firstFourPnl.toLocaleString('en-US', { minimumFractionDigits: 2 }));
+describe('the day played back', () => {
+  const html = renderToString(createElement(DayStory));
+  const words = text(html);
+
+  it('starts as the finished day: every trade drawn, the verdict shown, every paragraph readable', () => {
+    expect(html.match(/story-seg is-shown/g)).toHaveLength(day.trades.length);
+    expect(html.match(/story-pt is-shown/g)).toHaveLength(day.trades.length);
+    expect(html.match(/story-beat [^"]*is-on/g)).toHaveLength(4);
+    expect(words).toContain(`If you had stopped at ${numberWord(STORY_CAP)} ${signedMoney(day.atCap)}`);
+  });
+
+  it('says in words what the chart shows, from the same trades', () => {
+    expect(words).toContain(`After the ${ordinal(STORY_CAP)} trade the day stands at ${signedMoney(day.atCap)}`);
+    expect(words).toContain(`The day ends at ${signedMoney(day.total)}`);
+    expect(words).toContain(`Stopping at ${numberWord(STORY_CAP)} kept ${signedMoney(day.atCap)}`);
+    expect(words).toContain('Three more, and the day is gone');
+    expect(words).toContain('None of them wins back what the last two lost');
+    expect(words).toContain(`June ended at ${signedMoney(june.net)}`);
+    expect(words).toContain(`would have made ${signedMoney(june.cappedNet)}`);
+  });
+
+  it('asks before it moves', () => {
+    expect(readFileSync('src/components/landing/DayStory.tsx', 'utf8')).toContain('usePrefersReducedMotion');
+  });
+});
+
+describe('the prices', () => {
+  const html = renderToString(createElement(PricingLadder, { onStart: noop, onPricing: noop }));
+  const words = text(html);
+
+  it('lists every plan at its real price, with the lines the pricing page prints', () => {
+    for (const tier of TIER_ORDER) {
+      expect(words).toContain(`${TIER_PLANS[tier].name} `);
+      expect(words).toContain(`$${TIER_PLANS[tier].price}`);
+      for (const line of featureLines(tier)) expect(words).toContain(line.text);
+    }
+  });
+
+  it('badges exactly the plans that have a trial, with the trial’s real length', () => {
+    const badges = text(html).match(new RegExp(`${TRIAL_DAYS}-day free trial`, 'g')) ?? [];
+    expect(badges).toHaveLength(TIER_ORDER.filter(hasTrial).length);
+    expect(hasTrial('free')).toBe(false);
+  });
+
+  it('does not sell market replay before it works', () => {
+    if (!MARKET_REPLAY_LIVE) expect(words).not.toContain('Market replay');
+  });
+});
+
+describe('the trial, as the page advertises it', () => {
+  const page = readFileSync('src/pages/LandingPage.tsx', 'utf8');
+
+  it('reads which plans have one from the config, never from a plan typed into a sentence', () => {
+    expect(page).toContain('PAID_TIERS.every(hasTrial)');
+    expect(page).not.toMatch(/(Silver|Gold|Diamond)[^\n]*free trial/);
+  });
+
+  it('is on every paid plan, as Jay set them up', () => {
+    expect(PAID_TIERS.every(hasTrial)).toBe(true);
+  });
+});
+
+describe('the screens', () => {
+  const html = renderToString(createElement(FeatureBento));
+
+  it('loads every screenshot lazily and at a known size, so nothing jumps as it arrives', () => {
+    const imgs = html.match(/<img [^>]*>/g) ?? [];
+    expect(imgs.length).toBeGreaterThanOrEqual(6);
+    for (const img of imgs) {
+      expect(img).toContain('loading="lazy"');
+      expect(img).toMatch(/width="\d+"/);
+      expect(img).toMatch(/height="\d+"/);
+      expect(img).toMatch(/alt="[^"]+"/);
+    }
+  });
+
+  it('ships every image it names', () => {
+    const files = [...html.matchAll(/(?:src|srcSet)="\/landing\/([^"]+)"/g)].map((m) => m[1]);
+    const fan = [...renderToString(createElement(PhoneFan)).matchAll(/src="\/landing\/([^"]+)"/g)].map((m) => m[1]);
+    for (const f of new Set([...files, ...fan])) expect(existsSync(`public/landing/${f}`), f).toBe(true);
+  });
+
+  it('gives a phone the phone’s own screenshot', () => {
+    expect(html.match(/<source media="\(max-width: 1023px\)"/g)?.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe('the phones', () => {
+  it('shows three real screens in three phones', () => {
+    const html = renderToString(createElement(PhoneFan));
+    expect(html.match(/class="iphone /g)).toHaveLength(3);
+    expect(html.match(/iphone-island/g)).toHaveLength(3);
+  });
+});
+
+describe('the chapter bar', () => {
+  it('fills from a quarter screen before the first chapter to the end of the last', () => {
+    // Chapters from 1,000px to 5,000px down a 1,000px-tall screen.
+    expect(chapterProgress(0, 1000, 1000, 5000)).toBe(0);
+    expect(chapterProgress(750, 1000, 1000, 5000)).toBe(0);
+    expect(chapterProgress(4000, 1000, 1000, 5000)).toBe(1);
+    expect(chapterProgress(2375, 1000, 1000, 5000)).toBeCloseTo(0.5, 5);
+  });
+
+  it('names the last chapter whose top has passed the upper part of the screen', () => {
+    expect(currentChapter([600, 2000, 4000], 1000)).toBe(0);
+    expect(currentChapter([-900, 300, 2000], 1000)).toBe(1);
+    expect(currentChapter([-5000, -3000, 100], 1000)).toBe(2);
+  });
+});
+
+describe('the sticky parts', () => {
+  it('are not trapped by a scroll container around the page', () => {
+    // overflow-x: hidden on the page's root made it the scroll container every sticky element sticks
+    // to, so the header, the chapter bar and the story's chart all scrolled away. Clip does not.
+    const page = readFileSync('src/pages/LandingPage.tsx', 'utf8');
+    expect(page).toContain('overflow-x-clip');
+    expect(page).not.toMatch(/className="[^"]*overflow-(x-)?(hidden|auto|scroll)[^"]*flex flex-col"/);
+  });
+});
+
+describe('the page keeps the anchors other pages link to', () => {
+  const page = readFileSync('src/pages/LandingPage.tsx', 'utf8');
+  it.each(['features', 'faq', 'security'])('#%s', (id) => {
+    expect(page).toContain(`id="${id}"`);
   });
 });
 
@@ -64,81 +202,26 @@ describe('the broker strip', () => {
     expect(html).toContain('motion-reduce:animate-none');
   });
 
+  it('splits a long list into two rows that run opposite ways', () => {
+    const names = ['Charles Schwab', 'Robinhood', 'Fidelity', 'Webull', 'E*TRADE', 'Vanguard', 'tastytrade', 'Public'];
+    const html = renderToString(createElement(BrokerMarquee, { names }));
+    expect(html).toMatch(/animate-marquee(?!-)/);
+    expect(html).toContain('animate-marquee-reverse');
+  });
+
+  it('never wraps a broker name inside its tile', () => {
+    const html = renderToString(createElement(BrokerMarquee, { names: ['Interactive Brokers'] }));
+    expect(html).toContain('whitespace-nowrap');
+  });
+
   it('renders nothing with no brokers', () => {
     expect(renderToString(createElement(BrokerMarquee, { names: [] }))).toBe('');
   });
 });
 
-describe('the broker card', () => {
-  const html = renderToString(createElement(BrokerGrid, { names: SUPPORTED_BROKERS.map((b) => b.name) }));
-
-  /*
-   * Every word a tile can show, in the tile's font — Figtree 600 at 14px — measured with
-   * canvas.measureText in Chrome on 2026-10-17. A broker added with a word that is not here fails
-   * the last test, which is the prompt to measure it before it can wrap mid-word on the live page.
-   */
-  const WORD_PX: Record<string, number> = {
-    Management: 83.8, TradeStation: 82.2, thinkorswim: 78.5, Robinhood: 69.2, Interactive: 69.1,
-    tastytrade: 66.5, Vanguard: 61.6, 'E*TRADE': 59.8, Coinbase: 59.5, Moomoo: 56.6, Schwab: 50.7,
-    Edward: 48.4, Brokers: 48.1, Charles: 48, Fidelity: 47.3, Wealth: 44.8, Tradier: 44.4,
-    Alpaca: 43.7, Webull: 43.6, Chase: 39.6, Public: 38.9, Jones: 37.8, TIAA: 31.5, PNC: 29.3,
-    Citi: 22.6,
-  };
-  const widest = Math.max(...Object.values(WORD_PX));
-
-  it('is what the landing page shows', () => {
-    expect(readFileSync('src/pages/LandingPage.tsx', 'utf8')).toContain('<BrokerGrid');
-  });
-
-  it('wraps a name only between words', () => {
-    // At 1600px this card printed "thinkors / wim" and "Vanguar / d": min-w-0 let the name shrink
-    // below its longest word and break-words then split the word to fit.
-    const labels = [...html.matchAll(/<span class="([^"]*)">([^<]+)<\/span>/g)];
-    expect(labels.map(([, , name]) => name)).toContain('thinkorswim');
-    expect(labels).toHaveLength(8);
-    for (const [, classes] of labels) {
-      const list = classes.split(' ');
-      expect(list).toContain('break-normal');
-      for (const splitter of ['min-w-0', 'break-words', 'break-all', 'wrap-anywhere', 'wrap-break-word']) {
-        expect(list).not.toContain(splitter);
-      }
-    }
-  });
-
-  it('takes its columns and its tile layout from the card, not the screen', () => {
-    // sm:grid-cols-4 was a screen width. From lg the card shares its row and is half as wide, so
-    // four columns held on as the tiles shrank to 93px.
-    expect(html).not.toMatch(/\b(sm|md|lg|xl|2xl):grid-cols-/);
-    expect(html).toMatch(/<div class="@container"><div class="grid /);
-    expect(html.match(/class="@container [^"]*px-3[^"]*"/g)).toHaveLength(8);
-  });
-
-  it('leaves room for the widest word at every column count and in both tile layouts', () => {
-    // A tile's content box is its width less 24px of padding and 2px of border; tiles are 8px apart.
-    expect(html).toMatch(/grid-cols-1 [^"]*\bgap-2\b/);
-    const steps = [...html.matchAll(/@min-\[([\d.]+)rem\]:grid-cols-(\d+)/g)].map(([, rem, cols]) => ({
-      container: Number(rem) * 16,
-      cols: Number(cols),
-    }));
-    expect(steps.map((s) => s.cols)).toEqual([2, 4]);
-    for (const { container, cols } of steps) {
-      expect((container - (cols - 1) * 8) / cols - 26).toBeGreaterThanOrEqual(widest);
-    }
-    // Side by side only once the tile holds the 44px badge, the 10px gap and the word.
-    const sideBySide = html.match(/@min-\[([\d.]+)rem\]:flex-row/);
-    expect(sideBySide).not.toBeNull();
-    expect(Number(sideBySide![1]) * 16 - 44 - 10).toBeGreaterThanOrEqual(widest);
-  });
-
-  it('has a measurement for every word a supported broker shows', () => {
-    const words = SUPPORTED_BROKERS.flatMap((b) => (resolveBroker(b.name)?.name ?? b.name).split(' '));
-    expect(words.filter((w) => !(w in WORD_PX))).toEqual([]);
-  });
-});
-
 describe('the FAQ', () => {
   const html = renderToString(createElement(LandingFaq));
-  const words = text(html).replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+  const words = text(html).replace(/&quot;/g, '"');
 
   it('shows every question and answer once, in the order the FAQPage markup lists them', () => {
     // Split into two columns on a wide screen — a slice that drops or repeats one would put a
@@ -168,18 +251,23 @@ describe('the FAQ', () => {
 describe('reduced motion', () => {
   const css = readFileSync('src/index.css', 'utf8');
 
-  it('stops every new CSS animation', () => {
+  it('stops every CSS animation the landing page runs', () => {
     const block = css.slice(css.indexOf('.site-aurora::before,\n  .site-aurora::after,\n  .animate-cell-pop'));
-    for (const name of ['.site-aurora::before', '.animate-cell-pop', '.animate-marquee', '.btn-shine::after']) {
+    for (const name of ['.site-aurora::before', '.animate-cell-pop', '.animate-marquee', '.animate-marquee-reverse', '.btn-shine::after']) {
       expect(block).toContain(name);
     }
     expect(css).toMatch(/\.hero-trend-line path \{\s*animation: none;\s*stroke-dashoffset: 0;/);
+
+    const shots = css.slice(css.indexOf("The landing page's product shots"));
+    const reduced = shots.slice(shots.indexOf('@media (prefers-reduced-motion: reduce)'));
+    for (const name of ['.hero-day', '.hero-dot', '.hero-tap', '.hero-phone', '.phone-float-a', '.phone-float-b', '.phone-float-c', '.story-seg', '.story-pt', '.bento-card']) {
+      expect(reduced, name).toContain(name);
+    }
+    expect(reduced).toMatch(/\.draw-line path \{\s*animation: none;\s*stroke-dashoffset: 0;/);
   });
 
   it('is asked by the animations driven from script', () => {
-    for (const file of ['DashboardPreview.tsx', 'AssistantDemo.tsx']) {
-      expect(readFileSync(`src/components/landing/${file}`, 'utf8')).toContain('usePrefersReducedMotion');
-    }
+    expect(readFileSync('src/components/landing/DayStory.tsx', 'utf8')).toContain('usePrefersReducedMotion');
     expect(readFileSync('src/hooks/useCountUp.ts', 'utf8')).toContain('usePrefersReducedMotion');
   });
 });

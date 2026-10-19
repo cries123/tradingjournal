@@ -267,6 +267,27 @@ and the history row print. Pin, pinned answers and thumbs up/down are in the des
   There is no rule in the prompt covering general knowledge, so "what does SPY track" is currently
   undefined behaviour.
 
+### The landing page (October 2026 rebuild, to the concept Jay approved)
+
+The page runs in this order: the hero (an HTML-built Overview in a browser window, plus an iPhone),
+the broker logos, then **Connect → See → Fix** chapters with a sticky bar, the founder's −$496/+$163
+proof, three fanned phones, the pricing ladder, guides and community, the FAQ, and the close.
+
+- **One sample journal feeds every figure** that is not a fact about the product:
+  `landingStory.ts` over `demoJournal()`. That means June 2026, a **3-trade cap**, and June 26
+  played back trade by trade. Three, not four, because the app's own Performance screen says "Stop
+  after three" for this sample, and the page shows that screen. `landingStory.test.ts` pins the
+  figures the copy prints.
+- **The app screenshots** in `public/landing/` are the real components rendered on that sample at
+  2x. Re-render them with `scripts/landing-shots/render.ps1` whenever a screen they show changes.
+  `landingShots.ts` holds their sizes, and its test reads each WebP header.
+- **The root is `overflow-x-clip`, never `-hidden`.** Hidden turns the page into a scroll container,
+  and every sticky element (the header, the chapter bar, the story's chart) then scrolls away. The
+  header had been marked sticky and had never stuck. A test guards this.
+- **Prices and trial badges come from the config**: `featureLines()` (the same function the
+  pricing page uses) and `hasTrial()` in `config/trial.ts`. `TRIAL_TIERS` must match the Creem
+  products that actually carry a trial.
+
 ## Deploy sequencing — this order, always
 
 1. Push → Netlify deploys.

@@ -31,6 +31,23 @@ import { TIER_PLANS, type Tier } from './tiers';
 export const TRIAL_TIER: Tier = 'silver';
 export const TRIAL_DAYS = 7;
 
+/**
+ * Every plan whose Creem product carries the free trial.
+ *
+ * All three paid plans, from October 2026: Jay put the same 7-day trial on Gold and Diamond as on
+ * Silver ("ima set up the free trial for all of the tiers… itll be 7 day free trial"). Like
+ * TRIAL_DAYS, this is a promise the site makes and Creem keeps, so it has to match the products in
+ * the Creem dashboard — a plan listed here whose product has no trial is a page advertising
+ * something checkout will not give.
+ *
+ * Marketing copy reads this (hasTrial), never a plan name typed into a sentence.
+ */
+export const TRIAL_TIERS: readonly Tier[] = ['silver', 'gold', 'diamond'];
+
+export function hasTrial(tier: Tier): boolean {
+  return TRIAL_TIERS.includes(tier);
+}
+
 /** What the button says, and what the plan card promises. */
 export function trialOffer(): string {
   return `${TRIAL_DAYS}-day free ${TIER_PLANS[TRIAL_TIER].name} trial`;

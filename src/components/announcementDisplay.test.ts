@@ -5,7 +5,6 @@ import { normalizeAnnouncement, type Announcement } from '../services/announceme
 import { SiteAnnouncement } from './SiteAnnouncement';
 import { AnnouncementBar } from './landing/AnnouncementBar';
 import { ProofStrip } from './landing/ProofStrip';
-import { PhoneShowcase } from './landing/PhoneShowcase';
 import { SUPPORTED_BROKER_COUNT } from '../data/brokerCopy';
 import { lowestPaidPrice } from '../seo/pricingClaims';
 
@@ -77,13 +76,10 @@ describe('the proof strip', () => {
     expect(words).not.toContain('trades journaled');
     expect(words).not.toContain('traders keeping a journal');
   });
-});
 
-describe('the phone section', () => {
-  it('shows the journal on a phone, from the sample journal, and says so', () => {
-    const words = text(renderToString(createElement(PhoneShowcase)));
-    expect(words).toContain('sample journal');
-    expect(words).toContain('Worth fixing');
-    expect(words).toContain('Overview');
+  it('says the same four things as cards in the proof section', () => {
+    const strip = text(renderToString(createElement(ProofStrip)));
+    const grid = text(renderToString(createElement(ProofStrip, { variant: 'grid' })));
+    expect(grid.trim()).toBe(strip.trim());
   });
 });

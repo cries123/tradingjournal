@@ -76,17 +76,12 @@ describe('the landing page entry', () => {
     expect([...graph.keys()].map(rel)).not.toContain('src/lib/firebase.ts');
   });
 
-  it('does not carry the landing page demos, which load as the visitor scrolls to them', () => {
-    // The simulator demo and the Performance showcase bring the simulator and the analytics with
-    // them. They are React.lazy behind LazyOnView; one static import would put both in the first
-    // download of every marketing page.
+  it('does not carry the journal\'s analytics', () => {
+    // The landing page shows the app as screenshots and as figures worked out in landingStory.ts.
+    // It used to run the real simulator and Performance panels, lazily; one static import of either
+    // would put the analytics in the first download of every marketing page.
     const files = [...graph.keys()].map(rel);
-    for (const heavy of [
-      'src/utils/ruleSimulator.ts',
-      'src/utils/brokerAnalytics.ts',
-      'src/components/landing/ProductShowcase.tsx',
-      'src/components/landing/RuleSimulatorDemo.tsx',
-    ]) {
+    for (const heavy of ['src/utils/ruleSimulator.ts', 'src/utils/brokerAnalytics.ts']) {
       expect(files).not.toContain(heavy);
     }
   });

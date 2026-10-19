@@ -7,12 +7,13 @@ import { proofFigures } from './proofFigures';
 const whole = (n: number) => Math.round(n).toLocaleString('en-US');
 
 /**
- * Four figures under the hero. Which four, and why, is proofFigures.ts.
+ * Four figures about the product. Which four, and why, is proofFigures.ts.
  *
- * The figures count up the first time the strip scrolls into view, and are plain text before
- * that, so the snapshot and screen readers have the final values.
+ * A strip across the page, or (`grid`) four cards beside the one-trader story in the proof section.
+ * The figures count up the first time they scroll into view, and are plain text before that, so the
+ * snapshot and screen readers have the final values.
  */
-export function ProofStrip() {
+export function ProofStrip({ variant = 'strip' }: { variant?: 'strip' | 'grid' }) {
   const [stats, setStats] = useState<PublicStats | null>(null);
   const { ref, inView } = useInView(0.3);
 
@@ -27,6 +28,28 @@ export function ProofStrip() {
   }, []);
 
   const figures = proofFigures(stats);
+
+  if (variant === 'grid') {
+    return (
+      <div ref={ref}>
+        <dl aria-label="Trend Chasers in numbers" className="grid h-full grid-cols-2 gap-3.5">
+          {figures.map((f) => (
+            <div key={f.key} className="rounded-[20px] border border-white/[0.07] bg-[#141414] p-5 sm:p-6">
+              <dt className="sr-only">{f.label}</dt>
+              <dd className="text-[30px] font-bold leading-none tracking-tight tabular-nums sm:text-[40px]">
+                {f.prefix}
+                {inView && f.value > 0 ? <CountUp value={f.value} from={0} format={whole} /> : whole(f.value)}
+                {f.suffix && <span className="text-accent">{f.suffix}</span>}
+              </dd>
+              <dd aria-hidden className="mt-2.5 text-[14.5px] leading-snug text-text-secondary">
+                {f.label}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    );
+  }
 
   return (
     <section aria-label="Trend Chasers in numbers" className="relative z-10 border-y border-white/5 py-10 md:py-14">

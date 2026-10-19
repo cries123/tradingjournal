@@ -2,28 +2,26 @@ import { BrokerLogo } from '../brokers/BrokerLogo';
 import { brokerIdFromName } from '../../utils/brokerIds';
 
 /**
- * The supported brokers, drifting past under the hero.
+ * The supported brokers, drifting past under the hero in two rows that run opposite ways.
  *
- * The broker grid sits a full screen down the page, so a visitor deciding in the first five seconds
- * never saw the one fact most of them arrive to check — "does it work with my broker". A strip in
- * the first screen answers it without a click.
+ * The first thing most visitors arrive to check is "does it work with my broker", and the answer is
+ * twenty logos rather than a sentence that says twenty. Each row is drawn twice and slid by half its
+ * width, which is what makes the loop seamless.
  *
- * The list is drawn twice and slid by half its width, which is what makes the loop seamless; the
- * second copy is hidden from screen readers so the list is announced once. Pauses on hover. Under
- * reduced motion it stops and becomes a row you can scroll yourself.
+ * Screen readers get the list once, as a plain list; the moving rows are hidden from them. Pauses on
+ * hover. Under reduced motion the rows stop and become rows you can scroll yourself.
  */
 export function BrokerMarquee({ names }: { names: string[] }) {
   if (names.length === 0) return null;
-  const row = (copy: number) => (
-    <ul
-      className="flex shrink-0 items-center gap-2.5 pr-2.5"
-      aria-hidden={copy === 1 ? true : undefined}
-      aria-label={copy === 0 ? 'Supported brokers' : undefined}
-    >
-      {names.map((name) => (
+  const half = Math.ceil(names.length / 2);
+  const rows = names.length > 6 ? [names.slice(0, half), names.slice(half)] : [names];
+
+  const track = (list: string[], copy: number) => (
+    <ul className="flex shrink-0 items-center gap-3.5 pr-3.5">
+      {list.map((name) => (
         <li
           key={`${copy}-${name}`}
-          className="rounded-lg border border-border/50 bg-bg-primary/60 px-3 py-2 flex items-center min-w-[11rem]"
+          className="flex h-16 items-center whitespace-nowrap rounded-2xl border border-white/[0.07] bg-[#141414] pl-2.5 pr-[18px] text-[#d6d6d6]"
         >
           <BrokerLogo broker={brokerIdFromName(name)} compact />
         </li>
@@ -32,10 +30,25 @@ export function BrokerMarquee({ names }: { names: string[] }) {
   );
 
   return (
-    <div className="marquee-mask overflow-hidden motion-reduce:overflow-x-auto">
-      <div className="flex w-max animate-marquee hover:[animation-play-state:paused] motion-reduce:animate-none">
-        {row(0)}
-        {row(1)}
+    <div>
+      <ul className="sr-only" aria-label="Supported brokers">
+        {names.map((name) => (
+          <li key={name}>{name}</li>
+        ))}
+      </ul>
+      <div aria-hidden="true" className="grid gap-3.5">
+        {rows.map((list, i) => (
+          <div key={i} className="marquee-mask overflow-hidden motion-reduce:overflow-x-auto">
+            <div
+              className={`flex w-max hover:[animation-play-state:paused] motion-reduce:animate-none ${
+                i === 0 ? 'animate-marquee' : 'animate-marquee-reverse'
+              }`}
+            >
+              {track(list, 0)}
+              {track(list, 1)}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

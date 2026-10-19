@@ -202,6 +202,11 @@ body {
   to { transform: translateX(-50%); }
 }
 
+/* The second row runs the other way, a little slower, so the two never line up. */
+.animate-marquee-reverse {
+  animation: marquee 56s linear infinite reverse;
+}
+
 .marquee-mask {
   mask-image: linear-gradient(90deg, transparent, black 7%, black 93%, transparent);
 }
@@ -262,6 +267,7 @@ body {
   .site-aurora::after,
   .animate-cell-pop,
   .animate-marquee,
+  .animate-marquee-reverse,
   .btn-shine::after,
   details.glass-card > p {
     animation: none !important;
@@ -396,20 +402,6 @@ body {
   text-wrap: balance;
 }
 
-.public-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  border-radius: 9999px;
-  background: #141414;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 0.6rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #fff;
-  white-space: nowrap;
-}
-
 .public-link {
   display: inline-flex;
   align-items: center;
@@ -429,93 +421,293 @@ body {
   border-radius: 2rem;
 }
 
-/* The product shot in the hero sits in a slab, the way a phone would. */
-.device-frame {
-  border-radius: 2rem;
-  padding: 0.75rem;
-  background: #0d0d0d;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+/*
+ * ─────────────────────────── The landing page's product shots ───────────────────────────
+ *
+ * A current iPhone, drawn in CSS: a metal edge, a thin black bezel, the side buttons, the Dynamic
+ * Island and the home bar. Jay's word for the first attempt, a rounded box with a pill in it, was
+ * "an iPhone 1". Every size comes from --pw, the phone's width, so the hero's phone and the three
+ * fanned out lower down are the same device at different sizes.
+ */
+.iphone {
+  /* --pw is set by IPhoneFrame, inline or as a responsive utility; a default here would win over the utility. */
+  position: relative;
+  width: var(--pw);
+  padding: 4px;
+  border-radius: calc(var(--pw) * 0.19);
+  background: linear-gradient(150deg, #707075 0%, #2b2b2e 16%, #161618 50%, #2b2b2e 84%, #626267 100%);
+  box-shadow: 0 50px 100px rgba(0, 0, 0, 0.85), inset 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 0 0 2px rgba(0, 0, 0, 0.6);
+}
+
+/* Action button and volume rocker on the left, side button on the right. */
+.iphone::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: calc(var(--pw) * 0.44);
+  width: 3px;
+  height: calc(var(--pw) * 0.62);
+  border-radius: 2px 0 0 2px;
+  background: linear-gradient(to bottom, #4a4a4f 0 11%, transparent 11% 22%, #4a4a4f 22% 52%, transparent 52% 60%, #4a4a4f 60% 90%, transparent 90%);
+}
+
+.iphone::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  top: calc(var(--pw) * 0.62);
+  width: 3px;
+  height: calc(var(--pw) * 0.36);
+  border-radius: 0 2px 2px 0;
+  background: #4a4a4f;
+}
+
+/* 393 × 852, an iPhone 15's screen in points. */
+.iphone-screen {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 393 / 852;
+  border: calc(var(--pw) * 0.024) solid #000;
+  border-radius: calc(var(--pw) * 0.19 - 4px);
+  background: #000;
+}
+
+.iphone-screen::after {
+  content: '';
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: calc(var(--pw) * 0.022);
+  transform: translateX(-50%);
+  width: calc(var(--pw) * 0.36);
+  height: calc(var(--pw) * 0.016);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.iphone-status {
+  position: absolute;
+  z-index: 3;
+  inset: 0 0 auto 0;
+  height: calc(var(--pw) * 0.14);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(var(--pw) * 0.012) calc(var(--pw) * 0.07) 0 calc(var(--pw) * 0.1);
+  background: #000;
+  color: #fff;
+  font: 600 calc(var(--pw) * 0.058) / 1 -apple-system, 'SF Pro Text', 'Figtree', sans-serif;
+  letter-spacing: -0.01em;
+}
+
+.iphone-island {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--pw) * 0.028);
+  transform: translateX(-50%);
+  width: calc(var(--pw) * 0.31);
+  height: calc(var(--pw) * 0.088);
+  border-radius: 9999px;
+  background: #000;
+  box-shadow: 0 0 0 1px #141414;
+}
+
+.iphone-island::after {
+  content: '';
+  position: absolute;
+  right: calc(var(--pw) * 0.03);
+  top: 50%;
+  width: calc(var(--pw) * 0.032);
+  height: calc(var(--pw) * 0.032);
+  border-radius: 50%;
+  transform: translateY(-50%);
+  background: radial-gradient(circle at 35% 35%, #34405e, #0a0c14 65%);
+}
+
+.iphone-icons {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--pw) * 0.018);
+}
+
+.iphone-icons svg {
+  height: calc(var(--pw) * 0.04);
+  width: auto;
+  fill: #fff;
+}
+
+.iphone-icons svg.iphone-battery {
+  height: calc(var(--pw) * 0.047);
+}
+
+/* What the phone shows, below the status bar. A screenshot fills the width and is cut at the bottom. */
+.iphone-content {
+  position: absolute;
+  inset: calc(var(--pw) * 0.14) 0 0 0;
+  overflow: hidden;
+}
+
+.iphone-content > img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 /*
- * The hero's backdrop: a skyline of dark bars rising behind the headline, the product's subject
- * (a month of P&L) as a silhouette. They rise once on arrival — the page's single orchestrated
- * moment — and sit still after.
+ * The hero. A browser window holding the Overview, tilted the way a product shot is photographed,
+ * and the phone in front of it. On arrival the month's days tint in one after another, the days that
+ * broke the cap get their amber dot, June 26 is tapped and the phone rises with that day open. It is
+ * the page's one orchestrated moment, and all of it is CSS, so the prerendered page plays it too.
  */
-.hero-bars {
-  position: absolute;
-  inset: 0 0 0 0;
-  pointer-events: none;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: clamp(10px, 2vw, 28px);
-  padding: 0 4vw;
-  mask-image: linear-gradient(180deg, transparent 0%, black 35%, black 80%, transparent 100%);
+.hero-window {
+  transform: perspective(1800px) rotateY(-9deg) rotateX(3deg);
+  transform-origin: left center;
 }
 
-.hero-bars > span {
-  flex: 1 1 0;
-  max-width: 140px;
-  height: var(--h);
-  background: linear-gradient(180deg, #1c1c1c, #0f0f0f);
-  border-radius: 28px 28px 0 0;
-  transform-origin: bottom;
-  animation: bar-rise 1.4s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: var(--d);
+.hero-day {
+  animation: hero-day-in 0.5s ease-out both;
+  animation-delay: var(--t, 0s);
 }
 
-@keyframes bar-rise {
-  from { transform: scaleY(0.2); opacity: 0; }
-  to { transform: scaleY(1); opacity: 1; }
+@keyframes hero-day-in {
+  from {
+    background-color: #101010;
+    border-color: #1a1a1a;
+  }
 }
 
-/* The giant figure: white fading to grey like a cast number, lit from below in lime. */
-.giant-figure {
-  font-size: clamp(6.5rem, 24vw, 19rem);
-  font-weight: 700;
-  letter-spacing: -0.05em;
-  line-height: 0.9;
-  background: linear-gradient(180deg, #ffffff 25%, #8a8a8a 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+.hero-dot {
+  animation: hero-dot-in 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+  animation-delay: calc(var(--t, 0s) + 0.5s);
 }
 
-.giant-glow {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: min(85vw, 960px);
-  height: 340px;
-  transform: translate(-50%, -20%);
-  background: radial-gradient(ellipse at center, rgba(122, 255, 69, 0.42), rgba(122, 255, 69, 0.08) 45%, transparent 70%);
-  filter: blur(42px);
-  pointer-events: none;
+@keyframes hero-dot-in {
+  from { transform: scale(0); }
 }
 
-/* The call to action that follows the reader once the hero's own button has scrolled away. */
-.sticky-cta {
-  position: fixed;
-  top: 0.875rem;
-  left: 50%;
-  z-index: 40;
-  transform: translate(-50%, -200%);
-  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+/* The day the phone opens, tapped once just before the phone rises. */
+.hero-tap {
+  animation: hero-day-in 0.5s ease-out both, hero-tap 1.2s ease-in-out 3.4s both;
 }
 
-.sticky-cta.is-visible {
-  transform: translate(-50%, 0);
+@keyframes hero-tap {
+  0%,
+  100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+  40% { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9); }
+}
+
+.hero-phone {
+  animation: hero-phone-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 3.9s both, phone-float 6s ease-in-out 4.8s infinite;
+}
+
+@keyframes hero-phone-in {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+}
+
+/* `translate`, not `transform`, so floating never fights a phone's own tilt. */
+@keyframes phone-float {
+  50% { translate: 0 -12px; }
+}
+
+.phone-float-a { animation: phone-float 7s ease-in-out infinite; }
+.phone-float-b { animation: phone-float 7s ease-in-out 1.2s infinite; }
+.phone-float-c { animation: phone-float 7s ease-in-out 2.4s infinite; }
+
+/* Lines that draw themselves: the hero's backdrop, its sparkline, the closing chart. pathLength=1. */
+.draw-line path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw-line 2.6s cubic-bezier(0.3, 0.7, 0.2, 1) 0.3s forwards;
+}
+
+/* The chapter bar's progress line: scaleX from scroll, set as --p by ChapterNav. */
+.chapter-progress {
+  transform-origin: left;
+  transform: scaleX(var(--p, 0));
+}
+
+/* One day played back: a segment draws and a point pops in as each trade is reached. */
+.story-seg {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 0.5s ease-out;
+}
+
+.story-seg.is-shown {
+  stroke-dashoffset: 0;
+}
+
+.story-pt {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(0.2);
+  transition: opacity 0.3s, transform 0.4s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.story-pt.is-shown {
+  opacity: 1;
+  transform: none;
+}
+
+.story-fade {
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+
+.story-fade.is-shown {
+  opacity: 1;
+}
+
+.story-beat {
+  opacity: 0.3;
+  transition: opacity 0.4s;
+}
+
+.story-beat.is-on {
+  opacity: 1;
+}
+
+.bento-card {
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.35s;
+}
+
+@media (hover: hover) {
+  .bento-card:hover {
+    transform: translateY(-6px);
+    border-color: rgba(122, 255, 69, 0.3);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-bars > span {
+  .hero-day,
+  .hero-dot,
+  .hero-tap,
+  .hero-phone,
+  .phone-float-a,
+  .phone-float-b,
+  .phone-float-c {
     animation: none;
   }
 
-  .sticky-cta {
+  .draw-line path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  .story-seg,
+  .story-pt,
+  .story-fade,
+  .story-beat,
+  .bento-card {
     transition: none;
+  }
+
+  .bento-card:hover {
+    transform: none;
   }
 }
 
