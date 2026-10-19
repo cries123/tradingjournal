@@ -5,7 +5,6 @@ import { useAuth } from '../../context/useAuth';
 import { NavAccountMenu } from './NavAccountMenu';
 import { ProductsDropdown } from './ProductsDropdown';
 import { MobileNavPanel } from './MobileNavPanel';
-import { BROKER_GUIDES } from '../../seo/brokerGuides';
 import { GUIDE_ARTICLES } from '../../seo/guides';
 import type { ExtraNavRoute } from '../../hooks/useRoute';
 import { SOCIAL_LINKS, X_HANDLE } from '../../data/social';
@@ -173,7 +172,10 @@ export function LandingFooter({
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-text-primary mb-3">Guides</p>
             <ul className="space-y-2 text-sm text-text-secondary">
-              {GUIDE_ARTICLES.map((guide) => (
+              {/* Three and a link, not thirteen. Jay: "too many, it's ugly" — every guide and six
+                  broker guides made this one column twice the height of the rest of the footer. The
+                  full set is one click away on /guides, which the sitemap lists for search. */}
+              {GUIDE_ARTICLES.slice(0, 3).map((guide) => (
                 <li key={guide.slug}>
                   <a
                     href={guide.path}
@@ -189,20 +191,6 @@ export function LandingFooter({
                   </a>
                 </li>
               ))}
-              {/* A handful, not all twenty: this column renders on every page, and a footer that
-                  is mostly broker links buries the rest of it. The full set is on /guides. */}
-              {BROKER_GUIDES.slice(0, 6).map((guide) => (
-                <li key={guide.slug}>
-                  <a
-                    href={guide.path}
-                    /* Left as a plain link on purpose: these are crawlable SEO landing pages and
-                       no page above the footer carries a broker-guide nav handler to pass down. */
-                    className="hover:text-accent transition-colors"
-                  >
-                    {guide.brokerName} journal guide
-                  </a>
-                </li>
-              ))}
               <li>
                 <a
                   href="/guides"
@@ -214,7 +202,7 @@ export function LandingFooter({
                   }}
                   className="hover:text-accent transition-colors"
                 >
-                  All {BROKER_GUIDES.length} broker guides →
+                  All guides →
                 </a>
               </li>
             </ul>
