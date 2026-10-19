@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Lock } from 'lucide-react';
 import { lowestTierWith, TIER_PLANS, tierHas, type Feature } from '../../config/tiers';
-import { TRIAL_TIER } from '../../config/trial';
+import { hasTrial } from '../../config/trial';
 import { useEntitlement } from '../../context/useEntitlement';
 import { goToPricing } from '../../utils/navigateToPath';
 import { StartTrialButton } from './StartTrialButton';
@@ -60,16 +60,16 @@ export function LockedFeature({
   const neededName = needed ? TIER_PLANS[needed].name : 'a paid plan';
 
   /*
-   * Whether the trial would actually hand them the thing this card is describing.
+   * The trial that would actually hand them the thing this card is describing: the one on the plan
+   * that unlocks it.
    *
-   * The trial is Creem's and it is attached to the Silver product, so it grants Silver and only
-   * Silver. Broker sync and the Performance screen are Silver features and the offer is honest
-   * there. The assistant is Gold; auto-sync, the coach seat, rule alerts and the weekly review
-   * are Diamond. On those, a "Try Silver free for 7 days" under a description of the feature is
-   * a card that promises one plan and sells another — somebody takes the trial, lands back on
-   * the same lock, and has been charged $9 for it.
+   * When only Silver had a trial, "Try Silver free for 7 days" under the assistant (Gold) or
+   * auto-sync (Diamond) was a card that promised one plan and sold another — somebody took the
+   * trial, landed back on the same lock, and had been charged $9 for it. Every paid plan carries the
+   * trial now, so the card offers the plan it names; a plan without one gets the buy button.
    */
-  const trialUnlocksThis = tierHas(TRIAL_TIER, feature);
+  const trialTier = needed && hasTrial(needed) && tierHas(needed, feature) ? needed : null;
+  const trialUnlocksThis = trialTier !== null;
 
   const buyCta = (
     <>
@@ -127,7 +127,7 @@ export function LockedFeature({
              * the offer is worth the most, and sending them to a pricing page instead is asking
              * them to want it again later.
              */
-            <StartTrialButton viaPricing fallback={buyCta} />
+            <StartTrialButton viaPricing tier={trialTier ?? undefined} fallback={buyCta} />
           ) : (
             buyCta
           )}

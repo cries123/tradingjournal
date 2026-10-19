@@ -34,6 +34,10 @@ vi.mock('../context/useEntitlement', () => ({
 vi.mock('../context/useSettings', () => ({
   useSettings: () => ({ settings: { currency: 'USD', tradingRules: { enabled: false } } }),
 }));
+// Signed in: the padlock offers a Gold trial now that Gold carries one, and that button reads auth.
+vi.mock('../context/useAuth', () => ({
+  useAuth: () => ({ user: { uid: 'u1', email: 'trader@example.com' }, firebaseEnabled: true, loading: false }),
+}));
 // A saved conversation, which a locked preview must not show or continue.
 vi.mock('../hooks/useAssistantThreads', () => ({
   useAssistantThreads: () => ({

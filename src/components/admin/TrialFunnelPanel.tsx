@@ -1,5 +1,5 @@
 import { Sparkles } from 'lucide-react';
-import { TRIAL_DAYS, TRIAL_TIER } from '../../config/trial';
+import { TRIAL_DAYS, TRIAL_TIERS } from '../../config/trial';
 import { TIER_PLANS } from '../../config/tiers';
 import type { TrialStats } from '../../utils/adminRisk';
 
@@ -27,7 +27,9 @@ interface TrialFunnelPanelProps {
  * up, not a collapse in signups.
  */
 export function TrialFunnelPanel({ stats, loaded, paidKnown }: TrialFunnelPanelProps) {
-  const plan = TIER_PLANS[TRIAL_TIER];
+  // Every plan that carries the trial, by name: "Silver, Gold and Diamond".
+  const names = TRIAL_TIERS.map((t) => TIER_PLANS[t].name);
+  const plans = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : (names[0] ?? 'no plan');
 
   return (
     <div className="panel-card rounded-xl p-5 md:p-6">
@@ -80,7 +82,7 @@ export function TrialFunnelPanel({ stats, loaded, paidKnown }: TrialFunnelPanelP
           </dl>
 
           <p className="mt-2.5 text-[10px] leading-relaxed text-text-secondary/80">
-            {TRIAL_DAYS}-day {plan.name} trial, card taken at checkout. Counts trials recorded since
+            {TRIAL_DAYS}-day trial on {plans}, card taken at checkout. Counts trials recorded since
             the webhook started storing their dates; anything older is invisible to this.
           </p>
         </>

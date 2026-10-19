@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Sparkles } from 'lucide-react';
-import { TIER_PLANS } from '../../config/tiers';
+import { TIER_PLANS, type Tier } from '../../config/tiers';
 import { TRIAL_DAYS, TRIAL_TIER } from '../../config/trial';
 import { useAuth } from '../../context/useAuth';
 import { useEntitlement } from '../../context/useEntitlement';
@@ -21,12 +21,14 @@ interface StartTrialButtonProps {
    * lose them. The pricing page is one more click and answers the question they actually have.
    */
   viaPricing?: boolean;
+  /** The plan being trialled. Every paid plan carries the trial (TRIAL_TIERS); Silver where unsaid. */
+  tier?: Tier;
 }
 
 /**
  * The trial, wherever somebody runs into the wall.
  *
- * The trial itself belongs to Creem — it is attached to the Silver product, so starting it means
+ * The trial itself belongs to Creem — it is attached to each paid plan's product, so starting it means
  * going through checkout and the card is taken up front. Two consequences worth knowing here: the
  * person becomes a real subscriber immediately, so nothing about ACCESS needs a special case; and
  * TRIAL_DAYS has to match what the Creem product is configured for, because this is the number the
@@ -41,6 +43,7 @@ export function StartTrialButton({
   className = '',
   showTerms = true,
   viaPricing = false,
+  tier = TRIAL_TIER,
 }: StartTrialButtonProps) {
   const { user } = useAuth();
   const { trialAvailable, loaded } = useEntitlement();
@@ -73,7 +76,7 @@ export function StartTrialButton({
     setBusy(true);
     setError(null);
     try {
-      const result = await choosePlan(TRIAL_TIER);
+      const result = await choosePlan(tier);
       if (result.kind === 'checkout') {
         window.location.assign(result.url);
         return;
@@ -97,12 +100,12 @@ export function StartTrialButton({
         className="btn-primary w-full py-2.5 text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60"
       >
         <Sparkles size={15} aria-hidden />
-        {busy ? 'Opening checkout…' : `Try ${TIER_PLANS[TRIAL_TIER].name} free for ${TRIAL_DAYS} days`}
+        {busy ? 'Opening checkout…' : `Try ${TIER_PLANS[tier].name} free for ${TRIAL_DAYS} days`}
       </button>
 
       {showTerms && !error && (
         <p className="mt-2.5 text-xs text-text-secondary text-center">
-          ${TIER_PLANS[TRIAL_TIER].price}/month after. Cancel any time before then and you pay nothing.
+          ${TIER_PLANS[tier].price}/month after. Cancel any time before then and you pay nothing.
         </p>
       )}
       {error && <p className="mt-2.5 text-xs text-red-400 text-center">{error}</p>}

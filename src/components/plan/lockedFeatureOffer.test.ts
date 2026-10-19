@@ -1,17 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
-import { lowestTierWith, TIER_PLANS, tierHas, type Feature } from '../../config/tiers';
-import { TRIAL_TIER } from '../../config/trial';
+import { lowestTierWith, TIER_ORDER, TIER_PLANS, tierHas, type Feature } from '../../config/tiers';
+import { hasTrial, TRIAL_TIER } from '../../config/trial';
 
 /*
  * What the lock card offers, per feature.
  *
- * The trial belongs to Creem and is attached to the Silver product, so it grants Silver and
- * nothing above it. The lock card used to put "Try Silver free for 7 days — $9/month after"
- * under every feature it gated, including the assistant, which is Gold. That is a paywall
- * describing one plan and selling another: the trial goes through checkout and takes the card,
- * so somebody who accepted it paid $9 and came back to the same lock.
+ * The trial belongs to Creem and goes through checkout, so it grants the plan it is on and nothing
+ * above it. When only Silver had one, the lock card put "Try Silver free for 7 days — $9/month
+ * after" under every feature it gated, including the assistant, which is Gold: a paywall describing
+ * one plan and selling another, and somebody who accepted it paid $9 and came back to the same lock.
+ * Every paid plan carries the trial now, so the card offers the plan that unlocks the feature.
  *
  * These render the real component against a free account and read the button.
  */
@@ -88,19 +88,30 @@ describe('LockedFeature upgrade offer', () => {
     expect(html).toContain(`Try ${TIER_PLANS[TRIAL_TIER].name} free for`);
   });
 
-  it('names Gold, not the Silver trial, on the assistant', () => {
+  it('offers the Gold trial, not the Silver one, on the assistant', () => {
+    // Every paid plan carries the trial now, so the card offers the plan that unlocks the feature.
     const html = cardFor('aiAssistant');
-    expect(html).toContain('Unlock with Gold');
+    expect(html).toContain('Try Gold free for');
     expect(html).toContain('$19/month');
     expect(html).not.toContain('Try Silver free');
   });
 
-  it('never offers a trial that would leave the feature locked', () => {
+  it('only ever offers the trial of the plan that unlocks the feature', () => {
     for (const feature of FEATURES) {
-      if (tierHas(TRIAL_TIER, feature)) continue;
+      const needed = lowestTierWith(feature);
       const html = cardFor(feature);
-      expect(html, feature).not.toContain(`Try ${TIER_PLANS[TRIAL_TIER].name} free`);
+      for (const tier of TIER_ORDER) {
+        if (tier === needed && hasTrial(tier) && tierHas(tier, feature)) continue;
+        expect(html, `${feature}: ${tier}`).not.toContain(`Try ${TIER_PLANS[tier].name} free`);
+      }
     }
+  });
+
+  it('offers the buy button on a plan without a trial', () => {
+    expect(hasTrial('free')).toBe(false);
+    // Market replay is sold with Diamond but not shipped: no trial is offered for something that
+    // would not unlock.
+    expect(cardFor('marketReplay')).not.toContain('free for');
   });
 
   it('offers the buy button instead when the account has already had its trial', () => {

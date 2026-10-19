@@ -13,7 +13,7 @@ import { REFUND_WINDOW_DAYS } from '../../config/legal';
 import { BROKER_COUNT_PHRASE } from '../../data/brokerCopy';
 import { useAuth } from '../../context/useAuth';
 import { useEntitlement } from '../../context/useEntitlement';
-import { REFUSALS, TRIAL_DAYS, TRIAL_TIER } from '../../config/trial';
+import { hasTrial, REFUSALS, TRIAL_DAYS } from '../../config/trial';
 import {
   CheckoutError,
   choosePlan,
@@ -371,7 +371,7 @@ export function PricingContent({
                     on the tier alone, so an ex-triallist saw "7-day free trial" above an ordinary
                     buy button with nothing explaining the difference. Signed-out visitors keep it:
                     the public page is advertising to people who have no record yet. */}
-                {tier === TRIAL_TIER && !yearly && (!user || trialOnOffer) && (
+                {hasTrial(tier) && !yearly && (!user || trialOnOffer) && (
                   <span className="ml-auto rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
                     {TRIAL_DAYS}-day free trial
                   </span>
@@ -450,7 +450,7 @@ export function PricingContent({
                   <div className="w-full rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-center text-sm font-medium text-amber-200">
                     Temporarily unavailable
                   </div>
-                ) : tier === TRIAL_TIER && trialOnOffer && !yearly ? (
+                ) : hasTrial(tier) && trialOnOffer && !yearly ? (
                   /*
                    * Broker sync is the only thing this product charges for, and a free account
                    * cannot touch it — so the one feature worth paying for is the one nobody has
@@ -465,7 +465,7 @@ export function PricingContent({
                      costs nothing — the only honest disclosure anywhere in the product, and it was
                      switched off on the page where most trials start. (No price written here: a
                      literal in this file is what pricingClaims.test.ts exists to catch.) */
-                  <StartTrialButton showTerms />
+                  <StartTrialButton tier={tier} showTerms />
                 ) : (
                   <button
                     type="button"
@@ -495,7 +495,7 @@ export function PricingContent({
                 {/* The one refusal the visitor can do something about. Everything else -- already
                     subscribed, already trialled -- is said by the plan state above, but an
                     unconfirmed address just made the trial vanish with no explanation. */}
-                {tier === TRIAL_TIER && !trialOnOffer && trialBlockedReason === 'email-unverified' && (
+                {hasTrial(tier) && !trialOnOffer && trialBlockedReason === 'email-unverified' && (
                   <p className="mt-2.5 text-xs text-amber-300 text-center">
                     {REFUSALS['email-unverified']} Then reload this page to start your free trial.
                   </p>

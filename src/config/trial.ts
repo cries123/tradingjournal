@@ -9,8 +9,8 @@ import { TIER_PLANS, type Tier } from './tiers';
  * funnel shows exactly that: plenty of signups, almost no connections. A trial is the shortest
  * path from "sounds useful" to "my calendar filled itself in".
  *
- * The trial itself belongs to CREEM, attached to the Silver product, so it is redeemed by going
- * through checkout: the card is taken up front and the person becomes a real subscriber straight
+ * The trial itself belongs to CREEM, attached to each paid product (TRIAL_TIERS below), so it is
+ * redeemed by going through checkout: the card is taken up front and the person becomes a real subscriber straight
  * away. ACCESS needs no special case for that — the reaper and effectiveTier should see an ordinary
  * subscription, because a triallist has handed over a card and is entitled to what they are
  * trialling.
@@ -28,6 +28,11 @@ import { TIER_PLANS, type Tier } from './tiers';
  * nothing in this codebase can detect that. Change one, change the other.
  */
 
+/**
+ * The plan a trial means where no plan is named — the trial on a broker-sync prompt, the fallback
+ * when an email cannot read the account's tier. The cheapest plan with a trial: broker sync is what a
+ * free account is missing, and it is on Silver.
+ */
 export const TRIAL_TIER: Tier = 'silver';
 export const TRIAL_DAYS = 7;
 
@@ -49,8 +54,8 @@ export function hasTrial(tier: Tier): boolean {
 }
 
 /** What the button says, and what the plan card promises. */
-export function trialOffer(): string {
-  return `${TRIAL_DAYS}-day free ${TIER_PLANS[TRIAL_TIER].name} trial`;
+export function trialOffer(tier: Tier = TRIAL_TIER): string {
+  return `${TRIAL_DAYS}-day free ${TIER_PLANS[tier].name} trial`;
 }
 
 export type TrialRefusal =
