@@ -70,7 +70,8 @@ function daysLeft(until: string): string {
 }
 
 /**
- * The plan strip in the sidebar: what you're on, and what's left of today.
+ * The plan card on the phone's More screen: what you're on, and what's left of today. (The desktop
+ * sidebar carries the plan as a pill on the profile row and PlanNotice below for anything urgent.)
  *
  * Both counters reset at midnight US Eastern — the market day, not the UTC day, which used to roll
  * over at 8pm in New York — and they are the same numbers the server enforces, so this is the
@@ -78,8 +79,7 @@ function daysLeft(until: string): string {
  */
 export function PlanBadge() {
   const { user } = useAuth();
-  const { tier, limits, usage, loaded, source, status, complimentaryUntil, onTrial, trialEndsAt } =
-    useEntitlement();
+  const { tier, limits, usage, loaded, status } = useEntitlement();
 
   if (!user || !loaded) return null;
 
@@ -139,6 +139,43 @@ export function PlanBadge() {
         </p>
       )}
 
+      <PlanNoticeLines />
+    </div>
+  );
+}
+
+/**
+ * The lines about the plan that must be seen wherever the plan is: a failed payment, a trial about
+ * to charge the card, access that was granted or comped.
+ *
+ * Separate from the badge so the desktop sidebar can carry these without the meters. When the badge
+ * left the sidebar, these were the part that could not go with it — the trial line in particular,
+ * which is the only place in the app that says a charge is coming. Renders nothing when there is
+ * nothing to say.
+ */
+export function PlanNotice({ className = '' }: { className?: string }) {
+  const { user } = useAuth();
+  const { loaded, source, status, complimentaryUntil, onTrial, trialEndsAt } = useEntitlement();
+  if (!user || !loaded) return null;
+  const anything =
+    status === 'past_due' || source === 'admin' || (onTrial && Boolean(trialEndsAt)) || (source === 'comp' && Boolean(complimentaryUntil));
+  if (!anything) return null;
+  return (
+    <div className={`rounded-xl border border-border/70 bg-bg-tertiary/40 px-3 py-2.5 space-y-1.5 ${className}`}>
+      {status === 'past_due' && (
+        <p className="text-[11px] text-loss-bright leading-snug">
+          Your last payment didn&apos;t go through, so paid features are paused.
+        </p>
+      )}
+      <PlanNoticeLines />
+    </div>
+  );
+}
+
+function PlanNoticeLines() {
+  const { source, status, complimentaryUntil, onTrial, trialEndsAt } = useEntitlement();
+  return (
+    <>
       {source === 'admin' && (
         <p className="text-[11px] text-text-secondary leading-snug">Granted to your account — nothing to pay.</p>
       )}
@@ -176,6 +213,6 @@ export function PlanBadge() {
           {new Date(complimentaryUntil).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} — nothing to pay.
         </p>
       )}
-    </div>
+    </>
   );
 }

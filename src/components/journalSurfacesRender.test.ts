@@ -81,6 +81,11 @@ vi.mock('../context/useSettings', () => ({
     addAccount: () => undefined,
     removeAccount: () => undefined,
     setActiveAccount: () => undefined,
+    setViewAllJournals: () => undefined,
+    viewingAllJournals: false,
+    canViewAllJournals: false,
+    journalLimit: 5,
+    canAddJournal: true,
   }),
 }));
 
@@ -186,12 +191,10 @@ const sidebar = (appView: Parameters<typeof Sidebar>[0]['appView']) =>
   });
 
 describe('Sidebar', () => {
-  it('paints the six destinations and nothing that used to scroll', () => {
+  it('paints the places to look, the journals and the broker, and nothing that used to scroll', () => {
     const html = renderToString(sidebar('dashboard'));
 
-    for (const label of [
-      'Overview', 'Performance', 'Rule simulator', 'Assistant', 'Connect broker', 'Settings', 'Support',
-    ]) {
+    for (const label of ['Overview', 'Performance', 'Rule simulator', 'Assistant', 'Track record', 'Journals', 'Connect a broker']) {
       expect(html).toContain(label);
     }
     /* The three that moved into Support, the two that moved out of the nav, and the leaderboard,
@@ -205,37 +208,73 @@ describe('Sidebar', () => {
     }
   });
 
-  it('leaves the account screens to the top bar', () => {
-    // They lived under the identity row for one release and moved into the account dropdown. Two
-    // routes to the same three screens, one of them at the very bottom of the panel, is how a nav
-    // ends up with eleven destinations again.
+  it('keeps Settings, Support and the billing screens behind the profile row', () => {
+    // They were split between an Account section of the nav and a dropdown in a top bar that held
+    // nothing else. One place for the account, behind the row that says whose account it is.
     const html = renderToString(sidebar('dashboard'));
 
-    for (const moved of ['Account settings', 'Subscription', 'Order history']) {
-      expect(html, moved).not.toContain(moved);
+    for (const moved of ['Settings', 'Support', 'Account settings', 'Subscription', 'Order history']) {
+      expect(html, moved).not.toContain(`>${moved}<`);
     }
-    // The identity row itself stays — it is what the dropdown is about.
     expect(html).toContain('trader@example.com');
+    expect(html).toContain('@chelo618');
+    expect(html).toContain('aria-haspopup="menu"');
+
+    const menu = readFileSync('src/components/nav/ProfileMenu.tsx', 'utf8');
+    for (const label of ['Settings', 'Account settings', 'Subscription', 'Order history', 'Support', 'Help center', "What's new", 'Sign out']) {
+      expect(menu, label).toContain(label);
+    }
   });
 
   it('does not draw a scrollbar rail down the panel', () => {
     expect(renderToString(sidebar('dashboard'))).toContain('no-scrollbar');
   });
 
-  it('shows unread support replies as a badge', () => {
-    expect(renderToString(sidebar('dashboard'))).toContain('>2<');
+  it('shows unread support replies on the profile row, where the menu that holds Support is', () => {
+    expect(renderToString(sidebar('dashboard'))).toContain('aria-label="2 unread support replies"');
   });
 
-  it('keeps Support lit while one of the screens it absorbed is open', () => {
+  it('keeps the profile row lit while one of its screens is open', () => {
     // Landing on "Report a bug" with nothing highlighted is how a nav loses the reader.
-    const html = renderToString(sidebar('report-bug'));
-    expect(html).toContain('aria-current="page"');
+    for (const view of ['report-bug', 'settings', 'subscription'] as const) {
+      expect(renderToString(sidebar(view)), view).toContain('aria-current="page"');
+    }
   });
 
-  it('paints as a mobile drawer too', () => {
-    expect(() =>
-      renderToString(createElement(Sidebar, { ...sidebar('dashboard').props, variant: 'drawer' })),
-    ).not.toThrow();
+  it('opens its account menu upward and inside the panel, which clips anything past its edge', () => {
+    const menu = readFileSync('src/components/nav/ProfileMenu.tsx', 'utf8');
+    expect(menu).toMatch(/absolute bottom-full inset-x-0/);
+  });
+});
+
+describe('MoreContent', () => {
+  it('paints the phone screen that replaced the drawer, with sign-out last', async () => {
+    const { MoreContent } = await import('./more/MoreContent');
+    const html = paint(
+      createElement(MoreContent, {
+        trades: syncedJournal(),
+        year: 2026,
+        month: 7,
+        hasBrokerTrades: true,
+        onConnectBroker: noop,
+        onTrades: noop,
+        onSimulator: noop,
+        onTrackRecord: noop,
+        onReport: noop,
+        onCoach: noop,
+        onSettings: noop,
+        onAccount: noop,
+        onSubscription: noop,
+        onOrderHistory: noop,
+        onSupport: noop,
+      }),
+    );
+    for (const label of ['More', '@chelo618', 'Sync', 'Primary journal', 'All trades', 'Rule simulator', 'Track record', 'Monthly report', 'Settings', 'Subscription', 'Support', 'Help center', "What's new"]) {
+      expect(html, label).toContain(label);
+    }
+    expect(html).toContain('2 new');
+    // Sign-out sits alone at the bottom, after everything else on the page.
+    expect(html.lastIndexOf('Sign out')).toBeGreaterThan(html.lastIndexOf("What's new"));
   });
 });
 
@@ -448,7 +487,7 @@ describe('MobileBottomNav', () => {
   const bar = (appView: Parameters<typeof MobileBottomNav>[0]['appView'] = 'dashboard') =>
     createElement(MobileBottomNav, {
       appView,
-      onOpenMenu: noop,
+      onMore: noop,
       onAddTrade: noop,
       onDashboard: noop,
       onPerformance: noop,
@@ -461,7 +500,7 @@ describe('MobileBottomNav', () => {
        which pushed the "+" button off centre and left a hole that read as a missing button. A
        count is a cheap way to catch the next one. */
     const html = paint(bar());
-    const grid = /<div class="grid grid-cols-(\d+) h-14">(.*)<\/div><\/nav>/s.exec(html);
+    const grid = /<div class="grid grid-cols-(\d+) h-\[60px\]">(.*)<\/div><\/nav>/s.exec(html);
     expect(grid).not.toBeNull();
 
     const columns = Number(grid![1]);
@@ -482,6 +521,15 @@ describe('MobileBottomNav', () => {
 
   it('lights the row for the view you are on', () => {
     expect(paint(bar('performance'))).toContain('aria-current="page"');
+  });
+
+  it('keeps More lit on every screen More leads to, so the way back is never in doubt', () => {
+    for (const view of ['more', 'settings', 'subscription', 'support', 'connect-broker', 'simulator'] as const) {
+      const html = paint(bar(view));
+      const more = html.slice(html.lastIndexOf('<button'));
+      expect(more, view).toContain('aria-current="page"');
+      expect(more, view).toContain('More');
+    }
   });
 });
 

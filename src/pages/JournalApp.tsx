@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AuthModal } from '../components/AuthModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { DashboardView } from '../components/DashboardView';
 import { DashboardSkeleton } from '../components/DashboardSkeleton';
 import { DayDetailDrawer } from '../components/DayDetailDrawer';
-import { MobileBottomNav, MobileDrawer, MobileHeader } from '../components/MobileNav';
+import { MobileBottomNav, MobileHeader } from '../components/MobileNav';
+import { MoreContent } from '../components/more/MoreContent';
 import { OnboardingOverlay } from '../components/OnboardingOverlay';
 import { hasCompletedOnboarding, hideGettingStarted, isGettingStartedHidden } from '../utils/onboarding';
 import { GettingStartedCard } from '../components/onboarding/GettingStartedCard';
@@ -137,7 +138,6 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   const [tradeModalDate, setTradeModalDate] = useState<string | undefined>();
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [clearConfirmStage, setClearConfirmStage] = useState<0 | 1 | 2>(0);
   const [clearError, setClearError] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(() => !hasCompletedOnboarding());
@@ -247,70 +247,45 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
     setImportTargetDate(undefined);
   };
 
-  const closeMobileMenu = () => setMobileMenuOpen(false);
-
   const sidebarActions = {
     appView,
-    onDashboard: () => {
-      openView('dashboard');
-      closeMobileMenu();
-    },
+    onDashboard: () => openView('dashboard'),
     onAddTrade: () => openAddTrade(),
-    onConnectBroker: () => {
-      openView('connect-broker');
-      closeMobileMenu();
-    },
-    onSettings: () => {
-      openView('settings');
-      closeMobileMenu();
-    },
-    onSupport: () => {
-      openView('support');
-      closeMobileMenu();
-    },
-    onPerformance: () => {
-      openView('performance');
-      closeMobileMenu();
-    },
-    onSimulator: () => {
-      openView('simulator');
-      closeMobileMenu();
-    },
-    onTrackRecord: () => {
-      openView('track-record');
-      closeMobileMenu();
-    },
-    onAssistant: () => {
-      openView('assistant');
-      closeMobileMenu();
-    },
-    onCoach: () => {
-      openView('coach');
-      closeMobileMenu();
-    },
-    onAccount: () => {
-      openView('account');
-      closeMobileMenu();
-    },
-    onSubscription: () => {
-      openView('subscription');
-      closeMobileMenu();
-    },
-    onOrderHistory: () => {
-      openView('order-history');
-      closeMobileMenu();
-    },
+    onConnectBroker: () => openView('connect-broker'),
+    onSettings: () => openView('settings'),
+    onSupport: () => openView('support'),
+    onPerformance: () => openView('performance'),
+    onSimulator: () => openView('simulator'),
+    onTrackRecord: () => openView('track-record'),
+    onAssistant: () => openView('assistant'),
+    onCoach: () => openView('coach'),
+    onAccount: () => openView('account'),
+    onSubscription: () => openView('subscription'),
+    onOrderHistory: () => openView('order-history'),
     onAdmin,
   };
 
   const [searchOpen, setSearchOpen] = useState(false);
 
-  /* Built once and handed to whichever header is on screen, so the two can never drift apart. */
   /*
-   * Search sits beside the account menu rather than becoming an eighth nav row.
-   *
-   * It is something you do on the way to somewhere else, not a destination — and the nav was cut
-   * back to six items once already for exactly this reason.
+   * Ctrl+K / ⌘K opens search, the shortcut every app the trader also uses has taught them. The
+   * sidebar's search row names it, so it is discoverable rather than a secret.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  /*
+   * The phone header's tools: search, and the account dropdown in the corner the marketing nav puts
+   * it in. Desktop has no top bar any more — both live in the sidebar, the search row at its top and
+   * the account behind the profile row at its foot — so this is the phone's alone.
    */
   const headerTools = (
     <div className="flex items-center gap-1.5">
@@ -342,22 +317,20 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
       {/* No starfield behind the journal since the rebrand: on pure black the specks read as dust
           on the screen, and the surfaces are the only thing that should sit on it. The auth and
           username modals keep theirs — a full-screen moment, not a page of numbers. */}
-      {isDesktop && <Sidebar variant="desktop" onHome={onHome} {...sidebarActions} />}
+      {isDesktop && (
+        <Sidebar
+          onHome={onHome}
+          {...sidebarActions}
+          onSearch={() => setSearchOpen(true)}
+          trades={everyTrade}
+          year={year}
+          month={month}
+          hasBrokerTrades={hasBrokerTrades}
+        />
+      )}
 
       <div className={`relative flex-1 flex flex-col min-w-0 w-full ${isDesktop ? '' : 'min-h-0'}`}>
         {!isDesktop && <MobileHeader onHome={onHome} account={headerTools} />}
-
-        {/*
-          The desktop top bar. Only the account control lives here: the sidebar is still the nav,
-          and a second row of destinations across the top would be two answers to "where do I go".
-          Sticky rather than scrolling away, because the thing it holds is the one control that is
-          not somewhere else on the screen.
-        */}
-        {isDesktop && (
-          /* z-40 for the same reason the mobile header carries one — see MobileNav. The open
-             dropdown overhangs <main>, and main is the later sibling. */
-          <div className="sticky top-0 z-40 flex justify-end px-5 pt-3 pb-1">{headerTools}</div>
-        )}
 
         <main
           className={`flex-1 p-2 md:p-5 ${
@@ -500,6 +473,24 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
               </LockedFeature>
             ) : appView === 'report-bug' ? (
               <ReportBugContent onBack={goBackView} />
+            ) : appView === 'more' ? (
+              <MoreContent
+                trades={everyTrade}
+                year={year}
+                month={month}
+                hasBrokerTrades={hasBrokerTrades}
+                onConnectBroker={sidebarActions.onConnectBroker}
+                onSimulator={sidebarActions.onSimulator}
+                onTrackRecord={sidebarActions.onTrackRecord}
+                onReport={() => openView('report')}
+                onCoach={sidebarActions.onCoach}
+                onSettings={sidebarActions.onSettings}
+                onAccount={sidebarActions.onAccount}
+                onSubscription={sidebarActions.onSubscription}
+                onOrderHistory={sidebarActions.onOrderHistory}
+                onSupport={sidebarActions.onSupport}
+                onAdmin={onAdmin}
+              />
             ) : isLoading ? (
               <DashboardSkeleton />
             ) : (
@@ -581,7 +572,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
         {!isDesktop && (
           <MobileBottomNav
             appView={appView}
-            onOpenMenu={() => setMobileMenuOpen(true)}
+            onMore={() => openView('more')}
             onAddTrade={() => openAddTrade()}
             onDashboard={() => openView('dashboard')}
             onPerformance={() => openView('performance')}
@@ -600,12 +591,6 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
            panel it opens. */
         showLauncher={isDesktop && appView !== 'assistant'}
       />
-
-      {!isDesktop && (
-        <MobileDrawer open={mobileMenuOpen} onClose={closeMobileMenu}>
-          <Sidebar variant="drawer" onHome={onHome} {...sidebarActions} onNavigate={closeMobileMenu} />
-        </MobileDrawer>
-      )}
 
       {showOnboarding && !showAuthModal && !showUsernameModal && appView === 'dashboard' && (
         <OnboardingOverlay onDone={() => setShowOnboarding(false)} />

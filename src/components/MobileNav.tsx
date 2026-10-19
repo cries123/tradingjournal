@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
 import { Gauge, LayoutGrid, Menu, MessageCircle, Plus } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
-import { useEscapeToClose } from '../hooks/useEscapeToClose';
 import type { SidebarAppView } from './Sidebar';
+import { MORE_VIEWS } from './nav/views';
 
 interface MobileNavProps {
   appView: SidebarAppView;
-  onOpenMenu: () => void;
+  /** Opens the More screen. */
+  onMore: () => void;
   onAddTrade: () => void;
   onDashboard: () => void;
   onPerformance: () => void;
@@ -81,7 +82,7 @@ function NavItem({ icon, label, active = false, onClick }: NavItemProps) {
       {/* Truncating rather than wrapping: a two-line label in a 56px-tall bar pushes the icon
           out of alignment with its neighbours, and one column growing taller than the rest is
           more noticeable than a clipped word. */}
-      <span className="w-full px-0.5 text-center text-[9px] font-medium leading-none truncate">
+      <span className="w-full px-0.5 text-center text-[10px] font-medium leading-none truncate">
         {label}
       </span>
     </button>
@@ -91,22 +92,19 @@ function NavItem({ icon, label, active = false, onClick }: NavItemProps) {
 /**
  * The app's primary navigation on phones.
  *
- * Rebuilt around actual destinations. The previous version held Menu, Broker, a "+" and a
- * sign-out button, which meant three of its four slots were wrong for a nav bar:
+ * Four destinations and the button that matters most, with More as a screen of its own rather than
+ * the desktop sidebar squeezed into a drawer. The drawer was a 280px column of the same rows the
+ * sidebar has, built for a mouse — Sign out sat a few millimetres under Support — and it covered the
+ * screen it was opened from without being somewhere you could come back to. More is a page: it has
+ * a back, it holds the journals and the broker at thumb size, and every screen it leads to keeps
+ * More lit in this bar so the way back is never in doubt.
  *
- *   - Menu duplicated the header's hamburger directly above it.
- *   - Broker was a permanent slot for a one-time setup task — dead weight forever once connected.
- *   - The fourth slot rendered AuthPanel, i.e. a LOG OUT button labelled "Out", sitting a
- *     thumb-width from "+". Miss the add-trade button and you signed yourself out. Signed-out
- *     users got nothing there at all, which is why the bar looked half-finished.
- *
- * None of them indicated the current view, and the bar was only mounted on the dashboard, so it
- * disappeared the moment you navigated anywhere. Sign-out now lives in the drawer with the rest
- * of the account controls.
+ * Sign-out lives at the bottom of More, alone, where it cannot be hit on the way to anything else —
+ * an earlier version of this bar put a LOG OUT button a thumb-width from "+".
  */
 export function MobileBottomNav({
   appView,
-  onOpenMenu,
+  onMore,
   onAddTrade,
   onDashboard,
   onPerformance,
@@ -119,31 +117,38 @@ export function MobileBottomNav({
       className="shrink-0 z-40 border-t border-border/60 bg-bg-secondary/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]"
     >
       {/* Five columns, five children. It briefly had four in a five-column grid — a leftover
-          from removing the leaderboard — which pushed "+" off centre and left a visible hole
+          from removing the leaderboard — which pushed "+" off center and left a visible hole
           somebody reasonably read as a missing button. */}
-      <div className="grid grid-cols-5 h-14">
+      <div className="grid grid-cols-5 h-[60px]">
         <NavItem
-          icon={<LayoutGrid size={18} />}
+          icon={<LayoutGrid size={20} />}
           label="Overview"
-          active={appView === 'dashboard'}
+          active={appView === 'dashboard' || appView === 'day'}
           onClick={onDashboard}
         />
         {/* Performance, not something quieter, because it is the screen the paid plans are for —
             and because the two destinations either side of "+" are the ones a thumb reaches
             without moving, so they should be the two people open most. */}
         <NavItem
-          icon={<Gauge size={18} />}
+          icon={<Gauge size={20} />}
           label="Performance"
           active={appView === 'performance'}
           onClick={onPerformance}
         />
+        {/*
+          The plus sits INSIDE the bar: 48px in a 60px bar, centred by the grid cell, no negative
+          margin and no transform. A button that rides up over the bar's top edge looks like a
+          floating action button, overlaps whatever the screen has at its bottom — the last calendar
+          row, the send box on Ask — and on an iPhone with the home indicator the part above the bar
+          is the part a thumb misses. bottomNavFit.test.ts holds it to this.
+        */}
         <button
           type="button"
           onClick={onAddTrade}
           aria-label="Log a trade"
-          className="flex flex-col items-center justify-center focus-ring"
+          className="flex items-center justify-center focus-ring"
         >
-          <span className="w-11 h-11 rounded-full bg-gradient-to-br from-profit-bright to-accent flex items-center justify-center text-bg-primary shadow-lg shadow-profit-bright/30">
+          <span className="w-12 h-12 rounded-full bg-gradient-to-br from-profit-bright to-accent flex items-center justify-center text-bg-primary shadow-md shadow-profit-bright/25">
             <Plus size={24} strokeWidth={2.5} />
           </span>
         </button>
@@ -152,38 +157,13 @@ export function MobileBottomNav({
             anyway, so the sheet was a full-page view pretending not to be one — and it had no
             room for the saved conversations. */}
         <NavItem
-          icon={<MessageCircle size={18} />}
+          icon={<MessageCircle size={20} />}
           label="Ask"
           active={assistantOpen || appView === 'assistant'}
           onClick={onAssistant}
         />
-        <NavItem icon={<Menu size={18} />} label="More" onClick={onOpenMenu} />
+        <NavItem icon={<Menu size={20} />} label="More" active={MORE_VIEWS.includes(appView)} onClick={onMore} />
       </div>
     </nav>
-  );
-}
-
-interface MobileDrawerProps {
-  open: boolean;
-  onClose: () => void;
-  children: ReactNode;
-}
-
-export function MobileDrawer({ open, onClose, children }: MobileDrawerProps) {
-  useEscapeToClose(onClose);
-  if (!open) return null;
-
-  return (
-    <>
-      <button
-        type="button"
-        className="md:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm animate-backdrop-in"
-        onClick={onClose}
-        aria-label="Close menu"
-      />
-      <div className="md:hidden fixed inset-y-0 left-0 z-50 w-[min(280px,85vw)] shadow-2xl animate-slide-in motion-safe:animate-slide-in">
-        {children}
-      </div>
-    </>
   );
 }

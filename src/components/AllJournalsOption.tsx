@@ -28,7 +28,7 @@ export function AllJournalsOption({ variant, onPicked }: { variant: 'row' | 'chi
         title={plan ? `Adding your journals together is on ${TIER_PLANS[plan].name} and up` : undefined}
         className={
           row
-            ? 'w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-left text-xs font-medium text-text-secondary/70 hover:text-text-primary hover:bg-bg-tertiary/80 border border-transparent transition-colors focus-ring'
+            ? 'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-[13px] font-medium text-text-secondary/70 hover:text-text-primary hover:bg-bg-tertiary/60 border border-transparent transition-colors focus-ring'
             : 'inline-flex items-center gap-1.5 px-3 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium bg-bg-tertiary/40 text-text-secondary/70 border border-dashed border-border/60 hover:text-text-primary transition-colors focus-ring'
         }
       >
@@ -53,10 +53,10 @@ export function AllJournalsOption({ variant, onPicked }: { variant: 'row' | 'chi
       aria-pressed={viewingAllJournals}
       className={
         row
-          ? `w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-left text-xs font-medium transition-colors focus-ring ${
+          ? `w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-[13px] font-medium transition-colors focus-ring ${
               viewingAllJournals
                 ? 'bg-accent/15 text-accent border border-accent/30'
-                : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/80 border border-transparent'
+                : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60 border border-transparent'
             }`
           : `inline-flex items-center gap-1.5 px-3 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-all focus-ring ${
               viewingAllJournals

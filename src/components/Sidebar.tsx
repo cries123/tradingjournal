@@ -1,27 +1,31 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
-  LayoutDashboard,
-  Link2,
-  Settings,
-  Gauge,
-  UserRoundCheck,
-  LifeBuoy,
-  ShieldCheck,
-  Sparkles,
-  FlaskConical,
   BadgeCheck,
+  FlaskConical,
+  Gauge,
+  LayoutDashboard,
+  List,
+  Search,
+  Sparkles,
+  UserRoundCheck,
 } from 'lucide-react';
-import { PlanBadge } from './plan/PlanBadge';
+import type { Trade } from '../types';
 import { BrandLogo } from './BrandLogo';
-import { SidebarJournalPicker } from './SidebarJournalPicker';
+import { JournalList } from './nav/JournalList';
+import { BrokerCard } from './nav/BrokerCard';
+import { ProfileMenu } from './nav/ProfileMenu';
+import { PlanNotice } from './plan/PlanBadge';
+import { ACCOUNT_VIEWS } from './nav/views';
 import { useAuth } from '../context/useAuth';
-import { isCurrentUserAdmin } from '../services/admin';
-import { reportErrorSilently } from '../services/errorReporting';
+import { useIsAdmin } from '../hooks/useIsAdmin';
 import { useSupportUnread } from '../hooks/useSupportUnread';
 import { useCoachingCount } from '../hooks/useCoachingCount';
 
 export type SidebarAppView =
   | 'dashboard'
+  | 'trades'
+  | 'day'
+  | 'more'
   | 'settings'
   | 'brokers'
   | 'connect-broker'
@@ -40,6 +44,7 @@ export type SidebarAppView =
 interface SidebarProps {
   appView: SidebarAppView;
   onDashboard: () => void;
+  onTrades?: () => void;
   onAddTrade: () => void;
   onConnectBroker: () => void;
   onPerformance: () => void;
@@ -49,10 +54,20 @@ interface SidebarProps {
   onSettings: () => void;
   onSupport: () => void;
   onCoach: () => void;
+  onAccount?: () => void;
+  onSubscription?: () => void;
+  onOrderHistory?: () => void;
+  /** Opens journal search. The sidebar is the only chrome on desktop, so search lives here. */
+  onSearch?: () => void;
   onAdmin?: () => void;
   onHome?: () => void;
-  variant?: 'desktop' | 'drawer';
-  onNavigate?: () => void;
+  /** Every trade in every journal, for each journal's month beside its name. */
+  trades?: readonly Trade[];
+  /** The month on screen, which is the month each journal's figure is for. */
+  year?: number;
+  month?: number;
+  /** A trade in the journal came from a broker. */
+  hasBrokerTrades?: boolean;
 }
 
 /**
@@ -69,28 +84,23 @@ function NavItem({
   icon,
   label,
   badge,
-  tone = 'default',
 }: {
   active: boolean;
   onClick: () => void;
   icon: React.ReactNode;
   label: string;
   badge?: number;
-  tone?: 'default' | 'admin';
 }) {
-  const base =
-    'group relative w-full flex items-center gap-2.5 pl-3 pr-2.5 py-2 rounded-lg text-[13px] transition-colors focus-ring';
-  const state = active
-    ? 'bg-accent/10 text-accent font-medium'
-    : tone === 'admin'
-      ? 'text-amber-300/80 hover:text-amber-200 hover:bg-amber-500/10'
-      : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60';
-
   return (
-    <button type="button" onClick={onClick} className={`${base} ${state}`} aria-current={active ? 'page' : undefined}>
-      {active && (
-        <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-accent" aria-hidden />
-      )}
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? 'page' : undefined}
+      className={`group relative w-full flex items-center gap-2.5 pl-3 pr-2.5 py-2 rounded-lg text-[13px] transition-colors focus-ring ${
+        active ? 'bg-accent/10 text-accent font-medium' : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/60'
+      }`}
+    >
+      {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-accent" aria-hidden />}
       <span className={`shrink-0 ${active ? 'text-accent' : ''}`}>{icon}</span>
       <span className="flex-1 text-left truncate">{label}</span>
       {badge != null && badge > 0 && (
@@ -102,31 +112,22 @@ function NavItem({
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-text-secondary/45">
-      {children}
-    </p>
-  );
-}
-
 /**
- * The journal's navigation.
+ * The journal's navigation on desktop — the only chrome on the screen.
  *
- * It used to carry eleven destinations, which is what put a scrollbar down the side of a 224px
- * panel on any laptop screen — and a rail beside eight items is most of the ornament in the panel.
- * The fix was not a shorter scroll but fewer places: supported brokers, reporting a bug and
- * requesting a broker were three separate rows for three halves of the same errand, and they now
- * live as sections inside Support. Clearing the journal moved to Settings, where the rest of the
- * destructive controls already are, and Share month was always a duplicate of the button in the
- * dashboard toolbar.
+ * Three parts, top to bottom: the places you look at your trading; the things you are looking at
+ * (your journals, each with its month, and your broker with its Sync button); and you, with the
+ * account behind your name. Settings, Support and Connect broker were nav rows of their own, which
+ * made a list of destinations where three of the rows were errands. They now sit where each errand
+ * starts: the broker card, and the menu behind the profile row.
  *
- * What's left is grouped by what a row is for: the four places you look at your trading, then the
- * journal you're looking at, then the three places you go to change something about the account.
+ * Phones do not get this panel in a drawer any more. They have a bottom bar and a More screen
+ * (components/more/MoreContent), which shows the same journals and broker card at thumb size.
  */
 export function Sidebar({
   appView,
   onDashboard,
+  onTrades,
   onAddTrade,
   onConnectBroker,
   onPerformance,
@@ -136,56 +137,31 @@ export function Sidebar({
   onSettings,
   onSupport,
   onCoach,
+  onAccount,
+  onSubscription,
+  onOrderHistory,
+  onSearch,
   onAdmin,
   onHome,
-  variant = 'desktop',
-  onNavigate,
+  trades,
+  year,
+  month,
+  hasBrokerTrades = false,
 }: SidebarProps) {
-  const { user, loading, firebaseEnabled, logout, username } = useAuth();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { user, loading, firebaseEnabled } = useAuth();
+  const isAdmin = useIsAdmin('sidebar-admin-check');
   const supportUnread = useSupportUnread();
   const coaching = useCoachingCount();
-
-  useEffect(() => {
-    if (!user?.uid || !firebaseEnabled) {
-      // Clearing state before the fetch or subscription below. This is the external-system sync
-      // the rule's own guidance describes as a legitimate effect; the alternative is tracking which
-      // request each piece of state belongs to, through auth, settings and trades, to satisfy a lint
-      // rule rather than to fix a bug.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setIsAdmin(false);
-      return;
-    }
-    let cancelled = false;
-    void isCurrentUserAdmin(user.uid)
-      .then((ok) => {
-        if (!cancelled) setIsAdmin(ok);
-      })
-      // Offline or on a refused read this rejected into the global handler with no scope, which is
-      // the same anonymous unhandled rejection this repo keeps finding. Not being shown the admin
-      // link is the correct outcome of not knowing, so there is nothing to tell the user.
-      .catch((error: unknown) => {
-        reportErrorSilently(error, 'promise', 'sidebar-admin-check');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.uid, firebaseEnabled]);
-
-  const wrap = (fn: () => void) => () => {
-    fn();
-    onNavigate?.();
-  };
-
-  const shellClass =
-    variant === 'drawer'
-      ? 'flex flex-col w-full h-full bg-bg-secondary/95 backdrop-blur-xl'
-      : 'flex flex-col w-56 shrink-0 sticky top-0 h-dvh bg-bg-secondary/80 backdrop-blur-xl border-r border-border/60';
+  // The month on screen when the caller says which; otherwise this one. Read once, not in render.
+  const [opened] = useState(() => new Date());
+  const shownYear = year ?? opened.getFullYear();
+  const shownMonth = month ?? opened.getMonth();
+  // ⌘ on a Mac, Ctrl everywhere else — the hint should name the key the reader will press.
+  const [mac] = useState(() => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.userAgent));
 
   return (
-    <aside className={`${shellClass} overflow-hidden`}>
-      {/* md, not lg: at 224px wide the large mark forced the wordmark to wrap and ate the top of
-          the panel. The brand still reads first, it just stops being the loudest thing here. */}
+    <aside className="flex flex-col w-56 shrink-0 sticky top-0 h-dvh bg-bg-secondary/80 backdrop-blur-xl border-r border-border/60 overflow-hidden">
+      {/* md, not lg: at 224px wide the large mark forced the wordmark to wrap. */}
       <div className="px-4 py-3 border-b border-border/60 shrink-0">
         {onHome ? (
           <button
@@ -201,52 +177,39 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Still scrollable — a 600px-tall window or a drawer on a small phone will always be able
-          to run out of room — but without the drawn rail. See .no-scrollbar in index.css. */}
+      {/* Still scrollable — a 600px-tall window will always be able to run out of room — but
+          without the drawn rail. See .no-scrollbar in index.css. */}
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain no-scrollbar">
-        <nav className="px-2.5 pt-3 space-y-0.5">
-          <NavItem
-            active={appView === 'dashboard'}
-            onClick={wrap(onDashboard)}
-            icon={<LayoutDashboard size={16} />}
-            label="Overview"
-          />
-          <NavItem
-            active={appView === 'performance'}
-            onClick={wrap(onPerformance)}
-            icon={<Gauge size={16} />}
-            label="Performance"
-          />
+        {onSearch && (
+          <div className="px-2.5 pt-3">
+            <button
+              type="button"
+              onClick={onSearch}
+              className="w-full flex items-center gap-2 rounded-lg border border-border/70 bg-bg-tertiary/40 px-3 py-1.5 text-[13px] text-text-secondary hover:text-text-primary hover:border-border transition-colors focus-ring"
+            >
+              <Search size={14} aria-hidden />
+              <span className="flex-1 text-left">Search</span>
+              <kbd className="rounded border border-border px-1 text-[10px] font-sans text-text-secondary">{mac ? '⌘K' : 'Ctrl K'}</kbd>
+            </button>
+          </div>
+        )}
+
+        <nav className="px-2.5 pt-3 space-y-0.5" aria-label="Journal">
+          <NavItem active={appView === 'dashboard' || appView === 'day'} onClick={onDashboard} icon={<LayoutDashboard size={16} />} label="Overview" />
+          {onTrades && <NavItem active={appView === 'trades'} onClick={onTrades} icon={<List size={16} />} label="Trades" />}
+          <NavItem active={appView === 'performance'} onClick={onPerformance} icon={<Gauge size={16} />} label="Performance" />
           {/* Next to Performance: both answer "what did my trading actually do", and this one is
               the only place that answers it about a version of the year that did not happen. */}
-          <NavItem
-            active={appView === 'simulator'}
-            onClick={wrap(onSimulator)}
-            icon={<FlaskConical size={16} />}
-            label="Rule simulator"
-          />
-          <NavItem
-            active={appView === 'assistant'}
-            onClick={wrap(onAssistant)}
-            icon={<Sparkles size={16} />}
-            label="Assistant"
-          />
-          {/* Last of the analysis rows because it is the only one that produces something
-              other people see — it belongs after the screens that decide whether there is
-              anything worth showing them. */}
-          <NavItem
-            active={appView === 'track-record'}
-            onClick={wrap(onTrackRecord)}
-            icon={<BadgeCheck size={16} />}
-            label="Track record"
-          />
-          {/* Only for the people who are actually somebody's coach — which is almost nobody, and a
-              permanent row saying "nobody has invited you" is a nav item advertising a feature
-              rather than doing anything. */}
+          <NavItem active={appView === 'simulator'} onClick={onSimulator} icon={<FlaskConical size={16} />} label="Rule simulator" />
+          <NavItem active={appView === 'assistant'} onClick={onAssistant} icon={<Sparkles size={16} />} label="Assistant" />
+          {/* Last of the analysis rows because it is the only one that produces something other
+              people see. */}
+          <NavItem active={appView === 'track-record'} onClick={onTrackRecord} icon={<BadgeCheck size={16} />} label="Track record" />
+          {/* Only for the people who are actually somebody's coach — which is almost nobody. */}
           {coaching > 0 && (
             <NavItem
               active={appView === 'coach'}
-              onClick={wrap(onCoach)}
+              onClick={onCoach}
               icon={<UserRoundCheck size={16} />}
               label="Coaching"
               badge={coaching > 1 ? coaching : undefined}
@@ -254,78 +217,35 @@ export function Sidebar({
           )}
         </nav>
 
-        {/* No section label above this one: the picker draws its own "Journal" heading. */}
-        <div className="px-2.5 pt-4">
-          <SidebarJournalPicker onNavigate={onNavigate} />
+        <div className="px-2.5 pt-5">
+          <JournalList trades={trades} year={shownYear} month={shownMonth} />
         </div>
 
-        <div className="px-2.5 pt-4 pb-3">
-          <SectionLabel>Account</SectionLabel>
-          <div className="space-y-0.5">
-            <NavItem
-              active={appView === 'connect-broker'}
-              onClick={wrap(onConnectBroker)}
-              icon={<Link2 size={16} />}
-              label="Connect broker"
-            />
-            <NavItem
-              active={appView === 'settings'}
-              onClick={wrap(onSettings)}
-              icon={<Settings size={16} />}
-              label="Settings"
-            />
-            <NavItem
-              active={appView === 'support' || appView === 'brokers' || appView === 'report-bug'}
-              onClick={wrap(onSupport)}
-              icon={<LifeBuoy size={16} />}
-              label="Support"
-              /* A reply nobody opens is the same as no reply, and there is no email going out. */
-              badge={supportUnread}
-            />
-            {isAdmin && onAdmin && (
-              <NavItem
-                active={false}
-                onClick={wrap(onAdmin)}
-                icon={<ShieldCheck size={16} />}
-                label="Admin"
-                tone="admin"
-              />
-            )}
-          </div>
+        <div className="px-2.5 pt-5 pb-3">
+          <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-text-secondary/60">Broker</p>
+          <BrokerCard hasBrokerTrades={hasBrokerTrades} onConnectBroker={onConnectBroker} />
         </div>
       </div>
 
-      <div className="p-3 border-t border-border/60 shrink-0 space-y-3">
-        <PlanBadge />
+      <div className="p-3 border-t border-border/60 shrink-0 space-y-2.5">
+        <PlanNotice />
 
-        <button type="button" onClick={wrap(onAddTrade)} className="w-full py-2.5 btn-primary text-sm font-semibold">
-          + Log Trade
+        <button type="button" onClick={onAddTrade} className="w-full py-2.5 btn-primary text-sm font-semibold">
+          + Log trade
         </button>
 
-        {/*
-          Identity only. Account settings, Subscription and Order history used to sit under this
-          row and have moved into the account dropdown in the top bar — the same control, in the
-          same corner, as the one in the marketing nav. Three more rows at the bottom of a panel
-          that already ends in a plan card, a Log Trade button and an email address was the
-          quietest possible place to put the billing screens.
-        */}
         {firebaseEnabled && !loading && user && (
-          <div className="flex items-center gap-2 px-1 min-w-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
-            <div className="min-w-0 flex-1">
-              {username ? (
-                <p className="text-[11px] text-accent font-medium truncate">@{username}</p>
-              ) : null}
-              <p className="text-[11px] text-text-secondary truncate">{user.email}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => void logout()}
-              className="text-[11px] text-text-secondary hover:text-text-primary shrink-0 focus-ring rounded"
-            >
-              Sign out
-            </button>
-          </div>
+          <ProfileMenu
+            onSettings={onSettings}
+            onAccount={onAccount ?? onSettings}
+            onSubscription={onSubscription ?? onSettings}
+            onOrderHistory={onOrderHistory ?? onSettings}
+            onSupport={onSupport}
+            onAdmin={onAdmin}
+            isAdmin={isAdmin}
+            supportUnread={supportUnread}
+            active={ACCOUNT_VIEWS.includes(appView)}
+          />
         )}
 
         {firebaseEnabled && !loading && !user && (
@@ -333,9 +253,7 @@ export function Sidebar({
         )}
 
         {!firebaseEnabled && (
-          <p className="text-[10px] text-text-secondary px-1 leading-relaxed">
-            Trades saved locally in this browser
-          </p>
+          <p className="text-[10px] text-text-secondary px-1 leading-relaxed">Trades saved locally in this browser</p>
         )}
       </div>
     </aside>

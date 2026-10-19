@@ -30,11 +30,13 @@ describe('account dropdown stacking', () => {
     expect(header).toMatch(/\bz-40\b/);
   });
 
-  it('gives the desktop top bar one too', () => {
-    const source = read('src/pages/JournalApp.tsx');
-    // headerTools, not accountMenu: search joined the dropdown in that bar. What is being pinned
-    // is the bar's stacking context, not the name of whatever it holds.
-    expect(source).toMatch(/sticky top-0 z-40[^"]*"[^>]*>\{headerTools\}/);
+  it('keeps the desktop account menu inside the sidebar, which has no top bar to borrow', () => {
+    // The desktop top bar existed only to hold this dropdown and search; both moved into the
+    // sidebar in the October 2026 redesign. The menu now opens upward from the profile row, inside
+    // the panel — so it never overhangs <main> and needs no stacking context of its own there.
+    const app = read('src/pages/JournalApp.tsx');
+    expect(app).not.toMatch(/sticky top-0 z-40[^"]*"[^>]*>\{headerTools\}/);
+    expect(read('src/components/nav/ProfileMenu.tsx')).toMatch(/absolute bottom-full inset-x-0 z-50/);
   });
 
   it('still relies on the header, because the panel is inside a backdrop-filter', () => {
