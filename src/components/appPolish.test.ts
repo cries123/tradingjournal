@@ -312,14 +312,14 @@ describe('the assistant page', () => {
   const html = paint(createElement(InAppProvider, null, createElement(AssistantContent, { periods, onBack: noop })));
 
   it('opens on the conversation, not on a row of stat tiles', () => {
-    expect(html).toContain('What do you want to know about July 2026?');
+    expect(html).toContain('What do you want to know about July?');
     for (const tile of ['Saved conversations', 'Questions asked', 'Switch period in the chat']) {
       expect(html).not.toContain(tile);
     }
   });
 
   it('keeps the allowance, as a meter under the history', () => {
-    const history = html.indexOf('>History');
+    const history = html.indexOf('Search conversations');
     const meter = html.indexOf('Questions left today');
     expect(history).toBeGreaterThan(-1);
     expect(meter).toBeGreaterThan(history);
@@ -339,21 +339,22 @@ describe('the assistant page', () => {
     expect(page).toMatch(/aria-pressed="true"[^>]*>2026</);
   });
 
-  it('puts the conversation above the history on a phone', () => {
-    const chat = html.indexOf('order-1 lg:order-2');
-    const rail = html.indexOf('order-2 lg:order-1');
-    expect(chat).toBeGreaterThan(-1);
-    expect(rail).toBeGreaterThan(-1);
+  it('opens on the conversation on a phone, with the history behind a button', () => {
+    // Stacked, the history list and the allowance meter filled the whole first screen and the
+    // chat began below the fold. Now the history column is a desktop column only, and a phone
+    // reaches it from the clock button in the chat's own header.
+    const search = html.indexOf('Search conversations');
+    const aside = html.lastIndexOf('<aside', search);
+    expect(html.slice(aside, html.indexOf('>', aside))).toContain('hidden lg:flex');
+    expect(html).toContain('aria-label="Conversations"');
   });
 
   it('picks the period with the app’s one toggle', () => {
     expect(html).toContain('role="group" aria-label="Period"');
   });
 
-  it('reads the conversation in a column, not across the whole panel', () => {
-    // The scrolling conversation itself, not just the composer under it, which is capped too.
-    expect(html).toMatch(/overflow-y-auto[^"]*"><div class="mx-auto w-full max-w-3xl">/);
-  });
+  // "Reads the conversation in a column" needs a conversation on screen: it is in
+  // assistantPage.test.ts, which seeds one.
 });
 
 describe('dialogs play out instead of vanishing', () => {

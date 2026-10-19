@@ -9,6 +9,7 @@ import {
   pruneMessages,
   removeThread,
   upsertThread,
+  type AnswerSource,
   type AssistantThread,
   type ThreadStore,
 } from '../utils/assistantThreads';
@@ -101,9 +102,14 @@ export function useAssistantThreads() {
   const messages = active?.messages ?? [];
 
   /** Adds turns to the open conversation, opening one first if there isn't one. */
-  const append = useCallback((next: AssistantMessage[]) => {
+  const append = useCallback((next: (AssistantMessage & { source?: AnswerSource })[]) => {
     const now = Date.now();
-    const stamped = next.map((m) => ({ role: m.role, content: m.content, at: now }));
+    const stamped = next.map((m) => ({
+      role: m.role,
+      content: m.content,
+      at: now,
+      ...(m.source ? { source: m.source } : {}),
+    }));
     update((prev) => {
       const thread = prev.threads.find((t) => t.id === prev.activeId) ?? newThread(makeId(), now);
       return upsertThread(prev, appendToThread(thread, stamped, now));

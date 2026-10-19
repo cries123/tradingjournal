@@ -231,9 +231,13 @@ of the app.
 
 ### The assistant
 
-`AssistantPanel` is one component on two surfaces — the Assistant page (`layout="page"`) and the
-dock on the Overview. Both read the same saved conversations from `useAssistantThreads`
-(localStorage, not Firestore).
+One assistant, two surfaces: the Assistant page (`AssistantContent` — conversations, the chat,
+"What it can see"; on a phone "Ask" with the history behind a clock icon) and the dock on the
+Overview (`AssistantPanel`). Both take their state and their one way of asking from
+`useAssistantChat` (facts, notes opt-in, Compare, the chatLocked gate — the hook never hands out
+`send`) and the same saved conversations from `useAssistantThreads` (localStorage, not Firestore).
+Each answer stores the period it saw (`source`), which is what its "From your journal · …" line
+and the history row print. Pin, pinned answers and thumbs up/down are in the design but not built.
 
 - The period opens on the narrowest one that **has trades**, not always this month — on the 1st of
   a month the old default showed "no trades in this period" over a full journal.

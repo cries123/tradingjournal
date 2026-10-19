@@ -103,14 +103,17 @@ describe('the assistant on Silver', () => {
   });
 
   it('labels the findings with where they can be asked', () => {
-    expect(html).toContain('What stands out');
+    expect(html).toContain('Starting points');
     expect(html).toContain('Ask on Gold');
     expect(html).not.toContain('Ask about this');
   });
 
   it('does not show or continue a saved conversation', () => {
     expect(html).not.toContain('An old question from when I was on Gold');
-    expect(html).not.toContain('>History');
+    // No conversations column, and no way to it on a phone: the plan card stands where it was.
+    expect(html).not.toContain('Search conversations');
+    expect(html).not.toContain('aria-label="Conversations"');
+    expect(html).toContain('Ask it anything on Gold');
   });
 
   it('leaves out the controls that only change what the model is sent', () => {
@@ -124,9 +127,15 @@ describe('a click on Silver', () => {
     // Clicks need a DOM; this pins the one path every finding and question goes through. The server
     // refuses a Silver chat request anyway — this is so the screen never makes one.
     const { readFileSync } = await import('node:fs');
-    const src = readFileSync('src/components/analytics/AssistantPanel.tsx', 'utf8');
-    expect(src).toContain('if (chatLocked) setWanted(label);\n    else void send(question);');
-    expect(src).not.toMatch(/onClick=\{\(\) => void send\(|onAsk=\{\(\) => void send\(/);
+    const hook = readFileSync('src/hooks/useAssistantChat.ts', 'utf8');
+    expect(hook).toContain('if (chatLocked) setWanted(label);\n    else void send(question);');
+    // The composer goes through the same gate as every finding and chip.
+    expect(hook).toMatch(/const submit = \(\) => \{[^}]*ask\(question, question\)/);
+    // And the send itself is not handed to any surface, so none can call it around the gate.
+    expect(hook).not.toMatch(/^\s*send,$/m);
+    for (const file of ['AssistantPanel', 'AssistantContent', 'AssistantConversation', 'AssistantRail', 'AssistantHistory']) {
+      expect(readFileSync(`src/components/analytics/${file}.tsx`, 'utf8'), file).not.toMatch(/\bsend\(/);
+    }
   });
 });
 
