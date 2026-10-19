@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -6,8 +5,8 @@ import type { Trade } from '../types';
 
 /*
  * The Performance screen's second pass: a verdict at the top, panels ranked and sized by money,
- * every card leading with its figure, the finding first on a phone, and the Overview's equity
- * curve. Plus the two copy bugs: "293t · 42%" and a tilt sentence that contradicted its figures.
+ * every card leading with its figure, the finding first on a phone, and the period named on the
+ * Overview. Plus the two copy bugs: "293t · 42%" and a tilt sentence that contradicted its figures.
  */
 
 vi.mock('../lib/firebase', () => ({
@@ -229,37 +228,13 @@ describe('the Overview', () => {
       ),
     );
 
-  it('draws the running P&L as a strip inside the Net P&L card, with the drawdown on its label line', () => {
-    const html = overview(journal());
-    expect(html).toContain('class="equity-line"');
-    // Twelve days at −$290 from a standing start: the high-water mark is zero, the trough day 12.
-    expect(text(html)).toMatch(/Running P&L · 16 days · max drawdown −\$3,480\.00 ?, Aug 12/);
-    // Inside the hero card, not a card of its own.
-    const hero = html.indexOf('hero-card');
-    const strip = html.indexOf('equity-line');
-    const nextCard = html.indexOf('panel-card', hero);
-    expect(strip).toBeGreaterThan(hero);
-    expect(strip).toBeLessThan(nextCard);
-  });
-
-  it('draws no curve for two trading days', () => {
-    n = 0;
-    const html = overview([trade({ date: '2026-08-03', pnl: 10 }), trade({ date: '2026-08-04', pnl: -5 })]);
-    expect(html).not.toContain('equity-line');
-  });
-
   it('names the period beside the insights heading', () => {
     expect(text(overview(journal()))).toContain("What's working, what's not · August 2026");
   });
-});
 
-describe('the stylesheet', () => {
-  it('draws the equity line only when motion is welcome, and holds it until the card is seen', () => {
-    const css = readFileSync('src/index.css', 'utf8');
-    const allowed = css.indexOf('@media (prefers-reduced-motion: no-preference) {');
-    const block = css.slice(allowed, css.indexOf('\n}\n', allowed));
-    expect(block).toContain('.equity-line {');
-    expect(block).toContain("[data-revealed='false'] .equity-line");
-    expect(css.replace(block, '')).not.toContain('.equity-line');
+  // The equity curve was built, shrunk to a strip, and then removed at Jay's request: it took
+  // more room than a one-second read was worth. The Risk group still states the max drawdown.
+  it('draws no equity curve', () => {
+    expect(overview(journal())).not.toContain('equity-line');
   });
 });

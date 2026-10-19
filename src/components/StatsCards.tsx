@@ -18,8 +18,6 @@ interface StatsCardsProps {
   /** Show the vs-SPY comparison. Only true for the month view — the endpoint reports
    *  month-to-date, so pinning it next to a year total would be comparing different windows. */
   showBenchmark?: boolean;
-  /** A strip drawn under the figures — the period's running P&L (EquityCurve). */
-  sparkline?: ReactNode;
 }
 
 export function StatsCards({
@@ -28,7 +26,6 @@ export function StatsCards({
   streakDays = 0,
   goalPnl = 0,
   showBenchmark = false,
-  sparkline,
 }: StatsCardsProps) {
   const { settings } = useSettings();
   const hasTrades = stats.totalTrades > 0;
@@ -160,8 +157,6 @@ export function StatsCards({
           </dl>
         )}
       </div>
-
-      {hasTrades && sparkline}
 
       {hasTrades && (
         <div className="relative mt-2.5 md:mt-4 h-1 rounded-full bg-bg-primary/80 overflow-hidden">

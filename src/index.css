@@ -769,18 +769,6 @@ body {
   [data-revealed='false'] .bar-in {
     animation-play-state: paused;
   }
-
-  /* The equity curve draws itself once, left to right, when its card arrives. pathLength=1 on the
-     path makes 1 the whole length, whatever the box was stretched to. */
-  .equity-line {
-    stroke-dasharray: 1;
-    stroke-dashoffset: 1;
-    animation: draw-line 1.6s cubic-bezier(0.22, 1, 0.36, 1) 200ms forwards;
-  }
-
-  [data-revealed='false'] .equity-line {
-    animation-play-state: paused;
-  }
 }
 
 /*

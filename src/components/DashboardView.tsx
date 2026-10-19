@@ -18,7 +18,6 @@ import { ShareCardModal } from './ShareCardModal';
 import { StatsCards } from './StatsCards';
 import { YearMonths } from './YearMonths';
 import { TradingInsightsSection } from './analytics/TradingInsightsSection';
-import { EquityCurve } from './analytics/EquityCurve';
 import { DirectionPanel } from './analytics/DirectionPanel';
 import { TakeawayBanner } from './analytics/TakeawayBanner';
 import { SegmentedControl } from './ui/SegmentedControl';
@@ -251,9 +250,6 @@ export function DashboardView({
           streakDays={streakDays}
           goalPnl={mode === 'month' ? settings.monthlyGoalPnl : 0}
           showBenchmark={mode === 'month'}
-          /* The one chart: running P&L for the period, as a strip inside the card rather than a
-             card of its own. Hides itself under three trading days — see equityCurve.ts. */
-          sparkline={<EquityCurve trades={analyticsTrades} currency={settings.currency} />}
         />
       )}
 
