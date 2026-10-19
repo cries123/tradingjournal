@@ -3,7 +3,9 @@ import { AuthModal } from '../components/AuthModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { DashboardView } from '../components/DashboardView';
 import { DashboardSkeleton } from '../components/DashboardSkeleton';
-import { DayDetailDrawer } from '../components/DayDetailDrawer';
+import { DayContent } from '../components/day/DayContent';
+import { DaySheet } from '../components/day/DaySheet';
+import { TradesContent } from '../components/trades/TradesContent';
 import { MobileBottomNav, MobileHeader } from '../components/MobileNav';
 import { MoreContent } from '../components/more/MoreContent';
 import { OnboardingOverlay } from '../components/OnboardingOverlay';
@@ -209,6 +211,16 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
     setMonth(m);
   };
 
+  /*
+   * A day opens as a page on desktop and as a sheet over the screen on a phone, as the approved
+   * designs draw it. Stepping from one day to the next on the page replaces the day rather than
+   * stacking another page, so Back still goes to the month.
+   */
+  const openDay = (date: string) => {
+    setSelectedDay(date);
+    if (isDesktop && appView !== 'day') openView('day');
+  };
+
   const openAddTrade = (date?: string) => {
     setEditingTrade(null);
     setTradeModalDate(date);
@@ -250,6 +262,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   const sidebarActions = {
     appView,
     onDashboard: () => openView('dashboard'),
+    onTrades: () => openView('trades'),
     onAddTrade: () => openAddTrade(),
     onConnectBroker: () => openView('connect-broker'),
     onSettings: () => openView('settings'),
@@ -473,6 +486,42 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
               </LockedFeature>
             ) : appView === 'report-bug' ? (
               <ReportBugContent onBack={goBackView} />
+            ) : appView === 'trades' ? (
+              <TradesContent
+                trades={allTrades}
+                ruleTrades={activeJournalTrades}
+                ruleDates={ruleDates}
+                year={year}
+                month={month}
+                onPrevMonth={handlePrevMonth}
+                onNextMonth={handleNextMonth}
+                onPrevYear={() => setYear((y) => y - 1)}
+                onNextYear={() => setYear((y) => y + 1)}
+                onOpenDay={openDay}
+                onEdit={openEditTrade}
+                onDelete={deleteTrade}
+                onImportCsv={() => openImportCsv()}
+                onExport={() => openView('settings')}
+              />
+            ) : appView === 'day' && selectedDay ? (
+              <DayContent
+                layout="page"
+                date={selectedDay}
+                trades={allTrades}
+                ruleTrades={activeJournalTrades}
+                ruleDates={ruleDates}
+                onBack={() => {
+                  goBackView();
+                  setSelectedDay(null);
+                }}
+                onOpenDay={openDay}
+                onEdit={openEditTrade}
+                onDelete={deleteTrade}
+                onAddTrade={() => openAddTrade(selectedDay)}
+                onImportCsv={() => openImportCsv(selectedDay)}
+                onOpenSimulator={() => openView('simulator')}
+                onOpenSettings={() => openView('settings')}
+              />
             ) : appView === 'more' ? (
               <MoreContent
                 trades={everyTrade}
@@ -527,7 +576,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                       else if (step === 'set-rules') openView('settings');
                       // A day note is written from a day, so send them to the most recent one they
                       // have — or to logging a trade, since there is no day to open without one.
-                      else if (latestTradeDate) setSelectedDay(latestTradeDate);
+                      else if (latestTradeDate) openDay(latestTradeDate);
                       else setShowTradeModal(true);
                     }}
                   />
@@ -546,7 +595,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                   filterSymbols={symbols}
                   filterSetups={filterSetups}
                   onFiltersChange={setFilters}
-                  onDayClick={setSelectedDay}
+                  onDayClick={openDay}
                   onPrevMonth={handlePrevMonth}
                   onNextMonth={handleNextMonth}
                   onMonthChange={handleMonthChange}
@@ -565,6 +614,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                   ruleTrades={activeJournalTrades}
                   onSetRules={() => openView('settings')}
                   onOpenPerformance={() => openView('performance')}
+                  onAllTrades={() => openView('trades')}
                 />
               </>
             )}
@@ -605,8 +655,9 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
           trades={everyTrade}
           onClose={() => setSearchOpen(false)}
           onOpenDay={(date) => {
-            setSelectedDay(date);
-            openView('dashboard');
+            // A phone shows the day as a sheet over the Overview; desktop opens the day's page.
+            if (!isDesktop) openView('dashboard');
+            openDay(date);
           }}
         />
       )}
@@ -678,20 +729,28 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
         />
       )}
 
-      {selectedDay && (
-        <DayDetailDrawer
+      {!isDesktop && selectedDay && appView !== 'day' && (
+        <DaySheet
           date={selectedDay}
           trades={allTrades}
+          ruleTrades={activeJournalTrades}
+          ruleDates={ruleDates}
           onClose={() => setSelectedDay(null)}
-          onDelete={deleteTrade}
+          onOpenDay={openDay}
           onEdit={openEditTrade}
+          onDelete={deleteTrade}
           onImportCsv={() => {
             openImportCsv(selectedDay);
             setSelectedDay(null);
           }}
-          onAddTrade={() => {
-            openAddTrade(selectedDay);
+          onAddTrade={() => openAddTrade(selectedDay)}
+          onOpenSimulator={() => {
             setSelectedDay(null);
+            openView('simulator');
+          }}
+          onOpenSettings={() => {
+            setSelectedDay(null);
+            openView('settings');
           }}
         />
       )}

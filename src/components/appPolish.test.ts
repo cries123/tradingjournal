@@ -366,6 +366,7 @@ describe('dialogs play out instead of vanishing', () => {
     'src/components/search/JournalSearch.tsx',
     'src/components/analytics/AssistantDock.tsx',
     'src/components/AnnouncementModal.tsx',
+    'src/components/day/DaySheet.tsx',
   ];
 
   it('route every way out through the exit animation', () => {
@@ -378,9 +379,10 @@ describe('dialogs play out instead of vanishing', () => {
     }
   });
 
-  it('slides the day drawer out on Escape too, not only from the X', () => {
-    const drawer = readFileSync('src/components/DayDetailDrawer.tsx', 'utf8');
-    expect(drawer).toContain('useEscapeToClose(handleClose,');
+  it('plays the day sheet out on Escape too, not only from the X', () => {
+    // The phone's day sheet replaced the drawer; Escape is the way out the drawer once skipped.
+    const sheet = readFileSync('src/components/day/DaySheet.tsx', 'utf8');
+    expect(sheet).toContain('useEscapeToClose(close)');
   });
 });
 
