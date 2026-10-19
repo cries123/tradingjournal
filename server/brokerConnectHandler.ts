@@ -25,6 +25,7 @@ import {
 } from '../src/utils/syncRefund';
 import { confirmJournalEvent, readJournalEvents, recordJournalEvent } from './journalEvents';
 import { nextSyncState, planSyncStart, type AccountSyncState, type SyncStartReason } from '../src/utils/syncPlan';
+import { historyLoadingMessage, historyStillLoading, readHistoryStatus } from '../src/utils/brokerHistoryStatus';
 import { isClientRejected, isUpstreamOutage, upstreamSummary } from './upstreamErrors';
 import {
   getOrRegisterCreds as getOrRegisterCredsWith,
@@ -471,13 +472,21 @@ async function handleStatus(uid: string): Promise<BrokerConnectResult> {
     }),
   );
 
-  const accounts = res.data.map((a) => ({
-    id: a.id,
-    name: a.name,
-    institutionName: a.institution_name,
-    authorizationId: a.brokerage_authorization,
-    status: a.sync_status,
-  }));
+  const accounts = res.data.map((a) => {
+    // Whether SnapTrade has finished loading this account's history, read once here so the screen
+    // does not parse SnapTrade's shape. A new connection reports false for its first few minutes,
+    // during which every pull comes back empty — see src/utils/brokerHistoryStatus.ts.
+    const history = readHistoryStatus(a.sync_status);
+    return {
+      id: a.id,
+      name: a.name,
+      institutionName: a.institution_name,
+      authorizationId: a.brokerage_authorization,
+      status: a.sync_status,
+      historyLoaded: history.loaded,
+      firstTransactionDate: history.firstTransactionDate,
+    };
+  });
 
   await recordBrokerConnectionState(
     uid,
@@ -587,8 +596,31 @@ async function handleSync(
   // it was capped for, and counting afterwards would let a retry loop pull for free.
   /* Named here while the account list is still in hand, so the history row can say which
      connection a sync belonged to — a two-account trader cannot read a log that does not. */
-  const syncedInstitution =
-    listed.data.find((a) => a.id === accountId)?.institution_name ?? null;
+  const synced = listed.data.find((a) => a.id === accountId);
+  const syncedInstitution = synced?.institution_name ?? null;
+
+  /*
+   * Not pulled, not charged, not recorded, while SnapTrade is still loading the history.
+   *
+   * A connection's first few minutes answer every activity request with an empty list, and the
+   * account list says so. Pulling anyway produced a "no activity" sync — refunded, but written into
+   * the trader's history as spent for nothing, and indistinguishable on screen from a broken
+   * connection. Answered before the allowance is touched, with the one thing to do: wait.
+   */
+  if (synced && historyStillLoading(synced.sync_status)) {
+    return {
+      statusCode: 200,
+      body: {
+        historyLoading: true,
+        message: historyLoadingMessage(syncedInstitution),
+        trades: [],
+        activityCount: 0,
+        totalActivityCount: 0,
+        partial: false,
+        tier,
+      },
+    };
+  }
 
   const spend = await consumeDaily('sync', uid, limits.syncsPerDay);
   if (!spend.ok) {
@@ -796,6 +828,8 @@ async function pullActivities(
       resumeFrom: resumeFrom ?? null,
       ...(pull.stoppedBy ? { stoppedBy: pull.stoppedBy } : {}),
       landed: false,
+      // Whether it was charged, so the row never says "spent" of a sync that was handed back.
+      refunded,
     },
   });
 
@@ -981,7 +1015,10 @@ export async function pullRecentActivityForUser(
   pulls: number;
   /** An account hit the page cap; its newest days wait for the next pull, which resumes there. */
   partial: boolean;
+  /** Connected accounts past the per-run cap, left for a manual sync. */
   skippedAccounts: number;
+  /** Accounts SnapTrade is still loading the history of. Not pulled, not recorded; tomorrow's run gets them. */
+  historyLoading: number;
   perAccount: PulledAccount[];
   /**
    * The earliest start date any account's window used, or undefined when one pulled everything.
@@ -991,7 +1028,7 @@ export async function pullRecentActivityForUser(
 }> {
   const creds = await getCredsIfRegistered(uid);
   if (!creds) {
-    return { accounts: 0, trades: [], pulls: 0, partial: false, skippedAccounts: 0, perAccount: [], earliestStart: startDate };
+    return { accounts: 0, trades: [], pulls: 0, partial: false, skippedAccounts: 0, historyLoading: 0, perAccount: [], earliestStart: startDate };
   }
 
   const snaptrade = getSnaptrade();
@@ -1009,11 +1046,20 @@ export async function pullRecentActivityForUser(
   let partial = false;
   let earliestStart: string | undefined = startDate;
   let anyFullPull = false;
+  let historyLoading = 0;
 
   for (const account of listed.data) {
     if (!account.id) continue;
     if (pulls >= maxAccounts) break;
     const accountId = account.id;
+
+    // A connection SnapTrade is still loading answers with nothing. Left alone — no pull, no sync
+    // state, no "the broker returned no activity" row in the trader's history — and not counted
+    // against the run's cap, since it cost the run nothing. The same check the Sync button makes.
+    if (historyStillLoading(account.sync_status)) {
+      historyLoading += 1;
+      continue;
+    }
 
     // The same planning as a manual sync. The ten-day lookback is the request; a position still
     // open from before it widens the window, an account with no trusted state pulls everything,
@@ -1129,7 +1175,9 @@ export async function pullRecentActivityForUser(
     trades,
     pulls,
     partial,
-    skippedAccounts: Math.max(0, listed.data.length - pulls),
+    // A still-loading account is not "left for a manual sync" — a manual sync would be refused too.
+    skippedAccounts: Math.max(0, listed.data.length - pulls - historyLoading),
+    historyLoading,
     perAccount,
     earliestStart: anyFullPull ? undefined : earliestStart,
   };

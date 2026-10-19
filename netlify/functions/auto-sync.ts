@@ -101,12 +101,17 @@ async function journalCandidates(uid: string): Promise<Trade[]> {
 
 async function importFor(uid: string, activeAccountId: string, today: string) {
   const since = lookbackStart(today);
-  const { accounts, trades, pulls, skippedAccounts, partial, perAccount, earliestStart } =
+  const { accounts, trades, pulls, skippedAccounts, historyLoading, partial, perAccount, earliestStart } =
     await pullRecentActivityForUser(uid, since, accountsPerRun());
   if (skippedAccounts > 0) {
     console.info(
       `[auto-sync] ${uid}: refreshed ${pulls} of ${accounts} accounts; ${skippedAccounts} left for a manual sync.`,
     );
+  }
+  if (historyLoading > 0) {
+    // A connection made overnight whose history SnapTrade has not finished loading. Nothing to
+    // pull yet and nothing written to the trader's history; the next run picks it up.
+    console.info(`[auto-sync] ${uid}: ${historyLoading} account(s) still loading history at SnapTrade; skipped.`);
   }
   if (partial) {
     // An account past the page cap. Said out loud, because the alternative — what this used to do —

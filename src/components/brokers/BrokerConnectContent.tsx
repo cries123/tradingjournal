@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { syncStartDate } from '../../utils/syncWindow';
 import { manualSyncTradeId } from '../../utils/brokerTradeIds';
-import { describeSyncResult } from '../../utils/syncOutcomeCopy';
+import { describeSyncResult, historyStillOnItsWay } from '../../utils/syncOutcomeCopy';
 import { readCachedBrokerStatus, writeCachedBrokerStatus, writeLastBrokerSync } from '../../services/brokerStatusCache';
 import { describeEvent, type JournalEvent } from '../../utils/journalEvents';
+import { historyLoadingMessage, historyLoadingNote } from '../../utils/brokerHistoryStatus';
 import { SyncHistory } from './SyncHistory';
-import { CheckCircle2, ExternalLink, Link2, Loader2, RefreshCw, Unlink } from 'lucide-react';
+import { CheckCircle2, Clock, ExternalLink, Link2, Loader2, RefreshCw, Unlink } from 'lucide-react';
 import { PageFrame } from '../layout/PageFrame';
 import { BrokerLogo } from './BrokerLogo';
 import { useEntitlement } from '../../context/useEntitlement';
@@ -188,6 +189,14 @@ export function BrokerConnectContent({
   /** The underlying reason, when the server judged this caller to be the site admin. */
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  /**
+   * The server's answer when a sync was declined because SnapTrade is still loading the history.
+   *
+   * Its own box, not the success one: nothing was imported, and not the error one: nothing is
+   * wrong. A brand-new connection used to show "No trade activity came back" twice in its first
+   * quarter hour, which reads as broken, over a history row that called each attempt wasted.
+   */
+  const [waiting, setWaiting] = useState<string | null>(null);
   /** The trader's own sync history, loaded with the status and again after each sync. */
   const [history, setHistory] = useState<JournalEvent[] | null>(null);
 
@@ -297,6 +306,7 @@ export function BrokerConnectContent({
     setError(null);
     setErrorDetail(null);
     setSyncMessage(null);
+    setWaiting(null);
     setSyncNotes([]);
     setSyncingAccountId(account.id);
     // One clock read for the window and for the ids of what it brings back.
@@ -305,7 +315,8 @@ export function BrokerConnectContent({
       const {
         trades, partial, eventId, syncsRemaining, syncsPerDay, syncCredits, activityCount,
         unmatchedCloses, assumedShorts, inferredOrderDays, ignored, negativeFees,
-        openPositions, orientationAssumed, windowReason, syncRefundNotice,
+        openPositions, orientationAssumed, windowReason, windowStart, syncRefundNotice,
+        historyLoading, message,
         /*
          * A window, not the whole account.
          *
@@ -320,6 +331,23 @@ export function BrokerConnectContent({
         account.id,
         syncStartDate(existingTrades, account.id, startedAt),
       );
+
+      if (historyLoading) {
+        /*
+         * Declined, not failed: SnapTrade has not finished loading this connection's history, so
+         * the server pulled nothing and spent nothing. The meter is left alone — there is no count
+         * on this answer — and the row is marked, so the account says so until the next status
+         * read finds the history loaded.
+         */
+        setWaiting(message ?? historyLoadingMessage(account.institutionName));
+        setStatus((current) =>
+          current
+            ? { ...current, accounts: current.accounts.map((x) => (x.id === account.id ? { ...x, historyLoaded: false } : x)) }
+            : current,
+        );
+        return;
+      }
+
       // The server has already spent one of today's syncs by the time this returns, so the meter
       // is updated from its answer rather than guessed at. Bonus syncs ride inside the remaining
       // count, so they come out before the day's own allowance is worked back.
@@ -352,6 +380,7 @@ export function BrokerConnectContent({
       }));
       const outcome = {
         label,
+        institution: account.institutionName,
         activityCount: activityCount ?? trades.length * 2,
         tradesReturned: trades.length,
         // A cut-short pull: the sentence tells the trader to press Sync again, and the server has
@@ -359,10 +388,15 @@ export function BrokerConnectContent({
         partial: partial === true,
         refundNotice: syncRefundNotice ?? null,
         windowReason,
+        windowStart,
       };
 
       if (freshTrades.length === 0) {
-        setSyncMessage(describeSyncResult({ ...outcome, fresh: 0 }));
+        const line = describeSyncResult({ ...outcome, fresh: 0 });
+        // An empty full-history pull is the history still on its way, not a result: it goes in the
+        // wait box, not under a green tick, whatever the account's flag said before the pull.
+        if (historyStillOnItsWay(outcome)) setWaiting(line);
+        else setSyncMessage(line);
         // Nothing to save, so the row is confirmed at once: "0 new", not "not confirmed".
         await confirmImport(eventId, 0);
         return;
@@ -428,6 +462,7 @@ export function BrokerConnectContent({
     setError(null);
     setErrorDetail(null);
     setSyncMessage(null);
+    setWaiting(null);
     try {
       await disconnectBroker(account.authorizationId);
       const next = await refreshStatus();
@@ -554,6 +589,13 @@ export function BrokerConnectContent({
         </div>
       )}
 
+      {waiting && (
+        <div className="rounded-lg border border-border bg-bg-tertiary/40 px-4 py-3 text-sm text-text-secondary flex items-start gap-2">
+          <Clock size={16} className="shrink-0 mt-0.5" aria-hidden />
+          <p>{waiting}</p>
+        </div>
+      )}
+
       {syncMessage && (
         <div className="rounded-lg border border-accent/30 bg-accent/5 px-4 py-3 text-sm text-accent flex items-start gap-2">
           <CheckCircle2 size={16} className="shrink-0 mt-0.5" />
@@ -575,7 +617,8 @@ export function BrokerConnectContent({
         </div>
       )}
 
-      {history && history.length > 0 && <SyncHistory events={history} describe={describeEvent} />}
+      {/* The trader's wording, not support's: see EventAudience. */}
+      {history && history.length > 0 && <SyncHistory events={history} describe={(e) => describeEvent(e, 'trader')} />}
 
       {/* Twenty brokers down one 768px column was five screens of scrolling to find yours. A grid
           puts every one of them within a glance on a desktop. */}
@@ -595,13 +638,26 @@ export function BrokerConnectContent({
 
               {isConnected ? (
                 <div className="space-y-2 mb-4">
-                  {accounts.map((a) => (
+                  {accounts.map((a) => {
+                    /*
+                     * SnapTrade is still loading this account's history, so a sync would come back
+                     * empty. The button is softened rather than disabled: the status it reads can
+                     * be minutes stale (it is shown from a cache first), the server checks the live
+                     * answer and spends nothing while the history is loading, so a press costs
+                     * nothing and may well succeed. The note says why there is nothing yet.
+                     */
+                    const loadingHistory = a.historyLoaded === false;
+                    return (
                     <div
                       key={a.id}
                       className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-accent/25 bg-accent/5 px-3 py-2"
                     >
                       <div className="flex items-center gap-2 text-sm">
-                        <CheckCircle2 size={14} className="text-accent shrink-0" />
+                        {loadingHistory ? (
+                          <Clock size={14} className="text-text-secondary shrink-0" aria-hidden />
+                        ) : (
+                          <CheckCircle2 size={14} className="text-accent shrink-0" />
+                        )}
                         <span className="font-medium">{a.name ?? a.institutionName}</span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -609,7 +665,10 @@ export function BrokerConnectContent({
                           type="button"
                           onClick={() => void handleSync(a)}
                           disabled={syncingAccountId === a.id}
-                          className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-border/60 hover:border-accent/40 hover:text-accent transition-colors disabled:opacity-50 focus-ring"
+                          title={loadingHistory ? historyLoadingNote(a.institutionName) : undefined}
+                          className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-border/60 hover:border-accent/40 hover:text-accent transition-colors disabled:opacity-50 focus-ring${
+                            loadingHistory ? ' opacity-60 text-text-secondary' : ''
+                          }`}
                         >
                           {syncingAccountId === a.id ? (
                             <Loader2 size={13} className="animate-spin" />
@@ -627,8 +686,14 @@ export function BrokerConnectContent({
                           Disconnect
                         </button>
                       </div>
+                      {loadingHistory && (
+                        <p className="basis-full text-xs text-text-secondary leading-relaxed">
+                          {historyLoadingNote(a.institutionName)}
+                        </p>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <>
