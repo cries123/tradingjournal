@@ -55,6 +55,13 @@ describe('whether a checkout carries the trial', () => {
     expect(planCheckoutTrial(null, 'silver', 'month', true)).toEqual({ action: 'checkout', trial: true });
   });
 
+  it('lets a buyer skip the trial and pay from today, whoever they are', () => {
+    // Jay: "i also want the option for people to just buy the product without a trial".
+    expect(planCheckoutTrial(ELIGIBLE, 'gold', 'month', true, false)).toEqual({ action: 'checkout', trial: false });
+    // Not asked to confirm an email for a trial they just turned down.
+    expect(planCheckoutTrial(refuse('email-unverified'), 'gold', 'month', true, false)).toEqual({ action: 'checkout', trial: false });
+  });
+
   it('never puts a trial on a yearly plan', () => {
     expect(planCheckoutTrial(ELIGIBLE, 'gold', 'year', true)).toEqual({ action: 'checkout', trial: false });
   });
@@ -154,6 +161,14 @@ describe('the wiring', () => {
     expect(checkout).toContain('trialEligibility(uid');
     expect(checkout).toContain('trial: trialPlan.trial');
     expect(checkout.indexOf('planCheckoutTrial(')).toBeLessThan(checkout.indexOf('await createCheckout('));
+  });
+
+  it('reads the buyer’s choice to skip the trial, and only an explicit false', () => {
+    const checkout = code('netlify/functions/creem-checkout.ts');
+    expect(checkout).toContain('const wantsTrial = body.trial !== false;');
+    expect(checkout).toContain('noTrialProductIdForTier(tier) !== null, wantsTrial)');
+    // The browser sends it only when asked, so every older call still means the trial.
+    expect(code('src/services/entitlement.ts')).toContain("...(options.trial === false ? { trial: false } : {})");
   });
 
   it('chooses the product through the one tested function', () => {

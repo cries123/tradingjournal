@@ -85,9 +85,9 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
     };
   }
 
-  let body: { tier?: unknown; interval?: unknown };
+  let body: { tier?: unknown; interval?: unknown; trial?: unknown };
   try {
-    body = JSON.parse(event.body || '{}') as { tier?: unknown; interval?: unknown };
+    body = JSON.parse(event.body || '{}') as { tier?: unknown; interval?: unknown; trial?: unknown };
   } catch {
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON body' }) };
   }
@@ -249,13 +249,18 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
    * a product that has one, so a returning customer is sent to the plan's no-trial copy instead —
    * see planCheckoutTrial for the rule and for why a failed check still gives the trial.
    */
+  // `trial: false` is the buyer choosing to start paying now. Only an explicit false: every client
+  // before the choice existed sends nothing, and meant the trial.
+  const wantsTrial = body.trial !== false;
   let decision: TrialDecision | null = null;
-  try {
-    decision = (await trialEligibility(uid, Date.now())).decision;
-  } catch (err) {
-    console.warn('[creem-checkout] trial eligibility check failed; giving the trial:', err);
+  if (wantsTrial) {
+    try {
+      decision = (await trialEligibility(uid, Date.now())).decision;
+    } catch (err) {
+      console.warn('[creem-checkout] trial eligibility check failed; giving the trial:', err);
+    }
   }
-  const trialPlan = planCheckoutTrial(decision, tier, interval, noTrialProductIdForTier(tier) !== null);
+  const trialPlan = planCheckoutTrial(decision, tier, interval, noTrialProductIdForTier(tier) !== null, wantsTrial);
   if (trialPlan.action === 'confirm-email') {
     return {
       statusCode: 409,

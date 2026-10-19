@@ -29,8 +29,16 @@ export function planCheckoutTrial(
   tier: Tier,
   interval: BillingInterval,
   blocking: boolean,
+  /**
+   * False when the buyer chose to skip the trial and pay now. Sold through the same no-trial copy
+   * a returning customer gets, so it is only a real choice once that copy exists: until then the
+   * plan's own product is the only one, and Creem puts its trial on the checkout regardless.
+   * payments-status reports which copies exist, for the page to offer the choice only where it works.
+   */
+  wantsTrial = true,
 ): CheckoutTrialPlan {
   if (interval === 'year' || !hasTrial(tier)) return { action: 'checkout', trial: false };
+  if (!wantsTrial) return { action: 'checkout', trial: false };
   if (!decision || decision.eligible) return { action: 'checkout', trial: true };
   if (!blocking) return { action: 'checkout', trial: true };
   if (decision.reason === 'email-unverified') {
