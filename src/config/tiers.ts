@@ -149,6 +149,16 @@ export interface TierPlan {
   productIdEnv?: string;
   /** Creem product id for the yearly price. Absent until annual billing is switched on. */
   annualProductIdEnv?: string;
+  /**
+   * The same monthly plan with no free trial, for anyone who has already had one.
+   *
+   * Creem attaches a trial to a PRODUCT and gives it to every new subscription of that product; a
+   * checkout cannot opt out. So with the trial on all three monthly products, the only way to stop
+   * one person taking Silver's week, then Gold's, then Diamond's is a second product with no trial,
+   * which checkout sends them to instead. Same price, same plan: the webhook books it as this tier.
+   * Optional, and per plan: until it is set, checkout behaves as it always has.
+   */
+  noTrialProductIdEnv?: string;
 }
 
 /**
@@ -252,6 +262,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     },
     productIdEnv: 'CREEM_PRODUCT_SILVER',
     annualProductIdEnv: 'CREEM_PRODUCT_SILVER_ANNUAL',
+    noTrialProductIdEnv: 'CREEM_PRODUCT_SILVER_NO_TRIAL',
   },
   gold: {
     id: 'gold',
@@ -265,6 +276,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     },
     productIdEnv: 'CREEM_PRODUCT_GOLD',
     annualProductIdEnv: 'CREEM_PRODUCT_GOLD_ANNUAL',
+    noTrialProductIdEnv: 'CREEM_PRODUCT_GOLD_NO_TRIAL',
   },
   diamond: {
     id: 'diamond',
@@ -279,6 +291,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     },
     productIdEnv: 'CREEM_PRODUCT_DIAMOND',
     annualProductIdEnv: 'CREEM_PRODUCT_DIAMOND_ANNUAL',
+    noTrialProductIdEnv: 'CREEM_PRODUCT_DIAMOND_NO_TRIAL',
   },
 };
 

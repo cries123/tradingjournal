@@ -1,6 +1,13 @@
 import type { Handler } from '@netlify/functions';
 import { PAID_TIERS, TIER_PLANS } from '../../src/config/tiers';
-import { annualBillingReady, CREEM_BASE_URL, CREEM_MODE_MISMATCH, CREEM_TEST_MODE } from '../../server/creemClient';
+import {
+  annualBillingReady,
+  CREEM_BASE_URL,
+  CREEM_MODE_MISMATCH,
+  CREEM_TEST_MODE,
+  noTrialProductIdForTier,
+  repeatTrialsBlocked,
+} from '../../server/creemClient';
 import { readCheckoutStatus } from '../../server/checkoutStatus';
 import { maintenanceMessage } from '../../src/config/checkoutStatus';
 
@@ -42,6 +49,19 @@ export const handler: Handler = async () => {
     return { tier, name: TIER_PLANS[tier].name, envName: envName ?? null, present: envName ? present(envName) : false };
   });
 
+  /*
+   * The no-trial copies, reported like the yearly products: optional, so never "missing". Without
+   * them checkout still sells, and every checkout carries the trial; with them, somebody who has
+   * had a trial pays from day one (server/checkoutTrial.ts). `present` reads through the same
+   * function checkout does, so an id pasted into the wrong variable reads as absent here too.
+   */
+  const noTrialProducts = PAID_TIERS.map((tier) => ({
+    tier,
+    name: TIER_PLANS[tier].name,
+    envName: TIER_PLANS[tier].noTrialProductIdEnv ?? null,
+    present: noTrialProductIdForTier(tier) !== null,
+  }));
+
   const apiKey = present('CREEM_API_KEY');
   const webhookSecret = present('CREEM_WEBHOOK_SECRET');
 
@@ -82,6 +102,9 @@ export const handler: Handler = async () => {
       // id pasted into a yearly variable, which a presence check alone would wave through.
       annualReady: apiKey && annualBillingReady(),
       annualProducts,
+      // One free trial per person across every plan, once all three no-trial copies exist.
+      repeatTrialsBlocked: repeatTrialsBlocked(),
+      noTrialProducts,
     }),
   };
 };

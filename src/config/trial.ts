@@ -9,9 +9,10 @@ import { TIER_PLANS, type Tier } from './tiers';
  * funnel shows exactly that: plenty of signups, almost no connections. A trial is the shortest
  * path from "sounds useful" to "my calendar filled itself in".
  *
- * The trial itself belongs to CREEM, attached to the Silver product, so it is redeemed by going
+ * The trial itself belongs to CREEM, attached to each plan's monthly product (Silver first; Gold and
+ * Diamond since October 2026, when Jay asked for a trial on every plan), so it is redeemed by going
  * through checkout: the card is taken up front and the person becomes a real subscriber straight
- * away. ACCESS needs no special case for that — the reaper and effectiveTier should see an ordinary
+ * away, and on day 8 Creem charges that plan's price. ACCESS needs no special case for that — the reaper and effectiveTier should see an ordinary
  * subscription, because a triallist has handed over a card and is entitled to what they are
  * trialling.
  *
@@ -23,17 +24,27 @@ import { TIER_PLANS, type Tier } from './tiers';
  * know reads them through trialUntil() — deliberately outside the access decision, so a stale date
  * can never become free access to the one feature this product charges for.
  *
- * TRIAL_DAYS therefore has to MATCH the Creem product's own trial setting. It is the number the
- * site promises, and Creem is the one that honours it; if the two disagree the site is lying, and
- * nothing in this codebase can detect that. Change one, change the other.
+ * TRIAL_DAYS therefore has to MATCH every Creem product's own trial setting. It is the number the
+ * site promises, and Creem is the one that honours it; if the two disagree the site is lying. The
+ * admin Ops tab now asks Creem and says so (utils/trialProductCheck.ts). Change one, change the other.
+ *
+ * One trial per person, across all the plans: the eligibility below is not about a plan, and
+ * checkout sends anybody it refuses to the plan's no-trial copy (noTrialProductIdEnv in tiers.ts).
  */
 
+/** Every plan with a free trial on its monthly product. */
+export const TRIAL_TIERS: readonly Tier[] = ['silver', 'gold', 'diamond'];
+/** The cheapest of them: the plan a trial button offers where nothing names one. */
 export const TRIAL_TIER: Tier = 'silver';
 export const TRIAL_DAYS = 7;
 
+export function hasTrial(tier: Tier | null | undefined): tier is Tier {
+  return tier != null && TRIAL_TIERS.includes(tier);
+}
+
 /** What the button says, and what the plan card promises. */
-export function trialOffer(): string {
-  return `${TRIAL_DAYS}-day free ${TIER_PLANS[TRIAL_TIER].name} trial`;
+export function trialOffer(tier: Tier = TRIAL_TIER): string {
+  return `${TRIAL_DAYS}-day free ${TIER_PLANS[tier].name} trial`;
 }
 
 export type TrialRefusal =

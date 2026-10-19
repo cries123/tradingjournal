@@ -6,8 +6,12 @@ import {
   createCheckout,
   CreemError,
   CREEM_CONFIGURED,
+  noTrialProductIdForTier,
   productIdForTier,
 } from '../../server/creemClient';
+import { planCheckoutTrial } from '../../server/checkoutTrial';
+import { trialEligibility } from '../../server/trialHandler';
+import type { TrialDecision } from '../../src/config/trial';
 import { isProtectedGrant, readEntitlement, writeEntitlement } from '../../server/entitlements';
 import { planChangeRoute } from '../../server/planChangeRoute';
 import { readCheckoutStatus } from '../../server/checkoutStatus';
@@ -240,6 +244,26 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
     event.headers.origin ||
     'https://trendchasers.net';
 
+  /*
+   * One free trial per person, across every plan. Creem puts the trial on every new subscription of
+   * a product that has one, so a returning customer is sent to the plan's no-trial copy instead —
+   * see planCheckoutTrial for the rule and for why a failed check still gives the trial.
+   */
+  let decision: TrialDecision | null = null;
+  try {
+    decision = (await trialEligibility(uid, Date.now())).decision;
+  } catch (err) {
+    console.warn('[creem-checkout] trial eligibility check failed; giving the trial:', err);
+  }
+  const trialPlan = planCheckoutTrial(decision, tier, interval, noTrialProductIdForTier(tier) !== null);
+  if (trialPlan.action === 'confirm-email') {
+    return {
+      statusCode: 409,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: trialPlan.message }),
+    };
+  }
+
   try {
     const checkout = await createCheckout({
       tier,
@@ -247,6 +271,7 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
       uid,
       email,
       successUrl: `${origin}/pricing?checkout=success&plan=${tier}`,
+      trial: trialPlan.trial,
     });
     return {
       statusCode: 200,
