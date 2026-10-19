@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   BadgeCheck,
   FlaskConical,
@@ -61,11 +60,8 @@ interface SidebarProps {
   onSearch?: () => void;
   onAdmin?: () => void;
   onHome?: () => void;
-  /** Every trade in every journal, for each journal's month beside its name. */
+  /** Every trade in every journal, for each journal's overall P&L beside its name. */
   trades?: readonly Trade[];
-  /** The month on screen, which is the month each journal's figure is for. */
-  year?: number;
-  month?: number;
   /** A trade in the journal came from a broker. */
   hasBrokerTrades?: boolean;
 }
@@ -116,7 +112,7 @@ function NavItem({
  * The journal's navigation on desktop — the only chrome on the screen.
  *
  * Three parts, top to bottom: the places you look at your trading; the things you are looking at
- * (your journals, each with its month, and your broker with its Sync button); and you, with the
+ * (your journals, each with its overall P&L, and your broker with its Sync button); and you, with the
  * account behind your name. Settings, Support and Connect broker were nav rows of their own, which
  * made a list of destinations where three of the rows were errands. They now sit where each errand
  * starts: the broker card, and the menu behind the profile row.
@@ -144,18 +140,12 @@ export function Sidebar({
   onAdmin,
   onHome,
   trades,
-  year,
-  month,
   hasBrokerTrades = false,
 }: SidebarProps) {
   const { user, loading, firebaseEnabled } = useAuth();
   const isAdmin = useIsAdmin('sidebar-admin-check');
   const supportUnread = useSupportUnread();
   const coaching = useCoachingCount();
-  // The month on screen when the caller says which; otherwise this one. Read once, not in render.
-  const [opened] = useState(() => new Date());
-  const shownYear = year ?? opened.getFullYear();
-  const shownMonth = month ?? opened.getMonth();
   return (
     /* z-30, and no overflow clipping: the profile menu opens upward from the foot of the panel and
        wider than it, over the page, so the panel has to sit above the page and let it out. Its own
@@ -208,7 +198,7 @@ export function Sidebar({
           )}
         </nav>
 
-        <JournalList trades={trades} year={shownYear} month={shownMonth} />
+        <JournalList trades={trades} />
 
         <p className="pl-3 pt-4 pb-1.5 text-[10px] tracking-[0.12em] text-text-secondary/60">BROKER</p>
         <BrokerCard hasBrokerTrades={hasBrokerTrades} trades={trades} onConnectBroker={onConnectBroker} />

@@ -336,8 +336,6 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
           {...sidebarActions}
           onSearch={() => setSearchOpen(true)}
           trades={everyTrade}
-          year={year}
-          month={month}
           hasBrokerTrades={hasBrokerTrades}
         />
       )}

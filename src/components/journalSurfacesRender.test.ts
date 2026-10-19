@@ -192,6 +192,19 @@ const sidebar = (appView: Parameters<typeof Sidebar>[0]['appView']) =>
   });
 
 describe('Sidebar', () => {
+  it('puts each journal’s overall P&L beside its name, not the month on screen', () => {
+    // Jay: "the number next to the journal name should be overall pnl not just the selected month".
+    // Two months a year apart, and no month passed in: the row is the sum of both.
+    const html = renderToString(
+      createElement(Sidebar, {
+        ...sidebar('dashboard').props,
+        trades: [trade({ date: '2026-08-03', pnl: 1200 }), trade({ date: '2025-01-10', pnl: 300 })],
+      }),
+    );
+    expect(html).toContain('$1.5k');
+    expect(html).toContain('title="Primary journal, all time"');
+  });
+
   it('paints the places to look, the journals and the broker, and nothing that used to scroll', () => {
     const html = renderToString(sidebar('dashboard'));
 

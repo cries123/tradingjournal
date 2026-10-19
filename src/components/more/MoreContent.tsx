@@ -165,7 +165,7 @@ export function MoreContent({
       <h2 className="mx-1 mt-5 mb-2 text-[13px] font-bold text-text-secondary">Broker</h2>
       <BrokerCard variant="more" hasBrokerTrades={hasBrokerTrades} trades={trades} onConnectBroker={onConnectBroker} />
 
-      <JournalList variant="more" trades={trades} year={year} month={month} />
+      <JournalList variant="more" trades={trades} />
 
       <Group title="Tools">
         <Row icon={<FlaskConical size={18} />} label="Rule simulator" onClick={onSimulator} />

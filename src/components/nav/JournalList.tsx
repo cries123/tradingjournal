@@ -4,15 +4,13 @@ import type { Trade } from '../../types';
 import { useSettings } from '../../context/useSettings';
 import { goToPricing } from '../../utils/navigateToPath';
 import { formatCurrency, formatCurrencyCompact } from '../../utils/format';
-import { journalMonthNets } from '../../utils/journalMonth';
+import { journalNets } from '../../utils/journalNets';
 import { lowestTierWith, TIER_PLANS } from '../../config/tiers';
 import { AllJournalsNote } from '../AllJournalsOption';
 
 interface JournalListProps {
-  /** Every trade in every journal, so each row can carry its own month. Without it the rows are names only. */
+  /** Every trade in every journal, so each row can carry its own total. Without it the rows are names only. */
   trades?: readonly Trade[];
-  year: number;
-  month: number;
   /** The sidebar's rows, or More's grouped list. */
   variant?: 'sidebar' | 'more';
 }
@@ -34,16 +32,16 @@ function Switch({ on, big }: { on: boolean; big: boolean }) {
 }
 
 /**
- * The journals, each with how its month is going.
+ * The journals, each with its overall P&L.
  *
  * It replaced a picker that was names and a check mark: switching to the paper account to see how it
- * was doing, then back, was the only way to compare two journals. The month is the one on screen,
- * named in the tooltip, so the figure beside the active journal is the figure on the Overview.
+ * was doing, then back, was the only way to compare two journals. The figure is all time, not the
+ * month on screen (see journalNets for why), and the rows say so.
  *
  * "All journals" is a switch, because it is a view laid over whichever journal is active rather
  * than another journal to pick — new trades still go to the active one, and rules stay per journal.
  */
-export function JournalList({ trades, year, month, variant = 'sidebar' }: JournalListProps) {
+export function JournalList({ trades, variant = 'sidebar' }: JournalListProps) {
   const {
     settings,
     setActiveAccount,
@@ -56,9 +54,8 @@ export function JournalList({ trades, year, month, variant = 'sidebar' }: Journa
   } = useSettings();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
-  const nets = useMemo(() => (trades ? journalMonthNets(trades, year, month) : null), [trades, year, month]);
+  const nets = useMemo(() => (trades ? journalNets(trades) : null), [trades]);
   const more = variant === 'more';
-  const monthName = new Date(year, month, 15).toLocaleDateString('en-US', { month: 'long' });
   const allPlan = lowestTierWith('combinedJournals');
   const fmt = (n: number) => (more ? formatCurrency(n, settings.currency) : formatCurrencyCompact(n, settings.currency));
 
@@ -187,7 +184,7 @@ export function JournalList({ trades, year, month, variant = 'sidebar' }: Journa
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px]">{account.name}</span>
-                  <span className="mt-0.5 block text-xs text-text-secondary">{monthName}</span>
+                  {net !== undefined && <span className="mt-0.5 block text-xs text-text-secondary">All time</span>}
                 </span>
                 {net !== undefined && (
                   <span className={`shrink-0 text-[13px] font-semibold tabular-nums ${net >= 0 ? 'text-profit-bright' : 'text-loss-bright'}`}>{fmt(net)}</span>
@@ -217,7 +214,7 @@ export function JournalList({ trades, year, month, variant = 'sidebar' }: Journa
               type="button"
               onClick={() => setActiveAccount(account.id)}
               aria-current={active ? 'true' : undefined}
-              title={net !== undefined ? `${account.name}, ${monthName} ${year}` : account.name}
+              title={net !== undefined ? `${account.name}, all time` : account.name}
               className={`flex w-full items-center justify-between gap-2 rounded-[9px] border px-3 py-2 text-left text-[13px] transition-colors focus-ring ${
                 active ? 'border-border bg-[#151515] text-text-primary' : 'border-transparent text-text-secondary hover:text-text-primary'
               }`}
