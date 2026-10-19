@@ -251,14 +251,13 @@ export function DashboardView({
           streakDays={streakDays}
           goalPnl={mode === 'month' ? settings.monthlyGoalPnl : 0}
           showBenchmark={mode === 'month'}
+          /* The one chart: running P&L for the period, as a strip inside the card rather than a
+             card of its own. Hides itself under three trading days — see equityCurve.ts. */
+          sparkline={<EquityCurve trades={analyticsTrades} currency={settings.currency} />}
         />
       )}
 
       {hasAnyTrades && <TakeawayBanner takeaway={takeaway} aiText={aiTakeawayText} aiPending={aiTakeawayPending} />}
-
-      {/* The one chart: running P&L for the period with the drawdown shaded under the peak. Hides
-          itself under three trading days — see equityCurve.ts. */}
-      {hasAnyTrades && <EquityCurve trades={analyticsTrades} currency={settings.currency} periodLabel={periodLabel} />}
 
       {/* The week recap goes above the calendar at full width, not in a column beside it.
           It shared an 1800px-and-up split with the calendar back when the equity curve was

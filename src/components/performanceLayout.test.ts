@@ -229,11 +229,17 @@ describe('the Overview', () => {
       ),
     );
 
-  it('draws the equity curve for the period, with the drawdown as its figure', () => {
+  it('draws the running P&L as a strip inside the Net P&L card, with the drawdown on its label line', () => {
     const html = overview(journal());
-    expect(text(html)).toContain('Running P&L · August 2026');
     expect(html).toContain('class="equity-line"');
-    expect(html).toContain('Max drawdown');
+    // Twelve days at −$290 from a standing start: the high-water mark is zero, the trough day 12.
+    expect(text(html)).toMatch(/Running P&L · 16 days · max drawdown −\$3,480\.00 ?, Aug 12/);
+    // Inside the hero card, not a card of its own.
+    const hero = html.indexOf('hero-card');
+    const strip = html.indexOf('equity-line');
+    const nextCard = html.indexOf('panel-card', hero);
+    expect(strip).toBeGreaterThan(hero);
+    expect(strip).toBeLessThan(nextCard);
   });
 
   it('draws no curve for two trading days', () => {
