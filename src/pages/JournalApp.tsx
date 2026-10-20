@@ -426,6 +426,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                   month={month}
                   onBack={goBackView}
                   onOpenSimulator={() => openView('simulator')}
+                  measure={replayAccess === 'open'}
                 />
               </LockedFeature>
             ) : appView === 'simulator' ? (
@@ -517,6 +518,8 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 onDelete={deleteTrade}
                 onImportCsv={() => openImportCsv()}
                 onExport={() => openView('settings')}
+                measure={replayAccess === 'open'}
+                onReplay={replayAccess === 'open' ? openReplay : undefined}
               />
             ) : appView === 'replay' && replayDate ? (
               replayAccess === 'open' ? (
@@ -776,6 +779,15 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
           }}
           onEdit={openEditTrade}
           onDelete={deleteTrade}
+          measure={replayAccess === 'open'}
+          onReplay={
+            replayAccess === 'open'
+              ? (date) => {
+                  setOpenTradeId(null);
+                  openReplay(date);
+                }
+              : undefined
+          }
         />
       )}
 

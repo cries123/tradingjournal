@@ -4,6 +4,7 @@ import type { Trade } from '../../types';
 import { useSettings } from '../../context/useSettings';
 import { useAnimatedClose } from '../../hooks/useAnimatedClose';
 import { useEscapeToClose } from '../../hooks/useEscapeToClose';
+import { useAfterExitView } from '../../hooks/useTradePaths';
 import { formatCurrency } from '../../utils/format';
 import { usualQuantity } from '../../utils/tradeContext';
 import { describeTradeForDeletion } from '../../utils/tradeHelpers';
@@ -21,6 +22,10 @@ interface TradeSheetProps {
   onDelete: (id: string) => void;
   /** The trade form is open over the sheet, so Escape is the form's, not the sheet's. */
   covered?: boolean;
+  /** Market replay is open to this account: measure what the contract did after the close. */
+  measure?: boolean;
+  /** Opens the trade's day in market replay. */
+  onReplay?: (date: string) => void;
 }
 
 /**
@@ -34,8 +39,9 @@ interface TradeSheetProps {
  * Every way out plays the sheet out through useAnimatedClose. Edit opens the trade form over the
  * sheet, as the day sheet does, and the sheet shows the saved trade when it closes.
  */
-export function TradeSheet({ trade, ruleTrades, onClose, onOpenDay, onEdit, onDelete, covered = false }: TradeSheetProps) {
+export function TradeSheet({ trade, ruleTrades, onClose, onOpenDay, onEdit, onDelete, covered = false, measure = false, onReplay }: TradeSheetProps) {
   const { settings, viewingAllJournals } = useSettings();
+  const after = useAfterExitView(trade, measure);
   const { closing, close } = useAnimatedClose(onClose);
   const [confirming, setConfirming] = useState(false);
   // Escape answers whatever is on top (the delete confirmation, or the trade form) rather than closing both.
@@ -79,6 +85,8 @@ export function TradeSheet({ trade, ruleTrades, onClose, onOpenDay, onEdit, onDe
               onOpenDay={() => onOpenDay(trade.date)}
               onEdit={() => onEdit(trade)}
               onDelete={() => setConfirming(true)}
+              after={after}
+              onReplay={onReplay ? () => onReplay(trade.date) : undefined}
             />
           </div>
         </div>

@@ -320,7 +320,24 @@ function readContracts(input: unknown): ContractRequest[] | null {
   return out;
 }
 
-async function isSiteAdmin(uid: string): Promise<boolean> {
+/**
+ * Bars already in the cache for these symbols on a day, and nothing else: never asks Databento, so it
+ * costs nothing. Symbols never bought are simply absent from the map. For the trade measurements in
+ * server/tradePaths.ts, which only ever work from days somebody has already opened.
+ */
+export async function readCachedBars(dataset: 'options' | 'equities', symbols: string[], date: string): Promise<Map<string, Bar[]>> {
+  const set = dataset === 'options' ? OPTIONS_DATASET : EQUITY_DATASET;
+  const db = getAdminFirestore();
+  const unique = [...new Set(symbols)];
+  const snaps = await Promise.all(unique.map((s) => db.collection(CACHE).doc(cacheId(set, s, date)).get()));
+  const out = new Map<string, Bar[]>();
+  unique.forEach((s, i) => {
+    if (snaps[i].exists) out.set(s, fromCached(snaps[i].data() as CachedDay));
+  });
+  return out;
+}
+
+export async function isSiteAdmin(uid: string): Promise<boolean> {
   try {
     const snap = await getAdminFirestore().doc('config/admin').get();
     return snap.exists && (snap.data() as { uid?: string }).uid === uid;

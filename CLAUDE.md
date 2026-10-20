@@ -447,6 +447,17 @@ with the junction still in place can delete through it into the real `node_modul
     capped but is counted. A failed price is an estimate at a deliberately high $1/GB and is flagged.
     Admin → Ops → "Market replay data" shows the real spend. Jay considered opening replay to every
     paid plan behind a switch and decided against it (too expensive): Diamond only.
+  - **Trade measurements reuse replay's bars and buy nothing.** `/api/trade-paths`
+    (`server/tradePaths.ts`) answers only from the `marketReplayBars` cache — a day nobody opened in
+    replay comes back "not stored" and the screen says to open it. `utils/tradePath.ts` places a trade
+    on its bars (exact times when the broker sent them; otherwise the first minute each price traded,
+    exit after entry, flagged as an estimate — Schwab sends no times) and gives: "After you closed it"
+    on the trade panel and sheet; measured MAE/MFE filling the Performance breakdowns where none was
+    typed (a hand-entered figure always wins, nothing is written to the trade); and the stop/target
+    test on the Performance screen (searches from the minute after entry, assumes the stop when one
+    minute touches both levels, says it is a test on past trades and never a suggestion). Diamond, via
+    `replayAccess === 'open'`. `useTradePaths` keeps one module-level cache per visit; ReplayContent
+    calls `forgetUnstored()` after it stores a day.
   - **The next-day rule is the license, not a preference.** OPRA charges nothing for options data
     a full trading day old, and Databento allows external display after 24 hours, so a day opens at
     the later of the two (`replayAvailableAt`: a Friday on Monday at 9:30 ET, a Monday on Tuesday at

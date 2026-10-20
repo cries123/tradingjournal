@@ -22,6 +22,7 @@ import { SegmentedControl } from '../ui/SegmentedControl';
 import { PeriodStepper } from '../overview/ToolbarControls';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { TradeDetail } from './TradeDetail';
+import { useAfterExitView } from '../../hooks/useTradePaths';
 
 type Scope = 'month' | 'year' | 'all';
 
@@ -43,6 +44,10 @@ interface TradesContentProps {
   onImportCsv?: () => void;
   /** Export lives in Settings (backup and the tax-year file); the button goes there. */
   onExport?: () => void;
+  /** Market replay is open to this account: measure what each contract did after the close. */
+  measure?: boolean;
+  /** Opens a day in market replay. */
+  onReplay?: (date: string) => void;
 }
 
 /**
@@ -72,7 +77,7 @@ function dayHeading(date: string): string {
  * same form as everywhere else, so there is one way a note is changed and it is the tested one.
  */
 export function TradesContent(props: TradesContentProps) {
-  const { trades, ruleTrades, ruleDates, year, month, onPrevMonth, onNextMonth, onPrevYear, onNextYear, onOpenDay, onEdit, onDelete, onImportCsv, onExport } = props;
+  const { trades, ruleTrades, ruleDates, year, month, onPrevMonth, onNextMonth, onPrevYear, onNextYear, onOpenDay, onEdit, onDelete, onImportCsv, onExport, measure = false, onReplay } = props;
   const { settings, viewingAllJournals } = useSettings();
   const [scope, setScope] = useState<Scope>('month');
   const [filters, setFilters] = useState<TradeListFilters>(NO_FILTERS);
@@ -96,6 +101,7 @@ export function TradesContent(props: TradesContentProps) {
   const ruleDays = useMemo(() => tradesByDay(ruleTrades), [ruleTrades]);
   const ordered = useMemo(() => days.flatMap(([, list]) => list), [days]);
   const selected = ordered.find((t) => t.id === selectedId) ?? ordered[0] ?? null;
+  const after = useAfterExitView(selected, measure);
   const anyTime = shown.some((t) => Boolean(t.entryTime));
   const periodLabel =
     scope === 'month' ? new Date(year, month, 15).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : scope === 'year' ? String(year) : 'All time';
@@ -380,6 +386,8 @@ export function TradesContent(props: TradesContentProps) {
             onEdit={() => onEdit(selected)}
             onDelete={() => setPendingDelete(selected)}
             onOpenDay={() => onOpenDay(selected.date)}
+            after={after}
+            onReplay={onReplay ? () => onReplay(selected.date) : undefined}
           />
         )}
       </div>

@@ -22,6 +22,10 @@ import { FilterMenu, PeriodStepper } from './overview/ToolbarControls';
 import { PhoneJournalSelect } from './overview/PhoneJournalSelect';
 import { PerformanceVerdict } from './analytics/PerformanceVerdict';
 import { PerformanceBreakdowns, PhoneBreakdownPage } from './analytics/PerformanceBreakdowns';
+import { StopTargetPanel } from './analytics/StopTargetPanel';
+import { useTradePaths } from '../hooks/useTradePaths';
+import { measureTrades, withMeasuredExcursions } from '../utils/tradePath';
+import { pathItemFor } from '../utils/tradePathBars';
 
 interface PerformanceContentProps {
   trades: Trade[];
@@ -31,6 +35,11 @@ interface PerformanceContentProps {
   onBack?: () => void;
   /** Opens the rule simulator. Without it the cap findings still show, with nowhere to click through to. */
   onOpenSimulator?: () => void;
+  /**
+   * Market replay is open to this account (Diamond): measure MAE and MFE from stored minute bars where
+   * none was recorded, and test stops and targets on real prices.
+   */
+  measure?: boolean;
 }
 
 const SCOPES: { id: Scope; label: string }[] = [
@@ -61,7 +70,7 @@ const toneOf = (good: boolean | null) => (good === null ? '' : good ? 'text-prof
  * before it says anything, and a month often does not clear it. The period and the filter are this
  * screen's own, so narrowing the analysis here does not quietly narrow the Overview.
  */
-export function PerformanceContent({ trades, year, month, onOpenSimulator }: PerformanceContentProps) {
+export function PerformanceContent({ trades, year, month, onOpenSimulator, measure = false }: PerformanceContentProps) {
   const { settings, viewingAllJournals } = useSettings();
   const fmt = useMemo(() => (n: number) => formatCurrency(n, settings.currency), [settings.currency]);
 
@@ -99,8 +108,16 @@ export function PerformanceContent({ trades, year, month, onOpenSimulator }: Per
   const stats = useMemo(() => computeStats(scoped), [scoped]);
   const coverage = useMemo(() => brokerCoverage(scoped), [scoped]);
   const drawdown = useMemo(() => drawdownFromPeak(scoped), [scoped]);
-  const band = useMemo(() => verdictBand(scoped, fmt, words, coverage), [scoped, fmt, words, coverage]);
-  const set = useMemo(() => buildBreakdowns(scoped, fmt, words, coverage), [scoped, fmt, words, coverage]);
+
+  // Diamond: trades on days market replay has stored are measured from their minute bars, which fills
+  // the MAE/MFE breakdowns a broker import leaves empty. A hand-entered figure always wins.
+  const paths = useTradePaths(scoped, measure);
+  const measured = useMemo(() => measureTrades(scoped, paths.barsFor), [scoped, paths.barsFor]);
+  const analysed = useMemo(() => (measure ? withMeasuredExcursions(scoped, measured.excursions).trades : scoped), [measure, scoped, measured]);
+  const candidates = useMemo(() => (measure ? scoped.filter((t) => pathItemFor(t) !== null).length : 0), [measure, scoped]);
+
+  const band = useMemo(() => verdictBand(analysed, fmt, words, coverage), [analysed, fmt, words, coverage]);
+  const set = useMemo(() => buildBreakdowns(analysed, fmt, words, coverage), [analysed, fmt, words, coverage]);
 
   const periodLabel = scope === 'month' ? formatMonthYear(cursor.year, cursor.month) : scope === 'year' ? String(cursor.year) : 'All time';
   const stepLabel = scope === 'month' ? new Date(cursor.year, cursor.month, 15).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : periodLabel;
@@ -197,6 +214,20 @@ export function PerformanceContent({ trades, year, month, onOpenSimulator }: Per
 
         {set.list.length === 0 && !set.edge && (
           <Notice>Not enough trades in {periodLabel} to break down yet — each breakdown needs at least five, and a group three of its own.</Notice>
+        )}
+
+        {measure && candidates > 0 && (
+          <>
+            <StopTargetPanel measurement={measured} candidates={candidates} loading={paths.loading} fmt={fmt} />
+            <p className="px-1 text-[11.5px] leading-relaxed text-text-secondary">
+              {measured.placed.length > 0
+                ? `Heat and peak (MAE and MFE) measured from market data on ${measured.placed.length} of ${candidates} trades${
+                    measured.estimated > 0 ? `, ${measured.estimated} of them placed from your prices because your broker sends no fill times` : ''
+                  }. Figures you entered by hand are kept.`
+                : 'Heat and peak (MAE and MFE) can be measured from market data for trades on days you have opened in market replay.'}
+              {measured.notStored > 0 && ` ${measured.notStored} trade${measured.notStored === 1 ? ' is' : 's are'} on days not opened in replay yet.`}
+            </p>
+          </>
         )}
       </>
     );

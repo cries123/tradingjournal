@@ -14,6 +14,7 @@ import { DEFAULT_PARAMS, runStrategy, type StrategyKind, type StrategyParams } f
 import { loadDrawings, saveDrawings, type Drawing, type DrawingTool } from '../../utils/replayDrawings';
 import { fetchReplay, ReplayError, type ReplayData } from '../../services/marketReplay';
 import { replayUsedLabel } from '../../utils/replayAllowance';
+import { forgetUnstored } from '../../hooks/useTradePaths';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import type { ChartCommand, ChartMarker } from './ReplayChart';
 import { ContractPicker, IndicatorsMenu, PracticePanel, StrategyPanel, ToolRail } from './ReplayPanels';
@@ -92,6 +93,8 @@ export function ReplayContent({ trades, date, onDateChange, onBack, preload }: R
     let cancelled = false;
     fetchReplay(date, optionUnderlying, contracts)
       .then((data) => {
+        // This day's bars are stored now, so the trade panels can measure its trades.
+        forgetUnstored();
         if (!cancelled) setResult({ key: requestKey, data });
       })
       .catch((err: unknown) => {

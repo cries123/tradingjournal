@@ -4,6 +4,8 @@ import { tradeLine } from '../../utils/tradeLine';
 import { holdTimeMinutes, tradeTags } from '../../utils/tradeHelpers';
 import { tradeContext } from '../../utils/tradeContext';
 import { ordinal } from '../../utils/dayReport';
+import type { AfterExitView } from '../../utils/tradePath';
+import { AfterExitSection } from './AfterExitSection';
 
 function price(n: number | undefined): string {
   return n == null || !Number.isFinite(n) ? '—' : n.toFixed(2);
@@ -24,6 +26,10 @@ export interface TradeDetailProps {
   onOpenDay: () => void;
   /** A card beside the Trades page's table, or the body of the trade sheet. */
   frame?: 'panel' | 'sheet';
+  /** What the contract did after it was closed, where market replay can say (Diamond). */
+  after?: AfterExitView | null;
+  /** Opens this trade's day in market replay. */
+  onReplay?: () => void;
 }
 
 /**
@@ -35,7 +41,7 @@ export interface TradeDetailProps {
  * Nothing here writes. The note is shown, not edited: the trade form is the one place a note is
  * changed, and Edit opens it.
  */
-export function TradeDetail({ trade, ruleTrades, usual, cap, fmt, onPrev, onNext, onEdit, onDelete, onOpenDay, frame = 'panel' }: TradeDetailProps) {
+export function TradeDetail({ trade, ruleTrades, usual, cap, fmt, onPrev, onNext, onEdit, onDelete, onOpenDay, frame = 'panel', after, onReplay }: TradeDetailProps) {
   const line = tradeLine(trade);
   const ctx = tradeContext(trade, ruleTrades, usual);
   const held = holdTimeMinutes(trade);
@@ -102,6 +108,8 @@ export function TradeDetail({ trade, ruleTrades, usual, cap, fmt, onPrev, onNext
         <Fact label="Exit" value={price(trade.exitPrice)} />
         <Fact label="Times" value={trade.entryTime ? `${trade.entryTime.slice(0, 5)}${trade.exitTime ? `–${trade.exitTime.slice(0, 5)}` : ''}` : '—'} />
       </div>
+
+      {after && <AfterExitSection view={after} fmt={fmt} onReplay={onReplay} pad={pad} />}
 
       {flags.length > 0 && (
         <div className={`border-b border-white/[0.06] ${pad} py-3.5`}>
