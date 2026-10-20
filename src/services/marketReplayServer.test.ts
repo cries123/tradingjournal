@@ -1,19 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Tier } from '../config/tiers';
 
 /*
  * The market replay server: who gets bars, when, and what each request costs.
  *
  * Driven through the real handler with Databento and Firestore faked. What matters most: nobody is
- * shown a day before it is historical, nobody outside the plan (or, before launch, outside admin)
- * gets in, and every symbol-day is bought from Databento once.
+ * shown a day before it is historical, nobody outside Diamond gets in (bar the site admin), every
+ * symbol-day is bought from Databento once, and a member's monthly data allowance — released a day
+ * at a time — stops new pulls without ever stopping a replay of a day already cached.
  */
 
 let callerUid = 'trader';
-let tier: 'free' | 'diamond' = 'diamond';
+let tier: Tier = 'diamond';
 let adminUid = 'jay';
 const store = new Map<string, Record<string, unknown>>();
-const spent: string[] = [];
-const refunded: string[] = [];
+let failLedger = false;
+const pulls: { uid: string; pull: { usd: number; bytes: number; bars: number; symbols: number; estimated: boolean } }[] = [];
 
 vi.mock('../../server/snaptradeAuth', async () => {
   const actual = await vi.importActual<typeof import('../../server/snaptradeAuth')>('../../server/snaptradeAuth');
@@ -23,15 +25,16 @@ vi.mock('../../server/entitlements', async () => {
   const { limitsFor } = await vi.importActual<typeof import('../../src/config/tiers')>('../../src/config/tiers');
   return { resolveAccess: async () => ({ tier, limits: limitsFor(tier) }) };
 });
-vi.mock('../../server/usage', () => ({
-  consumeDaily: async (kind: string) => {
-    spent.push(kind);
-    return { ok: true, remaining: 39, source: 'daily', credits: 0 };
-  },
-  refundDaily: async (kind: string) => {
-    refunded.push(kind);
-  },
-}));
+// The real month reader against the fake store; the batch write captured instead.
+vi.mock('../../server/replayLedger', async () => {
+  const actual = await vi.importActual<typeof import('../../server/replayLedger')>('../../server/replayLedger');
+  return {
+    ...actual,
+    recordReplayPull: async (uid: string, pull: (typeof pulls)[number]['pull']) => {
+      pulls.push({ uid, pull });
+    },
+  };
+});
 vi.mock('../../server/errorReports', () => ({ logServerError: async () => undefined }));
 vi.mock('../../server/firebaseAdmin', () => ({
   getAdminFirestore: () => ({
@@ -41,6 +44,7 @@ vi.mock('../../server/firebaseAdmin', () => ({
     collection: (name: string) => ({
       doc: (id: string) => ({
         get: async () => {
+          if (failLedger && name === 'replayMonths') throw new Error('Firestore unavailable');
           const data = store.get(`${name}/${id}`);
           return { exists: data !== undefined, data: () => data };
         },
@@ -58,20 +62,31 @@ const csv = (close: number) =>
 
 let calls: { url: string; body: URLSearchParams; auth: string }[] = [];
 let respond: (symbol: string) => { status: number; text: string } = () => ({ status: 200, text: csv(1) });
+/** Databento's cost endpoint: a bare dollar amount per symbol, as it answers. */
+let costCalls: string[] = [];
+let price: (symbol: string) => { status: number; text: string } = () => ({ status: 200, text: '0.002' });
 
 beforeEach(() => {
   calls = [];
+  costCalls = [];
   store.clear();
-  spent.length = 0;
-  refunded.length = 0;
+  failLedger = false;
+  pulls.length = 0;
   callerUid = 'trader';
   tier = 'diamond';
   adminUid = 'jay';
   respond = () => ({ status: 200, text: csv(1) });
+  price = () => ({ status: 200, text: '0.002' });
   vi.stubEnv('DATABENTO_API_KEY', 'db-test-key');
   vi.stubGlobal('fetch', async (url: string, init: { body: URLSearchParams; headers: Record<string, string> }) => {
+    const symbol = init.body.get('symbols') ?? '';
+    if (url.includes('metadata.get_cost')) {
+      costCalls.push(symbol);
+      const p = price(symbol);
+      return new Response(p.text, { status: p.status });
+    }
     calls.push({ url, body: init.body, auth: init.headers.Authorization });
-    const r = respond(init.body.get('symbols') ?? '');
+    const r = respond(symbol);
     return new Response(r.text, { status: r.status });
   });
   vi.resetModules();
@@ -93,13 +108,15 @@ describe('who may replay', () => {
     expect(res.statusCode).toBe(200);
   });
 
-  it('refuses a plan below Diamond before buying anything', async () => {
-    tier = 'free';
+  it('refuses every plan below Diamond before buying anything', async () => {
     const { handleMarketReplayRequest } = await load();
-    const res = await handleMarketReplayRequest(headers, { date: '2026-10-16', underlying: 'SPY', contracts: [] }, AFTER);
-    expect(res.statusCode).toBe(403);
+    for (const below of ['free', 'silver', 'gold'] as const) {
+      tier = below;
+      const res = await handleMarketReplayRequest(headers, { date: '2026-10-16', underlying: 'SPY', contracts: [] }, AFTER);
+      expect(res.statusCode, below).toBe(403);
+    }
     expect(calls).toHaveLength(0);
-    expect(spent).toHaveLength(0);
+    expect(pulls).toHaveLength(0);
   });
 
   it('lets the site admin in on any plan, so the owner can always check it', async () => {
@@ -156,7 +173,11 @@ describe('the bars', () => {
     const body = res.body as { contracts: { osi: string; bars: { close: number }[] }[]; underlying: { symbol: string; proxyFor: string } };
     expect(body.contracts[0].osi).toBe('SPX   261016C05800000');
     expect(body.underlying).toMatchObject({ symbol: 'SPY', proxyFor: 'SPX' });
-    expect(spent).toEqual(['replay']);
+    // One pull, priced symbol by symbol by Databento's own cost endpoint.
+    expect(costCalls.sort()).toEqual(['SPX   261016C05800000', 'SPXW  261016C05800000', 'SPY']);
+    expect(pulls).toHaveLength(1);
+    expect(pulls[0].pull).toMatchObject({ bars: 3, bytes: 168, symbols: 3, estimated: false });
+    expect(pulls[0].pull.usd).toBeCloseTo(0.006, 9);
   });
 
   it('buys each symbol-day once: a second request is served from the cache and costs nothing', async () => {
@@ -166,7 +187,7 @@ describe('the bars', () => {
     const again = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
     expect(again.statusCode).toBe(200);
     expect(calls).toHaveLength(first);
-    expect(spent).toEqual(['replay']);
+    expect(pulls).toHaveLength(1);
   });
 
   it('reads a strike nobody listed as an empty day, and keeps it', async () => {
@@ -176,16 +197,85 @@ describe('the bars', () => {
     expect(res.statusCode).toBe(200);
     expect((res.body as { contracts: { osi: string | null }[] }).contracts[0].osi).toBeNull();
     expect([...store.keys()].some((k) => k.includes('SPXW'))).toBe(true);
+    // Nothing came back for the strikes, so nothing was billed for them and nothing is priced.
+    expect(costCalls).toEqual(['SPY']);
+    expect(pulls[0].pull.symbols).toBe(1);
   });
 
-  it('hands the allowance back and caches nothing when Databento refuses the key', async () => {
+  it('counts nothing and caches nothing when Databento refuses the key', async () => {
     respond = () => ({ status: 401, text: 'bad key' });
     const { handleMarketReplayRequest } = await load();
     const res = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
     expect(res.statusCode).toBe(502);
     expect(String(res.body.error)).toContain('refused');
-    expect(refunded).toEqual(['replay']);
+    expect(pulls).toHaveLength(0);
     expect(store.size).toBe(0);
+  });
+
+  it('prices a pull at a deliberately high rate, marked as an estimate, when the cost endpoint fails', async () => {
+    price = () => ({ status: 500, text: 'down' });
+    const { handleMarketReplayRequest } = await load();
+    await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
+    expect(pulls[0].pull.estimated).toBe(true);
+    // Three one-minute bars at 56 bytes, at $1 a GB.
+    expect(pulls[0].pull.usd).toBeCloseTo((3 * 56) / 1e9, 15);
+  });
+});
+
+describe('the monthly data allowance', () => {
+  // 20 October of a 31-day month: 20/31 of the $20 is open, about $12.90.
+  const month = 'replayMonths/trader_2026-10';
+
+  it('lets a member pull while under the share open so far, and says how much is used', async () => {
+    store.set(month, { usd: 5 });
+    const { handleMarketReplayRequest } = await load();
+    const res = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
+    expect(res.statusCode).toBe(200);
+    const allowance = (res.body as { allowance: { used: number; available: number } }).allowance;
+    expect(allowance.used).toBeCloseTo(5.006 / 20, 9);
+    expect(allowance.available).toBeCloseTo(20 / 31, 9);
+    expect(pulls).toHaveLength(1);
+  });
+
+  it('refuses new data past the share open so far, before asking Databento for anything', async () => {
+    store.set(month, { usd: 13 });
+    const { handleMarketReplayRequest } = await load();
+    const res = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
+    expect(res.statusCode).toBe(429);
+    expect(String(res.body.error)).toContain('tomorrow');
+    expect(calls).toHaveLength(0);
+    expect(pulls).toHaveLength(0);
+  });
+
+  it('still plays a day already opened once the allowance is used up', async () => {
+    const { handleMarketReplayRequest } = await load();
+    await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
+    const bought = calls.length;
+    store.set(month, { usd: 20 });
+    const again = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
+    expect(again.statusCode).toBe(200);
+    expect(calls).toHaveLength(bought);
+    // A new contract on the same day is new data, and that is refused.
+    const other = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [{ ...spxCall, strike: 5805 }] }, AFTER);
+    expect(other.statusCode).toBe(429);
+  });
+
+  it('never holds the site admin to it, though his pulls are counted', async () => {
+    callerUid = 'jay';
+    store.set('replayMonths/jay_2026-10', { usd: 50 });
+    const { handleMarketReplayRequest } = await load();
+    const res = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
+    expect(res.statusCode).toBe(200);
+    expect((res.body as { allowance: unknown }).allowance).toBeNull();
+    expect(pulls.map((p) => p.uid)).toEqual(['jay']);
+  });
+
+  it('refuses new data rather than guess when the month cannot be read', async () => {
+    failLedger = true;
+    const { handleMarketReplayRequest } = await load();
+    const res = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
+    expect(res.statusCode).toBe(503);
+    expect(calls).toHaveLength(0);
   });
 });
 

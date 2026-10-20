@@ -13,6 +13,7 @@ import { buildStudies, loadStudies, saveStudies, type StudySettings } from '../.
 import { DEFAULT_PARAMS, runStrategy, type StrategyKind, type StrategyParams } from '../../utils/replayStrategies';
 import { loadDrawings, saveDrawings, type Drawing, type DrawingTool } from '../../utils/replayDrawings';
 import { fetchReplay, ReplayError, type ReplayData } from '../../services/marketReplay';
+import { replayUsedLabel } from '../../utils/replayAllowance';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import type { ChartCommand, ChartMarker } from './ReplayChart';
 import { ContractPicker, IndicatorsMenu, PracticePanel, StrategyPanel, ToolRail } from './ReplayPanels';
@@ -576,6 +577,13 @@ export function ReplayContent({ trades, date, onDateChange, onBack, preload }: R
           </div>
 
           <p className="text-[11px] text-text-secondary">
+            {data.allowance && (
+              <>
+                Replay data this month: <b className="font-medium text-text-primary">{replayUsedLabel(data.allowance.used)}</b> used of the{' '}
+                {Math.round(data.allowance.available * 100)}% open so far. A little more opens each day so it lasts the month, and days you
+                have already opened don&apos;t count.{' '}
+              </>
+            )}
             One-minute bars from OPRA and Databento, shown the trading day after. Practice trades fill at the close of the candle on screen,
             with no commission, and are not saved to your journal. Drawings and indicators are remembered in this browser.
           </p>

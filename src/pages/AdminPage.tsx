@@ -119,6 +119,7 @@ import {
 } from '../services/adminEntitlements';
 import { TIER_PLANS, type Tier } from '../config/tiers';
 import { JobRunsPanel } from '../components/admin/JobRunsPanel';
+import { ReplaySpendPanel } from '../components/admin/ReplaySpendPanel';
 import { SyncFeedPanel } from '../components/admin/SyncFeedPanel';
 import { BillingEventsPanel } from '../components/admin/BillingEventsPanel';
 import { EmailLogPanel } from '../components/admin/EmailLogPanel';
@@ -2329,6 +2330,7 @@ export function AdminPage({ onHome }: AdminPageProps) {
                 {ready.ops?.report && (
                   <>
                     <JobRunsPanel jobs={ready.ops.report.jobs} now={now} />
+                    <ReplaySpendPanel stats={ready.ops.report.replay ?? null} />
                     <SyncFeedPanel
                       rows={ready.ops.report.syncFeed}
                       now={now}

@@ -59,8 +59,21 @@ export interface TierLimits {
   syncsPerDay: number;
   /** Assistant questions per market day. 0 means the assistant is not included. */
   aiMessagesPerDay: number;
-  /** Market replay. Built but not shipped — see MARKET_REPLAY_LIVE. */
+  /** Market replay — see MARKET_REPLAY_LIVE. */
   marketReplay: boolean;
+  /**
+   * Dollars of new market data one member's replays may buy in a calendar month (Eastern), as
+   * Databento itself prices it. 0 where replay is not included.
+   *
+   * Diamond's $20 is Jay's figure (October 2026). Only data bought counts: a day anybody has already
+   * opened is served from the cache for nothing, so this stops new pulls and never stops a replay of
+   * a day already seen. A trader's day is about a dozen charts of one-minute bars, which Databento
+   * prices in fractions of a cent, so this is a ceiling for something going wrong rather than a
+   * ration a trader replaying their own days will reach. Released a day at a time so it lasts the
+   * month, with what is not used carried forward (utils/replayAllowance.ts). Enforced in
+   * server/marketReplay.ts.
+   */
+  replayUsdPerMonth: number;
   /**
    * Separate journals in one account — a live account and a paper one, or one per strategy.
    *
@@ -247,7 +260,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     price: 0,
     tagline: 'Log trades by hand and keep the full journal.',
     limits: {
-      brokers: 0, syncsPerDay: 0, aiMessagesPerDay: 0, marketReplay: false, journals: 2,
+      brokers: 0, syncsPerDay: 0, aiMessagesPerDay: 0, marketReplay: false, replayUsdPerMonth: 0, journals: 2,
       performanceAnalytics: false, ruleSimulator: false, trackRecord: false, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
       combinedJournals: false, monthlyReport: false,
     },
@@ -258,7 +271,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     price: 9,
     tagline: 'Connect a broker and stop typing trades in.',
     limits: {
-      brokers: 5, syncsPerDay: 5, aiMessagesPerDay: 0, marketReplay: false, journals: 3,
+      brokers: 5, syncsPerDay: 5, aiMessagesPerDay: 0, marketReplay: false, replayUsdPerMonth: 0, journals: 3,
       performanceAnalytics: true, ruleSimulator: false, trackRecord: true, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
       combinedJournals: true, monthlyReport: true,
     },
@@ -272,7 +285,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     price: 19,
     tagline: 'Ten brokers, and an assistant that reads your stats.',
     limits: {
-      brokers: 10, syncsPerDay: 10, aiMessagesPerDay: 15, marketReplay: false, journals: 5,
+      brokers: 10, syncsPerDay: 10, aiMessagesPerDay: 15, marketReplay: false, replayUsdPerMonth: 0, journals: 5,
       performanceAnalytics: true, ruleSimulator: true, trackRecord: true, autoSync: false, coachSeat: false, ruleAlerts: false, aiReview: false,
       combinedJournals: true, monthlyReport: true,
     },
@@ -286,7 +299,7 @@ export const TIER_PLANS: Record<Tier, TierPlan> = {
     price: 39,
     tagline: 'Everything, with room to actually use it.',
     limits: {
-      brokers: UNLIMITED_BROKERS, syncsPerDay: 24, aiMessagesPerDay: 40, marketReplay: true,
+      brokers: UNLIMITED_BROKERS, syncsPerDay: 24, aiMessagesPerDay: 40, marketReplay: true, replayUsdPerMonth: 20,
       journals: UNLIMITED_JOURNALS,
       performanceAnalytics: true, ruleSimulator: true, trackRecord: true, autoSync: true, coachSeat: true, ruleAlerts: true, aiReview: true,
       combinedJournals: true, monthlyReport: true,

@@ -413,8 +413,17 @@ with the junction still in place can delete through it into the real `node_modul
   - **Data:** Databento historical, pay-as-you-go. OPRA.PILLAR for options, EQUS.MINI for the
     underlying, ohlcv-1m. Fetched by `server/marketReplay.ts` with `DATABENTO_API_KEY` (set in
     Netlify), and cached once per symbol-day in the server-only `marketReplayBars` collection (no
-    rule, so clients are denied). Uncached requests count against `replayUsage` (40 a day). SPX is
-    drawn as SPY, because index values carry their own license.
+    rule, so clients are denied). SPX is drawn as SPY, because index values carry their own license.
+  - **What it costs, and the allowance.** Databento bills by bytes in its binary encoding (56 bytes a
+    one-minute bar) and publishes no per-GB rate for options, so every pull is priced by its own
+    `metadata.get_cost` endpoint and recorded in `server/replayLedger.ts` (`replayMonths/{uid}_{month}`,
+    `replayStats/{day}` and `month-{month}`, all server-only). Each Diamond member gets
+    `replayUsdPerMonth` ($20, Jay's figure, in `tiers.ts`), released a day at a time with what is unused
+    carried forward (`utils/replayAllowance.ts`), so it lasts the month. Only bought data counts: a
+    cached day always replays, even for someone who has used their allowance. The site admin is never
+    capped but is counted. A failed price is an estimate at a deliberately high $1/GB and is flagged.
+    Admin → Ops → "Market replay data" shows the real spend. Jay considered opening replay to every
+    paid plan behind a switch and decided against it (too expensive): Diamond only.
   - **The next-day rule is the license, not a preference.** OPRA charges nothing for options data
     a full trading day old, and Databento allows external display after 24 hours, so a day opens at
     the later of the two (`replayAvailableAt`: a Friday on Monday at 9:30 ET, a Monday on Tuesday at

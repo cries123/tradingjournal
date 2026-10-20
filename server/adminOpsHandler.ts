@@ -7,6 +7,7 @@ import { noteBillingEvent, readBillingEvent, readRecentBillingEvents, type Billi
 import { readEmailsTo, readRecentEmails, type EmailLogEntry } from './emailLog';
 import { readLatestJobRuns } from './jobRuns';
 import { isMailConfigured } from './mailer';
+import { readReplayStats, type ReplayStats } from './replayLedger';
 import { readSyncFeed, type SyncFeedRow } from './syncFeed';
 import { readTrialProductCheck, type TrialPlanCheck } from './trialProductCheck';
 import { JOBS, type JobRun, type JobSpec } from '../src/utils/jobSchedule';
@@ -40,17 +41,20 @@ export interface AdminOpsReport {
    * payments are not configured. See trialProductCheck.ts.
    */
   trialProducts: TrialPlanCheck[] | null;
+  /** What market replay has bought from Databento: this month and the last fourteen days. Null if unreadable. */
+  replay: ReplayStats | null;
   generatedAt: string;
 }
 
 export async function readOpsReport(): Promise<AdminOpsReport> {
-  const [runs, syncFeed, billingEvents, emails, trialProducts] = await Promise.all([
+  const [runs, syncFeed, billingEvents, emails, trialProducts, replay] = await Promise.all([
     readLatestJobRuns(),
     readSyncFeed(),
     readRecentBillingEvents(),
     readRecentEmails(),
     // Never fails the tab: a product Creem would not return is named as a problem inside the check.
     readTrialProductCheck().catch(() => null),
+    readReplayStats().catch(() => null),
   ]);
   return {
     jobs: JOBS.map((spec, i) => ({ spec, last: runs[i] ?? null })),
@@ -59,6 +63,7 @@ export async function readOpsReport(): Promise<AdminOpsReport> {
     emails,
     mailConfigured: isMailConfigured(),
     trialProducts,
+    replay,
     generatedAt: new Date().toISOString(),
   };
 }

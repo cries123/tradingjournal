@@ -2,9 +2,10 @@ import type { IncomingHttpHeaders } from 'http';
 import { assertCallerUid, BrokerRequestError } from './snaptradeAuth';
 import { resolveAccess } from './entitlements';
 import { getAdminFirestore } from './firebaseAdmin';
-import { consumeDaily, refundDaily } from './usage';
+import { readReplayMonthSpend, recordReplayPull, replayPeriods, type ReplayPull } from './replayLedger';
 import { logServerError } from './errorReports';
-import { MARKET_REPLAY_LIVE } from '../src/config/tiers';
+import { tierHas } from '../src/config/tiers';
+import { monthShareSoFar, REPLAY_PACED_OUT, replayHasRoom, replayUsed } from '../src/utils/replayAllowance';
 import {
   chartedUnderlying,
   isTradingDay,
@@ -22,18 +23,35 @@ import {
  * Market replay's data: one session of minute bars per instrument, bought from Databento once and
  * kept.
  *
- * The cost is per byte and tiny (a contract's whole day is about 22 KB, against OPRA's $0.04/GB),
- * but it is per byte for every request that reaches Databento, so every (dataset, symbol, day) is
- * fetched once, for whoever asks first, and served from Firestore after that. A past day's bars
- * never change, so the cache never expires.
+ * Databento bills a historical request by its size in their binary encoding (a one-minute bar is a
+ * 56-byte record, so a contract's whole day is about 22 KB), and it bills every request that reaches
+ * it. So every (dataset, symbol, day) is fetched once, for whoever asks first, and served from
+ * Firestore after that; a past day's bars never change, so the cache never expires. What a pull did
+ * cost is asked of Databento itself (metadata.get_cost) and counted against the member's monthly
+ * allowance (TierLimits.replayUsdPerMonth) and the admin panel's totals — see replayLedger.ts.
  *
- * Server-only on purpose: the API key never leaves this function, and the cache collection has no
- * security rule, which Firestore reads as deny.
+ * Server-only on purpose: the API key never leaves this function, and the cache and ledger
+ * collections have no security rule, which Firestore reads as deny.
  */
 
 const DATABENTO_URL = 'https://hist.databento.com/v0/timeseries.get_range';
+const COST_URL = 'https://hist.databento.com/v0/metadata.get_cost';
 const DATABENTO_KEY = process.env.DATABENTO_API_KEY?.trim() ?? '';
 export const REPLAY_CONFIGURED = Boolean(DATABENTO_KEY);
+
+/** An ohlcv record in Databento's binary encoding, which is the size they bill. */
+const BYTES_PER_BAR = 56;
+/**
+ * Dollars per byte when the cost endpoint does not answer: the rate it last answered with in this
+ * container, else this deliberately high stand-in ($1 a GB). Databento publishes no per-GB rate for
+ * options, and a guessed price should err toward the member's allowance, not toward the bill.
+ */
+const FALLBACK_USD_PER_BYTE = 1 / 1e9;
+const observedRate = new Map<string, number>();
+
+function databentoAuth(): string {
+  return `Basic ${Buffer.from(`${DATABENTO_KEY}:`).toString('base64')}`;
+}
 
 /** OPRA: every US equity option, consolidated. */
 const OPTIONS_DATASET = 'OPRA.PILLAR';
@@ -42,11 +60,6 @@ const EQUITY_DATASET = 'EQUS.MINI';
 
 /** Contracts a screen can ask for at once: a busy day's traded contracts plus a few picked by hand. */
 const MAX_CONTRACTS = 12;
-/**
- * Requests a day that may go to Databento. Cached days are free and do not count. Forty days of a
- * dozen contracts is about 10 MB, well under a cent; the cap is there for a script, not a trader.
- */
-const REPLAY_FETCHES_PER_DAY = 40;
 
 const CACHE = 'marketReplayBars';
 
@@ -80,6 +93,11 @@ export interface ReplayResponse {
   sessionEnd: number;
   underlying: { symbol: string; proxyFor: string | null; bars: Bar[] } | null;
   contracts: ReplayContract[];
+  /**
+   * This month's replay data: how much the member has used and how much is released so far, both 0
+   * to 1 of the month. Null for the site admin.
+   */
+  allowance: { used: number; available: number } | null;
 }
 
 /* ------------------------------------------------------------------ Databento */
@@ -152,10 +170,7 @@ async function fetchSession(dataset: string, symbol: string, date: string): Prom
   });
   const res = await fetch(DATABENTO_URL, {
     method: 'POST',
-    headers: {
-      Authorization: `Basic ${Buffer.from(`${DATABENTO_KEY}:`).toString('base64')}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
+    headers: { Authorization: databentoAuth(), 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
   });
   const text = await res.text();
@@ -163,6 +178,43 @@ async function fetchSession(dataset: string, symbol: string, date: string): Prom
   // 422 is Databento's answer for a symbol that did not resolve on that day: a strike nobody listed.
   if (res.status === 422) return [];
   throw new DatabentoError(`Databento ${res.status} for ${dataset} ${symbol.trim()} ${date}: ${text.slice(0, 200)}`, res.status);
+}
+
+/**
+ * What Databento charged for one symbol's session, in dollars.
+ *
+ * Asked of its own cost endpoint with the same query, which answers with a bare dollar amount. A
+ * symbol that returned no bars was not billed. When the endpoint does not answer, the size is priced
+ * at the last rate it gave, or the high stand-in, and marked as an estimate for the admin panel.
+ */
+async function priceSession(dataset: string, symbol: string, date: string, bars: number): Promise<{ usd: number; estimated: boolean }> {
+  if (bars === 0) return { usd: 0, estimated: false };
+  const bytes = bars * BYTES_PER_BAR;
+  try {
+    const { start, end } = sessionWindow(date);
+    const res = await fetch(COST_URL, {
+      method: 'POST',
+      headers: { Authorization: databentoAuth(), 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        dataset,
+        symbols: symbol,
+        schema: 'ohlcv-1m',
+        start: start.toISOString(),
+        end: end.toISOString(),
+        stype_in: 'raw_symbol',
+      }),
+    });
+    const text = (await res.text()).trim();
+    const usd = Number(text);
+    if (res.ok && text !== '' && Number.isFinite(usd) && usd >= 0) {
+      observedRate.set(dataset, usd / bytes);
+      return { usd, estimated: false };
+    }
+    console.warn(`[market-replay] cost endpoint answered ${res.status}: ${text.slice(0, 120)}`);
+  } catch (err) {
+    console.warn('[market-replay] cost endpoint failed:', err);
+  }
+  return { usd: bytes * (observedRate.get(dataset) ?? FALLBACK_USD_PER_BYTE), estimated: true };
 }
 
 /* ------------------------------------------------------------------ the cache */
@@ -205,16 +257,17 @@ function fromCached(d: CachedDay): Bar[] {
 }
 
 /**
- * The sessions for a set of symbols, cached ones first and the rest from Databento.
+ * The sessions for a set of symbols, cached ones first and the rest from Databento, and what the
+ * rest cost.
  *
- * `spend` is called once, before the first Databento request, so a fully cached replay costs the
- * trader nothing from their allowance.
+ * `allowed` is called once, before the first Databento request, so a fully cached replay never
+ * touches the allowance and is never refused by it.
  */
 async function sessions(
   wanted: { dataset: string; symbol: string }[],
   date: string,
-  spend: () => Promise<void>,
-): Promise<Map<string, Bar[]>> {
+  allowed: () => void,
+): Promise<{ bars: Map<string, Bar[]>; bought: ReplayPull | null }> {
   const db = getAdminFirestore();
   const out = new Map<string, Bar[]>();
   const unique = [...new Map(wanted.map((w) => [cacheId(w.dataset, w.symbol, date), w])).entries()];
@@ -226,17 +279,28 @@ async function sessions(
     if (snap.exists) out.set(id, fromCached(snap.data() as CachedDay));
     else missing.push([id, w]);
   });
-  if (missing.length === 0) return out;
+  if (missing.length === 0) return { bars: out, bought: null };
 
-  await spend();
+  allowed();
   const fetched = await Promise.all(missing.map(([, w]) => fetchSession(w.dataset, w.symbol, date)));
-  await Promise.all(
-    missing.map(([id, w], i) => {
+  const [prices] = await Promise.all([
+    Promise.all(missing.map(([, w], i) => priceSession(w.dataset, w.symbol, date, fetched[i].length))),
+    ...missing.map(([id, w], i) => {
       out.set(id, fetched[i]);
       return db.collection(CACHE).doc(id).set(toCached(w.dataset, w.symbol, date, fetched[i]));
     }),
-  );
-  return out;
+  ]);
+  const bars = fetched.reduce((n, f) => n + f.length, 0);
+  return {
+    bars: out,
+    bought: {
+      usd: prices.reduce((sum, p) => sum + p.usd, 0),
+      bytes: bars * BYTES_PER_BAR,
+      bars,
+      symbols: fetched.filter((f) => f.length > 0).length,
+      estimated: prices.some((p) => p.estimated),
+    },
+  };
 }
 
 /* ------------------------------------------------------------------ the request */
@@ -283,12 +347,13 @@ export async function handleMarketReplayRequest(
   }
 
   /*
-   * The plan grants it (Diamond) once MARKET_REPLAY_LIVE is on. The site admin can always open it,
-   * which is how Jay tried it on his own journal before it was on the plan card.
+   * Diamond's, through tierHas, which also carries MARKET_REPLAY_LIVE. The site admin can always open
+   * it — how Jay tried it on his own journal before it was on the plan card — and is never held to the
+   * monthly allowance, though his pulls are counted like anybody's.
    */
-  const { limits } = await resolveAccess(uid);
+  const { tier, limits } = await resolveAccess(uid);
   const admin = await isSiteAdmin(uid);
-  if (!(limits.marketReplay || admin) || !(MARKET_REPLAY_LIVE || admin)) {
+  if (!tierHas(tier, 'marketReplay') && !admin) {
     return { statusCode: 403, body: { error: 'Market replay is part of Diamond.' } };
   }
 
@@ -318,25 +383,34 @@ export async function handleMarketReplayRequest(
     ...(charted ? [{ dataset: EQUITY_DATASET, symbol: charted.symbol }] : []),
   ];
 
-  let spentFrom: 'daily' | 'credit' | null = null;
-  const spend = async () => {
-    const result = await consumeDaily('replay', uid, REPLAY_FETCHES_PER_DAY);
-    if (!result.ok) {
-      throw new BrokerRequestError(
-        result.reason === 'unavailable' ? 'Replay is briefly unavailable. Try again in a moment.' : 'That is a lot of replay for one day. It resets at midnight Eastern.',
-        result.reason === 'unavailable' ? 503 : 429,
-      );
-    }
-    spentFrom = result.source;
+  // Read before anything is bought. A ledger that cannot be read refuses new data rather than guess
+  // at somebody's month; days already cached are refused too, which a moment's retry fixes.
+  let spent: number;
+  try {
+    spent = await readReplayMonthSpend(uid, now);
+  } catch (err) {
+    await logServerError('market-replay-ledger', err, { uid });
+    return { statusCode: 503, body: { error: 'Replay is briefly unavailable. Try again in a moment.' } };
+  }
+  // Released a day at a time so it lasts the month; what a member has not used carries forward.
+  const allowance = limits.replayUsdPerMonth;
+  const shareSoFar = monthShareSoFar(replayPeriods(now).day);
+  const allowed = () => {
+    if (!admin && !replayHasRoom(spent, allowance, shareSoFar)) throw new BrokerRequestError(REPLAY_PACED_OUT, 429);
   };
 
   let got: Map<string, Bar[]>;
   try {
-    got = await sessions(wanted, date, spend);
+    const result = await sessions(wanted, date, allowed);
+    got = result.bars;
+    if (result.bought) {
+      await recordReplayPull(uid, result.bought, now);
+      spent += result.bought.usd;
+    }
   } catch (err) {
     if (err instanceof BrokerRequestError) return { statusCode: err.statusCode, body: { error: err.message } };
-    // The trader paid a unit for a request Databento did not answer. Hand it back.
-    if (spentFrom) await refundDaily('replay', uid, spentFrom).catch(() => undefined);
+    // Nothing is counted for a request Databento did not answer: the ledger only records a pull once
+    // its bars are in hand.
     await logServerError('market-replay', err, { uid });
     const keyRefused = err instanceof DatabentoError && (err.status === 401 || err.status === 403);
     return {
@@ -357,6 +431,8 @@ export async function handleMarketReplayRequest(
       const osi = pickContract(options, c.fills ?? []);
       return { index, osi, bars: osi ? bars(OPTIONS_DATASET, osi) : [] };
     }),
+    // Null for the site admin, who has no allowance to show.
+    allowance: admin ? null : { used: replayUsed(spent, allowance), available: shareSoFar },
   };
   return { statusCode: 200, body: response as unknown as Record<string, unknown> };
 }

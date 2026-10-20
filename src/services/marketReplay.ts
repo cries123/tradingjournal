@@ -8,6 +8,11 @@ export interface ReplayData {
   sessionEnd: number;
   underlying: { symbol: string; proxyFor: string | null; bars: Bar[] } | null;
   contracts: { index: number; osi: string | null; bars: Bar[] }[];
+  /**
+   * This month's replay data, used and released so far, each 0 to 1 of the month. Null for the site
+   * admin; absent on older responses.
+   */
+  allowance?: { used: number; available: number } | null;
 }
 
 export class ReplayError extends Error {

@@ -8,7 +8,8 @@ import { getAdminFirestore } from './firebaseAdmin';
  * market day so it resets on its own with no cleanup job to forget about.
  */
 
-export type UsageKind = 'ai' | 'sync' | 'takeaway' | 'replay';
+// Market replay is not here: it is allowed by the dollar, per month, in server/replayLedger.ts.
+export type UsageKind = 'ai' | 'sync' | 'takeaway';
 
 /**
  * The kinds an admin can top up with credits.
@@ -30,9 +31,6 @@ const COLLECTION: Record<UsageKind, string> = {
   // assistant there is — and because charging a paid user chat messages for a banner they never
   // asked for would be a strange way to spend their allowance. Its own counter, its own cap.
   takeaway: 'takeawayUsage',
-  // Market replay counts only the requests that had to buy bars from Databento; a cached day is
-  // free and uncounted. See server/marketReplay.ts.
-  replay: 'replayUsage',
 };
 
 /*
