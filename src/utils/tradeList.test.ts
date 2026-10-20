@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Trade } from '../types';
-import { filterTradeList, NO_FILTERS, NO_SETUP, summarizeTradeList } from './tradeList';
+import { dayIsOpen, filterTradeList, flipsForAll, isFiltering, NO_FILTERS, NO_SETUP, openByDefault, summarizeTradeList } from './tradeList';
 
 let n = 0;
 const t = (over: Partial<Trade>): Trade => ({ id: `t${n++}`, date: '2026-09-17', symbol: 'SPY', pnl: 0, ...over }) as Trade;
@@ -42,6 +42,60 @@ describe('filterTradeList', () => {
 
   it('keeps only the days a rule broke, when asked', () => {
     expect(filterTradeList(all, { ...NO_FILTERS, brokeOnly: true }, broke)).toEqual([call, put]);
+  });
+});
+
+describe('isFiltering', () => {
+  it('is off with no filters, and with a search of only spaces', () => {
+    expect(isFiltering(NO_FILTERS)).toBe(false);
+    expect(isFiltering({ ...NO_FILTERS, query: '   ' })).toBe(false);
+  });
+
+  it('is on for a search or any one filter', () => {
+    expect(isFiltering({ ...NO_FILTERS, query: 'fade' })).toBe(true);
+    expect(isFiltering({ ...NO_FILTERS, result: 'lost' })).toBe(true);
+    expect(isFiltering({ ...NO_FILTERS, setup: 'ORB' })).toBe(true);
+    expect(isFiltering({ ...NO_FILTERS, setup: NO_SETUP })).toBe(true);
+    expect(isFiltering({ ...NO_FILTERS, kind: 'puts' })).toBe(true);
+    expect(isFiltering({ ...NO_FILTERS, brokeOnly: true })).toBe(true);
+  });
+});
+
+describe('which days are open', () => {
+  const dates = ['2026-09-24', '2026-09-18', '2026-09-17'];
+  const newest = dates[0];
+  const none = new Set<string>();
+  const open = (filtering: boolean, flipped: ReadonlySet<string>) => dates.filter((d) => dayIsOpen(d, newest, filtering, flipped));
+
+  it('opens only the newest day while browsing', () => {
+    expect(open(false, none)).toEqual([newest]);
+    expect(openByDefault('2026-09-18', newest, false)).toBe(false);
+  });
+
+  it('opens every day a search or filter found', () => {
+    expect(open(true, none)).toEqual(dates);
+  });
+
+  it('opens a closed day, or closes an open one, that the trader flipped', () => {
+    expect(open(false, new Set(['2026-09-17']))).toEqual([newest, '2026-09-17']);
+    expect(open(false, new Set([newest]))).toEqual([]);
+    expect(open(true, new Set(['2026-09-18']))).toEqual([newest, '2026-09-17']);
+  });
+
+  it('has no newest day to open in an empty list', () => {
+    expect(openByDefault('2026-09-17', undefined, false)).toBe(false);
+  });
+
+  it('expands or collapses every day from either default', () => {
+    for (const filtering of [false, true]) {
+      expect(open(filtering, flipsForAll(dates, true, newest, filtering)), `expand, filtering ${filtering}`).toEqual(dates);
+      expect(open(filtering, flipsForAll(dates, false, newest, filtering)), `collapse, filtering ${filtering}`).toEqual([]);
+    }
+  });
+
+  it('needs no flips to get back to the default', () => {
+    expect(flipsForAll(dates, true, newest, true).size).toBe(0);
+    expect([...flipsForAll(dates, false, newest, false)]).toEqual([newest]);
   });
 });
 

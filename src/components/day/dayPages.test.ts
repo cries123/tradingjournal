@@ -113,11 +113,11 @@ describe('the day page', () => {
 
 describe('the Trades page', () => {
   const trades = [...sep17(), t(180, { symbol: 'CVX', date: '2026-09-18', assetType: 'stock' })];
-  const page = () =>
+  const page = (list = trades) =>
     paint(
       createElement(TradesContent, {
-        trades,
-        ruleTrades: trades,
+        trades: list,
+        ruleTrades: list,
         ruleDates: new Set(['2026-09-17']),
         year: 2026,
         month: 8,
@@ -139,7 +139,18 @@ describe('the Trades page', () => {
   });
 
   it('flags the trades past the cap', () => {
-    expect(page().match(/title="Past your 3-trade cap"/g)).toHaveLength(3);
+    // Sep 17 alone, so it is the newest day and drawn open.
+    expect(page(sep17()).match(/title="Past your 3-trade cap"/g)).toHaveLength(3);
+  });
+
+  it('opens only the newest day, and folds the others to their header', () => {
+    const html = page();
+    expect(html.match(/aria-expanded="true"/g)).toHaveLength(1);
+    expect(html.match(/aria-expanded="false"/g)).toHaveLength(1);
+    expect(html.replace(/<[^>]+>/g, '')).toContain('Thu Sep 17 · 6 trades · 2 won 4 lost · broke a rule');
+    // The CVX trade on Sep 18 is listed; none of Sep 17's six are.
+    expect(html.match(/<tr[^>]*aria-selected/g)).toHaveLength(1);
+    expect(html).toContain('Expand all days');
   });
 
   it('shows a trade’s note without a box to type in — the trade form is the one place it is edited', () => {

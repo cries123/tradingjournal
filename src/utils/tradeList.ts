@@ -45,6 +45,40 @@ export function filterTradeList(trades: readonly Trade[], f: TradeListFilters, r
   });
 }
 
+/** Is anything narrowing the list? A blank search is not. */
+export function isFiltering(f: TradeListFilters): boolean {
+  return f.query.trim() !== '' || f.result !== 'all' || f.setup !== '' || f.kind !== 'all' || f.brokeOnly;
+}
+
+/*
+ * Which days of the list are open.
+ *
+ * Browsing, only the newest day starts open: the trade shown beside the list is its first, and with
+ * every day open one busy day (Jay's Jul 31 had 19 trades) filled the screen before the next day's
+ * header, which is why the list used to stop at four days. Closed, a day is one line — date, count,
+ * net — and a month reads at a glance.
+ *
+ * Searching or filtering, every day starts open: the point of a search is the trades it found, and
+ * hiding them behind headers would read as having found nothing.
+ *
+ * What the trader opens or closes by hand is kept as flips of that default rather than as a list of
+ * open days, so "no flips" is always the default, whatever the newest day turns out to be. The screen
+ * clears the flips when the filters change, because a flip made while browsing means the opposite
+ * once every day starts open.
+ */
+export function openByDefault(date: string, newest: string | undefined, filtering: boolean): boolean {
+  return filtering || date === newest;
+}
+
+export function dayIsOpen(date: string, newest: string | undefined, filtering: boolean, flipped: ReadonlySet<string>): boolean {
+  return openByDefault(date, newest, filtering) !== flipped.has(date);
+}
+
+/** The flips that leave every one of these days open, or every one closed. */
+export function flipsForAll(dates: readonly string[], open: boolean, newest: string | undefined, filtering: boolean): Set<string> {
+  return new Set(dates.filter((d) => openByDefault(d, newest, filtering) !== open));
+}
+
 export interface TradeListSummary {
   count: number;
   won: number;

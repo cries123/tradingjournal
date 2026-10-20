@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, Search, StickyNote } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, StickyNote } from 'lucide-react';
 import type { Trade } from '../../types';
 import { useSettings } from '../../context/useSettings';
 import { formatCurrency } from '../../utils/format';
@@ -8,7 +8,16 @@ import { tradesByDay } from '../../utils/tradingRules';
 import { tradeLine } from '../../utils/tradeLine';
 import { describeTradeForDeletion, tradeTags } from '../../utils/tradeHelpers';
 import { usualQuantity } from '../../utils/tradeContext';
-import { filterTradeList, NO_FILTERS, NO_SETUP, summarizeTradeList, type TradeListFilters } from '../../utils/tradeList';
+import {
+  dayIsOpen,
+  filterTradeList,
+  flipsForAll,
+  isFiltering,
+  NO_FILTERS,
+  NO_SETUP,
+  summarizeTradeList,
+  type TradeListFilters,
+} from '../../utils/tradeList';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import { PeriodStepper } from '../overview/ToolbarControls';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -36,7 +45,12 @@ interface TradesContentProps {
   onExport?: () => void;
 }
 
-const DAYS_SHOWN = 4;
+/**
+ * Days drawn before "Show earlier days". It was 4 while every day was drawn open, because one busy
+ * day filled the screen. Closed days are one line each, so this is now the most trading days a
+ * calendar month can hold: the Month view never hides a day, and Year and All time page by a month.
+ */
+const DAYS_SHOWN = 23;
 
 function price(n: number | undefined): string {
   return n == null || !Number.isFinite(n) ? '—' : n.toFixed(2);
@@ -52,6 +66,7 @@ function dayHeading(date: string): string {
  * desktop's ledger: filter to the losers, to the puts, to the days a rule broke or to the trades with
  * no setup (the ones the setup breakdowns cannot count), and read any one of them in full on the
  * right — where it sat in its day, whether it was bigger than usual, its setups and its note.
+ * Each day folds to one line; which start open is decided in tradeList.ts.
  *
  * Nothing here writes. The note and the setups are shown as they are; Edit opens the trade in the
  * same form as everywhere else, so there is one way a note is changed and it is the tested one.
@@ -64,6 +79,8 @@ export function TradesContent(props: TradesContentProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [limit, setLimit] = useState(DAYS_SHOWN);
   const [pendingDelete, setPendingDelete] = useState<Trade | null>(null);
+  /** Days opened or closed by hand, as flips of which days start open (see tradeList.ts). */
+  const [flipped, setFlipped] = useState<ReadonlySet<string>>(() => new Set());
   const fmt = (n: number) => formatCurrency(n, settings.currency);
   const tone = (n: number) => (n >= 0 ? 'text-profit-bright' : 'text-loss-bright');
 
@@ -86,7 +103,18 @@ export function TradesContent(props: TradesContentProps) {
   const set = (patch: Partial<TradeListFilters>) => {
     setFilters((f) => ({ ...f, ...patch }));
     setLimit(DAYS_SHOWN);
+    setFlipped(new Set());
   };
+  const newest = days[0]?.[0];
+  const filtering = isFiltering(filters);
+  const isOpen = (date: string) => dayIsOpen(date, newest, filtering, flipped);
+  const toggle = (date: string) =>
+    setFlipped((f) => {
+      const next = new Set(f);
+      if (!next.delete(date)) next.add(date);
+      return next;
+    });
+  const allOpen = days.every(([date]) => isOpen(date));
   const cap = settings.tradingRules.enabled && !viewingAllJournals ? settings.tradingRules.maxTradesPerDay : undefined;
   const btn = 'inline-flex items-center gap-1.5 rounded-[9px] border border-border px-[11px] py-1.5 text-xs text-text-secondary hover:text-text-primary focus-ring';
   const select = 'appearance-none rounded-[9px] border border-border bg-transparent py-1.5 pl-[11px] pr-7 text-xs text-text-secondary hover:text-text-primary focus-ring';
@@ -94,7 +122,13 @@ export function TradesContent(props: TradesContentProps) {
   const step = (dir: -1 | 1) => {
     const i = selected ? ordered.indexOf(selected) : -1;
     const next = ordered[i + dir];
-    if (next) setSelectedId(next.id);
+    if (!next) return;
+    setSelectedId(next.id);
+    // Stepping walks every trade listed, closed days and days not drawn yet included; open and
+    // draw the day it lands in, or the trade on the right has no row in the list.
+    if (!isOpen(next.date)) toggle(next.date);
+    const at = days.findIndex(([date]) => date === next.date);
+    if (at >= limit) setLimit(at + 1);
   };
 
   return (
@@ -119,6 +153,7 @@ export function TradesContent(props: TradesContentProps) {
           onChange={(s) => {
             setScope(s);
             setLimit(DAYS_SHOWN);
+            setFlipped(new Set());
           }}
           options={[
             { id: 'month', label: 'Month' },
@@ -183,6 +218,11 @@ export function TradesContent(props: TradesContentProps) {
           </span>
           Only days I broke a rule
         </button>
+        {days.length > 1 && (
+          <button type="button" onClick={() => setFlipped(flipsForAll(days.map(([date]) => date), !allOpen, newest, filtering))} className={`ml-auto ${btn}`}>
+            {allOpen ? 'Collapse all days' : 'Expand all days'}
+          </button>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-x-7 gap-y-2 rounded-xl border border-white/[0.06] bg-bg-card px-4 py-3 text-xs text-text-secondary">
@@ -228,23 +268,52 @@ export function TradesContent(props: TradesContentProps) {
                   const net = list.reduce((s, t) => s + t.pnl, 0);
                   const wins = list.filter((t) => t.pnl > 0).length;
                   const ruleDay = ruleDays.get(date) ?? [];
+                  const open = isOpen(date);
+                  // The divider keeps closed days, stacked header on header, from running together.
+                  const head = 'border-b border-white/[0.06] bg-bg-tertiary px-2.5 py-2';
                   return [
-                    <tr key={`d-${date}`}>
-                      <td colSpan={anyTime ? 5 : 4} className="bg-bg-tertiary px-2.5 py-2 text-xs font-semibold">
-                        {dayHeading(date)}{' '}
-                        <span className="font-normal text-text-secondary">
-                          · {list.length} trade{list.length === 1 ? '' : 's'} · {wins} won {list.length - wins} lost
-                        </span>
-                        {ruleDates.has(date) && <span className="font-medium text-amber-300"> · broke a rule</span>}
+                    // The whole row opens and closes the day; the chevron is the same thing as a
+                    // button, for the keyboard and for screen readers.
+                    <tr key={`d-${date}`} onClick={() => toggle(date)} className="group cursor-pointer">
+                      <td colSpan={anyTime ? 5 : 4} className={`${head} text-xs font-semibold`}>
+                        <button
+                          type="button"
+                          aria-expanded={open}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggle(date);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded text-left focus-ring"
+                        >
+                          <ChevronRight
+                            size={14}
+                            aria-hidden
+                            className={`shrink-0 text-text-secondary transition-transform duration-150 motion-reduce:transition-none group-hover:text-text-primary ${open ? 'rotate-90' : ''}`}
+                          />
+                          <span>
+                            {dayHeading(date)}{' '}
+                            <span className="font-normal text-text-secondary">
+                              · {list.length} trade{list.length === 1 ? '' : 's'} · {wins} won {list.length - wins} lost
+                            </span>
+                            {ruleDates.has(date) && <span className="font-medium text-amber-300"> · broke a rule</span>}
+                          </span>
+                        </button>
                       </td>
-                      <td className={`bg-bg-tertiary px-2.5 py-2 text-right text-xs font-semibold tabular-nums ${tone(net)}`}>{fmt(net)}</td>
-                      <td colSpan={2} className="bg-bg-tertiary px-2.5 py-2 text-right">
-                        <button type="button" onClick={() => onOpenDay(date)} className="text-[11.5px] font-medium text-accent focus-ring rounded">
+                      <td className={`${head} text-right text-xs font-semibold tabular-nums ${tone(net)}`}>{fmt(net)}</td>
+                      <td colSpan={2} className={`${head} text-right`}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenDay(date);
+                          }}
+                          className="whitespace-nowrap text-[11.5px] font-medium text-accent focus-ring rounded"
+                        >
                           Open day
                         </button>
                       </td>
                     </tr>,
-                    ...list.map((trade) => {
+                    ...(open ? list : []).map((trade) => {
                       const line = tradeLine(trade);
                       const position = ruleDay.findIndex((t) => t.id === trade.id) + 1;
                       const pastCap = cap != null && position > cap;
