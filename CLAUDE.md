@@ -391,9 +391,27 @@ with the junction still in place can delete through it into the real `node_modul
 
 ## Open items
 
-- Market replay is **not built and not on any card**. Diamond still grants it, so shipping is
-  `MARKET_REPLAY_LIVE = true` in `tiers.ts` and the line returns to the card by itself. It needs
-  licensed intraday data; don't relist it as "coming soon" — that is still selling it.
+- **Market replay is built (October 2026) but not on any card yet.** Until `MARKET_REPLAY_LIVE = true`
+  in `tiers.ts` only the site admin can open it (`useReplayAccess`, and the same rule on the server).
+  Flipping it puts the line back on the Diamond card and opens it to Diamond. Don't relist it as
+  "coming soon" before then. That is still selling it.
+  - **What it is:** TradingView-style bar replay on the day page's "Replay" button. Candles from
+    TradingView's open-source Lightweight Charts (pinned 5.2.1, lazy-loaded so no other screen pays
+    for it), 1m/5m/15m, VWAP, click a candle to start, play/step/speed, practice trades at the close
+    of the candle on screen (`utils/replayPractice.ts`, never saved), the day's contracts, plus any
+    0DTE strike picked by hand.
+  - **Data:** Databento historical, pay-as-you-go. OPRA.PILLAR for options, EQUS.MINI for the
+    underlying, ohlcv-1m. Fetched by `server/marketReplay.ts` with `DATABENTO_API_KEY` (set in
+    Netlify), and cached once per symbol-day in the server-only `marketReplayBars` collection (no
+    rule, so clients are denied). Uncached requests count against `replayUsage` (40 a day). SPX is
+    drawn as SPY, because index values carry their own license.
+  - **The next-day rule is the license, not a preference.** OPRA charges nothing for options data
+    a full trading day old, and Databento allows external display after 24 hours, so a day opens at
+    the later of the two (`replayAvailableAt`: a Friday on Monday at 9:30 ET, a Monday on Tuesday at
+    4:15 ET). The server refuses anything earlier. Same-day replay would bring OPRA's $1,500/month.
+  - **Schwab sends no fill times,** so the replay never shows a real time for those trades. It
+    shades the candles a fill price traded through, labeled as an estimate. SPX vs SPXW is decided
+    by which root's bars contain the trader's fill prices.
 - Annual billing is built and **switches itself on** once `CREEM_PRODUCT_SILVER_ANNUAL`,
   `_GOLD_ANNUAL` and `_DIAMOND_ANNUAL` are set in Netlify (distinct from the monthly ids) —
   `/api/payments-status` reports `annualReady`, the pricing toggle sells from it, and the admin

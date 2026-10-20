@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Pencil, Upload, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, Play, Upload, X } from 'lucide-react';
 import type { Trade } from '../../types';
 import { useSettings } from '../../context/useSettings';
 import { useDayNote } from '../../hooks/useDayNote';
@@ -8,6 +8,7 @@ import { computeStats } from '../../utils/stats';
 import { tradesByDay } from '../../utils/tradingRules';
 import { capReport, dayRuleLines, ordinal, runningTotals } from '../../utils/dayReport';
 import { tradeLine } from '../../utils/tradeLine';
+import { replayAvailable, replayAvailableAt } from '../../utils/marketReplay';
 import { tradeTags, describeTradeForDeletion } from '../../utils/tradeHelpers';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { ShareCardModal } from '../ShareCardModal';
@@ -32,9 +33,17 @@ export interface DayContentProps {
   onImportCsv?: () => void;
   onOpenSimulator?: () => void;
   onOpenSettings?: () => void;
+  /** Opens market replay on this day. Left out where the person cannot see replay at all. */
+  onReplay?: () => void;
 }
 
 const NONE: ReadonlySet<string> = new Set();
+
+/** "Replay opens Tue 4:15 PM", for a day too recent to replay yet. */
+function replayOpensWords(date: string): string {
+  const at = replayAvailableAt(date);
+  return `Replay opens ${at.toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: 'numeric', minute: '2-digit' })} ET`;
+}
 
 /** One to ten as words, the way the sentence would be said: "the three below cost…". */
 function words(n: number): string {
@@ -64,8 +73,10 @@ function price(n: number | undefined): string {
  * re-saved unchanged, and an edit is saved when the trader leaves the day.
  */
 export function DayContent(props: DayContentProps) {
-  const { date, trades, ruleTrades, ruleDates = NONE, layout, onBack, onOpenDay, onEdit, onDelete, onAddTrade, onImportCsv, onOpenSimulator, onOpenSettings } = props;
+  const { date, trades, ruleTrades, ruleDates = NONE, layout, onBack, onOpenDay, onEdit, onDelete, onAddTrade, onImportCsv, onOpenSimulator, onOpenSettings, onReplay } = props;
   const { settings, viewingAllJournals } = useSettings();
+  const [now] = useState(() => Date.now());
+  const replayReady = replayAvailable(date, new Date(now));
   const rules = settings.tradingRules;
   const note = useDayNote(date);
   const [pendingDelete, setPendingDelete] = useState<Trade | null>(null);
@@ -267,6 +278,17 @@ export function DayContent(props: DayContentProps) {
             + Log a trade
           </button>
         </div>
+        {onReplay && (
+          <button
+            type="button"
+            onClick={onReplay}
+            disabled={!replayReady}
+            className="mt-3 flex h-[46px] w-full items-center justify-center gap-1.5 rounded-full border border-accent/40 text-sm font-semibold text-accent disabled:border-border disabled:font-normal disabled:text-text-secondary focus-ring"
+          >
+            <Play size={14} aria-hidden />
+            {replayReady ? 'Replay this day' : replayOpensWords(date)}
+          </button>
+        )}
         {onImportCsv && (
           <button type="button" onClick={onImportCsv} className="mt-3 inline-flex items-center justify-center gap-1.5 text-[13px] text-text-secondary focus-ring rounded">
             <Upload size={13} aria-hidden />
@@ -298,6 +320,24 @@ export function DayContent(props: DayContentProps) {
           </button>
         </div>
         <span className="flex-1" />
+        {onReplay && (
+          <button
+            type="button"
+            onClick={onReplay}
+            disabled={!replayReady}
+            title={replayReady ? undefined : replayOpensWords(date)}
+            /* Its own class string when ready: an accent colour added after navButton's grey loses to
+               it, because Tailwind orders the CSS, not the class list. */
+            className={
+              replayReady
+                ? 'inline-flex items-center gap-1 rounded-[9px] border border-accent/40 px-[11px] py-1.5 text-xs font-semibold text-accent hover:bg-accent/10 focus-ring'
+                : navButton
+            }
+          >
+            <Play size={12} aria-hidden />
+            {replayReady ? 'Replay' : replayOpensWords(date)}
+          </button>
+        )}
         {onImportCsv && (
           <button type="button" onClick={onImportCsv} className={navButton}>
             <Upload size={12} aria-hidden />

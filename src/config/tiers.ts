@@ -170,9 +170,13 @@ export interface TierPlan {
  *
  * Until then it is not on the card at all. It used to be, marked "coming soon", and that is still
  * selling it: someone who pays $39 partly for a line on a card has bought it whatever the label
- * said, and the longer it stays unbuilt the more it reads as a refund owed. It needs licensed
- * intraday market data, a flat bill that per-seat revenue does not cover yet, so "soon" was not
- * true either.
+ * said, and the longer it stays unbuilt the more it reads as a refund owed.
+ *
+ * Built in October 2026 (components/replay, server/marketReplay.ts) on Databento's pay-as-you-go
+ * historical data: pennies a month, because each day opens only once it is historical (no OPRA fees)
+ * and each symbol-day is bought once. While this is false the site admin alone can open it, to try
+ * it on a real journal. Databento's licensing for OPRA and US Equities allows showing historical data
+ * externally (checked by Jay, October 2026). Flip this once he has tried it.
  */
 export const MARKET_REPLAY_LIVE = false;
 

@@ -4,6 +4,8 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { DashboardView } from '../components/DashboardView';
 import { DashboardSkeleton } from '../components/DashboardSkeleton';
 import { DayContent } from '../components/day/DayContent';
+import { ReplayContent } from '../components/replay/ReplayContent';
+import { useReplayAccess } from '../hooks/useReplayAccess';
 import { DaySheet } from '../components/day/DaySheet';
 import { TradeSheet } from '../components/trades/TradeSheet';
 import { TradesContent } from '../components/trades/TradesContent';
@@ -141,6 +143,9 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   const [tradeModalDate, setTradeModalDate] = useState<string | undefined>();
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  /** The day market replay is on. Its own state, so stepping days in the replay leaves the day page alone. */
+  const [replayDate, setReplayDate] = useState<string | null>(null);
+  const replayAccess = useReplayAccess();
   /** The trade opened from the Overview's trade log. An id, so the sheet shows the trade as saved after an edit. */
   const [openTradeId, setOpenTradeId] = useState<string | null>(null);
   const openTrade = openTradeId ? (allTrades.find((t) => t.id === openTradeId) ?? null) : null;
@@ -223,6 +228,13 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
   const openDay = (date: string) => {
     setSelectedDay(date);
     if (isDesktop && appView !== 'day') openView('day');
+  };
+
+  /** Market replay on a day: a page of its own on both layouts, so a phone's day sheet closes first. */
+  const openReplay = (date: string) => {
+    setReplayDate(date);
+    if (!isDesktop) setSelectedDay(null);
+    openView('replay');
   };
 
   const openAddTrade = (date?: string) => {
@@ -506,8 +518,27 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
                 onImportCsv={() => openImportCsv()}
                 onExport={() => openView('settings')}
               />
+            ) : appView === 'replay' && replayDate ? (
+              replayAccess === 'open' ? (
+                <ReplayContent
+                  key={replayDate}
+                  trades={allTrades}
+                  date={replayDate}
+                  onDateChange={setReplayDate}
+                  onBack={goBackView}
+                />
+              ) : (
+                <LockedFeature
+                  feature="marketReplay"
+                  title="Market replay is part of Diamond"
+                  description="Replay any past session minute by minute on a TradingView-style chart, with the contracts you traded that day, and practice the trade again."
+                >
+                  <div className="panel-card h-[420px]" />
+                </LockedFeature>
+              )
             ) : appView === 'day' && selectedDay ? (
               <DayContent
+                onReplay={replayAccess === 'hidden' ? undefined : () => openReplay(selectedDay)}
                 layout="page"
                 date={selectedDay}
                 trades={allTrades}
@@ -750,6 +781,7 @@ export function JournalApp({ onHome, onAdmin }: JournalAppProps) {
 
       {!isDesktop && selectedDay && appView !== 'day' && (
         <DaySheet
+          onReplay={replayAccess === 'hidden' ? undefined : () => openReplay(selectedDay)}
           date={selectedDay}
           trades={allTrades}
           ruleTrades={activeJournalTrades}

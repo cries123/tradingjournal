@@ -24,6 +24,7 @@ export type SidebarAppView =
   | 'dashboard'
   | 'trades'
   | 'day'
+  | 'replay'
   | 'more'
   | 'settings'
   | 'brokers'
