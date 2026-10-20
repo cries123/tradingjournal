@@ -412,6 +412,18 @@ with the junction still in place can delete through it into the real `node_modul
   - **Schwab sends no fill times,** so the replay never shows a real time for those trades. It
     shades the candles a fill price traded through, labeled as an estimate. SPX vs SPXW is decided
     by which root's bars contain the trader's fill prices.
+  - **The chart's toolkit** (all computed in `utils/`, drawn by `components/replay/ReplayChart.tsx`):
+    studies in `indicators.ts` use TradingView's default definitions (EMA seeded with an SMA,
+    Wilder's RSI, population-sd Bollinger) so a number matches theirs; `replayStudies.ts` holds
+    which are on, per browser. The strategy tester (`replayStrategies.ts`: EMA cross, opening-range
+    breakout, VWAP cross) only sees the bars the replay has shown, fills at candle closes, and is
+    labeled a test on one past day, never a signal. Drawings (`replayDrawings.ts`, trend line,
+    horizontal line, zone) are kept per contract and day in localStorage.
+  - **Drawing clicks come from the DOM, not the chart.** Lightweight Charts folds a second click
+    within ~500ms into a double-click and reports neither when the two are far apart, so a trend
+    line drawn at a natural pace lost its end. `subscribeClick` is only for picking a start candle.
+  - The chart box is `isolate`: the library's pane separator has a z-index that otherwise sat over
+    the Indicators menu once RSI or MACD was on.
 - Annual billing is built and **switches itself on** once `CREEM_PRODUCT_SILVER_ANNUAL`,
   `_GOLD_ANNUAL` and `_DIAMOND_ANNUAL` are set in Netlify (distinct from the monthly ids) —
   `/api/payments-status` reports `annualReady`, the pricing toggle sells from it, and the admin

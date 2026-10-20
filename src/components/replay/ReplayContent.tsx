@@ -1,29 +1,21 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Pause, Play, Plus, RotateCcw, SkipForward, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Maximize2, Minimize2, Minus, Pause, Play, Plus, ScanLine, SkipForward, SlidersHorizontal, X } from 'lucide-react';
 import type { Trade } from '../../types';
 import { useSettings } from '../../context/useSettings';
 import { formatCurrency } from '../../utils/format';
-import { aggregateBars, chartedUnderlying, contractLabel, nextTradingDay, previousTradingDay, replayAvailable, replayAvailableAt, vwapLine, type Bar, type Right } from '../../utils/marketReplay';
+import { aggregateBars, chartedUnderlying, contractLabel, nextTradingDay, previousTradingDay, replayAvailable, replayAvailableAt, type Bar } from '../../utils/marketReplay';
 import { easternClock } from '../../utils/replayClock';
 import { handPicked, replayPlan, sameContract, type ReplayContractRequest } from '../../utils/replayTrades';
-import { applyFill, EMPTY_BOOK, flatten, multiplierFor, unrealized, type PracticeBook } from '../../utils/replayPractice';
-import {
-  actualFills,
-  cursorForCandle,
-  estimatedFillTimes,
-  markPrice,
-  nextCursor,
-  revealed,
-  SPEEDS,
-  strikeStep,
-  suggestedStrike,
-  TIMEFRAMES,
-  type Speed,
-  type Timeframe,
-} from '../../utils/replayView';
+import { applyFill, EMPTY_BOOK, flatten, multiplierFor, type PracticeBook } from '../../utils/replayPractice';
+import { actualFills, cursorForCandle, estimatedFillTimes, markPrice, nextCursor, revealed, SPEEDS, suggestedStrike, TIMEFRAMES, type Speed, type Timeframe } from '../../utils/replayView';
+import { heikinAshi } from '../../utils/indicators';
+import { buildStudies, loadStudies, saveStudies, type StudySettings } from '../../utils/replayStudies';
+import { DEFAULT_PARAMS, runStrategy, type StrategyKind, type StrategyParams } from '../../utils/replayStrategies';
+import { loadDrawings, saveDrawings, type Drawing, type DrawingTool } from '../../utils/replayDrawings';
 import { fetchReplay, ReplayError, type ReplayData } from '../../services/marketReplay';
 import { SegmentedControl } from '../ui/SegmentedControl';
-import type { ChartMarker } from './ReplayChart';
+import type { ChartCommand, ChartMarker } from './ReplayChart';
+import { ContractPicker, IndicatorsMenu, PracticePanel, StrategyPanel, ToolRail } from './ReplayPanels';
 
 const ReplayChart = lazy(() => import('./ReplayChart'));
 
@@ -51,6 +43,8 @@ interface Instrument {
   traded: boolean;
 }
 
+type ChartType = 'candles' | 'heikin';
+
 function longDate(date: string): string {
   return new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 }
@@ -62,11 +56,13 @@ function availableAtWords(date: string): string {
 }
 
 /**
- * Market replay: a past session bar by bar, TradingView style, with practice trades on it.
+ * Market replay: a past session bar by bar on a TradingView-style chart, with studies, drawings,
+ * a strategy tester and practice trades.
  *
  * The day's own contracts come first, then anything picked by hand on that day. Click a candle to
- * start the replay there; the rest of the day stays hidden until it plays. Practice fills happen at
- * the close of the candle on screen and are never saved: this is a rehearsal, not the journal.
+ * start the replay there; the rest of the day stays hidden until it plays, and nothing here (the
+ * studies, the strategy tester) is computed from a candle the replay has not shown. Practice fills
+ * happen at the close of the candle on screen and are never saved: this is a rehearsal, not the journal.
  */
 export function ReplayContent({ trades, date, onDateChange, onBack, preload }: ReplayContentProps) {
   const { settings } = useSettings();
@@ -115,7 +111,7 @@ export function ReplayContent({ trades, date, onDateChange, onBack, preload }: R
       const req = contracts[c.index];
       if (!req) return;
       list.push({
-        id: `c${c.index}`,
+        id: c.osi ?? `${req.underlying} ${req.strike}${req.right}`,
         label: c.osi ? contractLabel(c.osi) : `${req.underlying} ${req.strike}${req.right}`,
         sub: c.index < plan.contracts.length ? 'You traded this' : 'Picked',
         kind: 'option',
@@ -126,7 +122,7 @@ export function ReplayContent({ trades, date, onDateChange, onBack, preload }: R
     });
     if (data.underlying) {
       list.push({
-        id: 'u',
+        id: data.underlying.symbol,
         label: data.underlying.symbol,
         sub: data.underlying.proxyFor ? `Drawn for ${data.underlying.proxyFor}` : 'Underlying',
         kind: 'stock',
@@ -142,7 +138,9 @@ export function ReplayContent({ trades, date, onDateChange, onBack, preload }: R
   const selected = instruments.find((i) => i.id === selectedId) ?? instruments.find((i) => i.bars.length > 0) ?? instruments[0] ?? null;
 
   const [timeframe, setTimeframe] = useState<Timeframe>(1);
-  const [showVwap, setShowVwap] = useState(true);
+  const [chartType, setChartType] = useState<ChartType>('candles');
+  const [studies, setStudiesState] = useState<StudySettings>(loadStudies);
+  const [showIndicators, setShowIndicators] = useState(false);
   const [showEstimates, setShowEstimates] = useState(true);
   const [cursor, setCursor] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -150,11 +148,23 @@ export function ReplayContent({ trades, date, onDateChange, onBack, preload }: R
   const [books, setBooks] = useState<Record<string, PracticeBook>>({});
   const [qty, setQty] = useState(1);
   const [picking, setPicking] = useState(false);
+  const [tool, setTool] = useState<DrawingTool>('cursor');
+  const [drawingEdits, setDrawingEdits] = useState<Record<string, Drawing[]>>({});
+  const [command, setCommand] = useState<ChartCommand | null>(null);
+  const [strategy, setStrategy] = useState<StrategyKind | null>(null);
+  const [params, setParams] = useState<StrategyParams>(DEFAULT_PARAMS);
+  const [fullscreen, setFullscreen] = useState(false);
+  const chartBox = useRef<HTMLElement>(null);
+
+  const setStudies = (s: StudySettings) => {
+    setStudiesState(s);
+    saveStudies(s);
+  };
 
   const sessionStart = data?.sessionStart ?? 0;
   const sessionEnd = data?.sessionEnd ?? 0;
-
   const firstCandle = cursorForCandle(Math.floor(sessionStart / (timeframe * 60)) * timeframe * 60, timeframe);
+
   /* The cursor as of the last render, for the timer: the next step is decided outside a state
      updater so that stopping at the close is not a side effect React might run twice. */
   const cursorNow = useRef(cursor);
@@ -179,16 +189,42 @@ export function ReplayContent({ trades, date, onDateChange, onBack, preload }: R
     return () => window.clearInterval(id);
   }, [playing, speed, step]);
 
-  // Space plays and pauses, the right arrow steps, the way replay works on TradingView.
+  const drawingKey = selected ? `${selected.id}` : '';
+  const drawings = useMemo(() => drawingEdits[drawingKey] ?? (drawingKey ? loadDrawings(date, drawingKey) : []), [drawingEdits, drawingKey, date]);
+  const setDrawings = useCallback(
+    (next: Drawing[]) => {
+      if (!drawingKey) return;
+      saveDrawings(date, drawingKey, next);
+      setDrawingEdits((m) => ({ ...m, [drawingKey]: next }));
+    },
+    [date, drawingKey],
+  );
+
+  /*
+   * TradingView's keys: Space plays and pauses, the right arrow steps, Esc puts the cursor back,
+   * T, H and R pick the trend line, horizontal line and zone, and Ctrl+Z takes the last drawing off.
+   */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
-      if (cursor === null) return;
-      if (e.key === ' ') {
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        if (drawings.length > 0) {
+          e.preventDefault();
+          setDrawings(drawings.slice(0, -1));
+        }
+        return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const key = e.key.toLowerCase();
+      if (key === 'escape') setTool('cursor');
+      else if (key === 't') setTool('trend');
+      else if (key === 'h') setTool('hline');
+      else if (key === 'r') setTool('rect');
+      else if (cursor !== null && e.key === ' ') {
         e.preventDefault();
         setPlaying((p) => !p);
-      } else if (e.key === 'ArrowRight') {
+      } else if (cursor !== null && e.key === 'ArrowRight') {
         e.preventDefault();
         setPlaying(false);
         step();
@@ -196,11 +232,26 @@ export function ReplayContent({ trades, date, onDateChange, onBack, preload }: R
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [cursor, step]);
+  }, [cursor, step, drawings, setDrawings]);
+
+  // Full screen is the chart's panel, as TradingView's full-screen button does.
+  useEffect(() => {
+    const onChange = () => setFullscreen(document.fullscreenElement === chartBox.current);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+  const toggleFullscreen = () => {
+    const el = chartBox.current;
+    if (!el) return;
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+    else void el.requestFullscreen?.().catch(() => undefined);
+  };
 
   const minuteBars = useMemo(() => (selected ? revealed(selected.bars, cursor) : []), [selected, cursor]);
   const shownBars = useMemo(() => aggregateBars(minuteBars.map((b) => ({ ...b })), timeframe), [minuteBars, timeframe]);
-  const vwap = useMemo(() => (showVwap ? vwapLine(shownBars) : null), [showVwap, shownBars]);
+  const drawnBars = useMemo(() => (chartType === 'heikin' ? heikinAshi(shownBars) : shownBars), [chartType, shownBars]);
+  const chartStudies = useMemo(() => buildStudies(shownBars, sessionStart, studies), [shownBars, sessionStart, studies]);
+  const tested = useMemo(() => (strategy && shownBars.length > 0 ? runStrategy(strategy, shownBars, sessionStart, params) : null), [strategy, shownBars, sessionStart, params]);
 
   const selectedTrades = useMemo(
     () => (selected?.contract == null ? [] : dayTrades.filter((t) => plan.tradeContract.get(t.id) === selected.contract)),
@@ -218,15 +269,14 @@ export function ReplayContent({ trades, date, onDateChange, onBack, preload }: R
   const markers = useMemo<ChartMarker[]>(() => {
     const size = timeframe * 60;
     const bucket = (t: number) => Math.floor(t / size) * size;
-    const practice: ChartMarker[] = book.fills.map((f) => ({
-      time: bucket(f.time),
-      side: f.side,
-      text: `${f.side === 'buy' ? 'B' : 'S'} ${f.qty} @${f.price}`,
-      kind: 'practice',
-    }));
+    const practice: ChartMarker[] = book.fills.map((f) => ({ time: bucket(f.time), side: f.side, text: `${f.side === 'buy' ? 'B' : 'S'} ${f.qty} @${f.price}`, kind: 'practice' }));
     const actual: ChartMarker[] = actualFills(selectedTrades, date, cursor).map((f) => ({ ...f, time: bucket(f.time), kind: 'actual' }));
-    return [...actual, ...practice];
-  }, [book.fills, selectedTrades, date, cursor, timeframe]);
+    const strat: ChartMarker[] = (tested?.trades ?? []).flatMap((t) => {
+      const entry: ChartMarker = { time: t.entryTime, side: t.side === 'long' ? 'buy' : 'sell', text: t.side === 'long' ? 'Long' : 'Short', kind: 'strategy' };
+      return t.open ? [entry] : [entry, { time: t.exitTime, side: t.side === 'long' ? 'sell' : 'buy', text: 'Exit', kind: 'strategy' }];
+    });
+    return [...actual, ...strat, ...practice];
+  }, [book.fills, selectedTrades, date, cursor, timeframe, tested]);
 
   const trade = (side: 'buy' | 'sell') => {
     if (!selected || cursor === null || mark === null) return;
@@ -251,7 +301,10 @@ export function ReplayContent({ trades, date, onDateChange, onBack, preload }: R
   };
 
   const btn = 'inline-flex h-8 items-center gap-1.5 rounded-[9px] border border-border px-2.5 text-xs text-text-secondary hover:text-text-primary disabled:opacity-40 focus-ring';
+  const iconBtn = 'grid h-8 w-8 place-items-center rounded-[9px] border border-border text-text-secondary hover:text-text-primary focus-ring';
   const charted = chartedUnderlying(optionUnderlying);
+  const studyCount = Object.values(studies).filter((s) => s.on).length;
+  const zoom = (kind: ChartCommand['kind']) => setCommand((c) => ({ kind, n: (c?.n ?? 0) + 1 }));
 
   return (
     <div className="flex flex-col gap-3 pb-4 md:gap-4">
@@ -269,16 +322,6 @@ export function ReplayContent({ trades, date, onDateChange, onBack, preload }: R
             <ChevronRight size={14} />
           </button>
         </span>
-        <span className="flex-1" />
-        <SegmentedControl
-          label="Timeframe"
-          value={String(timeframe)}
-          onChange={(v) => setTimeframe(Number(v) as Timeframe)}
-          options={TIMEFRAMES.map((t) => ({ id: String(t), label: `${t}m` }))}
-        />
-        <button type="button" onClick={() => setShowVwap((v) => !v)} aria-pressed={showVwap} className={`${btn} ${showVwap ? 'border-accent/40 text-accent' : ''}`}>
-          VWAP
-        </button>
       </header>
 
       {!available ? (
@@ -334,22 +377,81 @@ export function ReplayContent({ trades, date, onDateChange, onBack, preload }: R
           )}
 
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px] xl:gap-4">
-            <section className="panel-card min-w-0 p-0">
-              <div className="h-[320px] md:h-[460px]">
-                <Suspense fallback={<div className="grid h-full place-items-center text-[13px] text-text-secondary">Loading the chart…</div>}>
-                  <ReplayChart
-                    bars={shownBars}
-                    vwap={vwap}
-                    markers={markers}
-                    estimates={estimates}
-                    fitKey={`${date}|${selected?.id}|${timeframe}`}
-                    following={cursor !== null}
-                    onPickTime={(t) => {
-                      setPlaying(false);
-                      setCursor(cursorForCandle(t, timeframe));
-                    }}
-                  />
-                </Suspense>
+            <section ref={chartBox} className="panel-card flex min-w-0 flex-col p-0 [&:fullscreen]:rounded-none [&:fullscreen]:bg-bg-primary">
+              {/* The chart's own toolbar, along the top as on TradingView. */}
+              <div className="relative flex flex-wrap items-center gap-1.5 border-b border-white/[0.06] px-2 py-1.5">
+                <SegmentedControl
+                  label="Timeframe"
+                  value={String(timeframe)}
+                  onChange={(v) => setTimeframe(Number(v) as Timeframe)}
+                  options={TIMEFRAMES.map((t) => ({ id: String(t), label: `${t}m` }))}
+                />
+                <SegmentedControl
+                  label="Candles"
+                  value={chartType}
+                  onChange={(v) => setChartType(v as ChartType)}
+                  options={[
+                    { id: 'candles', label: 'Candles' },
+                    { id: 'heikin', label: 'Heikin Ashi' },
+                  ]}
+                />
+                <span className="relative">
+                  <button type="button" onClick={() => setShowIndicators((s) => !s)} aria-expanded={showIndicators} className={btn}>
+                    <SlidersHorizontal size={13} aria-hidden /> Indicators{studyCount > 0 ? ` · ${studyCount}` : ''}
+                  </button>
+                  {showIndicators && <IndicatorsMenu studies={studies} onChange={setStudies} onClose={() => setShowIndicators(false)} />}
+                </span>
+                <span className="flex-1" />
+                <button type="button" className={iconBtn} aria-label="Zoom out" title="Zoom out" onClick={() => zoom('out')}>
+                  <Minus size={14} />
+                </button>
+                <button type="button" className={iconBtn} aria-label="Zoom in" title="Zoom in" onClick={() => zoom('in')}>
+                  <Plus size={14} />
+                </button>
+                <button type="button" className={iconBtn} aria-label="Fit the whole session" title="Fit the whole session" onClick={() => zoom('fit')}>
+                  <ScanLine size={14} />
+                </button>
+                <button type="button" className={iconBtn} aria-label={fullscreen ? 'Leave full screen' : 'Full screen'} title={fullscreen ? 'Leave full screen' : 'Full screen'} onClick={toggleFullscreen}>
+                  {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                </button>
+              </div>
+
+              <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+                <ToolRail
+                  tool={tool}
+                  onTool={setTool}
+                  canUndo={drawings.length > 0}
+                  onUndo={() => setDrawings(drawings.slice(0, -1))}
+                  onClear={() => setDrawings([])}
+                />
+                {/* Grows only along the row. In the phone's column, flex-1's zero basis beat the
+                    360px height and the chart shrank to a sliver; full screen grows it either way.
+                    `isolate` keeps the chart's own z-indexes inside it: the separator above an RSI
+                    or MACD pane otherwise sat over the Indicators menu and swallowed its taps. */}
+                <div className="isolate h-[360px] min-w-0 md:h-[560px] md:flex-1 [:fullscreen_&]:h-auto [:fullscreen_&]:flex-1">
+                  <Suspense fallback={<div className="grid h-full place-items-center text-[13px] text-text-secondary">Loading the chart…</div>}>
+                    <ReplayChart
+                      bars={drawnBars}
+                      studies={chartStudies}
+                      markers={markers}
+                      estimates={estimates}
+                      fitKey={`${date}|${selected?.id}|${timeframe}`}
+                      following={cursor !== null}
+                      timeframe={timeframe}
+                      tool={tool}
+                      drawings={drawings}
+                      onDrawing={(d) => {
+                        setDrawings([...drawings, d]);
+                        setTool('cursor');
+                      }}
+                      onPickTime={(t) => {
+                        setPlaying(false);
+                        setCursor(cursorForCandle(t, timeframe));
+                      }}
+                      command={command}
+                    />
+                  </Suspense>
+                </div>
               </div>
 
               {/* The replay controls, under the chart where TradingView puts them. */}
@@ -366,7 +468,15 @@ export function ReplayContent({ trades, date, onDateChange, onBack, preload }: R
                     <button type="button" className="btn-primary inline-flex h-8 w-20 items-center justify-center gap-1.5 text-xs font-semibold focus-ring" onClick={() => setPlaying((p) => !p)} aria-label={playing ? 'Pause' : 'Play'}>
                       {playing ? <Pause size={13} aria-hidden /> : <Play size={13} aria-hidden />} {playing ? 'Pause' : 'Play'}
                     </button>
-                    <button type="button" className={btn} onClick={() => { setPlaying(false); step(); }} aria-label="Step one candle">
+                    <button
+                      type="button"
+                      className={btn}
+                      onClick={() => {
+                        setPlaying(false);
+                        step();
+                      }}
+                      aria-label="Step one candle"
+                    >
                       <SkipForward size={13} aria-hidden /> Step
                     </button>
                     <span className="flex overflow-hidden rounded-[9px] border border-border" role="radiogroup" aria-label="Speed">
@@ -383,11 +493,18 @@ export function ReplayContent({ trades, date, onDateChange, onBack, preload }: R
                         </button>
                       ))}
                     </span>
-                    <span className="font-semibold tabular-nums text-[13px]">{easternClock(cursor)} ET</span>
+                    <span className="text-[13px] font-semibold tabular-nums">{easternClock(cursor)} ET</span>
                     <span className="h-1 min-w-[60px] flex-1 overflow-hidden rounded-full bg-white/[0.06]" aria-hidden>
                       <span className="block h-full bg-accent/70" style={{ width: `${Math.min(100, Math.max(0, ((cursor - sessionStart) / Math.max(1, sessionEnd - sessionStart)) * 100))}%` }} />
                     </span>
-                    <button type="button" className={btn} onClick={() => { setPlaying(false); setCursor(null); }}>
+                    <button
+                      type="button"
+                      className={btn}
+                      onClick={() => {
+                        setPlaying(false);
+                        setCursor(null);
+                      }}
+                    >
                       Show the whole day
                     </button>
                   </>
@@ -412,6 +529,17 @@ export function ReplayContent({ trades, date, onDateChange, onBack, preload }: R
                 onSell={() => trade('sell')}
                 onClose={close}
                 onReset={() => selected && setBooks((b) => ({ ...b, [selected.id]: EMPTY_BOOK }))}
+                fmt={fmt}
+              />
+
+              <StrategyPanel
+                kind={strategy}
+                params={params}
+                result={tested}
+                multiplier={multiplier}
+                replaying={cursor !== null}
+                onKind={setStrategy}
+                onParams={setParams}
                 fmt={fmt}
               />
 
@@ -445,159 +573,10 @@ export function ReplayContent({ trades, date, onDateChange, onBack, preload }: R
 
           <p className="text-[11px] text-text-secondary">
             One-minute bars from OPRA and Databento, shown the trading day after. Practice trades fill at the close of the candle on screen,
-            with no commission, and are not saved to your journal.
+            with no commission, and are not saved to your journal. Drawings and indicators are remembered in this browser.
           </p>
         </>
       )}
     </div>
-  );
-}
-
-function PracticePanel({
-  book,
-  mark,
-  multiplier,
-  qty,
-  onQty,
-  replaying,
-  onBuy,
-  onSell,
-  onClose,
-  onReset,
-  fmt,
-}: {
-  book: PracticeBook;
-  mark: number | null;
-  multiplier: number;
-  qty: number;
-  onQty: (n: number) => void;
-  replaying: boolean;
-  onBuy: () => void;
-  onSell: () => void;
-  onClose: () => void;
-  onReset: () => void;
-  fmt: (n: number) => string;
-}) {
-  const open = mark === null ? 0 : unrealized(book, mark, multiplier);
-  const tone = (n: number) => (n > 0 ? 'text-profit-bright' : n < 0 ? 'text-loss-bright' : 'text-text-primary');
-  const can = replaying && mark !== null;
-  return (
-    <section className="panel-card p-4">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-[13px] font-medium text-text-secondary">Practice trade</h2>
-        {book.fills.length > 0 && (
-          <button type="button" onClick={onReset} className="inline-flex items-center gap-1 text-[11.5px] text-text-secondary hover:text-text-primary focus-ring rounded">
-            <RotateCcw size={11} aria-hidden /> Reset
-          </button>
-        )}
-      </div>
-      {!replaying && <p className="mt-2 text-[12.5px] text-text-secondary">Start the replay to trade it. The future stays hidden until it plays.</p>}
-      <div className="mt-3 flex items-center gap-2">
-        <label className="text-xs text-text-secondary" htmlFor="practice-qty">
-          Qty
-        </label>
-        <input
-          id="practice-qty"
-          type="number"
-          min={1}
-          value={qty}
-          onChange={(e) => onQty(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
-          className="input-field w-20 py-1.5 text-[16px] md:text-sm"
-        />
-        <span className="ml-auto text-xs tabular-nums text-text-secondary">{mark === null ? '' : `Last ${mark}`}</span>
-      </div>
-      <div className="mt-2.5 grid grid-cols-3 gap-2">
-        <button type="button" disabled={!can} onClick={onBuy} className="h-10 rounded-xl bg-profit-bright/15 text-sm font-semibold text-profit-bright hover:bg-profit-bright/25 disabled:opacity-40 focus-ring">
-          Buy
-        </button>
-        <button type="button" disabled={!can} onClick={onSell} className="h-10 rounded-xl bg-loss-bright/15 text-sm font-semibold text-loss-bright hover:bg-loss-bright/25 disabled:opacity-40 focus-ring">
-          Sell
-        </button>
-        <button type="button" disabled={!can || book.qty === 0} onClick={onClose} className="h-10 rounded-xl border border-border text-sm text-text-secondary hover:text-text-primary disabled:opacity-40 focus-ring">
-          Close
-        </button>
-      </div>
-      <dl className="mt-3 grid grid-cols-3 gap-2 text-xs text-text-secondary">
-        <div>
-          <dt>Position</dt>
-          <dd className="mt-0.5 text-sm font-semibold tabular-nums text-text-primary">{book.qty === 0 ? 'Flat' : `${book.qty > 0 ? 'Long' : 'Short'} ${Math.abs(book.qty)}`}</dd>
-          {book.qty !== 0 && <dd className="text-[11px] tabular-nums">at {Math.round(book.avgPrice * 100) / 100}</dd>}
-        </div>
-        <div>
-          <dt>Open P&amp;L</dt>
-          <dd className={`mt-0.5 text-sm font-semibold tabular-nums ${tone(open)}`}>{fmt(open)}</dd>
-        </div>
-        <div>
-          <dt>Closed P&amp;L</dt>
-          <dd className={`mt-0.5 text-sm font-semibold tabular-nums ${tone(book.realized)}`}>{fmt(book.realized)}</dd>
-        </div>
-      </dl>
-      {book.fills.length > 0 && (
-        <ul className="mt-3 max-h-40 space-y-1 overflow-y-auto border-t border-white/[0.06] pt-2 text-[12px]">
-          {[...book.fills].reverse().map((f, i) => (
-            <li key={`${f.time}-${i}`} className="flex justify-between gap-2 tabular-nums">
-              <span>
-                <span className="text-text-secondary">{easternClock(f.time)}</span> {f.side === 'buy' ? 'Bought' : 'Sold'} {f.qty} @ {f.price}
-              </span>
-              {f.realized !== 0 && <span className={tone(f.realized)}>{fmt(f.realized)}</span>}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-function ContractPicker({
-  underlying,
-  suggestion,
-  approximate,
-  onAdd,
-}: {
-  underlying: string;
-  suggestion: number | null;
-  approximate: boolean;
-  onAdd: (right: Right, strike: number) => void;
-}) {
-  const stepBy = strikeStep(underlying);
-  const [right, setRight] = useState<Right>('C');
-  const [strike, setStrike] = useState<number>(suggestion ?? 0);
-  return (
-    <section className="panel-card flex flex-wrap items-center gap-2 p-3" aria-label="Pick a contract">
-      <span className="text-[13px] font-semibold">{underlying} 0DTE</span>
-      <SegmentedControl
-        label="Call or put"
-        value={right}
-        onChange={(r) => setRight(r as Right)}
-        options={[
-          { id: 'C', label: 'Call' },
-          { id: 'P', label: 'Put' },
-        ]}
-      />
-      <span className="flex items-center gap-1">
-        <button type="button" aria-label="Lower strike" onClick={() => setStrike((s) => Math.max(stepBy, s - stepBy))} className="h-8 w-8 rounded-[9px] border border-border focus-ring">
-          −
-        </button>
-        <input
-          type="number"
-          aria-label="Strike"
-          value={strike || ''}
-          step={stepBy}
-          onChange={(e) => setStrike(Number(e.target.value))}
-          className="input-field w-24 py-1.5 text-center text-[16px] tabular-nums md:text-sm"
-        />
-        <button type="button" aria-label="Higher strike" onClick={() => setStrike((s) => s + stepBy)} className="h-8 w-8 rounded-[9px] border border-border focus-ring">
-          +
-        </button>
-      </span>
-      {suggestion !== null && (
-        <span className="text-[11.5px] text-text-secondary">
-          {approximate ? 'About' : ''} at the money: {suggestion}
-        </span>
-      )}
-      <button type="button" disabled={!(strike > 0)} onClick={() => onAdd(right, strike)} className="btn-primary ml-auto h-8 px-3 text-xs font-semibold disabled:opacity-40 focus-ring">
-        Add {strike > 0 ? `${strike}${right}` : ''}
-      </button>
-    </section>
   );
 }
