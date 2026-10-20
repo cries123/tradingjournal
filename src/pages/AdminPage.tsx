@@ -123,6 +123,7 @@ import { ReplaySpendPanel } from '../components/admin/ReplaySpendPanel';
 import { SyncFeedPanel } from '../components/admin/SyncFeedPanel';
 import { BillingEventsPanel } from '../components/admin/BillingEventsPanel';
 import { EmailLogPanel } from '../components/admin/EmailLogPanel';
+import { EmailBroadcastPanel } from '../components/admin/EmailBroadcastPanel';
 import { fetchAdminOps, replayBillingEvent, type AdminOpsResult } from '../services/adminOps';
 import { matchesPlanFilter, PLAN_FILTERS, type PlanFilter } from '../utils/adminUserFilters';
 import { jobState } from '../utils/jobSchedule';
@@ -2483,6 +2484,8 @@ export function AdminPage({ onHome }: AdminPageProps) {
               )}
               </>
             )}
+
+            {tab === 'email' && <EmailBroadcastPanel />}
 
             {tab === 'content' && user && (
               <div className="mb-8">

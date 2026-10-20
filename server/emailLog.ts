@@ -35,6 +35,24 @@ export async function logEmail(entry: Omit<EmailLogEntry, 'id'>): Promise<void> 
   }
 }
 
+/**
+ * Many rows at once, for a batch send. One write batch per 500 rows (Firestore's cap per batch)
+ * rather than a round trip each: a hundred separate adds after every batch of a broadcast would
+ * cost more time than the send itself. Never throws, like logEmail.
+ */
+export async function logEmails(entries: Omit<EmailLogEntry, 'id'>[]): Promise<void> {
+  try {
+    const db = getAdminFirestore();
+    for (let i = 0; i < entries.length; i += 500) {
+      const batch = db.batch();
+      for (const entry of entries.slice(i, i + 500)) batch.set(db.collection(EMAIL_LOG).doc(), entry);
+      await batch.commit();
+    }
+  } catch (err) {
+    console.error('[email-log] could not record a batch of sends:', err);
+  }
+}
+
 /** The most recent sends, newest first. */
 export async function readRecentEmails(max = 100): Promise<EmailLogEntry[]> {
   const snap = await getAdminFirestore().collection(EMAIL_LOG).orderBy('at', 'desc').limit(max).get();

@@ -12,6 +12,7 @@ export type AdminTab =
   | 'errors'
   | 'costs'
   | 'ops'
+  | 'email'
   | 'content';
 
 export const ADMIN_TABS: { id: AdminTab; label: string }[] = [
@@ -26,5 +27,7 @@ export const ADMIN_TABS: { id: AdminTab; label: string }[] = [
   // What the server did with nobody watching: scheduled runs, every sync, every email, every
   // billing webhook. Before this tab those were found by a customer writing in.
   { id: 'ops', label: 'Ops' },
+  // One email to everybody, or to one plan. The single-user note stays on each user's card.
+  { id: 'email', label: 'Email' },
   { id: 'content', label: 'Content' },
 ];

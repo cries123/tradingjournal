@@ -7,7 +7,7 @@ import { resolveList, UNSUBSCRIBE_LISTS } from '../../server/unsubscribeLists';
 /**
  * The unsubscribe link at the bottom of the mail this app sends.
  *
- * Three lists reach here — the weekly recap, the rule alerts and the free-trial welcome note — and
+ * Four lists reach here — the weekly recap, the rule alerts, the free-trial welcome note and the news sent from the admin Email tab — and
  * which one is in the link, inside its signature. See server/unsubscribeLists.ts for why that matters and what it used to do instead.
  *
  * A GET that works in one click with no sign-in, because an unsubscribe that asks someone to log
@@ -16,8 +16,16 @@ import { resolveList, UNSUBSCRIBE_LISTS } from '../../server/unsubscribeLists';
  * proves the link came from us, and it only ever turns a preference OFF.
  *
  * Returns a small HTML page rather than JSON, since a person clicked this from their inbox.
+ *
+ * A POST is the mail client's own unsubscribe button (RFC 8058): the news email names this URL in
+ * its List-Unsubscribe header with List-Unsubscribe-Post: List-Unsubscribe=One-Click, which Gmail
+ * and Yahoo require of anyone mailing their users in bulk. Same signed query string, same write;
+ * the answer is plain text, because no person is looking at it.
  */
-function page(title: string, message: string, status: number) {
+function page(title: string, message: string, status: number, oneClick = false) {
+  if (oneClick) {
+    return { statusCode: status, headers: { 'Content-Type': 'text/plain; charset=utf-8' }, body: title };
+  }
   return {
     statusCode: status,
     headers: { 'Content-Type': 'text/html; charset=utf-8' },
@@ -34,6 +42,10 @@ function page(title: string, message: string, status: number) {
 }
 
 export const handler: Handler = async (event) => {
+  if (event.httpMethod !== 'GET' && event.httpMethod !== 'POST') {
+    return { statusCode: 405, headers: { Allow: 'GET, POST' }, body: 'Method not allowed' };
+  }
+  const oneClick = event.httpMethod === 'POST';
   const uid = event.queryStringParameters?.uid ?? '';
   const token = event.queryStringParameters?.t ?? '';
 
@@ -57,6 +69,7 @@ export const handler: Handler = async (event) => {
       'That link didn’t work',
       'It may have expired or been copied incompletely. Reply to any email from us and we will turn it off by hand.',
       400,
+      oneClick,
     );
   }
 
@@ -85,10 +98,11 @@ export const handler: Handler = async (event) => {
       'Unsubscribed',
       `You won’t get ${definition.stopped} any more. ${definition.stillArrives ? `${definition.stillArrives} ` : ''}Support replies about your own tickets will still reach you — those aren’t part of this list.`,
       200,
+      oneClick,
     );
   } catch (err) {
     console.error('[email-unsubscribe] failed:', err);
     await logServerError('email-unsubscribe', err);
-    return page('We couldn’t save that', `Something went wrong on our end. ${elsewhere}`, 500);
+    return page('We couldn’t save that', `Something went wrong on our end. ${elsewhere}`, 500, oneClick);
   }
 };
