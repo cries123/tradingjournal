@@ -37,6 +37,12 @@ interface LayoutOptions {
    * reads about an email and it was being spent restating the first.
    */
   preheader?: string;
+  /**
+   * Where the logo is loaded from. Defaults to the CTA's origin, which is the site for every email
+   * that existed before the broadcast; a broadcast's button may point somewhere else entirely, and
+   * the logo would then have been fetched from that site's /nav-logo.png.
+   */
+  logoOrigin?: string;
 }
 
 const FONT = '-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif';
@@ -60,8 +66,9 @@ function layout({
   footerNote,
   unsubscribeUrl,
   preheader,
+  logoOrigin,
 }: LayoutOptions): string {
-  const origin = originOf(ctaUrl);
+  const origin = logoOrigin ?? originOf(ctaUrl);
 
   /*
    * A PNG, never the SVG the site uses. Most mail clients — Outlook and Gmail among them — refuse
@@ -354,6 +361,95 @@ export function adminMessageEmail(options: {
       '',
       'Sent by the Trend Chasers team. Reply to this email to reach support.',
     ].join('\n'),
+  };
+}
+
+/* ------------------------------------------------------------------ to everybody */
+
+export type BroadcastKind = 'news' | 'notice';
+
+/**
+ * Admin-written text as email HTML: blank lines make paragraphs, **this** is bold, and a bare
+ * https:// address becomes a link. Escaped first, so nothing typed in the panel can become markup
+ * of its own, and links are found in the escaped text so an address can never close the attribute
+ * it is put in.
+ */
+export function broadcastBodyHtml(text: string): string {
+  return escapeHtml(text.trim())
+    .split(/\n{2,}/)
+    .map((para) => para.trim())
+    .filter(Boolean)
+    .map((para) => {
+      const linked = para.replace(
+        /https:\/\/[^\s<>"']+[^\s<>"'.,;:!?)]/g,
+        (url) => `<a href="${url}" style="color:${BRAND};">${url}</a>`,
+      );
+      const bold = linked.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      return `<p style="margin:0 0 12px 0;">${bold.replace(/\n/g, '<br>')}</p>`;
+    })
+    .join('\n');
+}
+
+/**
+ * The email the admin Email tab sends to everybody, in one of two kinds.
+ *
+ * 'news' is anything a person could reasonably not want: a feature, a price, a sale. It carries an
+ * unsubscribe link and the sender's postal address, both of which US law (CAN-SPAM) requires of a
+ * commercial email, and the server refuses to send one without them. 'notice' is something about
+ * their own account that they have to be told — a change to the terms, a problem with their data —
+ * and like the broker-link and trial-charge notices it carries no opt-out.
+ */
+export function broadcastEmail(options: {
+  kind: BroadcastKind;
+  subject: string;
+  heading: string;
+  body: string;
+  preheader?: string | null;
+  ctaLabel?: string | null;
+  ctaUrl?: string | null;
+  siteUrl: string;
+  unsubscribeUrl?: string | null;
+  postalAddress?: string | null;
+}): TicketReplyEmail {
+  const ctaLabel = options.ctaLabel?.trim() || 'Open Trend Chasers';
+  const ctaUrl = options.ctaUrl?.trim() || `${options.siteUrl}/app`;
+  const paragraphs = options.body
+    .trim()
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  const footerNote =
+    options.kind === 'news'
+      ? `You're getting this because you have a Trend Chasers account.${options.postalAddress ? ` Trend Chasers, ${options.postalAddress}.` : ''}`
+      : 'A notice about your Trend Chasers account, sent to every account holder. Reply to this email to reach support.';
+  const unsubscribeUrl = options.kind === 'news' ? (options.unsubscribeUrl ?? null) : null;
+
+  return {
+    subject: options.subject,
+    html: layout({
+      title: options.heading,
+      body: broadcastBodyHtml(options.body),
+      ctaLabel,
+      ctaUrl,
+      footerNote,
+      unsubscribeUrl,
+      // What the inbox shows beside the subject: the admin's own line, or the opening sentence.
+      preheader: options.preheader?.trim() || paragraphs[0]?.replace(/\*\*/g, '').slice(0, 140),
+      logoOrigin: originOf(options.siteUrl) ?? undefined,
+    }),
+    text: [
+      options.heading,
+      '',
+      ...paragraphs.flatMap((p) => [p.replace(/\*\*/g, ''), '']),
+      `${ctaLabel}: ${ctaUrl}`,
+      '',
+      footerNote,
+      unsubscribeUrl ? `Unsubscribe: ${unsubscribeUrl}` : '',
+    ]
+      .filter((line, i, all) => line !== '' || all[i - 1] !== '')
+      .join('\n')
+      .trim(),
   };
 }
 

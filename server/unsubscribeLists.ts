@@ -16,7 +16,7 @@
  * it is testable; the handler is not.
  */
 
-export type UnsubscribeList = 'recap' | 'rule-alerts' | 'trial';
+export type UnsubscribeList = 'recap' | 'rule-alerts' | 'trial' | 'news';
 
 export interface ListDefinition {
   /** Where the preference lives, relative to the user. */
@@ -103,6 +103,24 @@ export const UNSUBSCRIBE_LISTS: Record<UnsubscribeList, ListDefinition> = {
       'The two notes telling you when your card is charged and how to stop it are not part of this list — you will still get those.',
     inSettings: false,
   },
+
+  /*
+   * News written in the admin panel's Email tab and sent to everybody (server/broadcast.ts).
+   *
+   * Only the 'news' kind carries this link. The other kind, an account notice, is for things a
+   * person has to be told about their own account — a change to the terms, a problem with their
+   * data — and is sent to everybody whatever this says, for the same reason the broker-link and
+   * trial-charge notices carry no link. No toggle in Settings: emailPrefs rules pin what a client can
+   * write to uid/recap/updatedAt, and a toggle would mean a rules change published by hand.
+   */
+  news: {
+    target: 'emailPrefs',
+    field: 'news',
+    stopped: 'news and announcements from Trend Chasers',
+    stillArrives:
+      'Emails about your own account — billing, your broker connection, and the rare notice we have to send everybody — are not part of this list.',
+    inSettings: false,
+  },
 };
 
 /** A purpose from a query string, or null. Never defaulted: see resolveList. */
@@ -114,6 +132,6 @@ export function resolveList(purpose: string | undefined): UnsubscribeList | null
    * cannot be identified should say so, because the alternative is confidently stopping a list the
    * reader never asked about.
    */
-  if (purpose === 'recap' || purpose === 'rule-alerts' || purpose === 'trial') return purpose;
+  if (purpose === 'recap' || purpose === 'rule-alerts' || purpose === 'trial' || purpose === 'news') return purpose;
   return null;
 }

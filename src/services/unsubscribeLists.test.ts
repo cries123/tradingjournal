@@ -20,10 +20,11 @@ import { unsubscribeToken, unsubscribeUrl, verifyUnsubscribeToken } from '../../
  */
 
 describe('resolveList', () => {
-  it('accepts the two lists that exist', () => {
+  it('accepts the lists that exist', () => {
     expect(resolveList('recap')).toBe('recap');
     expect(resolveList('rule-alerts')).toBe('rule-alerts');
     expect(resolveList('trial')).toBe('trial');
+    expect(resolveList('news')).toBe('news');
   });
 
   it('refuses anything else rather than falling back to the recap', () => {
@@ -70,6 +71,13 @@ describe('what each list turns off', () => {
     expect(UNSUBSCRIBE_LISTS.trial.stopped).toBe('the free-trial welcome note');
     expect(UNSUBSCRIBE_LISTS.trial.stillArrives).toContain('card is charged');
     expect(UNSUBSCRIBE_LISTS.trial.inSettings).toBe(false);
+  });
+
+  it('keeps the news list to news, and says account mail still arrives', () => {
+    // An announcement unsubscribe that also silenced billing or broker-link notices would leave
+    // somebody surprised by a charge or a disconnection they were never told about.
+    expect(UNSUBSCRIBE_LISTS.news).toMatchObject({ target: 'emailPrefs', field: 'news', inSettings: false });
+    expect(UNSUBSCRIBE_LISTS.news.stillArrives).toContain('your own account');
   });
 
   it('has the endpoint saying what still arrives', () => {

@@ -335,6 +335,29 @@ added it and the panel says so.
   `server/creemApply.ts`; **Replay** on the Ops tab runs it again with `notify: false`, so no
   customer email is re-sent, and audits as `billing.event-replayed`.
 
+## Emailing everybody — the admin Email tab
+
+`server/broadcast.ts`, `server/adminBroadcastHandler.ts`, `/api/admin-broadcast`,
+`components/admin/EmailBroadcastPanel.tsx`. Two server-only collections, `broadcasts/{id}` and
+`broadcasts/{id}/chunks/{n}`, in no security rule, so no rules deploy.
+
+- **Two kinds.** `news` carries an unsubscribe link (list `news`, `emailPrefs/{uid}.news`), the
+  RFC 8058 `List-Unsubscribe` / `List-Unsubscribe-Post` headers Gmail and Yahoo require of bulk mail,
+  and the sender's postal address that CAN-SPAM requires of commercial mail. **The server refuses
+  news unless `MAIL_POSTAL_ADDRESS` and `EMAIL_TOKEN_SECRET` are set in Netlify** — a PO box or
+  virtual mailbox address, never Jay's legal name. `notice` (account or service changes only) has no
+  opt-out, reaches people who unsubscribed from news, and needs a tick box saying it is not a promotion.
+- **The send is resumable and cannot double up.** `create` snapshots the recipients into chunks of
+  100; the open tab then calls `send` until done, each call sending chunks until 3.5 s before its 8 s
+  budget. One Resend batch per chunk with `Idempotency-Key: broadcast-<id>-<n>` (Resend honors keys
+  for 24 h), a 60 s lease on the chunk being sent, and a retry with the same key after a 429/5xx or a
+  call that died. A batch refused outright falls back to one message at a time, each with its own key.
+  Five strikes and a chunk's remaining people are counted as failed. Totals are recomputed from the
+  chunks on every call, so the record cannot drift from what went out.
+- `email-unsubscribe` now accepts POST (the mail client's own button) as well as GET.
+- Every recipient is in `emailLog` (tag `broadcast`); starting a send audits `email.broadcast-sent`,
+  a test `email.broadcast-test`.
+
 ## Errors
 
 Client errors land in the admin panel through `src/services/errorFingerprint.ts` (pure: fingerprint

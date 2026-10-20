@@ -49,7 +49,10 @@ export type AdminAuditAction =
   | 'announcement.published'
   | 'checkout.toggled'
   /** Logged by the server: a stored Creem event run through the entitlement logic again. */
-  | 'billing.event-replayed';
+  | 'billing.event-replayed'
+  /** Logged by the server when the recipient list is fixed and an email to everybody starts going out. */
+  | 'email.broadcast-sent'
+  | 'email.broadcast-test';
 
 export interface AdminAuditEntry {
   id: string;
@@ -66,7 +69,8 @@ export interface AdminAuditEntry {
     | 'help-article'
     | 'announcement'
     | 'checkout'
-    | 'billing-event';
+    | 'billing-event'
+    | 'broadcast';
   targetId: string;
   targetLabel: string;
   detail: string;
@@ -85,6 +89,8 @@ export const AUDIT_ACTION_LABELS: Record<AdminAuditAction, string> = {
   'announcement.published': 'Updated the site announcement',
   'checkout.toggled': 'Changed plan checkout availability',
   'billing.event-replayed': 'Replayed billing event',
+  'email.broadcast-sent': 'Sent an email to',
+  'email.broadcast-test': 'Sent themselves a test of',
   'user.tier-granted': 'Granted a plan to',
   'user.tier-grant-cleared': 'Removed the granted plan from',
   'user.access-extended': 'Extended access for',
