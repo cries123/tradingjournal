@@ -49,6 +49,79 @@ function mixedBook(): Trade[] {
   return trades;
 }
 
+/*
+ * Jay: "audit the ai assistant and make sure its using max capabilities". The Performance screen's
+ * breakdowns (where in the day, how busy the day, 0DTE or not, calls or puts) and the playbook were
+ * computed and drawn for months while the assistant, one import away, could not see them. These
+ * pin that they reach the model, through the same functions and the same sample gates.
+ */
+describe('the Performance screen’s breakdowns reach the model', () => {
+  it('carries where each trade fell in its day, the way the screen leads with it', () => {
+    const facts = buildJournalFacts(mixedBook(), 'March')!;
+    expect(facts.sequence).toEqual([
+      { position: '1st', trades: 20, pnl: 4000, perTrade: 200, winRate: 100 },
+      { position: '2nd', trades: 20, pnl: -6000, perTrade: -300, winRate: 0 },
+      { position: '3rd', trades: 20, pnl: 3000, perTrade: 150, winRate: 100 },
+    ]);
+  });
+
+  it('groups whole days by how much was traded, and says nothing when every day is the same size', () => {
+    // Twenty days of three trades is one bucket, and one bucket compares nothing.
+    expect(buildJournalFacts(mixedBook(), 'March')!.dailyLoad).toBeNull();
+
+    const trades = mixedBook();
+    for (let day = 21; day <= 26; day += 1) trades.push(imported({ date: `2026-03-${day}`, pnl: 80 }));
+    const load = buildJournalFacts(trades, 'March')!.dailyLoad!;
+    expect(load.map((r) => r.tradesPerDay)).toEqual(['1–2 trades', '3–5 trades']);
+    expect(load[0]).toEqual({ tradesPerDay: '1–2 trades', days: 6, net: 480, perDay: 80, greenDays: 6 });
+    expect(load[1].perDay).toBe(50);
+  });
+
+  it('splits options by their expiry and by call, put and share, with the screen’s gates', () => {
+    const trades: Trade[] = [];
+    for (let day = 1; day <= 12; day += 1) {
+      const date = `2026-03-${String(day).padStart(2, '0')}`;
+      trades.push(imported({ date, pnl: -100, assetType: 'option', optionType: 'put', expiration: date }));
+      trades.push(imported({ date, pnl: 150, assetType: 'option', optionType: 'call', expiration: '2026-04-17' }));
+      trades.push(imported({ date, pnl: 40, assetType: 'stock' }));
+    }
+    const facts = buildJournalFacts(trades, 'March')!;
+    expect(facts.expiry!.map((r) => [r.daysToExpiry, r.pnl])).toEqual([['0DTE', -1200], ['31+ days', 1800]]);
+    expect(facts.instruments!.map((r) => [r.instrument, r.trades])).toEqual([['Calls', 12], ['Puts', 12], ['Shares', 12]]);
+    // A feed with no expiries and no instrument types: null, never an empty table.
+    expect(buildJournalFacts(mixedBook(), 'March')!.expiry).toBeNull();
+    expect(buildJournalFacts(mixedBook(), 'March')!.instruments).toBeNull();
+  });
+
+  it('compares the days a rule was broken with the days it was kept, per day', () => {
+    // The suggested question has asked this for months with nothing in the payload to answer it.
+    const trades = mixedBook(); // 20 days of 3 trades, net +50 a day
+    for (let day = 21; day <= 25; day += 1) trades.push(imported({ date: `2026-03-${day}`, pnl: 200 }));
+    const rules = { enabled: true, maxTradesPerDay: 2 } as never;
+    const facts = buildJournalFacts(trades, 'March', { rules })!;
+    expect(facts.ruleDays).toEqual({ brokenDays: 20, brokenNet: 1000, brokenPerDay: 50, keptDays: 5, keptNet: 1000, keptPerDay: 200 });
+    expect(facts.ruleBreachCount).toBe(20);
+    // No rules, or none broken: nothing to compare.
+    expect(buildJournalFacts(trades, 'March')!.ruleDays).toBeNull();
+    expect(buildJournalFacts(trades, 'March', { rules: { enabled: true, maxTradesPerDay: 5 } as never })!.ruleDays).toBeNull();
+  });
+
+  it('carries the playbook rule by rule once a rule has been both kept and skipped', () => {
+    const trades = mixedBook().map((t, i) => ({
+      ...t,
+      checklist: [{ rule: 'Wait for the open', met: i % 3 !== 1 }],
+    }));
+    const facts = buildJournalFacts(trades, 'March')!;
+    // One rule is one row, and one row compares nothing by itself — so a second rule is needed.
+    expect(facts.playbook).toBeNull();
+    const two = trades.map((t, i) => ({ ...t, checklist: [...t.checklist, { rule: 'Size within plan', met: i % 3 !== 2 }] }));
+    const rows = buildJournalFacts(two, 'March')!.playbook!;
+    expect(rows.map((r) => r.rule)).toEqual(['Wait for the open', 'Size within plan']);
+    expect(rows[0]).toMatchObject({ followed: 40, skipped: 20, skippedPerTrade: -300 });
+    expect(buildJournalFacts(mixedBook(), 'March')!.playbook).toBeNull();
+  });
+});
+
 describe('buildJournalFacts', () => {
   it('returns nothing for an empty period rather than an empty shell', () => {
     expect(buildJournalFacts([], 'March')).toBeNull();

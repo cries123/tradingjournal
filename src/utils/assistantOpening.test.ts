@@ -56,6 +56,65 @@ describe('openingFindings', () => {
     expect(out[0].detail).toContain('7 points clear');
   });
 
+  it('leads with the trades past the first few when they give the day back', () => {
+    // The Performance screen's usual headline, stated the way the screen states it.
+    const out = openingFindings(
+      facts({
+        sequence: [
+          { position: '1st', trades: 62, pnl: 705.59, perTrade: 11.38, winRate: 52 },
+          { position: '2nd', trades: 56, pnl: 3552.3, perTrade: 63.43, winRate: 64 },
+          { position: '3rd', trades: 47, pnl: 1271.85, perTrade: 27.06, winRate: 66 },
+          { position: '4th+', trades: 139, pnl: -2537.9, perTrade: -18.26, winRate: 48 },
+        ],
+      }),
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].figure).toBe('-$2,538');
+    expect(out[0].detail).toBe('Your 4th+ trades of the day lost -$2,538 across 139. The trades before them made $5,530.');
+    expect(out[0].question).toContain('4th+');
+  });
+
+  it('says nothing about the sequence when the later trades pay, or when nothing does', () => {
+    const later = openingFindings(
+      facts({
+        sequence: [
+          { position: '1st', trades: 30, pnl: -500, perTrade: -16, winRate: 40 },
+          { position: '2nd', trades: 30, pnl: 900, perTrade: 30, winRate: 60 },
+        ],
+      }),
+    );
+    expect(later).toEqual([]);
+    // Every position losing is not "your later trades give the day back"; there was no day to give.
+    const all = openingFindings(
+      facts({
+        sequence: [
+          { position: '1st', trades: 30, pnl: -500, perTrade: -16, winRate: 40 },
+          { position: '2nd+', trades: 30, pnl: -300, perTrade: -10, winRate: 45 },
+        ],
+      }),
+    );
+    expect(all).toEqual([]);
+  });
+
+  it('states the busy-days finding with the pitch’s own shape: busy days lose, quiet days win', () => {
+    const out = openingFindings(
+      facts({
+        dailyLoad: [
+          { tradesPerDay: '1–2 trades', days: 14, net: 2282, perDay: 163, greenDays: 10 },
+          { tradesPerDay: '3–5 trades', days: 20, net: 400, perDay: 20, greenDays: 11 },
+          { tradesPerDay: '11+ trades', days: 9, net: -4464, perDay: -496, greenDays: 2 },
+        ],
+      }),
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].detail).toBe('Days with 11+ trades average -$496 across 9 days. Days with 1–2 trades average $163 across 14.');
+    expect(out[0].tone).toBe('bad');
+    // Busy days that also win are not a finding, and neither are busy days that lose when the
+    // quiet days lose too: "your busy days lose" implies the quiet ones don't.
+    expect(openingFindings(facts({ dailyLoad: [{ tradesPerDay: '1–2 trades', days: 5, net: 100, perDay: 20, greenDays: 3 }, { tradesPerDay: '6–10 trades', days: 5, net: 300, perDay: 60, greenDays: 4 }] }))).toEqual([]);
+    expect(openingFindings(facts({ dailyLoad: [{ tradesPerDay: '1–2 trades', days: 5, net: -100, perDay: -20, greenDays: 1 }, { tradesPerDay: '6–10 trades', days: 5, net: -300, perDay: -60, greenDays: 1 }] }))).toEqual([]);
+  });
+
   it('reports both halves of a rule simulation, never just the saving', () => {
     // A finding that quoted only the losses avoided would be selling a rule rather than testing
     // one — the same reason the simulator screen shows both numbers.

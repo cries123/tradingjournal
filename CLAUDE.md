@@ -264,8 +264,19 @@ and the history row print. Pin, pinned answers and thumbs up/down are in the des
 - Server guardrails are in `server/aiAssistantHandler.ts`: **the model never computes** (the client
   sends facts already derived by `journalFacts.ts`) and **it never advises on what to trade next**.
   That second line is what keeps this a journaling feature rather than unlicensed financial advice.
-  There is no rule in the prompt covering general knowledge, so "what does SPY track" is currently
-  undefined behaviour.
+  General questions have a rule since the October 2026 audit: trading vocabulary gets a short
+  answer marked as general; company, ticker and "is X a good investment" questions are refused in
+  one sentence. The model may say what the data shows past the third trade and that the Rule
+  simulator can replay a cap, but never which number to set.
+- **What the model sees is `JournalFacts`, and it now includes the Performance screen's breakdowns**
+  (`sequence`, `dailyLoad`, `expiry`, `instruments`), the broken-days-against-kept-days comparison
+  (`ruleDays`) and the playbook rule by rule (`playbook`). For months the assistant could not see
+  the screen's headline finding and answered "where does my money go" from setups alone. The whole
+  prompt is about 3,000 tokens; adding a block is cheap, but every block must be explained in the
+  prompt (`assistantPrompt.test.ts` checks the new ones) or the model ignores it.
+- Earlier turns are trimmed by `trimHistory`: questions at 600 characters, the assistant's own
+  answers at 2,400. They used to share the 600 cap, so a follow-up was answered without the answer
+  it followed. Reasoning effort is `AI_REASONING_EFFORT` (default medium); `AI_MODEL` picks the model.
 
 ### The landing page (October 2026 rebuild, to the concept Jay approved)
 
@@ -390,8 +401,7 @@ with the junction still in place can delete through it into the real `node_modul
   and yearly is refused on purpose (cross-interval proration in Creem is untested); support does it.
 - The playbook is done: rules per strategy in Settings, ticked on the trade form, stored on the trade
   as `checklist` (a snapshot — editing rules never rewrites old trades), scored rule-by-rule in the
-  Discipline panel (`src/utils/playbook.ts`). Rule-by-rule results are not yet in the assistant's
-  facts.
+  Discipline panel (`src/utils/playbook.ts`) and sent to the assistant as `playbook`.
 - The rule simulator shipped on Gold. Jay's own numbers were the pitch: −$496/day on 11+ trade days
   vs +$163 on 1–2 trade days; he needs a 47.2% win rate to break even and hits 39.9%.
 - Trial emails key on `trialEndsAt`, written by the webhook on a "trialing" signal. The daily
@@ -403,15 +413,17 @@ with the junction still in place can delete through it into the real `node_modul
   `planCheckoutTrial` (`server/checkoutTrial.ts`) sends anyone `trialEligibility` refuses to the
   plan's no-trial copy (`CREEM_PRODUCT_*_NO_TRIAL`). Until a copy exists, that plan's checkouts all
   get the trial, as Silver always did. `trialProducts` in the Ops report asks Creem whether all six
-  products match what the site promises. The server side shipped first. The pricing page and the
-  locked-feature cards still advertise only Silver's trial, and that front-end change is being made
-  in another session. `StartTrialButton` needs a `tier` prop, and `tier === TRIAL_TIER` checks become
-  `hasTrial(tier)`.
-- Rule-by-rule playbook results are still not in the assistant's facts.
-- The assistant prompt says nothing about general knowledge, so a plain "what does assignment mean"
-  is undefined — it may answer from memory or deflect. Company research is deliberately NOT wanted:
-  there is no data source behind it, the model's knowledge goes stale, and "is X a good company" is
-  the edge of investment advice.
+  products match what the site promises. The pricing page and the locked-feature cards offer each
+  plan's own trial (`hasTrial(tier)`, `StartTrialButton tier=`), a buy-now-without-the-trial link
+  where the plan's no-trial copy exists (`choosePlan(tier, 'month', { trial: false })`), and yearly
+  at two months free once `annualReady`.
+- Company research in the assistant is deliberately NOT wanted and the prompt now refuses it: there
+  is no data source behind it, the model's knowledge goes stale, and "is X a good company" is the
+  edge of investment advice.
+- The assistant still cannot see day notes or the "Followed my plan" rating (`users/{uid}/dayNotes`);
+  only trade notes go, behind the notes opt-in. `fetchAllDayNotes` exists, so it is a load and an
+  opt-in away. The `/api/ai-takeaway` endpoint and `useAiTakeaway` are dead since the Overview lost
+  its banner; the weekly recap uses `writeReview` in the assistant handler instead.
 
 ## Packaging it as a mobile app — what is already true
 

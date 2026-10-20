@@ -88,6 +88,43 @@ export function openingFindings(facts: JournalFacts): Finding[] {
     });
   }
 
+  /*
+   * The Performance screen's headline, nearly always: the trades past the first few give the day
+   * back. The pooled last row against everything before it, which is how the screen states it.
+   */
+  const seq = facts.sequence;
+  if (seq && seq.length > 1) {
+    const late = seq[seq.length - 1];
+    const before = seq.slice(0, -1).reduce((s, r) => s + r.pnl, 0);
+    if (late.pnl < 0 && before > 0) {
+      out.push({
+        headline: 'Your later trades give the day back',
+        detail: `Your ${late.position} trades of the day lost ${money(late.pnl)} across ${late.trades}. The trades before them made ${money(before)}.`,
+        figure: money(late.pnl),
+        lead: `from your ${late.position} trades of the day`,
+        question: `My ${late.position} trades of the day lose while the earlier ones make money. What does the data say about where in the day my money goes?`,
+        tone: 'bad',
+      });
+    }
+  }
+
+  /* Jay's own pitch: −$496 a day on 11+ trade days against +$163 on 1–2 trade days. */
+  const load = facts.dailyLoad;
+  if (load && load.length > 1) {
+    const busiest = load[load.length - 1];
+    const quietest = load[0];
+    if (busiest.perDay < 0 && quietest.perDay > 0) {
+      out.push({
+        headline: 'Your busy days lose',
+        detail: `Days with ${busiest.tradesPerDay} average ${money(busiest.perDay)} across ${busiest.days} days. Days with ${quietest.tradesPerDay} average ${money(quietest.perDay)} across ${quietest.days}.`,
+        figure: money(busiest.perDay),
+        lead: `a day on your ${busiest.tradesPerDay} days`,
+        question: 'Compare my busy days with my quiet ones. What does trading more in a day do to my results?',
+        tone: 'bad',
+      });
+    }
+  }
+
   if (facts.tilt && facts.tilt.delta < 0) {
     const t = facts.tilt;
     out.push({

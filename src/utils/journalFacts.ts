@@ -22,9 +22,21 @@ import {
 } from './behaviourFacts';
 import { checkRuleViolations } from './tradingRules';
 import type { TradingRules } from '../types/strategy';
-import { breakevenStats, costStats, sizingStats, tiltStats } from './brokerAnalytics';
+import {
+  breakevenStats,
+  costStats,
+  dailyLoadRows,
+  expiryRows,
+  instrumentRows,
+  sequenceRows,
+  sizingStats,
+  tiltStats,
+} from './brokerAnalytics';
 import { rulesAreTestable, simulateRules } from './ruleSimulator';
 import { monthlyTrend, type MonthSummary } from './assistantOpening';
+import { tradesByDay } from './tradingRules';
+import { effectivePnl } from './tradeHelpers';
+import { ruleByRule } from './playbook';
 
 /**
  * Compiles a trader's journal into a compact set of already-computed facts for the assistant.
@@ -166,6 +178,47 @@ export interface JournalFacts {
     winnersGivenUp: number;
     lossesAvoided: number;
   } | null;
+
+  /*
+   * The Performance screen's own breakdowns (October 2026).
+   *
+   * The screen ranks them biggest first and its headline finding is nearly always one of these —
+   * "your 4th and later trades cost you $2,537" — while the assistant could not see any of them
+   * and answered "where does my money go?" from setups and symbols alone. Same functions, same
+   * sample gates: an empty list means the screen would not draw it either.
+   */
+
+  /** Where each trade fell in its day: 1st, 2nd, 3rd, then the rest pooled. */
+  sequence: { position: string; trades: number; pnl: number; perTrade: number; winRate: number }[] | null;
+  /** Whole days grouped by how much was traded in them. Jay's own pitch is this block. */
+  dailyLoad: { tradesPerDay: string; days: number; net: number; perDay: number; greenDays: number }[] | null;
+  /** Options by how long they had left when opened: 0DTE against the longer-dated. */
+  expiry: { daysToExpiry: string; trades: number; pnl: number; perTrade: number; winRate: number }[] | null;
+  /** Calls, puts and shares as three separate businesses. */
+  instruments: { instrument: string; trades: number; pnl: number; perTrade: number; winRate: number }[] | null;
+  /**
+   * The days a rule was broken against the days it was kept.
+   *
+   * The suggested question "what happened on those days compared with the days I stayed inside
+   * them?" has been offered for months with nothing in the payload that could answer it.
+   */
+  ruleDays: {
+    brokenDays: number;
+    brokenNet: number;
+    brokenPerDay: number;
+    keptDays: number;
+    keptNet: number;
+    keptPerDay: number;
+  } | null;
+  /** The playbook, rule by rule: per trade when a rule was ticked against when it was not. */
+  playbook: {
+    rule: string;
+    followed: number;
+    skipped: number;
+    followedPerTrade: number;
+    skippedPerTrade: number;
+    costOfSkipping: number;
+  }[] | null;
 }
 
 export interface JournalFactsOptions {
@@ -257,6 +310,8 @@ export function buildJournalFacts(
       ? simulateRules(trades, options.rules)
       : null;
   const sessions = computeSessionPerformance(trades);
+  const ruleDays = breaches.length > 0 ? brokenAgainstKept(trades, breaches.map((b) => b.date)) : null;
+  const playbook = ruleByRule(trades).slice(0, MAX_PLAYBOOK_RULES);
 
   return {
     period,
@@ -407,6 +462,64 @@ export function buildJournalFacts(
           lossesAvoided: money(simulation.lossesAvoided),
         }
       : null,
+
+    sequence: rows(
+      sequenceRows(trades).map((r) => ({ position: r.label, trades: r.trades, pnl: money(r.pnl), perTrade: money(r.perTrade), winRate: pct(r.winRate) })),
+    ),
+    dailyLoad: rows(
+      dailyLoadRows(trades).map((r) => ({ tradesPerDay: r.label, days: r.days, net: money(r.net), perDay: money(r.perDay), greenDays: r.greenDays })),
+    ),
+    expiry: rows(
+      expiryRows(trades).map((r) => ({ daysToExpiry: r.label, trades: r.trades, pnl: money(r.pnl), perTrade: money(r.perTrade), winRate: pct(r.winRate) })),
+    ),
+    instruments: rows(
+      instrumentRows(trades).map((r) => ({ instrument: r.label, trades: r.trades, pnl: money(r.pnl), perTrade: money(r.perTrade), winRate: pct(r.winRate) })),
+    ),
+    ruleDays,
+    playbook: rows(
+      playbook.map((r) => ({
+        rule: r.rule,
+        followed: r.followed,
+        skipped: r.skipped,
+        followedPerTrade: money(r.followedPerTrade),
+        skippedPerTrade: money(r.skippedPerTrade),
+        costOfSkipping: money(r.costOfSkipping),
+      })),
+    ),
+  };
+}
+
+/** A breakdown with fewer than two groups compares nothing, and the prompt reads null as "not there". */
+function rows<T>(list: T[]): T[] | null {
+  return list.length > 1 ? list : null;
+}
+
+/** Enough rules to name the ones that cost the most, without sending the whole checklist. */
+const MAX_PLAYBOOK_RULES = 6;
+
+/**
+ * The days a limit was crossed, as a group, against the days none was.
+ *
+ * Whole days, because a limit is a fact about a day: the question is what a day on which the cap
+ * was blown was worth, next to a day inside it. Per day rather than per trade, since a broken day
+ * nearly always holds more trades and a per-trade figure would flatter it.
+ */
+function brokenAgainstKept(trades: Trade[], brokenDates: string[]): JournalFacts['ruleDays'] {
+  const broken = new Set(brokenDates);
+  const totals = { broken: [] as number[], kept: [] as number[] };
+  for (const [date, day] of tradesByDay(trades)) {
+    const net = day.reduce((s, t) => s + effectivePnl(t), 0);
+    (broken.has(date) ? totals.broken : totals.kept).push(net);
+  }
+  const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+  if (totals.broken.length === 0) return null;
+  return {
+    brokenDays: totals.broken.length,
+    brokenNet: money(sum(totals.broken)),
+    brokenPerDay: money(sum(totals.broken) / totals.broken.length),
+    keptDays: totals.kept.length,
+    keptNet: money(sum(totals.kept)),
+    keptPerDay: totals.kept.length > 0 ? money(sum(totals.kept) / totals.kept.length) : 0,
   };
 }
 
@@ -463,6 +576,38 @@ export function suggestedQuestions(facts: JournalFacts): SuggestedQuestion[] {
       label: `I broke my rules ${facts.ruleBreachCount ?? facts.ruleBreaches.length}×`,
       question:
         'I broke my own risk limits on some days this period. What happened on those days compared with the days I stayed inside them?',
+    });
+  }
+
+  // The broker-only findings the Performance screen leads with, offered the way it states them.
+  const seq = facts.sequence;
+  if (seq && seq.length > 1) {
+    const late = seq[seq.length - 1];
+    const before = seq.slice(0, -1).reduce((s, r) => s + r.pnl, 0);
+    if (late.pnl < 0 && before > 0) {
+      out.push({
+        id: 'sequence',
+        label: `What do my ${late.position} trades cost me?`,
+        question: `My ${late.position} trades of the day lose while the earlier ones make money. What does the data say about where in the day my money goes?`,
+      });
+    }
+  }
+
+  const load = facts.dailyLoad;
+  if (load && load.length > 1 && load[load.length - 1].perDay < 0 && load[0].perDay > 0) {
+    out.push({
+      id: 'load',
+      label: 'Do I overtrade?',
+      question: 'Compare my busy days with my quiet ones. What does trading more in a day do to my results?',
+    });
+  }
+
+  const zeroDte = facts.expiry?.find((r) => r.daysToExpiry === '0DTE');
+  if (zeroDte && zeroDte.pnl < 0 && facts.expiry!.some((r) => r.pnl > 0)) {
+    out.push({
+      id: 'expiry',
+      label: 'Is 0DTE costing me?',
+      question: 'Compare my 0DTE trades with the longer-dated ones. Which expiries make money and which lose?',
     });
   }
 

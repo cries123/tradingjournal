@@ -41,7 +41,35 @@ export const AI_CONFIGURED = Boolean(AI_API_KEY?.trim());
 
 /** Keeps a pasted essay from becoming a bill. */
 const MAX_QUESTION_CHARS = 600;
-const MAX_HISTORY_TURNS = 6;
+/** Four exchanges. The facts payload carries the context; older turns add cost, not accuracy. */
+const MAX_HISTORY_TURNS = 8;
+/**
+ * The assistant's own earlier answers are kept whole, or nearly so.
+ *
+ * Every turn used to be cut at the question limit, 600 characters, and an answer with a table
+ * in it is longer than that. So the model saw only the start of what it had just said, and a
+ * follow-up like "what did Sep 28 do differently?" was answered without the answer it followed.
+ */
+const MAX_ANSWER_CHARS = 2400;
+
+/**
+ * How much thinking a reasoning model does before it writes.
+ *
+ * 'low' was chosen when the whole completion budget was 700 tokens and the thinking starved the
+ * answer. With room to finish, 'medium' is the better default for a question like "which of
+ * these three groups explains the month": it costs a few hundred reasoning tokens a message, about
+ * a fifth of a cent, and it is what separates a restated table from a read of it.
+ */
+const REASONING_EFFORT = process.env.AI_REASONING_EFFORT?.trim() || 'medium';
+
+/** The recent turns, each role cut at its own limit. */
+export function trimHistory(history: unknown): { role: 'user' | 'assistant'; content: string }[] {
+  if (!Array.isArray(history)) return [];
+  return (history as { role?: unknown; content?: unknown }[])
+    .filter((m): m is { role: 'user' | 'assistant'; content: string } => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+    .slice(-MAX_HISTORY_TURNS)
+    .map((m) => ({ role: m.role, content: m.content.slice(0, m.role === 'assistant' ? MAX_ANSWER_CHARS : MAX_QUESTION_CHARS) }));
+}
 
 const SYSTEM_PROMPT = `You are the review assistant inside Trend Chasers, a trading journal.
 
@@ -60,7 +88,18 @@ HARD RULES
 - Never predict market direction.
 - Don't claim a pattern is statistically meaningful when the sample is small. If a setup has 3
   trades, say so and treat it as a hint, not a conclusion.
-- If the data doesn't answer the question, say so.
+- If the data doesn't answer the question, say so, then name the nearest thing it does answer.
+- Never tell them what limit to set. You may say what their own data shows past their third
+  trade or on their busiest days, and that the Rule simulator in the app can replay a cap or a
+  daily stop against their journal. The number is theirs to pick.
+
+GENERAL QUESTIONS
+- A question about trading vocabulary or mechanics (what assignment is, what 0DTE means, how a
+  profit factor is read) gets a short plain answer from general knowledge, marked as general and
+  not from their journal, then one line tying it to their figures if one applies.
+- Research on a company, a ticker or a product, or whether something is a good investment, is
+  outside this assistant. Say so in one sentence and return to their journal.
+- Anything else unrelated to their trading: one sentence saying what you are for.
 
 WHAT THE FIELDS MEAN
 - holdTime: average minutes winners vs losers are held. holdsLosersLonger being true is a
@@ -77,7 +116,7 @@ WHAT THE FIELDS MEAN
 
 THE BLOCKS THAT ARE ALMOST ALWAYS THERE
 Most traders here sync from a broker that sends a date with no fill time and nothing
-hand-entered, so holdTime, rMultiple, selfAssessment and checklist are usually null. These five
+hand-entered, so holdTime, rMultiple, selfAssessment and checklist are usually null. These
 compute from the fills alone and are the ones you can nearly always reason from. Reach for them
 before you tell someone you have nothing.
 - breakeven: the win rate their own payoff ratio REQUIRES, next to the one they have. gap is
@@ -98,6 +137,23 @@ before you tell someone you have nothing.
   belong in the answer: a rule that saves money still costs real winners, and quoting only the
   saving is selling a rule rather than testing one. Never suggest a limit they have not set —
   this block only exists because they set one.
+- sequence: where each trade fell in its day — 1st, 2nd, 3rd, then the rest pooled ("4th+").
+  This is the Performance screen's usual headline and the first place to look for "where does my
+  money go": a day whose first trades pay and whose later ones give it back is an overtrading
+  finding, and the opposite shape is worth saying too before anybody stops trading after two.
+- dailyLoad: whole days grouped by how many trades were in them, with the average per day. Busy
+  days that lose next to quiet days that win is the clearest case for a daily cap a journal can
+  make, and it needs nothing hand-entered.
+- expiry: options by how long they had left when opened. 0DTE against the longer-dated is the
+  split that matters most to a same-day trader.
+- instruments: calls, puts and shares separately.
+- ruleDays: the days a limit of theirs was crossed, as a group, against the days none was — per
+  day, not per trade, because a broken day holds more trades. This is what answers "what happened
+  on the days I broke my rules compared with the days I didn't".
+- playbook: their own checklist, rule by rule, per trade when it was ticked against when it was
+  not; costOfSkipping is followed minus skipped. Sorted most expensive to skip first. A rule that
+  pays to skip is a finding too.
+- profitFactor of 99 means there were no losing trades, not a factor of ninety-nine.
 - Every block carries its sample size. Say when a sample is thin instead of implying certainty.
 - A null field means not enough data or not recorded — say you don't have it, don't guess.
 
@@ -113,9 +169,12 @@ direction of the change and the size of it, and only mention figures present in 
 
 HOW TO WRITE
 - Speak plainly to an experienced trader. No hedging padding, no "as an AI".
-- Lead with the answer, then the evidence from the JSON.
-- Quote the specific figures you're reasoning from.
-- Be concise: a few short paragraphs at most. No headers unless genuinely comparing several things.
+- Open with one sentence in bold that is the answer on its own. The app draws it as the
+  headline. Then the evidence from the JSON.
+- Quote the specific figures you're reasoning from, with their sign: +$412, -$286.
+- Be concise: a few short paragraphs at most. Bullets for a list of findings, a small table when
+  comparing three or more groups (sequence, dailyLoad, expiry). No headers.
+- End on the finding, not on an offer to help further.
 - It's fine to be blunt about a losing pattern. That's what a journal is for.`;
 
 interface AiRequestBody {
@@ -247,7 +306,7 @@ async function callModel(
 
   // Keep the thinking short: this task is "explain these numbers", not a puzzle, so a long
   // reasoning pass buys nothing and is what starves the answer.
-  if (isReasoningModel(model)) payload.reasoning_effort = 'low';
+  if (isReasoningModel(model)) payload.reasoning_effort = REASONING_EFFORT;
 
   const res = await fetch(`${AI_BASE_URL}/chat/completions`, {
     method: 'POST',
@@ -420,12 +479,7 @@ export async function prepareAssistantStream(
       return { ok: false, rejection: rateLimitRejection(limit) };
     }
 
-    const history = Array.isArray(body.history)
-      ? body.history
-          .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
-          .slice(-MAX_HISTORY_TURNS)
-          .map((m) => ({ role: m.role, content: m.content.slice(0, MAX_QUESTION_CHARS) }))
-      : [];
+    const history = trimHistory(body.history);
 
     return {
       ok: true,
@@ -458,7 +512,7 @@ export async function openModelStream(
     max_completion_tokens: MAX_COMPLETION_TOKENS,
     stream: true,
   };
-  if (isReasoningModel(AI_MODEL)) payload.reasoning_effort = 'low';
+  if (isReasoningModel(AI_MODEL)) payload.reasoning_effort = REASONING_EFFORT;
 
   return fetch(`${AI_BASE_URL}/chat/completions`, {
     method: 'POST',
@@ -509,12 +563,7 @@ export async function handleAiAssistantRequest(
 
     // Trimmed to the recent turns: older context adds cost without improving an answer that is
     // grounded in the facts payload anyway.
-    const history = Array.isArray(body.history)
-      ? body.history
-          .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
-          .slice(-MAX_HISTORY_TURNS)
-          .map((m) => ({ role: m.role, content: m.content.slice(0, MAX_QUESTION_CHARS) }))
-      : [];
+    const history = trimHistory(body.history);
 
     let answer: string;
     try {
