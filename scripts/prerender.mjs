@@ -52,6 +52,7 @@ const ROUTES = [
   '/pricing',
   '/help-center',
   '/ai-assistant',
+  '/market-replay',
   '/whats-new',
   '/verified-track-record',
 ];

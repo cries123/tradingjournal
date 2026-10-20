@@ -15,7 +15,7 @@ const NAMED_PATHS: Record<string, string> = {
   // The path keeps its old name: it is linked from emails and error pages already in the wild.
   '/report-bug': 'support ticket',
   '/whats-new': "what's new",
-  '/market-simulator': 'the market simulator',
+  '/market-replay': 'market replay',
   '/ai-assistant': 'the AI assistant',
   '/privacy': 'the privacy policy',
   '/terms': 'the terms',

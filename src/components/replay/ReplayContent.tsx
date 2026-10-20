@@ -426,9 +426,13 @@ export function ReplayContent({ trades, date, onDateChange, onBack, preload }: R
                 />
                 {/* Grows only along the row. In the phone's column, flex-1's zero basis beat the
                     360px height and the chart shrank to a sliver; full screen grows it either way.
+                    On desktop it is at least 560px and stretches to the panel, which the column of
+                    practice and strategy cards beside it can make taller: a fixed 560 left a dead
+                    band under the time axis. The chart sits absolutely inside, so it never holds
+                    the panel open after that column shrinks again.
                     `isolate` keeps the chart's own z-indexes inside it: the separator above an RSI
                     or MACD pane otherwise sat over the Indicators menu and swallowed its taps. */}
-                <div className="isolate h-[360px] min-w-0 md:h-[560px] md:flex-1 [:fullscreen_&]:h-auto [:fullscreen_&]:flex-1">
+                <div className="relative isolate h-[360px] min-w-0 md:h-auto md:min-h-[560px] md:flex-1 [:fullscreen_&]:h-auto [:fullscreen_&]:flex-1">
                   <Suspense fallback={<div className="grid h-full place-items-center text-[13px] text-text-secondary">Loading the chart…</div>}>
                     <ReplayChart
                       bars={drawnBars}

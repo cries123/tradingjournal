@@ -398,7 +398,7 @@ export default function ReplayChart(props: ReplayChartProps) {
   const up = shown ? shown.close >= shown.open : true;
 
   return (
-    <div className="relative h-full w-full">
+    <div className="absolute inset-0">
       <div ref={box} className={`h-full w-full ${tool === 'cursor' ? '' : 'cursor-crosshair'}`} />
       {/* The legend, where TradingView puts it: the candle under the crosshair, or the latest. */}
       {shown && (

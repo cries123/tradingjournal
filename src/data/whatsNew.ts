@@ -27,6 +27,13 @@ export interface ChangelogEntry {
 // is something only the site owner can see, it doesn't belong here at all.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.4',
+    date: 'October 2026',
+    title: 'Market replay is here, on Diamond',
+    description:
+      'Open any day in your journal and press Replay, and the market plays that session back one minute at a time: the contracts you traded, the stock or ETF under them, and your own trades on the chart. Play it at up to ten times speed, step one candle at a time, or click a candle to start there. What hasn’t happened yet stays hidden until the replay gets to it.\n\nIt is a proper chart. One, five and fifteen-minute candles or Heikin Ashi; EMAs, an SMA, Bollinger Bands, VWAP and the opening range on the price, with RSI and MACD underneath; trend lines, horizontal levels and zones that stay on that chart for that day; zoom and full screen. You can take the trade again with practice orders, which fill at the close of the candle on screen and never touch your journal, and run a strategy test — an EMA crossover, an opening range breakout or a VWAP cross — over only the candles you have seen.\n\nThree things to know. A session opens for replay the trading day after it closes, because that is when options data stops carrying the exchanges’ real-time fees. SPX is drawn as SPY, NDX as QQQ and RUT as IWM, because index values carry their own license; your index options themselves are their real prices. And Schwab sends the day of a trade but not the minute, so for those trades the chart shades the candles your fill price traded through and says it is an estimate.\n\nMarket replay is part of Diamond. On another plan, the Replay button on a day shows what it is and how to get it.',
+  },
+  {
     version: '2.3',
     date: 'September 2026',
     title: 'The leaderboard and the charts have gone \u2014 share cards stayed',

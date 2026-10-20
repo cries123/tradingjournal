@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronRight, Lock } from 'lucide-react';
-import { lowestPaidPrice } from '../seo/pricingClaims';
+import { lowestPaidPrice, priceOf } from '../seo/pricingClaims';
+import { shot } from '../components/landing/landingShots';
 import { AnnouncementBar } from '../components/landing/AnnouncementBar';
 import { LandingFooter, LandingNav } from '../components/landing/LandingFooter';
 import { FadeIn } from '../components/motion/FadeIn';
@@ -93,6 +94,7 @@ export function LandingPage({
   }, []);
 
   const price = lowestPaidPrice();
+  const replay = priceOf('marketReplay');
   const openPricing = () => (onNavigate ? onNavigate('pricing') : onLaunch());
   // Said from the plans that carry a trial (config/trial.ts), never typed beside a plan name.
   const everyPaidPlanTrials = PAID_TIERS.every(hasTrial);
@@ -309,6 +311,66 @@ export function LandingPage({
           </div>
         </section>
       </div>
+
+      {/* 4 · Market replay: after the journal plays a day back, the market itself does. Drawn only
+          while it is sold (priceOf is null when MARKET_REPLAY_LIVE is off), so switching replay off
+          takes this section with it. */}
+      {replay && (
+        <section id="replay" className="relative z-10 scroll-mt-24 pb-10 pt-20 md:pt-28">
+          <div className="mx-auto max-w-[1240px] px-4 md:px-8">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="mb-[18px] inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent">
+                  <i className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden />
+                  New on {replay.name}
+                </p>
+                <h2 className="public-display text-4xl font-bold md:text-[52px]">Then replay the market itself</h2>
+                <p className="mt-4 max-w-[640px] text-lg leading-relaxed text-text-secondary md:text-[19px]">
+                  Open a day you traded and it plays back one minute at a time, with your trades on the chart. Take the trade again, mark
+                  your levels, add indicators, and test a rule on the day.
+                </p>
+              </div>
+              <button type="button" onClick={() => onNavigate?.('market-replay')} className="public-link shrink-0 self-start text-sm lg:self-end">
+                How market replay works
+                <ChevronRight size={16} aria-hidden />
+              </button>
+            </div>
+            <FadeIn>
+              <img
+                {...shot('shot-replay.webp')}
+                alt="The market replay chart partway through a session, with moving averages, VWAP, the opening range, a trend line, a zone, and practice buy and sell markers."
+                className="mt-11 h-auto w-full rounded-[22px] border border-white/[0.07] shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
+                loading="lazy"
+                decoding="async"
+              />
+            </FadeIn>
+            <div className="mt-[18px] grid gap-[18px] md:grid-cols-3">
+              {[
+                {
+                  title: 'Your trades on the chart',
+                  body: 'The contracts you traded and the stock under them. When your broker sends no fill time, the candles your price traded through are shaded as an estimate.',
+                },
+                {
+                  title: 'Take it again',
+                  body: 'Buy and sell as it plays. Practice orders fill at the close of the candle on screen and never touch your journal.',
+                },
+                {
+                  title: 'Test a rule on the day',
+                  body: 'Run a rule like an opening range breakout over only the candles you have seen, with its net and its worst drawdown.',
+                },
+              ].map((c) => (
+                <article key={c.title} className="rounded-[22px] border border-white/[0.07] bg-[#141414] p-6">
+                  <h3 className="text-[19px] font-semibold">{c.title}</h3>
+                  <p className="mt-2 text-[15px] leading-relaxed text-text-secondary">{c.body}</p>
+                </article>
+              ))}
+            </div>
+            <p className="mt-4 text-xs text-text-secondary/70">
+              Shown on a sample session. One-minute data from OPRA and the US stock exchanges, available the trading day after.
+            </p>
+          </div>
+        </section>
+      )}
 
       {/* 6 · Proof: the one real trader on the page, and four facts about the product. */}
       <section id="simulator" className="relative z-10 py-24 md:py-32">

@@ -56,6 +56,7 @@ const NAV_LINKS = [
   { name: 'Supported Brokers', url: `${SITE_ORIGIN}/brokers` },
   { name: 'Help Center', url: `${SITE_ORIGIN}/help-center` },
   { name: 'AI Assistant', url: `${SITE_ORIGIN}/ai-assistant` },
+  { name: 'Market Replay', url: `${SITE_ORIGIN}/market-replay` },
   { name: 'Guides', url: `${SITE_ORIGIN}/guides` },
   { name: 'Privacy Policy', url: `${SITE_ORIGIN}/privacy` },
   { name: 'Terms of Service', url: `${SITE_ORIGIN}/terms` },

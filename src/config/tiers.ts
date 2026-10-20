@@ -162,23 +162,21 @@ export interface TierPlan {
 }
 
 /**
- * Market replay is sold as part of Diamond but is not finished.
+ * Market replay is live on Diamond (October 2026).
  *
- * Flipping this to true is the only change needed when it ships — the plan already grants it, the
- * gate already checks it, and nobody has to be re-entitled, and the line comes back onto the
- * Diamond card by itself.
+ * The switch that shipped it: the plan already granted it and the gate already checked it, so
+ * turning this on put the line on the Diamond card, opened the screen and the server to Diamond,
+ * and re-entitled nobody. While it was off only the site admin could open it, and it was not on any
+ * card at all, not even as "coming soon", because someone who pays $39 partly for a line on a card
+ * has bought it whatever the label said. Turning it off again takes it away from paying Diamond
+ * members, so it is not a kill switch to reach for lightly.
  *
- * Until then it is not on the card at all. It used to be, marked "coming soon", and that is still
- * selling it: someone who pays $39 partly for a line on a card has bought it whatever the label
- * said, and the longer it stays unbuilt the more it reads as a refund owed.
- *
- * Built in October 2026 (components/replay, server/marketReplay.ts) on Databento's pay-as-you-go
- * historical data: pennies a month, because each day opens only once it is historical (no OPRA fees)
- * and each symbol-day is bought once. While this is false the site admin alone can open it, to try
- * it on a real journal. Databento's licensing for OPRA and US Equities allows showing historical data
- * externally (checked by Jay, October 2026). Flip this once he has tried it.
+ * Built on Databento's pay-as-you-go historical data (components/replay, server/marketReplay.ts):
+ * pennies a month, because each day opens only once it is historical (no OPRA fees) and each
+ * symbol-day is bought once. Databento's licensing for OPRA and US Equities allows showing
+ * historical data externally (checked by Jay, October 2026).
  */
-export const MARKET_REPLAY_LIVE = false;
+export const MARKET_REPLAY_LIVE = true;
 
 /** How often a subscription bills. */
 export type BillingInterval = 'month' | 'year';
@@ -399,7 +397,7 @@ export function tierHas(tier: Tier, feature: Feature): boolean {
   const l = limitsFor(tier);
   if (feature === 'brokerSync') return l.brokers > 0;
   if (feature === 'aiAssistant') return l.aiMessagesPerDay > 0;
-  // Sold with Diamond, but withheld until it actually works.
+  // The plan grants it; MARKET_REPLAY_LIVE is what lets the plan's grant reach anyone.
   if (feature === 'marketReplay') return l.marketReplay && MARKET_REPLAY_LIVE;
   return Boolean(l[BOOLEAN_FEATURES[feature]!]);
 }
@@ -461,6 +459,12 @@ function allFeatureLines(tier: Tier): FeatureLine[] {
   if (l.ruleSimulator) {
     lines.push({ text: 'Rule simulator — what a daily stop would have done to your own year' });
   }
+  /* Replay is the reason the top tier exists, so it comes straight after the counted limits and
+     ahead of the track record line that every card from Silver up repeats; below that line it
+     read as one more bullet in a long list. */
+  if (l.marketReplay && MARKET_REPLAY_LIVE) {
+    lines.push({ text: 'Market replay — past sessions bar by bar, with indicators and a strategy tester' });
+  }
   if (l.trackRecord) {
     lines.push({
       text: 'Publish a verified track record — broker-imported trades only',
@@ -468,15 +472,13 @@ function allFeatureLines(tier: Tier): FeatureLine[] {
     });
   }
 
-  /* The four that make the top tier a different product rather than a bigger one. Listed after
-     the counted limits because a count is what somebody compares and a capability is what they
-     buy — the eye should arrive at these last and stop. */
+  /* The capabilities that make the top tier a different product rather than a bigger one. Listed
+     after the counted limits because a count is what somebody compares and a capability is what
+     they buy — the eye should arrive at these last and stop. */
   if (l.autoSync) lines.push({ text: 'Trades import themselves every morning — no syncing' });
   if (l.coachSeat) lines.push({ text: 'Invite a coach to read your journal and comment on it' });
   if (l.ruleAlerts) lines.push({ text: 'Risk-rule alerts the moment you break your own limits' });
   if (l.aiReview) lines.push({ text: 'A weekly review written by the assistant, emailed to you' });
-
-  if (l.marketReplay && MARKET_REPLAY_LIVE) lines.push({ text: 'Market replay' });
   return lines;
 }
 

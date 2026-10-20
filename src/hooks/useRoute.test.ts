@@ -48,6 +48,11 @@ describe('parseRoutePath', () => {
     expect(parseRoutePath('/brokers').route).toBe('brokers');
   });
 
+  it('opens market replay at its own path and at the placeholder path it replaced', () => {
+    expect(parseRoutePath('/market-replay').route).toBe('market-replay');
+    expect(parseRoutePath('/market-simulator').route).toBe('market-replay');
+  });
+
   it('sends anything unrecognised to the landing page', () => {
     expect(parseRoutePath('/nope').route).toBe('landing');
     expect(parseRoutePath('/').route).toBe('landing');

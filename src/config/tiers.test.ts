@@ -113,11 +113,9 @@ describe('the other gates still sit where they did', () => {
     expect(limitsFor('silver').aiMessagesPerDay).toBe(0);
   });
 
-  it('withholds market replay until it works, even from the plan that includes it', () => {
-    // The limit says Diamond has it; tierHas is what the UI asks, and it stays false until
-    // MARKET_REPLAY_LIVE flips.
-    expect(limitsFor('diamond').marketReplay).toBe(true);
-    expect(tierHas('diamond', 'marketReplay')).toBe(false);
+  it('gives market replay to Diamond and to nothing below it', () => {
+    // tierHas is what the UI asks: the plan's grant AND the launch switch.
+    for (const tier of TIER_ORDER) expect(tierHas(tier, 'marketReplay')).toBe(tier === 'diamond');
   });
 });
 

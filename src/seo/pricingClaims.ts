@@ -15,8 +15,8 @@ import { MARKET_REPLAY_LIVE, TIER_PLANS, lowestTierWith, tierHas, type Feature }
 export function priceOf(feature: Feature): { name: string; price: number } | null {
   const tier = lowestTierWith(feature);
   if (!tier || tier === 'free') return null;
-  // tierHas, not the limits: market replay is sold with Diamond but withheld until it works, and
-  // marketing copy must not advertise a feature the app refuses to run.
+  // tierHas, not the limits: a feature a plan grants but the app does not yet run (market replay,
+  // until MARKET_REPLAY_LIVE) must not be advertised.
   if (!tierHas(tier, feature)) return null;
   return { name: TIER_PLANS[tier].name, price: TIER_PLANS[tier].price };
 }

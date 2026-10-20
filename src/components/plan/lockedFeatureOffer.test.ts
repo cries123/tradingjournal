@@ -42,7 +42,7 @@ vi.mock('../../context/useEntitlement', () => ({
   useEntitlement: () => ({
     has: () => false,
     loaded: true,
-    marketReplayLive: false,
+    marketReplayLive: true,
     get trialAvailable() {
       return trialAvailable;
     },
@@ -109,9 +109,6 @@ describe('LockedFeature upgrade offer', () => {
 
   it('offers the buy button on a plan without a trial', () => {
     expect(hasTrial('free')).toBe(false);
-    // Market replay is sold with Diamond but not shipped: no trial is offered for something that
-    // would not unlock.
-    expect(cardFor('marketReplay')).not.toContain('free for');
   });
 
   it('offers the buy button instead when the account has already had its trial', () => {
@@ -134,8 +131,7 @@ describe('LockedFeature upgrade offer', () => {
   it('names the lowest tier that actually includes the feature', () => {
     for (const feature of FEATURES) {
       const needed = lowestTierWith(feature);
-      // Market replay is sold but not shipped, so its card says "coming soon" instead of selling.
-      if (!needed || feature === 'marketReplay') continue;
+      if (!needed) continue;
       const html = cardFor(feature);
       expect(html, feature).toContain(TIER_PLANS[needed].name);
     }

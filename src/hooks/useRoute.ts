@@ -13,7 +13,7 @@ export type AppRoute =
   | 'admin'
   | 'guides'
   | 'guide'
-  | 'market-simulator'
+  | 'market-replay'
   | 'ai-assistant'
   | 'pricing'
   | 'help-center'
@@ -22,15 +22,15 @@ export type AppRoute =
   | 'verified-records'
   | 'track-record';
 
-/** Nav destinations reachable from the header dropdown and the footer — the "coming soon" and
- *  changelog pages, plus the two support pages the footer links to. Kept as its own union so a
- *  nav handler can't be passed a route that needs a slug. */
+/** Nav destinations reachable from the header dropdown and the footer — the product pages and the
+ *  changelog, plus the two support pages the footer links to. Kept as its own union so a nav
+ *  handler can't be passed a route that needs a slug. */
 /** Every route reachable by name alone. */
 export type NavRoute = Exclude<AppRoute, 'guide' | 'broker-guide' | 'track-record'>;
 
 export type ExtraNavRoute =
   | 'refunds'
-  | 'market-simulator'
+  | 'market-replay'
   | 'ai-assistant'
   | 'pricing'
   | 'help-center'
@@ -50,7 +50,7 @@ const ROUTE_PATHS: Record<NavRoute, string> = {
   'report-bug': '/report-bug',
   admin: '/admin',
   guides: '/guides',
-  'market-simulator': '/market-simulator',
+  'market-replay': '/market-replay',
   'ai-assistant': '/ai-assistant',
   pricing: '/pricing',
   'help-center': '/help-center',
@@ -106,7 +106,9 @@ export function parseRoutePath(path: string): RouteState {
    */
   if (path.startsWith('/request-broker')) return { route: 'brokers' };
   if (path.startsWith('/admin')) return { route: 'admin' };
-  if (path.startsWith('/market-simulator')) return { route: 'market-simulator' };
+  if (path.startsWith('/market-replay')) return { route: 'market-replay' };
+  // What the page was called while it was a placeholder; links to it are still out there.
+  if (path.startsWith('/market-simulator')) return { route: 'market-replay' };
   if (path.startsWith('/ai-assistant')) return { route: 'ai-assistant' };
   if (path.startsWith('/pricing')) return { route: 'pricing' };
   if (path.startsWith('/help-center')) return { route: 'help-center' };

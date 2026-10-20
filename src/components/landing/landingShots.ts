@@ -13,6 +13,9 @@ export const LANDING_SHOTS = {
   'shot-day.webp': { width: 1708, height: 620 },
   'shot-calendar.webp': { width: 1688, height: 924 },
   'shot-trade.webp': { width: 792, height: 1218 },
+  // Not from the SSR harness: the chart draws on a canvas, so this one is the replay screen in a real
+  // browser on a sample session (October 2026, 1180px wide at 2x).
+  'shot-replay.webp': { width: 2280, height: 1346 },
   'phone-overview.webp': { width: 780, height: 1600 },
   'phone-performance.webp': { width: 780, height: 1600 },
   'phone-ask.webp': { width: 780, height: 1578 },

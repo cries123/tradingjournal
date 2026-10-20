@@ -87,14 +87,22 @@ const headers = { authorization: 'Bearer t' };
 const spxCall = { underlying: 'SPX', expiration: '2026-10-16', right: 'C', strike: 5800, fills: [9.1] };
 
 describe('who may replay', () => {
-  it('is admin-only until market replay is listed, even on Diamond', async () => {
+  it('opens to a Diamond member', async () => {
     const { handleMarketReplayRequest } = await load();
-    const res = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [] }, AFTER);
-    expect(res.statusCode).toBe(403);
-    expect(calls).toHaveLength(0);
+    const res = await handleMarketReplayRequest(headers, { date: '2026-10-16', underlying: 'SPY', contracts: [] }, AFTER);
+    expect(res.statusCode).toBe(200);
   });
 
-  it('lets the site admin in before launch, so the owner can try it on his own journal', async () => {
+  it('refuses a plan below Diamond before buying anything', async () => {
+    tier = 'free';
+    const { handleMarketReplayRequest } = await load();
+    const res = await handleMarketReplayRequest(headers, { date: '2026-10-16', underlying: 'SPY', contracts: [] }, AFTER);
+    expect(res.statusCode).toBe(403);
+    expect(calls).toHaveLength(0);
+    expect(spent).toHaveLength(0);
+  });
+
+  it('lets the site admin in on any plan, so the owner can always check it', async () => {
     callerUid = 'jay';
     tier = 'free';
     const { handleMarketReplayRequest } = await load();

@@ -13,11 +13,11 @@ import { setPendingAppView } from './utils/pendingAppView';
 const AdminPage = lazy(() => import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })));
 const BrokerGuidePage = lazy(() => import('./pages/BrokerGuidePage').then((m) => ({ default: m.BrokerGuidePage })));
 const BrokersPage = lazy(() => import('./pages/BrokersPage').then((m) => ({ default: m.BrokersPage })));
-const ComingSoonPage = lazy(() => import('./pages/ComingSoonPage').then((m) => ({ default: m.ComingSoonPage })));
 const AiAssistantPage = lazy(() => import('./pages/AiAssistantPage').then((m) => ({ default: m.AiAssistantPage })));
 const GuidePage = lazy(() => import('./pages/GuidePage').then((m) => ({ default: m.GuidePage })));
 const GuidesIndexPage = lazy(() => import('./pages/GuidesIndexPage').then((m) => ({ default: m.GuidesIndexPage })));
 const HelpCenterPage = lazy(() => import('./pages/HelpCenterPage').then((m) => ({ default: m.HelpCenterPage })));
+const MarketReplayPage = lazy(() => import('./pages/MarketReplayPage').then((m) => ({ default: m.MarketReplayPage })));
 const JournalApp = lazy(() => import('./pages/JournalApp').then((m) => ({ default: m.JournalApp })));
 const RefundPolicyPage = lazy(() => import('./pages/RefundPolicyPage').then((m) => ({ default: m.RefundPolicyPage })));
 const PricingPage = lazy(() => import('./pages/PricingPage').then((m) => ({ default: m.PricingPage })));
@@ -78,16 +78,6 @@ export default function App() {
     onNavigate: navigate,
   };
 
-  const COMING_SOON_COPY: Record<
-    'market-simulator',
-    { feature: string; description: string; eyebrow?: string }
-  > = {
-    'market-simulator': {
-      feature: 'Market Simulator',
-      description: "We're building a risk-free way to practice trading strategies before you put real money on the line. Check back soon.",
-    },
-  };
-
   let content;
   let routeKey: string = route;
 
@@ -128,8 +118,9 @@ export default function App() {
     // Its own page now. It was the generic ComingSoonPage with the eyebrow overridden to "Now
     // live", which put a construction barrier above a feature people pay for.
     content = <AiAssistantPage {...publicPageProps} />;
-  } else if (route === 'market-simulator') {
-    content = <ComingSoonPage {...publicPageProps} {...COMING_SOON_COPY[route]} />;
+  } else if (route === 'market-replay') {
+    // Was the "Market Simulator — coming soon" placeholder at /market-simulator, which still lands here.
+    content = <MarketReplayPage {...publicPageProps} />;
   } else if (route === 'app') {
     content = (
       <div className="h-full min-h-0 flex flex-col">

@@ -44,14 +44,18 @@ describe('the four capabilities that make Diamond a different product', () => {
     }
   });
 
-  it('does not sell market replay, not even as coming soon, because it does not exist', () => {
-    // A "coming soon" line on a top tier is still a line someone paid for. The plan keeps granting
-    // it so shipping is a one-flag change; the card says nothing until then.
-    expect(tierHas('diamond', 'marketReplay')).toBe(false);
-    for (const tier of ['free', 'silver', 'gold', 'diamond'] as const) {
-      expect(featureLines(tier).some((l) => /replay/i.test(l.text) && !/journal/i.test(l.text))).toBe(false);
-      expect(featureLines(tier).some((l) => l.soon)).toBe(false);
+  it('sells market replay on Diamond alone, and leads the Diamond capabilities with it', () => {
+    expect(tierHas('diamond', 'marketReplay')).toBe(true);
+    const diamond = featureLines('diamond').map((l) => l.text);
+    const replay = diamond.findIndex((t) => /^Market replay/.test(t));
+    expect(replay).toBeGreaterThanOrEqual(0);
+    expect(replay).toBeLessThan(diamond.findIndex((t) => t.includes('verified track record')));
+    expect(replay).toBeLessThan(diamond.findIndex((t) => t.includes('import themselves')));
+    for (const tier of ['free', 'silver', 'gold'] as const) {
+      expect(featureLines(tier).some((l) => /replay/i.test(l.text))).toBe(false);
     }
+    // Nothing on any card is a promise: a "coming soon" line is still a line someone paid for.
+    for (const tier of TIER_ORDER) expect(featureLines(tier).some((l) => l.soon)).toBe(false);
   });
 });
 

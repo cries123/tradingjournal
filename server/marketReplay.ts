@@ -283,8 +283,8 @@ export async function handleMarketReplayRequest(
   }
 
   /*
-   * The plan grants it (Diamond), and until MARKET_REPLAY_LIVE the site admin alone can open it, so
-   * Jay can try it on his own journal before it is on the plan card.
+   * The plan grants it (Diamond) once MARKET_REPLAY_LIVE is on. The site admin can always open it,
+   * which is how Jay tried it on his own journal before it was on the plan card.
    */
   const { limits } = await resolveAccess(uid);
   const admin = await isSiteAdmin(uid);

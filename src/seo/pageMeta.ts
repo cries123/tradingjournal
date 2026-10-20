@@ -87,16 +87,16 @@ export const PAGE_SEO: Record<
     description: 'Product updates and changes to Trend Chasers, newest first.',
     path: '/whats-new',
   },
-  'market-simulator': {
-    title: 'Market Simulator (Coming Soon) — Trend Chasers',
-    description: 'Practice trading strategies risk-free. Coming soon to Trend Chasers.',
-    path: '/market-simulator',
-    noindex: true,
+  /* These were placeholders once and carried noindex to match. They shipped; the tags did not
+     follow. A live pricing page telling Google not to index it cannot rank, cannot be crawled, and
+     cannot become a sitelink — which is the one sitelink almost every competitor has. Market replay
+     replaced the noindexed "Market Simulator (Coming Soon)" page at /market-simulator. */
+  'market-replay': {
+    title: 'Market Replay — Replay the Days You Traded | Trend Chasers',
+    description:
+      'Replay a past session one minute at a time with your own trades on the chart. Indicators, drawing tools, practice orders and a strategy tester, on Diamond.',
+    path: '/market-replay',
   },
-  /* These two were placeholders once and carried noindex to match. They shipped; the tags did
-     not follow. A live pricing page telling Google not to index it cannot rank, cannot be
-     crawled, and cannot become a sitelink — which is the one sitelink almost every competitor
-     has. */
   'ai-assistant': {
     title: 'AI Trading Assistant — Trend Chasers',
     description:
@@ -225,6 +225,7 @@ export const PRERENDER_ROUTES = [
   '/pricing',
   '/help-center',
   '/ai-assistant',
+  '/market-replay',
   '/whats-new',
   '/verified-track-record',
 ] as const;

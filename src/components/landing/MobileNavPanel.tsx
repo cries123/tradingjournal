@@ -3,7 +3,7 @@ import {
   BadgeCheck,
   BookOpen,
   Building2,
-  Gauge,
+  ChartCandlestick,
   GraduationCap,
   LifeBuoy,
   LogOut,
@@ -26,10 +26,11 @@ interface MobileNavPanelProps {
   showBrokersLink?: boolean;
 }
 
-function SoonBadge() {
+/** Where the "Soon" chip on the old Market Simulator placeholder was. Take it off once replay is not news. */
+function NewBadge() {
   return (
-    <span className="ml-auto shrink-0 text-[10px] font-semibold uppercase tracking-wider text-text-secondary bg-bg-tertiary border border-border/60 rounded-full px-2 py-0.5">
-      Soon
+    <span className="ml-auto shrink-0 text-[10px] font-semibold uppercase tracking-wider text-accent bg-accent/10 border border-accent/30 rounded-full px-2 py-0.5">
+      New
     </span>
   );
 }
@@ -143,6 +144,15 @@ export function MobileNavPanel({
         </button>
         <button
           type="button"
+          onClick={() => go('market-replay')}
+          className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
+        >
+          <ChartCandlestick className="h-4 w-4 text-accent shrink-0" aria-hidden />
+          <span className="text-sm font-medium text-text-primary">Market Replay</span>
+          <NewBadge />
+        </button>
+        <button
+          type="button"
           onClick={() => go('verified-records')}
           className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
         >
@@ -164,15 +174,6 @@ export function MobileNavPanel({
         >
           <Megaphone className="h-4 w-4 text-accent shrink-0" aria-hidden />
           <span className="text-sm font-medium text-text-primary">What&apos;s New</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => go('market-simulator')}
-          className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-bg-tertiary/60 transition-colors"
-        >
-          <Gauge className="h-4 w-4 text-accent shrink-0" aria-hidden />
-          <span className="text-sm font-medium text-text-primary">Market Simulator</span>
-          <SoonBadge />
         </button>
 
         <div className="my-3 border-t border-border/50" />

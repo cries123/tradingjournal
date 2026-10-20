@@ -69,12 +69,11 @@ describe('published pricing claims', () => {
     expect(freeAnswer()).toContain(`$${TIER_PLANS.silver.price} a month`);
   });
 
-  it('does not advertise a feature the app will not run', () => {
-    // Market replay is sold with Diamond but withheld until it works.
-    expect(MARKET_REPLAY_IS_LIVE).toBe(false);
-    expect(priceOf('marketReplay')).toBeNull();
-    expect(paidFeatureNames()).not.toContain('market replay');
-    expect(freeAnswer().toLowerCase()).not.toContain('market replay');
+  it('advertises market replay at the Diamond price now that it runs', () => {
+    expect(MARKET_REPLAY_IS_LIVE).toBe(true);
+    expect(priceOf('marketReplay')).toEqual({ name: TIER_PLANS.diamond.name, price: TIER_PLANS.diamond.price });
+    expect(paidFeatureNames()).toContain('market replay');
+    expect(freeAnswer().toLowerCase()).toContain('market replay');
   });
 
   it('still says the paid features are paid, rather than going quiet about them', () => {

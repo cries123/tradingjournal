@@ -93,6 +93,7 @@ the change would have broken `"Script error."` filtering in production.
 | Track record, All journals, monthly PDF report | — | yes | yes | yes |
 | Rule simulator | — | — | yes | yes |
 | Auto-import, coach seat, rule alerts, AI review | — | — | — | yes |
+| Market replay | — | — | — | yes |
 
 ### What things actually cost (checked against Jay's SnapTrade invoice, not their public page)
 
@@ -391,10 +392,19 @@ with the junction still in place can delete through it into the real `node_modul
 
 ## Open items
 
-- **Market replay is built (October 2026) but not on any card yet.** Until `MARKET_REPLAY_LIVE = true`
-  in `tiers.ts` only the site admin can open it (`useReplayAccess`, and the same rule on the server).
-  Flipping it puts the line back on the Diamond card and opens it to Diamond. Don't relist it as
-  "coming soon" before then. That is still selling it.
+- **Market replay is live on Diamond (October 2026).** `MARKET_REPLAY_LIVE = true` in `tiers.ts` put it
+  on the Diamond card (first of the Diamond-only lines), opened the screen and the server to Diamond,
+  and turned on the landing page's `#replay` section, which renders only while `priceOf('marketReplay')`
+  is non-null. Below Diamond the day page's Replay button opens the lock card. The site admin can
+  always open it. Turning the flag off again takes it away from paying members.
+  - **Public page:** `/market-replay` (`pages/MarketReplayPage.tsx`), in the Products menu and the phone
+    menu with a "New" chip, prerendered and in the sitemap. It replaced the noindexed "Market Simulator
+    — coming soon" placeholder; `/market-simulator` still routes to it. Study and strategy names on it
+    are read from `replayStudies.ts` / `replayStrategies.ts`, plan and price from `tiers.ts`.
+  - **Landing image** `public/landing/shot-replay.webp` is NOT from the SSR harness (the chart is a
+    canvas): it is the replay screen in a real browser on the synthetic sample session, 1180px wide at
+    2x, captured with Playwright against the Vite dev server and a temporary preview entry. Its size is
+    in `landingShots.ts`, which the header test checks.
   - **What it is:** TradingView-style bar replay on the day page's "Replay" button. Candles from
     TradingView's open-source Lightweight Charts (pinned 5.2.1, lazy-loaded so no other screen pays
     for it), 1m/5m/15m, VWAP, click a candle to start, play/step/speed, practice trades at the close
