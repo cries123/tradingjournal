@@ -122,7 +122,7 @@ describe('the assistant on Silver', () => {
 
   it('leaves out the controls that only change what the model is sent', () => {
     expect(html).not.toContain('Compare against another period');
-    expect(html).not.toContain('Let it read my trade notes');
+    expect(html).not.toContain('Let it read my trade and day notes');
   });
 });
 

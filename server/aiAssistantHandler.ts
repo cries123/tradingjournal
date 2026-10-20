@@ -113,6 +113,11 @@ WHAT THE FIELDS MEAN
 - fees: total commissions. Worth mentioning when it's large next to netPnl.
 - notes: the trader's own words on their biggest trades, when they've shared them. Quote them back
   when a pattern shows up across several. Never invent a note that isn't in the JSON.
+- dayNotes: the trader's own words about whole sessions and their own 1-5 "Followed my plan"
+  rating, on the biggest days, beside each day's result. Same rule: quote them when a pattern
+  shows, never invent one. byRating is per day on days they rated 4-5 against days rated 1-2; a
+  plan they say they followed that loses, or a low rating on a winning day, is worth saying
+  plainly. A rated day that contradicts its result is a finding about their self-assessment.
 
 THE BLOCKS THAT ARE ALMOST ALWAYS THERE
 Most traders here sync from a broker that sends a date with no fill time and nothing

@@ -64,6 +64,9 @@ describe('the privacy policy', () => {
     expect(policy).toMatch(/sent to OpenAI/i);
     expect(policy).toMatch(/notes/i);
     expect(policy).toMatch(/off until you turn it on/i);
+    // Day notes and plan ratings go behind the same switch, and the policy says so.
+    expect(policy).toMatch(/on trades and on days/i);
+    expect(policy).toMatch(/Followed my plan/);
   });
 
   it('points at the deletion the app actually has', () => {

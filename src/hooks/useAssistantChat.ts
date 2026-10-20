@@ -1,12 +1,17 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Trade } from '../types';
 import type { TradingRules } from '../types/strategy';
 import { openingFindings } from '../utils/assistantOpening';
-import { buildJournalFacts, suggestedQuestions } from '../utils/journalFacts';
+import { buildJournalFacts, suggestedQuestions, type JournalFactsOptions } from '../utils/journalFacts';
+import { unreadNotesPhrase } from '../utils/assistantPeriod';
 import { AssistantError, streamAssistant, type AssistantMessage } from '../services/aiAssistant';
+import { reportErrorSilently } from '../services/errorReporting';
 import { useAssistantThreads } from './useAssistantThreads';
 import { useEntitlement } from '../context/useEntitlement';
+import { useAuth } from '../context/useAuth';
 import { lowestTierWith, TIER_PLANS } from '../config/tiers';
+
+type DayNotes = NonNullable<JournalFactsOptions['dayNotes']>;
 
 /** The plan the chat comes with, read from the plans so no prompt can name the wrong one. */
 const CHAT_PLAN = lowestTierWith('aiAssistant');
@@ -89,25 +94,52 @@ export function useAssistantChat({ periods, rules, chatLocked = false }: Assista
   const active = periods.find((p) => p.scope === scope) ?? periods[0];
   const compare = compareScope && compareScope !== scope ? periods.find((p) => p.scope === compareScope) ?? null : null;
 
+  /*
+   * The trader's day notes and plan ratings, read once per account when the screen opens.
+   *
+   * Read whether or not notes are shared, because the nudge to share them has to know they exist;
+   * reading your own notes into your own browser sends nothing anywhere. They only leave in the
+   * facts, and buildJournalFacts drops them unless shareNotes is on. Loaded by import() so the
+   * Firestore module stays out of any bundle that reaches this hook without opening the screen.
+   * A failed read leaves them out: the answer still comes, without them.
+   */
+  const { user } = useAuth();
+  const uid = user?.uid ?? null;
+  const [dayNotes, setDayNotes] = useState<DayNotes>([]);
+  useEffect(() => {
+    if (chatLocked) return;
+    let cancelled = false;
+    import('../services/dayNotes')
+      .then((m) => m.fetchAllDayNotes(uid))
+      .then((notes) => {
+        if (!cancelled) setDayNotes(notes);
+      })
+      .catch((err: unknown) => reportErrorSilently(err, 'promise', 'assistant-day-notes'));
+    return () => {
+      cancelled = true;
+    };
+  }, [uid, chatLocked]);
+
   const facts = useMemo(
     () =>
       active
         ? buildJournalFacts(active.trades, active.label, {
             includeNotes: shareNotes,
+            dayNotes,
             rules,
             // The widest period the trader has, so the trend spans more than what they are viewing.
             history: periods[periods.length - 1]?.trades,
           })
         : null,
-    [active, shareNotes, rules, periods],
+    [active, shareNotes, dayNotes, rules, periods],
   );
 
   const compareFacts = useMemo(
     () =>
       compare
-        ? buildJournalFacts(compare.trades, compare.label, { includeNotes: shareNotes, rules })
+        ? buildJournalFacts(compare.trades, compare.label, { includeNotes: shareNotes, dayNotes, rules })
         : null,
-    [compare, shareNotes, rules],
+    [compare, shareNotes, dayNotes, rules],
   );
   const suggestions = useMemo(() => (facts ? suggestedQuestions(facts) : []), [facts]);
 
@@ -121,11 +153,15 @@ export function useAssistantChat({ periods, rules, chatLocked = false }: Assista
   const findings = useMemo(() => (facts ? openingFindings(facts).slice(0, 3) : []), [facts]);
 
   /* Only worth offering when there is actually something to read. Asking permission for notes
-     that do not exist is a privacy prompt with no upside. */
-  const unreadNotes = useMemo(
-    () => (shareNotes ? 0 : (active?.trades.filter((t) => t.notes?.trim()).length ?? 0)),
-    [shareNotes, active],
-  );
+     that do not exist is a privacy prompt with no upside. Day notes count only on days with
+     trades in this period, the same days the facts would send. */
+  const unreadNotes = useMemo(() => {
+    if (shareNotes || !active) return null;
+    const tradeNotes = active.trades.filter((t) => t.notes?.trim()).length;
+    const tradedDays = new Set(active.trades.map((t) => t.date));
+    const dayNoteCount = dayNotes.filter((n) => tradedDays.has(n.date) && n.note?.trim()).length;
+    return unreadNotesPhrase(tradeNotes, dayNoteCount);
+  }, [shareNotes, active, dayNotes]);
 
   /** Notes are the trader's own words, so sharing them is their decision, remembered per browser. */
   const setShareNotes = useCallback((on: boolean) => {

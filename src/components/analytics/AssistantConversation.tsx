@@ -176,7 +176,7 @@ export function AssistantConversation({
             type="button"
             role="switch"
             aria-checked={shareNotes}
-            title="Let it read my trade notes"
+            title="Let it read my trade and day notes"
             onClick={() => setShareNotes(!shareNotes)}
             className={`max-lg:hidden ${headerButton} ${
               shareNotes ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-text-secondary hover:text-text-primary'
@@ -253,7 +253,7 @@ export function AssistantConversation({
               </div>
             )}
 
-            {!chatLocked && unreadNotes > 0 && (
+            {!chatLocked && unreadNotes && (
               /* On a phone this is the way to the notes opt-in before a question is asked; a desktop
                  has the switch in the header and in the rail beside it. */
               <button
@@ -261,7 +261,7 @@ export function AssistantConversation({
                 onClick={() => setShareNotes(true)}
                 className="mt-4 rounded px-1 text-left text-xs text-text-secondary transition-colors hover:text-accent focus-ring lg:hidden"
               >
-                You wrote notes on {unreadNotes} of these trades.{' '}
+                You wrote notes on {unreadNotes}.{' '}
                 <span className="text-accent underline">Let it read them</span> for a better answer.
               </button>
             )}
@@ -557,7 +557,7 @@ function ConversationMenu({ chat, disabled }: { chat: AssistantChat; disabled: b
           className="absolute right-0 top-full z-30 mt-2 w-64 rounded-xl border border-border bg-bg-secondary p-1.5 shadow-2xl shadow-black/60"
         >
           <div className="flex items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-sm">
-            <span>Read my trade notes</span>
+            <span>Read my trade and day notes</span>
             <NotesSwitch on={shareNotes} onChange={setShareNotes} />
           </div>
           {others.length > 0 && (

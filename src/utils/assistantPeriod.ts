@@ -34,6 +34,20 @@ export function periodNoun(scope: PeriodScope, label: string): string {
   return label;
 }
 
+/**
+ * What the "let it read your notes" nudge says the trader wrote, or null when there is nothing.
+ *
+ * Trade notes and day notes are one switch, so the nudge counts both: "3 of these trades and 2 of
+ * these days". It used to count trades alone, which hid the nudge from somebody who journals by
+ * the day and never writes on a single trade.
+ */
+export function unreadNotesPhrase(tradeNotes: number, dayNotes: number): string | null {
+  // "1 of these trades": "these" is the period's trades, so the noun stays plural at one.
+  const part = (n: number, one: string) => `${n} of these ${one}s`;
+  const parts = [tradeNotes > 0 ? part(tradeNotes, 'trade') : null, dayNotes > 0 ? part(dayNotes, 'day') : null].filter(Boolean);
+  return parts.length > 0 ? parts.join(' and ') : null;
+}
+
 /** Whole currency when it is whole: "-$500", not "-$500.00", in a sentence about a limit. */
 function limitMoney(value: number, currency: CurrencyCode): string {
   return formatCurrency(value, currency).replace(/[.,]00(?=\D*$)/, '');

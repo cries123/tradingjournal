@@ -122,6 +122,80 @@ describe('the Performance screen’s breakdowns reach the model', () => {
   });
 });
 
+/*
+ * The trader's own words about each session, and the "Followed my plan" rating, behind the notes
+ * switch. The day page has asked for both since the redesign and the assistant could read neither.
+ */
+describe('day notes and plan ratings', () => {
+  /** Ten days: the first five rated 5 and +$150 a day, the next five rated 1 and -$300 a day. */
+  function ratedMonth() {
+    const trades: Trade[] = [];
+    const notes: { date: string; note: string; discipline?: number }[] = [];
+    for (let day = 1; day <= 10; day += 1) {
+      const date = `2026-03-${String(day).padStart(2, '0')}`;
+      const kept = day <= 5;
+      trades.push(imported({ date, pnl: kept ? 100 : -200 }));
+      trades.push(imported({ date, pnl: kept ? 50 : -100 }));
+      notes.push({ date, note: kept ? 'Stopped at two.' : 'Kept going after the stop.', discipline: kept ? 5 : 1 });
+    }
+    return { trades, notes };
+  }
+
+  it('sends nothing unless the trader has switched their notes on', () => {
+    const { trades, notes } = ratedMonth();
+    expect(buildJournalFacts(trades, 'March', { dayNotes: notes })!.dayNotes).toBeNull();
+    expect(buildJournalFacts(trades, 'March', { includeNotes: true, dayNotes: notes })!.dayNotes).not.toBeNull();
+  });
+
+  it('puts each rating beside the day it was given, and compares the days they say they kept the plan', () => {
+    const { trades, notes } = ratedMonth();
+    const block = buildJournalFacts(trades, 'March', { includeNotes: true, dayNotes: notes })!.dayNotes!;
+    expect(block.ratedDays).toBe(10);
+    expect(block.averageRating).toBe(3);
+    expect(block.byRating).toEqual({ highDays: 5, highPerDay: 150, lowDays: 5, lowPerDay: -300 });
+    // Biggest days first, either way: the -$300 days lead.
+    expect(block.days[0]).toEqual({ date: '2026-03-06', pnl: -300, trades: 2, rating: 1, note: 'Kept going after the stop.' });
+  });
+
+  it('only compares ratings with three days a side, and leaves the comparison out below it', () => {
+    const { trades, notes } = ratedMonth();
+    // Days 6–8 unrated: two low days left against five high.
+    const fewLow = notes.map((n, i) => (i >= 5 && i <= 7 ? { ...n, discipline: undefined } : n));
+    const block = buildJournalFacts(trades, 'March', { includeNotes: true, dayNotes: fewLow })!.dayNotes!;
+    expect(block.ratedDays).toBe(7);
+    expect(block.byRating).toBeNull();
+    // Three a side is enough.
+    const threeLow = notes.map((n, i) => (i >= 5 && i <= 6 ? { ...n, discipline: undefined } : n));
+    expect(buildJournalFacts(trades, 'March', { includeNotes: true, dayNotes: threeLow })!.dayNotes!.byRating).toMatchObject({ lowDays: 3 });
+  });
+
+  it('keeps only notes on days with trades in the period, a rating without a note, and the caps', () => {
+    const { trades, notes } = ratedMonth();
+    const extra = [
+      { date: '2026-04-02', note: 'Another month entirely.', discipline: 5 },
+      { date: '2026-03-31', note: 'No trades this day.' },
+      { date: '2026-03-01', note: 'x'.repeat(500), discipline: 5 },
+    ];
+    const ratingOnly = notes.map((n, i) => (i === 9 ? { ...n, note: '' } : n));
+    const block = buildJournalFacts(trades, 'March', { includeNotes: true, dayNotes: [...ratingOnly, ...extra] })!.dayNotes!;
+    expect(block.days).toHaveLength(10);
+    expect(block.days.map((d) => d.date)).not.toContain('2026-04-02');
+    expect(block.days.map((d) => d.date)).not.toContain('2026-03-31');
+    expect(block.days.find((d) => d.date === '2026-03-10')).toMatchObject({ rating: 1, note: null });
+    expect(block.days.every((d) => (d.note?.length ?? 0) <= 200)).toBe(true);
+    // Nothing on a traded day: no block, not an empty one.
+    expect(buildJournalFacts(trades, 'March', { includeNotes: true, dayNotes: extra.slice(0, 2) })!.dayNotes).toBeNull();
+  });
+
+  it('ignores a rating outside 1 to 5 rather than averaging it in', () => {
+    const { trades, notes } = ratedMonth();
+    const odd = notes.map((n, i) => (i === 0 ? { ...n, discipline: 9 } : n));
+    const block = buildJournalFacts(trades, 'March', { includeNotes: true, dayNotes: odd })!.dayNotes!;
+    expect(block.ratedDays).toBe(9);
+    expect(block.days.find((d) => d.date === '2026-03-01')!.rating).toBeNull();
+  });
+});
+
 describe('buildJournalFacts', () => {
   it('returns nothing for an empty period rather than an empty shell', () => {
     expect(buildJournalFacts([], 'March')).toBeNull();

@@ -210,6 +210,23 @@ export interface JournalFacts {
     keptNet: number;
     keptPerDay: number;
   } | null;
+  /**
+   * The trader's own words about each session, and their "Followed my plan" rating, behind the same
+   * opt-in as the trade notes.
+   *
+   * The day page has asked for both since the redesign, and the assistant could read neither, so
+   * the one place a trader says "I knew I should have stopped" never reached the thing reviewing
+   * their trading. Only days that have trades in this period: the rating is compared with the
+   * day's result, and a note on a day with no trades has no result to sit beside.
+   */
+  dayNotes: {
+    ratedDays: number;
+    averageRating: number | null;
+    /** Per day, on days rated 4–5 against days rated 1–2. Null unless each side has three days. */
+    byRating: { highDays: number; highPerDay: number; lowDays: number; lowPerDay: number } | null;
+    /** The biggest days by result, with what the trader wrote and how they rated it. */
+    days: { date: string; pnl: number; trades: number; rating: number | null; note: string | null }[];
+  } | null;
   /** The playbook, rule by rule: per trade when a rule was ticked against when it was not. */
   playbook: {
     rule: string;
@@ -234,6 +251,13 @@ export interface JournalFactsOptions {
    * even though the trader had set one.
    */
   rules?: TradingRules;
+  /**
+   * Every day note the trader has written. Sent only with includeNotes, like the trade notes.
+   *
+   * The shape the day note service stores, declared here rather than imported so this file stays
+   * free of the Firestore module it lives beside.
+   */
+  dayNotes?: readonly { date: string; note: string; discipline?: number }[];
 }
 
 /** Notes are the only free-text in the payload, so they're the only part that needs bounding. */
@@ -311,6 +335,7 @@ export function buildJournalFacts(
       : null;
   const sessions = computeSessionPerformance(trades);
   const ruleDays = breaches.length > 0 ? brokenAgainstKept(trades, breaches.map((b) => b.date)) : null;
+  const dayNotes = options.includeNotes && options.dayNotes ? dayNotesFacts(trades, options.dayNotes) : null;
   const playbook = ruleByRule(trades).slice(0, MAX_PLAYBOOK_RULES);
 
   return {
@@ -476,6 +501,7 @@ export function buildJournalFacts(
       instrumentRows(trades).map((r) => ({ instrument: r.label, trades: r.trades, pnl: money(r.pnl), perTrade: money(r.perTrade), winRate: pct(r.winRate) })),
     ),
     ruleDays,
+    dayNotes,
     playbook: rows(
       playbook.map((r) => ({
         rule: r.rule,
@@ -496,6 +522,54 @@ function rows<T>(list: T[]): T[] | null {
 
 /** Enough rules to name the ones that cost the most, without sending the whole checklist. */
 const MAX_PLAYBOOK_RULES = 6;
+
+/** The same bound as trade notes, a little longer: a day's note covers a whole session. */
+const MAX_DAY_NOTES = 10;
+const MAX_DAY_NOTE_CHARS = 200;
+/** Fewer rated days a side than this and "your 4–5 days made money" is two Tuesdays. */
+const MIN_RATED_DAYS = 3;
+
+/**
+ * The period's day notes and ratings, beside each day's result.
+ *
+ * Days are picked by the size of the result, either way, as trade notes are: the note on the worst
+ * day of the month is where the pattern is, and taking from both ends keeps the model from
+ * concluding the trader only writes when they lose. A rating with no note still counts, both in
+ * the summary and as a row, because "rated 5, lost $400" is a finding on its own.
+ */
+function dayNotesFacts(trades: Trade[], notes: NonNullable<JournalFactsOptions['dayNotes']>): JournalFacts['dayNotes'] {
+  const byDay = tradesByDay(trades);
+  const rated = (n: number | undefined): n is number => typeof n === 'number' && n >= 1 && n <= 5;
+
+  const days = notes
+    .filter((n) => byDay.has(n.date) && (n.note?.trim() || rated(n.discipline)))
+    .map((n) => {
+      const day = byDay.get(n.date)!;
+      return {
+        date: n.date,
+        pnl: money(day.reduce((s, t) => s + effectivePnl(t), 0)),
+        trades: day.length,
+        rating: rated(n.discipline) ? n.discipline : null,
+        note: n.note?.trim() ? n.note.trim().slice(0, MAX_DAY_NOTE_CHARS) : null,
+      };
+    });
+  if (days.length === 0) return null;
+
+  const ratings = days.filter((d) => d.rating !== null);
+  const high = ratings.filter((d) => d.rating! >= 4);
+  const low = ratings.filter((d) => d.rating! <= 2);
+  const perDay = (xs: typeof days) => money(xs.reduce((s, d) => s + d.pnl, 0) / xs.length);
+
+  return {
+    ratedDays: ratings.length,
+    averageRating: ratings.length > 0 ? pct(ratings.reduce((s, d) => s + d.rating!, 0) / ratings.length) : null,
+    byRating:
+      high.length >= MIN_RATED_DAYS && low.length >= MIN_RATED_DAYS
+        ? { highDays: high.length, highPerDay: perDay(high), lowDays: low.length, lowPerDay: perDay(low) }
+        : null,
+    days: [...days].sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl)).slice(0, MAX_DAY_NOTES),
+  };
+}
 
 /**
  * The days a limit was crossed, as a group, against the days none was.

@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { buildMessages, trimHistory } from '../../server/aiAssistantHandler';
+import { unreadNotesPhrase } from '../utils/assistantPeriod';
 
 /*
  * What the model is told, and how much of the conversation it is shown.
@@ -14,7 +16,7 @@ const prompt = () => buildMessages({ period: 'x' }, 'q', [])[0].content;
 describe('the system prompt', () => {
   it('explains every breakdown the Performance screen draws, so the model reaches for them', () => {
     const p = prompt();
-    for (const block of ['sequence', 'dailyLoad', 'expiry', 'instruments', 'ruleDays', 'playbook', 'recentMonths', 'ruleSimulation']) {
+    for (const block of ['sequence', 'dailyLoad', 'expiry', 'instruments', 'ruleDays', 'playbook', 'recentMonths', 'ruleSimulation', 'notes', 'dayNotes']) {
       expect(p, block).toMatch(new RegExp(`^- ${block}:`, 'm'));
     }
   });
@@ -41,6 +43,27 @@ describe('the system prompt', () => {
 
   it('reads profit factor 99 as no losing trades', () => {
     expect(prompt()).toContain('profitFactor of 99 means there were no losing trades');
+  });
+});
+
+describe('the notes nudge', () => {
+  it('counts trade notes and day notes, because one switch shares both', () => {
+    expect(unreadNotesPhrase(3, 2)).toBe('3 of these trades and 2 of these days');
+    expect(unreadNotesPhrase(0, 1)).toBe('1 of these days');
+    expect(unreadNotesPhrase(1, 0)).toBe('1 of these trades');
+    expect(unreadNotesPhrase(1, 1)).toBe('1 of these trades and 1 of these days');
+    // Nothing written, nothing to ask permission for.
+    expect(unreadNotesPhrase(0, 0)).toBeNull();
+  });
+
+  it('is shown from the phrase on both surfaces, so a day-only journal still sees it', () => {
+    for (const file of ['src/components/analytics/AssistantConversation.tsx', 'src/components/analytics/AssistantPanel.tsx']) {
+      const source = readFileSync(file, 'utf8');
+      expect(source, file).toContain('{!chatLocked && unreadNotes && (');
+      expect(source, file).toContain('You wrote notes on {unreadNotes}.');
+    }
+    // Sent only through the facts, which drop them unless notes are shared.
+    expect(readFileSync('src/hooks/useAssistantChat.ts', 'utf8')).toContain('includeNotes: shareNotes,\n            dayNotes,');
   });
 });
 

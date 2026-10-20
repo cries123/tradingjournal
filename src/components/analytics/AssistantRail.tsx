@@ -52,7 +52,7 @@ export function AssistantRail({
         </Fact>
         {/* The opt-in only changes what is sent, so it goes with the chat. */}
         {!chatLocked && (
-          <Fact label="Trade notes">
+          <Fact label="Your notes">
             <NotesSwitch on={shareNotes} onChange={setShareNotes} />
           </Fact>
         )}

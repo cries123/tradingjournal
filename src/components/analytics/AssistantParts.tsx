@@ -72,7 +72,7 @@ export function NotesSwitch({ on, onChange }: { on: boolean; onChange: (on: bool
       type="button"
       role="switch"
       aria-checked={on}
-      aria-label="Let it read my trade notes"
+      aria-label="Let it read my trade and day notes"
       onClick={() => onChange(!on)}
       className={`relative inline-flex h-5 w-[34px] shrink-0 items-center rounded-full motion-safe:transition-colors focus-ring ${
         on ? 'bg-accent' : 'bg-[#2a2a2a]'

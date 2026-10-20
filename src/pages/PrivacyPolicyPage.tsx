@@ -70,8 +70,9 @@ export function PrivacyPolicyPage({ onHome, onLaunch, onPrivacy, onTerms, onBrok
           features; nothing is sent in the background.
         </p>
         <p>
-          Your written notes are <strong>not</strong> included unless you switch on &quot;share my notes&quot;
-          in the assistant. It is off until you turn it on, and turning it off stops them being sent again.
+          Your written notes, on trades and on days, and your &quot;Followed my plan&quot; ratings are{' '}
+          <strong>not</strong> included unless you switch on reading your notes in the assistant. It is
+          off until you turn it on, and turning it off stops them being sent again.
         </p>
       </section>
 

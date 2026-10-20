@@ -420,10 +420,14 @@ with the junction still in place can delete through it into the real `node_modul
 - Company research in the assistant is deliberately NOT wanted and the prompt now refuses it: there
   is no data source behind it, the model's knowledge goes stale, and "is X a good company" is the
   edge of investment advice.
-- The assistant still cannot see day notes or the "Followed my plan" rating (`users/{uid}/dayNotes`);
-  only trade notes go, behind the notes opt-in. `fetchAllDayNotes` exists, so it is a load and an
-  opt-in away. The `/api/ai-takeaway` endpoint and `useAiTakeaway` are dead since the Overview lost
-  its banner; the weekly recap uses `writeReview` in the assistant handler instead.
+- **Day notes and the "Followed my plan" rating reach the assistant** as `dayNotes`, behind the same
+  switch as trade notes (one switch, "Let it read my trade and day notes"; the privacy page says so).
+  `useAssistantChat` reads them once per account with `fetchAllDayNotes` (through `import()`, so
+  Firestore stays out of other bundles) whether or not they are shared, because the nudge counts
+  them; `buildJournalFacts` drops them unless `includeNotes`. Only days with trades in the period go,
+  biggest result first, ten at most; `byRating` compares days rated 4–5 with days rated 1–2 once
+  each side has three. The `/api/ai-takeaway` endpoint and `useAiTakeaway` are dead since the
+  Overview lost its banner; the weekly recap uses `writeReview` in the assistant handler instead.
 
 ## Packaging it as a mobile app — what is already true
 

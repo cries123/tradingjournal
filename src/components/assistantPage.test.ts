@@ -37,6 +37,11 @@ vi.mock('../context/useSettings', () => ({
     viewingAllJournals: view.allJournals,
   }),
 }));
+// The chat reads the signed-in account to load its day notes; the load itself is an effect, which a
+// server render never runs.
+vi.mock('../context/useAuth', () => ({
+  useAuth: () => ({ user: { uid: 'u1', email: 'trader@example.com' }, loading: false, firebaseEnabled: true }),
+}));
 vi.mock('../context/useEntitlement', () => ({
   useEntitlement: () => ({
     tier: 'diamond',
@@ -203,7 +208,7 @@ describe('what it can see', () => {
 
   it('shows the notes opt-in off until the trader turns it on', () => {
     // Opt-in, as it has always been: the switch and the header button both start off.
-    expect(html).toMatch(/role="switch" aria-checked="false" aria-label="Let it read my trade notes"/);
+    expect(html).toMatch(/role="switch" aria-checked="false" aria-label="Let it read my trade and day notes"/);
     expect(html).toContain('Notes off');
   });
 

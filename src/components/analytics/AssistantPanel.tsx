@@ -170,7 +170,7 @@ export function AssistantPanel({ periods, rules, bare = false, chatLocked = fals
                 className="sr-only"
               />
               <Lock size={12} className="shrink-0" aria-hidden />
-              {shareNotes ? 'Reading your trade notes' : 'Let it read my trade notes'}
+              {shareNotes ? 'Reading your notes' : 'Let it read my notes'}
             </label>
           )}
         </div>
@@ -203,7 +203,7 @@ export function AssistantPanel({ periods, rules, bare = false, chatLocked = fals
               </div>
             )}
 
-            {!chatLocked && unreadNotes > 0 && (
+            {!chatLocked && unreadNotes && (
               /* Surfaced where somebody is actually looking, and only when it would change the
                  answer. The toggle in the control row is easy to miss. */
               <button
@@ -211,7 +211,7 @@ export function AssistantPanel({ periods, rules, bare = false, chatLocked = fals
                 onClick={() => setShareNotes(true)}
                 className="w-full text-left text-[11px] text-text-secondary hover:text-accent transition-colors px-1 focus-ring rounded mb-3"
               >
-                You wrote notes on {unreadNotes} of these trades.{' '}
+                You wrote notes on {unreadNotes}.{' '}
                 <span className="text-accent underline">Let it read them</span> for a better answer.
               </button>
             )}
