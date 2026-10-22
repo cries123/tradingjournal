@@ -184,6 +184,10 @@ export function CostsPanel({ report, error, loading, onOpenUser, canOpenUser }: 
                 <dt className="text-text-secondary">Fees</dt>
                 <dd>{money(m.breakdown.processor)}</dd>
               </div>
+              <div className="flex justify-between">
+                <dt className="text-text-secondary">Market data</dt>
+                <dd>{money(m.breakdown.marketData ?? 0)}</dd>
+              </div>
               <div className="col-span-2 flex justify-between border-t border-border/30 pt-1 font-semibold">
                 <dt>Spend</dt>
                 <dd>{money(m.breakdown.total)}</dd>
@@ -213,7 +217,7 @@ export function CostsPanel({ report, error, loading, onOpenUser, canOpenUser }: 
                 <th className="text-right font-semibold px-3 py-1.5" colSpan={3}>
                   How much was used
                 </th>
-                <th className="text-right font-semibold px-3 py-1.5 border-l border-border/40" colSpan={6}>
+                <th className="text-right font-semibold px-3 py-1.5 border-l border-border/40" colSpan={7}>
                   What it cost, and what came in
                 </th>
               </tr>
@@ -226,6 +230,7 @@ export function CostsPanel({ report, error, loading, onOpenUser, canOpenUser }: 
                 <th className="text-right font-medium px-3 py-2.5">Syncs</th>
                 <th className="text-right font-medium px-3 py-2.5">SnapTrade</th>
                 <th className="text-right font-medium px-3 py-2.5">Fees</th>
+                <th className="text-right font-medium px-3 py-2.5">Market data</th>
                 <th className="text-right font-medium px-3 py-2.5">Spend</th>
                 <th className="text-right font-medium px-4 py-2.5">Collected</th>
               </tr>
@@ -233,7 +238,7 @@ export function CostsPanel({ report, error, loading, onOpenUser, canOpenUser }: 
             <tbody className="tabular-nums">
               {report.months.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-text-secondary text-sm">
+                  <td colSpan={11} className="px-4 py-8 text-center text-text-secondary text-sm">
                     No usage recorded yet.
                   </td>
                 </tr>
@@ -259,6 +264,7 @@ export function CostsPanel({ report, error, loading, onOpenUser, canOpenUser }: 
                   <td className="text-right px-3 py-2.5">{money(m.breakdown.syncs)}</td>
                   <td className="text-right px-3 py-2.5">{money(m.breakdown.connectedUsers)}</td>
                   <td className="text-right px-3 py-2.5">{money(m.breakdown.processor)}</td>
+                  <td className="text-right px-3 py-2.5">{money(m.breakdown.marketData ?? 0)}</td>
                   <td className="text-right px-3 py-2.5 font-semibold">
                     {money(m.breakdown.total)}
                   </td>
@@ -312,8 +318,8 @@ export function CostsPanel({ report, error, loading, onOpenUser, canOpenUser }: 
       <div>
         <h3 className="text-sm font-semibold mb-1">Worst case per user</h3>
         <p className="text-xs text-text-secondary mb-3">
-          If one person hit every daily cap every day of a 31-day month. Price below this and a
-          heavy customer costs you money.
+          If one person hit every daily cap every day of a 31-day month, market replay&apos;s data
+          allowance included. Price below this and a heavy customer costs you money.
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
           {PAID_TIERS.map((tier) => {
@@ -347,6 +353,12 @@ export function CostsPanel({ report, error, loading, onOpenUser, canOpenUser }: 
                     <dt>Processor</dt>
                     <dd>{money(worst.processor)}</dd>
                   </div>
+                  {worst.marketData > 0 && (
+                    <div className="flex justify-between">
+                      <dt>Market data</dt>
+                      <dd>{money(worst.marketData)}</dd>
+                    </div>
+                  )}
                 </dl>
                 <p
                   className={`text-xs font-semibold mt-2.5 pt-2.5 border-t border-border/40 tabular-nums ${
@@ -382,6 +394,7 @@ export function CostsPanel({ report, error, loading, onOpenUser, canOpenUser }: 
                 </span>
                 <span className="text-text-secondary tabular-nums shrink-0">
                   {u.aiMessages} msgs · {u.syncs} syncs
+                  {(u.replayUsd ?? 0) > 0 && <> · {money(u.replayUsd ?? 0)} market data</>}
                 </span>
                 <span className="font-semibold tabular-nums w-16 text-right shrink-0">
                   {money(u.cost)}
@@ -398,7 +411,10 @@ export function CostsPanel({ report, error, loading, onOpenUser, canOpenUser }: 
         {report.rates.aiMessage.toFixed(4)} per
         assistant message, ${report.rates.takeaway.toFixed(4)} per takeaway,{' '}
         {(report.rates.creemPercent * 100).toFixed(1)}% + ${report.rates.creemFlat.toFixed(2)} per
-        charge. Change any of them with the COST_* environment variables — no deploy needed.
+        charge. Change any of them with the COST_* environment variables — no deploy needed. Market
+        data is not a rate: it is Databento&apos;s own price for each market replay pull, added up, and
+        the worst case is Diamond&apos;s whole ${TIER_PLANS.diamond.limits.replayUsdPerMonth} a month
+        of it spent.
       </p>
     </section>
   );

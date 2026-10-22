@@ -582,9 +582,9 @@ export function ReplayContent({ trades, date, onDateChange, onBack, preload }: R
           <p className="text-[11px] text-text-secondary">
             {data.allowance && (
               <>
-                Replay data this month: <b className="font-medium text-text-primary">{replayUsedLabel(data.allowance.used)}</b> used of the{' '}
-                {Math.round(data.allowance.available * 100)}% open so far. A little more opens each day so it lasts the month, and days you
-                have already opened don&apos;t count.{' '}
+                Replay data: <b className="font-medium text-text-primary">{replayUsedLabel(data.allowance.today)}</b> of today&apos;s used,{' '}
+                {replayUsedLabel(data.allowance.month)} of this month&apos;s. It is split across the month so it lasts, and days you have
+                already opened don&apos;t count.{' '}
               </>
             )}
             One-minute bars from OPRA and Databento, shown the trading day after. Practice trades fill at the close of the candle on screen,

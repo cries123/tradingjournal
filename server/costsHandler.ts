@@ -2,6 +2,7 @@ import { assertCallerIsAdmin, AdminRequestError, getBearerToken } from './adminA
 import { getAdminFirestore } from './firebaseAdmin';
 import { logServerError } from './errorReports';
 import { readMonthRevenue } from './billingLedger';
+import { readReplayMonthCosts } from './replayLedger';
 import { mrrMovement, type MonthMovement } from '../src/utils/mrrMovement';
 import { getAdminAuth } from './firebaseAdmin';
 import {
@@ -68,7 +69,7 @@ export interface CostReport {
   everPaid: string[] | null;
   /** New against stopped-paying, month by month, from the whole ledger. Null when unreadable. */
   movement: MonthMovement[] | null;
-  topUsers: { uid: string; aiMessages: number; syncs: number; cost: number }[];
+  topUsers: { uid: string; aiMessages: number; syncs: number; replayUsd: number; cost: number }[];
   /** Who bought what, newest first. Straight from the ledger, so it is money, not entitlement. */
   purchases: { uid: string; email: string; tier: string; amount: number; at: string }[];
   /** Set when a month could not be read, so a low total is never mistaken for a cheap month. */
@@ -94,8 +95,8 @@ function monthsSince(from: string): string[] {
 }
 
 interface RawMonth {
-  counts: Pick<UsageCounts, 'aiMessages' | 'takeaways' | 'syncs' | 'syncingUsers'>;
-  perUser: Map<string, { aiMessages: number; syncs: number }>;
+  counts: Pick<UsageCounts, 'aiMessages' | 'takeaways' | 'syncs' | 'syncingUsers' | 'marketDataUsd'>;
+  perUser: Map<string, { aiMessages: number; syncs: number; replayUsd: number }>;
 }
 
 /**
@@ -109,8 +110,8 @@ async function readMonth(month: string): Promise<RawMonth> {
   const start = `${month}-01`;
   const end = `${month}-32`; // string compare: sorts after any real day in the month
 
-  const counts = { aiMessages: 0, takeaways: 0, syncs: 0, syncingUsers: 0 };
-  const perUser = new Map<string, { aiMessages: number; syncs: number }>();
+  const counts = { aiMessages: 0, takeaways: 0, syncs: 0, syncingUsers: 0, marketDataUsd: 0 };
+  const perUser = new Map<string, { aiMessages: number; syncs: number; replayUsd: number }>();
   const syncingUsers = new Set<string>();
 
   for (const [key, collection] of Object.entries(USAGE_COLLECTIONS) as [
@@ -136,11 +137,23 @@ async function readMonth(month: string): Promise<RawMonth> {
       if (key === 'syncs') syncingUsers.add(uid);
       if (key === 'takeaways') continue; // not per-user interesting; it is everybody, always
 
-      const row = perUser.get(uid) ?? { aiMessages: 0, syncs: 0 };
+      const row = perUser.get(uid) ?? { aiMessages: 0, syncs: 0, replayUsd: 0 };
       if (key === 'aiMessages') row.aiMessages += n;
       if (key === 'syncs') row.syncs += n;
       perUser.set(uid, row);
     }
+  }
+
+  /*
+   * Market replay's Databento spend, at Databento's own price per pull. Not caught: a month whose
+   * replay spend could not be read must not be cached as a month that spent nothing (see below).
+   */
+  const replay = await readReplayMonthCosts(month);
+  counts.marketDataUsd = replay.usd;
+  for (const [uid, usd] of replay.perUser) {
+    const row = perUser.get(uid) ?? { aiMessages: 0, syncs: 0, replayUsd: 0 };
+    row.replayUsd += usd;
+    perUser.set(uid, row);
   }
 
   counts.syncingUsers = syncingUsers.size;
@@ -307,7 +320,7 @@ export async function buildCostReport(): Promise<CostReport> {
   ]);
 
   const months: MonthCosts[] = [];
-  const topUsers = new Map<string, { aiMessages: number; syncs: number }>();
+  const topUsers = new Map<string, { aiMessages: number; syncs: number; replayUsd: number }>();
   let warning: string | null = null;
 
   for (const month of monthsSince(from)) {
@@ -366,10 +379,11 @@ export async function buildCostReport(): Promise<CostReport> {
       months.push({ month, counts, breakdown: priceUsage(counts, COST_RATES), partial });
 
       for (const [uid, row] of raw.perUser) {
-        const existing = topUsers.get(uid) ?? { aiMessages: 0, syncs: 0 };
+        const existing = topUsers.get(uid) ?? { aiMessages: 0, syncs: 0, replayUsd: 0 };
         topUsers.set(uid, {
           aiMessages: existing.aiMessages + row.aiMessages,
           syncs: existing.syncs + row.syncs,
+          replayUsd: existing.replayUsd + row.replayUsd,
         });
       }
 
@@ -387,9 +401,10 @@ export async function buildCostReport(): Promise<CostReport> {
     .map(([uid, row]) => ({
       uid,
       ...row,
-      // Assistant messages only: syncs are free (see priceUsage), so adding them here would rank
-      // the heaviest syncers as the most expensive users when they cost the same as everybody else.
-      cost: row.aiMessages * COST_RATES.aiMessage,
+      // Assistant messages and market data: syncs are free (see priceUsage), so adding them here
+      // would rank the heaviest syncers as the most expensive users when they cost the same as
+      // everybody else.
+      cost: row.aiMessages * COST_RATES.aiMessage + row.replayUsd,
     }))
     .sort((a, b) => b.cost - a.cost)
     .slice(0, 10);

@@ -21,6 +21,8 @@ import {
   type UsageCredits,
 } from './usage';
 import { emailAccountHolder, resetBrokerLink, setSignInSuspended } from './adminAccountActions';
+import { readMemberReplayUsage, replayPeriods, type MemberReplayUsage } from './replayLedger';
+import { dailyAllowanceUsd } from '../src/utils/replayAllowance';
 import { isTier, TIER_ORDER, TIER_PLANS, type Tier } from '../src/config/tiers';
 import {
   compIsLive,
@@ -84,6 +86,11 @@ export interface AdminUsageReport {
   today: Record<CreditKind, { used: number; limit: number; count: number; forgiven: number; bonus: number }>;
   credits: UsageCredits;
   tier: Tier;
+  /**
+   * Market replay's Databento spend for this person, with the allowance it is held to. Null when the
+   * ledger could not be read — never zeros, which would read as "hasn't used it".
+   */
+  replay: (MemberReplayUsage & { monthlyAllowanceUsd: number; dailyAllowanceUsd: number; capped: boolean }) | null;
 }
 
 interface UsageCounts {
@@ -374,6 +381,16 @@ async function handleAdjustCredits(
   };
 }
 
+/** Whether this is the site admin, who market replay never holds to an allowance. False if unreadable. */
+async function isSiteAdmin(uid: string): Promise<boolean> {
+  try {
+    const snap = await getAdminFirestore().doc('config/admin').get();
+    return snap.exists && (snap.data() as { uid?: string }).uid === uid;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * How much of the metered features one person has actually used.
  *
@@ -404,7 +421,7 @@ async function handleReadUsage(targetUid: string) {
     return { total, last30, lastDay };
   };
 
-  const [syncs, ai, takeaways, syncToday, aiToday, credits, access] = await Promise.all([
+  const [syncs, ai, takeaways, syncToday, aiToday, credits, access, replay, admin] = await Promise.all([
     read('syncUsage'),
     read('aiUsage'),
     read('takeawayUsage'),
@@ -412,7 +429,10 @@ async function handleReadUsage(targetUid: string) {
     readUsageToday('ai', targetUid),
     readUserCredits(targetUid),
     resolveAccess(targetUid),
+    readMemberReplayUsage(targetUid).catch(() => null),
+    isSiteAdmin(targetUid),
   ]);
+  const monthlyAllowanceUsd = access.limits.replayUsdPerMonth;
 
   const usage: AdminUsageReport = {
     syncs,
@@ -424,6 +444,13 @@ async function handleReadUsage(targetUid: string) {
     },
     credits,
     tier: access.tier,
+    replay: replay && {
+      ...replay,
+      monthlyAllowanceUsd,
+      dailyAllowanceUsd: dailyAllowanceUsd(monthlyAllowanceUsd, replayPeriods().day),
+      // The site admin opens replay on any plan and is never held to an allowance.
+      capped: !admin,
+    },
   };
 
   return { usage };

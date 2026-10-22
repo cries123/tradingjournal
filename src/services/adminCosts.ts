@@ -28,7 +28,8 @@ export interface CostReport {
   everPaid: string[] | null;
   /** New against stopped-paying, month by month, from the whole ledger. Null when unreadable. */
   movement: MonthMovement[] | null;
-  topUsers: { uid: string; aiMessages: number; syncs: number; cost: number }[];
+  /** `replayUsd` is absent on responses from before market data was counted. */
+  topUsers: { uid: string; aiMessages: number; syncs: number; replayUsd?: number; cost: number }[];
   purchases: { uid: string; email: string; tier: string; amount: number; at: string }[];
   warning: string | null;
 }

@@ -330,6 +330,9 @@ export function AdminUserDetailModal({
                     {usage.syncs.lastDay && (
                       <span className="text-text-secondary"> · last sync {usage.syncs.lastDay}</span>
                     )}
+                    {(usage.replay?.monthUsd ?? 0) > 0 && (
+                      <> · ${(usage.replay?.monthUsd ?? 0).toFixed(2)} of market data this month</>
+                    )}
                   </>
                 )}
               </dd>

@@ -26,7 +26,7 @@ export function ReplaySpendPanel({ stats }: { stats: ReplayStats | null }) {
           <h2 className="text-sm font-semibold text-text-primary">Market replay data</h2>
         </div>
         <p className="text-xs text-text-secondary">
-          {TIER_PLANS.diamond.name} allowance: ${allowance} per member a month, released daily
+          {TIER_PLANS.diamond.name} allowance: ${allowance} per member a month, split evenly across its days
         </p>
       </div>
       <p className="mb-4 text-xs text-text-secondary">

@@ -4,10 +4,11 @@ import type { Tier } from '../config/tiers';
 /*
  * The market replay server: who gets bars, when, and what each request costs.
  *
- * Driven through the real handler with Databento and Firestore faked. What matters most: nobody is
- * shown a day before it is historical, nobody outside Diamond gets in (bar the site admin), every
- * symbol-day is bought from Databento once, and a member's monthly data allowance — released a day
- * at a time — stops new pulls without ever stopping a replay of a day already cached.
+ * Driven through the real handler and the real ledger, with Databento and Firestore faked. What
+ * matters most: nobody is shown a day before it is historical, nobody outside Diamond gets in (bar
+ * the site admin), every symbol-day is bought from Databento once, every purchase is counted at
+ * Databento's price, and a member's allowance — $20 a month, split evenly across its days — stops
+ * new pulls without ever stopping a replay of a day already cached.
  */
 
 let callerUid = 'trader';
@@ -15,7 +16,8 @@ let tier: Tier = 'diamond';
 let adminUid = 'jay';
 const store = new Map<string, Record<string, unknown>>();
 let failLedger = false;
-const pulls: { uid: string; pull: { usd: number; bytes: number; bars: number; symbols: number; estimated: boolean } }[] = [];
+let failCache = false;
+let siteWrites: string[] = [];
 
 vi.mock('../../server/snaptradeAuth', async () => {
   const actual = await vi.importActual<typeof import('../../server/snaptradeAuth')>('../../server/snaptradeAuth');
@@ -25,36 +27,38 @@ vi.mock('../../server/entitlements', async () => {
   const { limitsFor } = await vi.importActual<typeof import('../../src/config/tiers')>('../../src/config/tiers');
   return { resolveAccess: async () => ({ tier, limits: limitsFor(tier) }) };
 });
-// The real month reader against the fake store; the batch write captured instead.
-vi.mock('../../server/replayLedger', async () => {
-  const actual = await vi.importActual<typeof import('../../server/replayLedger')>('../../server/replayLedger');
-  return {
-    ...actual,
-    recordReplayPull: async (uid: string, pull: (typeof pulls)[number]['pull']) => {
-      pulls.push({ uid, pull });
+vi.mock('../../server/errorReports', () => ({ logServerError: async () => undefined }));
+vi.mock('../../server/firebaseAdmin', () => {
+  const docRef = (name: string, id: string) => ({
+    path: `${name}/${id}`,
+    get: async () => {
+      if (failLedger && name === 'replayMonths') throw new Error('Firestore unavailable');
+      const data = store.get(`${name}/${id}`);
+      return { exists: data !== undefined, data: () => data };
     },
+    set: async (value: Record<string, unknown>) => {
+      if (failCache && name === 'marketReplayBars') throw new Error('write refused');
+      store.set(`${name}/${id}`, value);
+    },
+  });
+  type Ref = ReturnType<typeof docRef>;
+  return {
+    getAdminFirestore: () => ({
+      doc: (path: string) => ({
+        get: async () => ({ exists: path === 'config/admin', data: () => ({ uid: adminUid }) }),
+      }),
+      collection: (name: string) => ({ doc: (id: string) => docRef(name, id) }),
+      // Sequential, which is all a single request needs: read, decide, write.
+      runTransaction: async <T,>(fn: (tx: { get: (r: Ref) => ReturnType<Ref['get']>; set: (r: Ref, v: Record<string, unknown>) => void }) => Promise<T>) => {
+        const writes: [Ref, Record<string, unknown>][] = [];
+        const result = await fn({ get: (r) => r.get(), set: (r, v) => void writes.push([r, v]) });
+        for (const [r, v] of writes) await r.set(v);
+        return result;
+      },
+      batch: () => ({ set: (r: Ref) => void siteWrites.push(r.path), commit: async () => undefined }),
+    }),
   };
 });
-vi.mock('../../server/errorReports', () => ({ logServerError: async () => undefined }));
-vi.mock('../../server/firebaseAdmin', () => ({
-  getAdminFirestore: () => ({
-    doc: (path: string) => ({
-      get: async () => ({ exists: path === 'config/admin', data: () => ({ uid: adminUid }) }),
-    }),
-    collection: (name: string) => ({
-      doc: (id: string) => ({
-        get: async () => {
-          if (failLedger && name === 'replayMonths') throw new Error('Firestore unavailable');
-          const data = store.get(`${name}/${id}`);
-          return { exists: data !== undefined, data: () => data };
-        },
-        set: async (value: Record<string, unknown>) => {
-          store.set(`${name}/${id}`, value);
-        },
-      }),
-    }),
-  }),
-}));
 
 /** Databento's CSV for one minute bar, with pretty prices and times. */
 const csv = (close: number) =>
@@ -69,9 +73,10 @@ let price: (symbol: string) => { status: number; text: string } = () => ({ statu
 beforeEach(() => {
   calls = [];
   costCalls = [];
+  siteWrites = [];
   store.clear();
   failLedger = false;
-  pulls.length = 0;
+  failCache = false;
   callerUid = 'trader';
   tier = 'diamond';
   adminUid = 'jay';
@@ -98,8 +103,11 @@ afterEach(() => {
 
 const load = () => import('../../server/marketReplay');
 const AFTER = new Date('2026-10-20T15:00:00Z'); // Tuesday: Friday 16 Oct is historical
+const TODAY = '2026-10-20';
 const headers = { authorization: 'Bearer t' };
 const spxCall = { underlying: 'SPX', expiration: '2026-10-16', right: 'C', strike: 5800, fills: [9.1] };
+/** A member's month in the ledger. */
+const month = (uid: string) => store.get(`replayMonths/${uid}_2026-10`) as Record<string, number & Record<string, unknown>> | undefined;
 
 describe('who may replay', () => {
   it('opens to a Diamond member', async () => {
@@ -116,7 +124,7 @@ describe('who may replay', () => {
       expect(res.statusCode, below).toBe(403);
     }
     expect(calls).toHaveLength(0);
-    expect(pulls).toHaveLength(0);
+    expect(month('trader')).toBeUndefined();
   });
 
   it('lets the site admin in on any plan, so the owner can always check it', async () => {
@@ -156,7 +164,7 @@ describe('what may be replayed', () => {
   });
 });
 
-describe('the bars', () => {
+describe('the bars, and what they cost', () => {
   beforeEach(() => {
     callerUid = 'jay';
   });
@@ -173,85 +181,118 @@ describe('the bars', () => {
     const body = res.body as { contracts: { osi: string; bars: { close: number }[] }[]; underlying: { symbol: string; proxyFor: string } };
     expect(body.contracts[0].osi).toBe('SPX   261016C05800000');
     expect(body.underlying).toMatchObject({ symbol: 'SPY', proxyFor: 'SPX' });
-    // One pull, priced symbol by symbol by Databento's own cost endpoint.
-    expect(costCalls.sort()).toEqual(['SPX   261016C05800000', 'SPXW  261016C05800000', 'SPY']);
-    expect(pulls).toHaveLength(1);
-    expect(pulls[0].pull).toMatchObject({ bars: 3, bytes: 168, symbols: 3, estimated: false });
-    expect(pulls[0].pull.usd).toBeCloseTo(0.006, 9);
   });
 
-  it('buys each symbol-day once: a second request is served from the cache and costs nothing', async () => {
+  it('counts the pull at Databento’s own price on the member’s day and month, and on the site totals', async () => {
+    const { handleMarketReplayRequest } = await load();
+    await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
+    expect(costCalls.sort()).toEqual(['SPX   261016C05800000', 'SPXW  261016C05800000', 'SPY']);
+    const m = month('jay')!;
+    expect(m).toMatchObject({ bars: 3, bytes: 168, symbols: 3, pulls: 1, estimatedPulls: 0, pending: {} });
+    expect(m.usd).toBeCloseTo(0.006, 9);
+    expect((m.days as unknown as Record<string, number>)[TODAY]).toBeCloseTo(0.006, 9);
+    expect(siteWrites.sort()).toEqual(['replayStats/2026-10-20', 'replayStats/month-2026-10']);
+  });
+
+  it('buys each symbol-day once: a second request is served from the cache and counts nothing', async () => {
     const { handleMarketReplayRequest } = await load();
     await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
     const first = calls.length;
     const again = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
     expect(again.statusCode).toBe(200);
     expect(calls).toHaveLength(first);
-    expect(pulls).toHaveLength(1);
+    expect(month('jay')!.pulls).toBe(1);
   });
 
-  it('reads a strike nobody listed as an empty day, and keeps it', async () => {
+  it('reads a strike nobody listed as an empty day, keeps it, and prices only what came back', async () => {
     respond = (symbol) => (symbol.startsWith('SPX') ? { status: 422, text: 'did not resolve' } : { status: 200, text: csv(581) });
     const { handleMarketReplayRequest } = await load();
     const res = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
     expect(res.statusCode).toBe(200);
     expect((res.body as { contracts: { osi: string | null }[] }).contracts[0].osi).toBeNull();
     expect([...store.keys()].some((k) => k.includes('SPXW'))).toBe(true);
-    // Nothing came back for the strikes, so nothing was billed for them and nothing is priced.
     expect(costCalls).toEqual(['SPY']);
-    expect(pulls[0].pull.symbols).toBe(1);
+    expect(month('jay')!.symbols).toBe(1);
   });
 
-  it('counts nothing and caches nothing when Databento refuses the key', async () => {
+  it('counts nothing, caches nothing, and hands the reservation back when Databento refuses the key', async () => {
     respond = () => ({ status: 401, text: 'bad key' });
     const { handleMarketReplayRequest } = await load();
     const res = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
     expect(res.statusCode).toBe(502);
     expect(String(res.body.error)).toContain('refused');
-    expect(pulls).toHaveLength(0);
-    expect(store.size).toBe(0);
+    expect([...store.keys()].filter((k) => k.startsWith('marketReplayBars/'))).toHaveLength(0);
+    // toEqual, not toMatchObject: an object pattern of {} matches a reservation left behind.
+    expect(month('jay')!.pending).toEqual({});
+    expect(month('jay')!.usd).toBeUndefined();
   });
 
-  it('prices a pull at a deliberately high rate, marked as an estimate, when the cost endpoint fails', async () => {
+  it('prices a pull from Databento’s real rate, marked as an estimate, when the cost endpoint fails', async () => {
     price = () => ({ status: 500, text: 'down' });
     const { handleMarketReplayRequest } = await load();
     await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
-    expect(pulls[0].pull.estimated).toBe(true);
-    // Three one-minute bars at 56 bytes, at $1 a GB.
-    expect(pulls[0].pull.usd).toBeCloseTo((3 * 56) / 1e9, 15);
+    expect(month('jay')!.estimatedPulls).toBe(1);
+    // Three one-minute bars at 56 bytes, at $0.30 a MB: a little above the $0.256 Jay was billed.
+    expect(month('jay')!.usd).toBeCloseTo((3 * 56 * 0.3) / 1e6, 12);
   });
-});
 
-describe('the monthly data allowance', () => {
-  // 20 October of a 31-day month: 20/31 of the $20 is open, about $12.90.
-  const month = 'replayMonths/trader_2026-10';
-
-  it('lets a member pull while under the share open so far, and says how much is used', async () => {
-    store.set(month, { usd: 5 });
+  it('still returns and still counts bars Databento billed for when the cache write fails', async () => {
+    failCache = true;
     const { handleMarketReplayRequest } = await load();
     const res = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
     expect(res.statusCode).toBe(200);
-    const allowance = (res.body as { allowance: { used: number; available: number } }).allowance;
-    expect(allowance.used).toBeCloseTo(5.006 / 20, 9);
-    expect(allowance.available).toBeCloseTo(20 / 31, 9);
-    expect(pulls).toHaveLength(1);
+    expect((res.body as { contracts: { bars: unknown[] }[] }).contracts[0].bars).toHaveLength(1);
+    expect(month('jay')!.pulls).toBe(1);
+  });
+});
+
+describe('the allowance: $20 a month, split evenly across its days', () => {
+  // 20 October, a 31-day month: about 64.5¢ a day.
+  const key = 'replayMonths/trader_2026-10';
+
+  it('lets a member pull while under today’s share, and says how much of the day and month is used', async () => {
+    store.set(key, { uid: 'trader', month: '2026-10', usd: 5, days: { [TODAY]: 0.1 } });
+    const { handleMarketReplayRequest } = await load();
+    const res = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
+    expect(res.statusCode).toBe(200);
+    const allowance = (res.body as { allowance: { today: number; month: number } }).allowance;
+    expect(allowance.today).toBeCloseTo(0.106 / (20 / 31), 9);
+    expect(allowance.month).toBeCloseTo(5.006 / 20, 9);
   });
 
-  it('refuses new data past the share open so far, before asking Databento for anything', async () => {
-    store.set(month, { usd: 13 });
+  it('refuses new data past today’s share even early in a month left untouched, before asking Databento', async () => {
+    store.set(key, { usd: 0.65, days: { [TODAY]: 0.65 } });
     const { handleMarketReplayRequest } = await load();
     const res = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
     expect(res.statusCode).toBe(429);
-    expect(String(res.body.error)).toContain('tomorrow');
+    expect(String(res.body.error)).toContain('midnight Eastern');
     expect(calls).toHaveLength(0);
-    expect(pulls).toHaveLength(0);
+  });
+
+  it('refuses new data once the month is spent, whatever today looks like', async () => {
+    store.set(key, { usd: 20, days: {} });
+    const { handleMarketReplayRequest } = await load();
+    const res = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
+    expect(res.statusCode).toBe(429);
+    expect(String(res.body.error)).toContain('on the 1st');
+  });
+
+  it('counts a pull already in flight, so a second request at the same moment cannot slip under', async () => {
+    const inFlight = { usd: 0.6, at: new Date(AFTER.getTime() - 5_000).toISOString() };
+    store.set(key, { usd: 0.1, days: { [TODAY]: 0.1 }, pending: { other: inFlight } });
+    const { handleMarketReplayRequest } = await load();
+    expect((await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER)).statusCode).toBe(429);
+    // A reservation from a request that died long ago no longer holds anything.
+    store.set(key, { usd: 0.1, days: { [TODAY]: 0.1 }, pending: { other: { ...inFlight, at: '2026-10-20T14:00:00.000Z' } } });
+    expect((await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER)).statusCode).toBe(200);
+    expect(month('trader')!.pending).toEqual({});
   });
 
   it('still plays a day already opened once the allowance is used up', async () => {
     const { handleMarketReplayRequest } = await load();
     await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
     const bought = calls.length;
-    store.set(month, { usd: 20 });
+    store.set(key, { usd: 20, days: { [TODAY]: 20 } });
     const again = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
     expect(again.statusCode).toBe(200);
     expect(calls).toHaveLength(bought);
@@ -262,20 +303,25 @@ describe('the monthly data allowance', () => {
 
   it('never holds the site admin to it, though his pulls are counted', async () => {
     callerUid = 'jay';
-    store.set('replayMonths/jay_2026-10', { usd: 50 });
+    store.set('replayMonths/jay_2026-10', { usd: 50, days: { [TODAY]: 50 } });
     const { handleMarketReplayRequest } = await load();
     const res = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
     expect(res.statusCode).toBe(200);
     expect((res.body as { allowance: unknown }).allowance).toBeNull();
-    expect(pulls.map((p) => p.uid)).toEqual(['jay']);
+    expect(month('jay')!.usd).toBeCloseTo(50.006, 9);
   });
 
-  it('refuses new data rather than guess when the month cannot be read', async () => {
-    failLedger = true;
+  it('refuses new data rather than guess when the ledger cannot be read, but still plays a cached day', async () => {
     const { handleMarketReplayRequest } = await load();
-    const res = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
-    expect(res.statusCode).toBe(503);
-    expect(calls).toHaveLength(0);
+    await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
+    const bought = calls.length;
+    failLedger = true;
+    const cached = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [spxCall] }, AFTER);
+    expect(cached.statusCode).toBe(200);
+    expect((cached.body as { allowance: unknown }).allowance).toBeNull();
+    const fresh = await handleMarketReplayRequest(headers, { date: '2026-10-16', contracts: [{ ...spxCall, strike: 5805 }] }, AFTER);
+    expect(fresh.statusCode).toBe(503);
+    expect(calls).toHaveLength(bought);
   });
 });
 

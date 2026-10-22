@@ -29,6 +29,8 @@ const asyncNoop = async () => undefined;
 
 /** Server rendering separates adjacent text with comment nodes; the eye does not. */
 const paint = (element: Parameters<typeof renderToString>[0]) => renderToString(element).replace(/<!-- -->/g, '');
+/** What a reader sees: the painted HTML with its tags taken out. */
+const words = (element: Parameters<typeof renderToString>[0]) => paint(element).replace(/<[^>]+>/g, '');
 
 const usage = {
   syncs: { total: 12, last30: 4, lastDay: '2026-09-01' },
@@ -40,6 +42,21 @@ const usage = {
   },
   credits: { sync: 3, ai: 0 },
   tier: 'silver' as const,
+  replay: null,
+};
+
+const replay = {
+  todayUsd: 0.7,
+  monthUsd: 3.51,
+  lifetimeUsd: 3.51,
+  monthBytes: 13_700_000,
+  monthSymbols: 604,
+  monthPulls: 51,
+  monthEstimatedPulls: 0,
+  lastDay: '2026-10-20',
+  monthlyAllowanceUsd: 20,
+  dailyAllowanceUsd: 20 / 31,
+  capped: true,
 };
 
 const user: AdminUserSummary = {
@@ -68,6 +85,43 @@ describe('the new admin sections render', () => {
     expect(html).toContain('2 given back');
     expect(html).toContain('Not in Silver');
     expect(html).toContain('banked');
+    // A ledger that could not be read says so, rather than showing a member who used nothing.
+    expect(html).toContain('Could not read');
+  });
+
+  it('shows a Diamond member’s market replay data against today’s and the month’s allowance', () => {
+    const html = words(
+      createElement(AdminUserUsageSection, {
+        uid: 'u1',
+        usage: { ...usage, tier: 'diamond' as const, replay },
+        onChanged: asyncNoop,
+        onDone: noop,
+        onError: noop,
+        onAudit: noop,
+      }),
+    );
+    expect(html).toContain('Market replay data');
+    expect(html).toContain('$0.70 of $0.65');
+    expect(html).toContain('$3.51 of $20.00 this month');
+    expect(html).toContain('13.7 MB');
+    expect(html).toContain('604 new charts');
+    expect(html).toContain('last bought 2026-10-20');
+  });
+
+  it('says the site admin is never capped, and names pulls priced by estimate', () => {
+    const html = words(
+      createElement(AdminUserUsageSection, {
+        uid: 'jay',
+        usage: { ...usage, tier: 'free' as const, replay: { ...replay, capped: false, monthlyAllowanceUsd: 0, monthEstimatedPulls: 2 } },
+        onChanged: asyncNoop,
+        onDone: noop,
+        onError: noop,
+        onAudit: noop,
+      }),
+    );
+    expect(html).toContain('never capped (site admin)');
+    expect(html).toContain('$3.51 this month');
+    expect(html).toContain('2 pulls priced by estimate');
   });
 
   it('offers every paid plan and every preset for an extension', () => {

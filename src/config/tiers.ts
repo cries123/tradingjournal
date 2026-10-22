@@ -67,11 +67,10 @@ export interface TierLimits {
    *
    * Diamond's $20 is Jay's figure (October 2026). Only data bought counts: a day anybody has already
    * opened is served from the cache for nothing, so this stops new pulls and never stops a replay of
-   * a day already seen. A trader's day is about a dozen charts of one-minute bars, which Databento
-   * prices in fractions of a cent, so this is a ceiling for something going wrong rather than a
-   * ration a trader replaying their own days will reach. Released a day at a time so it lasts the
-   * month, with what is not used carried forward (utils/replayAllowance.ts). Enforced in
-   * server/marketReplay.ts.
+   * a day already seen. At Databento's real price (about $0.26 a MB of OPRA, from the 20 Oct bill)
+   * opening a day with a dozen contracts is about 7¢, so $20 is roughly 280 new days a month. Split
+   * evenly across the month's days with nothing carried forward — about 65¢, nine or ten new days, a
+   * day — so it lasts the month (utils/replayAllowance.ts). Enforced in server/marketReplay.ts.
    */
   replayUsdPerMonth: number;
   /**

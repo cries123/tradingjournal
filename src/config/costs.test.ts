@@ -45,6 +45,17 @@ describe('priceUsage', () => {
     expect(busy.connectedUsers).toBe(1);
   });
 
+  it('adds market replay’s Databento spend as the money it already is', () => {
+    const out = priceUsage(
+      { aiMessages: 0, takeaways: 0, syncs: 0, syncingUsers: 0, charges: 0, revenue: 0, marketDataUsd: 3.51 },
+      RATES,
+    );
+    expect(out.marketData).toBe(3.51);
+    expect(out.total).toBe(3.51);
+    // A month cached before replay existed has no figure, and spent nothing on it.
+    expect(priceUsage({ aiMessages: 0, takeaways: 0, syncs: 0, syncingUsers: 0, charges: 0, revenue: 0 }, RATES).marketData).toBe(0);
+  });
+
   it('costs nothing on a month with no usage', () => {
     const idle = priceUsage(
       { aiMessages: 0, takeaways: 0, syncs: 0, syncingUsers: 0, charges: 0, revenue: 0 },
@@ -71,6 +82,12 @@ describe('worstCaseMonthlyCost', () => {
     const gold = worstCaseMonthlyCost(TIER_PLANS.gold, RATES);
     const diamond = worstCaseMonthlyCost(TIER_PLANS.diamond, RATES);
     expect(diamond.ai).toBeGreaterThan(gold.ai);
+  });
+
+  it('counts Diamond’s whole market data allowance in its worst case, and nobody else’s', () => {
+    expect(worstCaseMonthlyCost(TIER_PLANS.diamond, RATES).marketData).toBe(20);
+    expect(worstCaseMonthlyCost(TIER_PLANS.gold, RATES).marketData).toBe(0);
+    expect(worstCaseMonthlyCost(TIER_PLANS.silver, RATES).marketData).toBe(0);
   });
 
   it('bills the free tier for takeaways but nothing else', () => {

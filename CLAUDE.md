@@ -439,14 +439,22 @@ with the junction still in place can delete through it into the real `node_modul
     rule, so clients are denied). SPX is drawn as SPY, because index values carry their own license.
   - **What it costs, and the allowance.** Databento bills by bytes in its binary encoding (56 bytes a
     one-minute bar) and publishes no per-GB rate for options, so every pull is priced by its own
-    `metadata.get_cost` endpoint and recorded in `server/replayLedger.ts` (`replayMonths/{uid}_{month}`,
-    `replayStats/{day}` and `month-{month}`, all server-only). Each Diamond member gets
-    `replayUsdPerMonth` ($20, Jay's figure, in `tiers.ts`), released a day at a time with what is unused
-    carried forward (`utils/replayAllowance.ts`), so it lasts the month. Only bought data counts: a
-    cached day always replays, even for someone who has used their allowance. The site admin is never
-    capped but is counted. A failed price is an estimate at a deliberately high $1/GB and is flagged.
-    Admin → Ops → "Market replay data" shows the real spend. Jay considered opening replay to every
-    paid plan behind a switch and decided against it (too expensive): Diamond only.
+    `metadata.get_cost` endpoint and recorded in `server/replayLedger.ts` (`replayMonths/{uid}_{month}`
+    with `usd`, `days.{day}` and in-flight `pending` reservations; `replayStats/{day}` and
+    `month-{month}`; all server-only). **The real rate, from Jay's 20 Oct 2026 bill: $3.51 for 13.7 MB,
+    about $0.26/MB of OPRA** — a contract's full session is ~0.6¢, opening a day of a dozen contracts
+    ~7¢. A failed price lookup is estimated at $0.30/MB and flagged (it was $1/GB, ~250× too low).
+  - Each Diamond member gets `replayUsdPerMonth` ($20, Jay's figure, in `tiers.ts`), **split evenly
+    across the month's days with nothing carried forward** (~65¢ a day; `utils/replayAllowance.ts`).
+    Carry-forward was tried first and let an untouched member spend $12.90 on the 20th. A pull
+    reserves its worst-case cost in a transaction before Databento is asked and settles at the real
+    price after, so simultaneous requests cannot each slip under; reservations expire after 2 min.
+    Only bought data counts: a cached day always replays, even with the ledger down. The site admin
+    is never capped but is counted. At the full $20, Diamond's worst-case margin is ~19%, not 71%.
+  - Where the spend shows: each user's card (Today & credits → "Market replay data"), the Costs tab
+    (a Market data column, Diamond's worst case, most-expensive users), and Ops → "Market replay
+    data". Jay considered opening replay to every paid plan behind a switch and decided against it
+    (too expensive): Diamond only.
   - **Trade measurements reuse replay's bars and buy nothing.** `/api/trade-paths`
     (`server/tradePaths.ts`) answers only from the `marketReplayBars` cache — a day nobody opened in
     replay comes back "not stored" and the screen says to open it. `utils/tradePath.ts` places a trade

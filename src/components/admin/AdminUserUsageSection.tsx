@@ -158,10 +158,69 @@ export function AdminUserUsageSection({ uid, usage, onChanged, onDone, onError, 
         })
       )}
 
+      {usage && <ReplayUsage usage={usage} />}
+
       <p className="text-[11px] text-text-secondary/80 leading-relaxed">
         Giving back today&apos;s allowance forgives what they spent; the calls still count in costs.
         Credits sit outside the daily cap, are spent only once it&apos;s reached, and never expire.
       </p>
+    </div>
+  );
+}
+
+const usd = (n: number) => (n > 0 && n < 0.01 ? '<$0.01' : `$${n.toFixed(2)}`);
+
+/**
+ * What this person's market replay has bought from Databento, against the allowance it is held to.
+ *
+ * Read-only: there is nothing to give back, because the money is spent at Databento the moment the
+ * bars arrive. The figures are Databento's own price for each pull, so this is the bill, not an
+ * estimate — except pulls priced while Databento's cost lookup was down, which are counted high and
+ * named.
+ */
+function ReplayUsage({ usage }: { usage: UserUsage }) {
+  const r = usage.replay;
+  const included = (r?.monthlyAllowanceUsd ?? 0) > 0 || r?.capped === false;
+  return (
+    <div className="rounded-lg border border-border/60 bg-bg-tertiary/30 p-3 space-y-1.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-sm font-medium text-text-primary">Market replay data</p>
+        <p className="text-xs text-text-secondary tabular-nums">
+          {!r ? (
+            'Could not read'
+          ) : !r.capped ? (
+            <>
+              <span className="text-text-primary">{usd(r.todayUsd)}</span> today · never capped (site admin)
+            </>
+          ) : !included ? (
+            <>Not in {TIER_PLANS[usage.tier].name}</>
+          ) : (
+            <>
+              <span className={r.todayUsd >= r.dailyAllowanceUsd ? 'text-loss-bright' : 'text-text-primary'}>
+                {usd(r.todayUsd)} of {usd(r.dailyAllowanceUsd)}
+              </span>{' '}
+              today
+            </>
+          )}
+        </p>
+      </div>
+      {r && (r.lifetimeUsd > 0 || included) && (
+        <p className="text-xs text-text-secondary tabular-nums leading-relaxed">
+          <span className={r.capped && r.monthUsd >= r.monthlyAllowanceUsd && r.monthlyAllowanceUsd > 0 ? 'text-loss-bright' : 'text-text-primary'}>
+            {usd(r.monthUsd)}
+          </span>
+          {r.capped && r.monthlyAllowanceUsd > 0 && <> of {usd(r.monthlyAllowanceUsd)}</>} this month ·{' '}
+          {(r.monthBytes / 1_000_000).toFixed(1)} MB · {r.monthSymbols} new chart{r.monthSymbols === 1 ? '' : 's'} · {usd(r.lifetimeUsd)} all
+          time
+          {r.lastDay && <> · last bought {r.lastDay}</>}
+          {r.monthEstimatedPulls > 0 && (
+            <span className="text-amber-300">
+              {' '}
+              · {r.monthEstimatedPulls} pull{r.monthEstimatedPulls === 1 ? '' : 's'} priced by estimate
+            </span>
+          )}
+        </p>
+      )}
     </div>
   );
 }

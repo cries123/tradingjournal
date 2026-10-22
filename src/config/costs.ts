@@ -87,6 +87,12 @@ export interface UsageCounts {
   /** Charges collected, for the processor's cut. */
   charges: number;
   revenue: number;
+  /**
+   * Dollars market replay spent on Databento: already money, at Databento's own price for each pull
+   * (server/replayLedger.ts), so it is added as it is rather than multiplied by a rate. Absent on
+   * months cached before replay existed, which read as zero.
+   */
+  marketDataUsd?: number;
 }
 
 export interface CostBreakdown {
@@ -102,6 +108,8 @@ export interface CostBreakdown {
   syncs: number;
   connectedUsers: number;
   processor: number;
+  /** Market replay's Databento spend. */
+  marketData: number;
   total: number;
 }
 
@@ -120,6 +128,7 @@ export function priceUsage(counts: UsageCounts, rates: CostRates = COST_RATES): 
   const syncs = 0;
   const connectedUsers = counts.syncingUsers * rates.connectedUserMonth;
   const processor = counts.revenue * rates.creemPercent + counts.charges * rates.creemFlat;
+  const marketData = counts.marketDataUsd ?? 0;
 
   return {
     ai,
@@ -127,7 +136,8 @@ export function priceUsage(counts: UsageCounts, rates: CostRates = COST_RATES): 
     syncs,
     connectedUsers,
     processor,
-    total: ai + takeaways + syncs + connectedUsers + processor,
+    marketData,
+    total: ai + takeaways + syncs + connectedUsers + processor + marketData,
   };
 }
 
@@ -138,7 +148,7 @@ export function priceUsage(counts: UsageCounts, rates: CostRates = COST_RATES): 
  * point: price above it and no individual customer can ever cost more than they pay.
  */
 export function worstCaseMonthlyCost(
-  plan: { price: number; limits: { syncsPerDay: number; aiMessagesPerDay: number; brokers: number } },
+  plan: { price: number; limits: { syncsPerDay: number; aiMessagesPerDay: number; brokers: number; replayUsdPerMonth?: number } },
   rates: CostRates = COST_RATES,
   daysInMonth = 31,
 ): CostBreakdown {
@@ -156,6 +166,8 @@ export function worstCaseMonthlyCost(
       syncingUsers: connected,
       charges: plan.price > 0 ? 1 : 0,
       revenue: plan.price,
+      // The whole month's replay allowance, spent: the most a member can cost in market data.
+      marketDataUsd: plan.limits.replayUsdPerMonth ?? 0,
     },
     rates,
   );
