@@ -267,6 +267,43 @@ describe('removing a manual grant', () => {
     expect(restored.preGrant).toBeNull();
   });
 
+  it('refuses to grant Free by hand, and writes nothing', async () => {
+    store.set(`entitlements/${TARGET}`, { tier: 'silver', source: 'purchase', status: 'expired', creemSubscriptionId: 'sub_123' });
+    const res = await call({ action: 'setTier', tier: 'free' });
+    expect(res.statusCode).toBe(400);
+    expect(String(res.body.error)).toContain('cancel it in Creem');
+    expect(store.get(`entitlements/${TARGET}`)).toMatchObject({ tier: 'silver', source: 'purchase', status: 'expired' });
+  });
+
+  it('lets a trial that expired and was then set to Free by hand buy again, and the purchase replaces the Free', async () => {
+    /*
+     * @poplavok, October 2026: a Silver trial expired, the panel lit Silver, and Free was granted by
+     * hand to be sure. That Free locked checkout ("your plan is set by hand") for somebody whose
+     * subscription had already ended.
+     */
+    store.set(`entitlements/${TARGET}`, {
+      tier: 'free',
+      source: 'admin',
+      status: 'active',
+      grantedBy: 'admin-1',
+      creemSubscriptionId: 'sub_123',
+      preGrant: { tier: 'silver', status: 'expired', currentPeriodEnd: '2026-10-22T16:46:13.000Z' },
+    });
+    const { planChangeRoute } = await import('../../server/planChangeRoute');
+    const { applyBillingUpdate, readEntitlement } = await import('../../server/entitlements');
+    expect(planChangeRoute(await readEntitlement(TARGET), 'silver')).toEqual({ action: 'checkout' });
+
+    expect(await applyBillingUpdate(TARGET, { tier: 'silver', status: 'active', creemSubscriptionId: 'sub_456' })).toEqual({ applied: true });
+    expect(store.get(`entitlements/${TARGET}`)).toMatchObject({
+      tier: 'silver',
+      status: 'active',
+      source: 'purchase',
+      creemSubscriptionId: 'sub_456',
+      preGrant: null,
+      grantedBy: '',
+    });
+  });
+
   it('does not bury the billing snapshot when one grant replaces another', async () => {
     // Granting twice must keep the ORIGINAL billing state, not overwrite it with the first grant.
     store.set(`entitlements/${TARGET}`, {

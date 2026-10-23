@@ -145,6 +145,19 @@ async function handleDeleteUser(callerUid: string, targetUid: string): Promise<{
  * webhook about a lapsed or absent one must never take it back off them.
  */
 async function handleSetTier(callerUid: string, targetUid: string, tier: Tier) {
+  /*
+   * Free is never granted by hand. It gives nobody anything, and every way it was used went wrong:
+   * over a live subscription it cut access while Creem kept charging; over an ended one it locked a
+   * former customer out of buying again (checkout answered "your plan is set by hand"); over a paid
+   * grant it did what removing the grant does, without putting back what they pay for. Each of those
+   * has a right tool, and the refusal names it.
+   */
+  if (tier === 'free') {
+    throw new AdminRequestError(
+      'Free is not granted by hand — it would stop them buying a plan later. To take back a hand-granted plan, remove the grant. To end a paid plan, cancel it in Creem.',
+      400,
+    );
+  }
   const existing = await readEntitlement(targetUid);
 
   /*

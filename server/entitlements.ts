@@ -117,6 +117,30 @@ export function isProtectedGrant(entitlement: Entitlement | null): boolean {
   );
 }
 
+/**
+ * Whether a hand-set Free may still have a live subscription under it.
+ *
+ * A Free set by hand covers billing over without ending it, so checkout must not sell a second
+ * subscription on top of one Creem is still running. But once the subscription underneath has ended,
+ * the hand-set Free protects nothing and only stands between a former customer and buying again —
+ * which is what happened to a trial that expired and was then set to Free from the admin panel.
+ *
+ * Read from preGrant, the billing state the grant saved when it was made. A grant from before that
+ * existed has none: with a subscription id it might be live, so it is treated as live; with none
+ * there was never anything underneath.
+ */
+export function freeGrantOverLiveBilling(e: Entitlement | null, now: number = Date.now()): boolean {
+  if (!e || e.source !== 'admin' || e.tier !== 'free') return false;
+  const under = e.preGrant;
+  if (!under) return Boolean(e.creemSubscriptionId);
+  if (under.status === 'active' || under.status === 'past_due') return true;
+  if (under.status === 'canceled' && under.currentPeriodEnd) {
+    const ends = Date.parse(under.currentPeriodEnd);
+    return Number.isFinite(ends) && ends > now;
+  }
+  return false;
+}
+
 function entitlementDoc(uid: string) {
   return getAdminFirestore().doc(`entitlements/${uid}`);
 }
@@ -365,6 +389,9 @@ export async function applyBillingUpdate(
   if (isProtectedGrant(existing)) {
     return { applied: false, reason: 'admin grant is not overridden by billing' };
   }
-  await writeEntitlement(uid, { ...patch, source: 'purchase' });
+  // A hand-set Free that billing is now replacing leaves nothing behind it: its saved billing state
+  // and who set it describe a grant that no longer exists.
+  const replacesGrant = existing?.source === 'admin' ? { preGrant: null, grantedBy: '' } : {};
+  await writeEntitlement(uid, { ...patch, ...replacesGrant, source: 'purchase' });
   return { applied: true };
 }

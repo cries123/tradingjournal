@@ -226,6 +226,17 @@ fifteen places used to ignore it. `.panel-card` and `.stat-chip` are `@layer com
 utility class on the element still wins; unlayered, their `border` shorthand silently beat every
 `border-*` utility, which is why the streak chip's amber border did nothing for months.
 
+### Admin plan grid — Free is never granted by hand
+
+The lit plan on a user's card is what billing or a grant gives them TODAY (`billingTierOf`), not
+`record.tier`: an expired Silver trial used to light Silver beside "Silver, expired — currently
+treated as Free", and read as somebody who still had Silver. Free cannot be granted (the server
+refuses `setTier` free): over a live subscription it cut access while Creem kept charging, over an
+ended one it locked a former customer out of checkout ("your plan is set by hand"). Hand-set Frees
+made before this still exist; checkout now refuses one only while the subscription under it may be
+live (`freeGrantOverLiveBilling`, read from `preGrant`), and a purchase replaces it and clears
+`preGrant`/`grantedBy`. "Remove the manual grant" hands an account back to billing.
+
 ### All journals
 
 Silver and up. A **view**, not a journal: `activeAccountId` stays a real journal so new trades,

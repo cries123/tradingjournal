@@ -1,4 +1,4 @@
-import { billingTier, subscribedTier, type Entitlement } from './entitlements';
+import { billingTier, freeGrantOverLiveBilling, subscribedTier, type Entitlement } from './entitlements';
 import { TIER_ORDER, type BillingInterval, type Tier } from '../src/config/tiers';
 
 export type PlanRoute =
@@ -25,11 +25,23 @@ export function planChangeRoute(
   entitlement: Entitlement | null,
   requested: Tier,
   interval: BillingInterval = 'month',
+  now: number = Date.now(),
 ): PlanRoute {
-  // A hand-granted tier has no subscription behind it, and billing webhooks are forbidden from
-  // touching it. Selling a checkout here would take money and change nothing.
+  /*
+   * A hand-granted PAID tier has no subscription behind it, and billing webhooks are forbidden from
+   * touching it: selling a checkout here would take money and change nothing.
+   *
+   * A hand-set FREE is refused only while a subscription may still be live under it, so nobody is
+   * sold a second one. Once that has ended, Free protects nothing and refusing would lock a former
+   * customer out of buying again — a trial that expired and was then set to Free by hand was told
+   * "your plan is set by hand" when they tried to come back. That path is a fresh checkout, and the
+   * webhook replaces the Free (isProtectedGrant does not protect it).
+   */
   if (entitlement?.source === 'admin' && entitlement.status === 'active') {
-    return { action: 'admin-granted', tier: entitlement.tier };
+    if (entitlement.tier !== 'free' || freeGrantOverLiveBilling(entitlement, now)) {
+      return { action: 'admin-granted', tier: entitlement.tier };
+    }
+    return { action: 'checkout' };
   }
 
   /*
@@ -53,7 +65,7 @@ export function planChangeRoute(
   const stillAtTheProcessor =
     entitlement?.status === 'active' ||
     entitlement?.status === 'past_due' ||
-    billingTier(entitlement) !== 'free';
+    billingTier(entitlement, now) !== 'free';
 
   const movable =
     entitlement?.source === 'purchase' &&

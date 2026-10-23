@@ -8,7 +8,7 @@ import {
   higherTier,
   validCalendarDate,
 } from '../../config/accessExtension';
-import { fetchUserEntitlement, type AdminEntitlementView } from '../../services/adminEntitlements';
+import { billingTierOf, fetchUserEntitlement, type AdminEntitlementView } from '../../services/adminEntitlements';
 import {
   adminClearAccessExtension,
   adminClearUserTierGrant,
@@ -62,6 +62,10 @@ function day(iso: string): string {
 function describe(record: AdminEntitlementView | null, now: number): string {
   if (!record) return 'Free — never paid, never granted.';
   const name = TIER_PLANS[record.tier].name;
+  if (record.source === 'admin' && record.tier === 'free') {
+    // Set before Free stopped being grantable. It does nothing but mark the account, so say how to undo it.
+    return 'Set to Free by hand. Remove the grant to hand the account back to billing.';
+  }
   if (record.source === 'admin') return `${name}, granted by hand. Billing can't override it.`;
   if (record.tier === 'free') return 'Free — nothing paid for.';
   if (record.status === 'active') {
@@ -84,17 +88,6 @@ function describe(record: AdminEntitlementView | null, now: number): string {
       : `${name}, cancelled.`;
   }
   return `${name}, ${record.status.replace('_', ' ')} — currently treated as Free.`;
-}
-
-/** The tier the subscription alone gives right now, mirroring the server's billingTier. */
-function billingTierOf(record: AdminEntitlementView | null, now: number): Tier {
-  if (!record) return 'free';
-  if (record.status === 'active') return record.tier;
-  if (record.status === 'canceled' && record.currentPeriodEnd) {
-    const ends = Date.parse(record.currentPeriodEnd);
-    if (Number.isFinite(ends) && ends > now) return record.tier;
-  }
-  return 'free';
 }
 
 /**
@@ -142,7 +135,14 @@ export function AdminUserPlanSection({ uid, onDone, onError, onAudit }: AdminUse
     };
   }, [uid]);
 
-  const currentTier: Tier = record?.tier ?? 'free';
+  /*
+   * The plan to light: what the subscription or grant gives them TODAY (a grant is always active).
+   *
+   * This lit `record.tier`, which is the plan on the subscription whether or not it is still running —
+   * so an expired Silver trial showed Silver lit beside "Silver, expired — currently treated as Free",
+   * and read as somebody who still had Silver.
+   */
+  const currentTier: Tier = billingTierOf(record, now);
   const liveComp = record && compIsLive(record.comp, now) ? record.comp : null;
   const effective = higherTier(billingTierOf(record, now), liveComp?.tier ?? 'free');
   const permanent = record?.source === 'admin' && record.tier !== 'free';
@@ -271,11 +271,14 @@ export function AdminUserPlanSection({ uid, onDone, onError, onAudit }: AdminUse
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {TIER_ORDER.map((tier) => {
           const active = !loading && tier === currentTier;
+          // Free is shown, never granted: see the note under the grid, and handleSetTier.
+          const grantable = tier !== 'free';
           return (
             <button
               key={tier}
               type="button"
-              disabled={loading || busy !== null || active}
+              disabled={loading || busy !== null || active || !grantable}
+              title={grantable || active ? undefined : 'Free is not granted by hand'}
               onClick={() => void grant(tier)}
               className={`rounded-lg border px-2 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed ${
                 active
@@ -301,9 +304,10 @@ export function AdminUserPlanSection({ uid, onDone, onError, onAudit }: AdminUse
       )}
 
       <p className="text-[11px] text-text-secondary/80 leading-relaxed">
-        Granting a plan here overrides billing and survives webhooks — that&apos;s how someone gets
-        grandfathered in, with no end date. Remove the grant to hand the account back to whatever
-        they actually pay for.
+        The lit plan is what they can use today. Granting a paid plan here overrides billing and
+        survives webhooks — that&apos;s how someone gets grandfathered in, with no end date. Remove the
+        grant to hand the account back to whatever they actually pay for. Free is never granted by
+        hand, because it would stop them buying later: to end a paid plan, cancel it in Creem.
       </p>
 
       {/* ---------------------------------------------------------------- extend */}

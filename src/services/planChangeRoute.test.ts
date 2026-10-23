@@ -158,6 +158,29 @@ describe('a hand-granted plan', () => {
     expect(planChangeRoute(grantedFree, 'silver')).toEqual({ action: 'admin-granted', tier: 'free' });
   });
 
+  it('blocks a hand-set Free only while the subscription under it may still be live', () => {
+    const underneath = (preGrant: Entitlement['preGrant'], over: Partial<Entitlement> = {}) =>
+      sub({ source: 'admin', tier: 'free', preGrant, ...over });
+    // Live, or being dunned, or cancelled but paid up: a second sale would double-bill.
+    expect(planChangeRoute(underneath({ tier: 'silver', status: 'active' }), 'gold').action).toBe('admin-granted');
+    expect(planChangeRoute(underneath({ tier: 'silver', status: 'past_due' }), 'gold').action).toBe('admin-granted');
+    expect(planChangeRoute(underneath({ tier: 'silver', status: 'canceled', currentPeriodEnd: iso(5) }), 'gold').action).toBe('admin-granted');
+    // Ended: nothing to double-bill, so the Free must not stand between them and buying again.
+    expect(planChangeRoute(underneath({ tier: 'silver', status: 'expired' }), 'silver')).toEqual({ action: 'checkout' });
+    expect(planChangeRoute(underneath({ tier: 'silver', status: 'canceled', currentPeriodEnd: iso(-1) }), 'silver')).toEqual({
+      action: 'checkout',
+    });
+    // A grant from before the snapshot existed: with a subscription id it might be live, so it holds;
+    // with none, there was never anything underneath.
+    expect(planChangeRoute(underneath(null), 'silver').action).toBe('admin-granted');
+    expect(planChangeRoute(underneath(null, { creemSubscriptionId: undefined }), 'silver')).toEqual({ action: 'checkout' });
+  });
+
+  it('still blocks a hand-granted PAID plan whatever is underneath', () => {
+    const granted = sub({ source: 'admin', tier: 'gold', preGrant: { tier: 'silver', status: 'expired' } });
+    expect(planChangeRoute(granted, 'diamond')).toEqual({ action: 'admin-granted', tier: 'gold' });
+  });
+
   it('still lets that customer reach the portal, because the billing is real', () => {
     const grantedFree = sub({ source: 'admin', tier: 'free' });
     expect(canManageBilling(grantedFree)).toBe(true);
